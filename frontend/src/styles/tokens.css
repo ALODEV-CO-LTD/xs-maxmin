@@ -1,0 +1,156 @@
+/*
+  XOSO design tokens - Neutral/Slate + Violet.
+
+  Layers:
+    1. Palette tokens   (--background, --card, --primary ...) - the source of truth,
+       defined once per theme below.
+    2. Derived tokens   (--primary-soft, --*-text, --input-border ...) - shades that
+       keep text/controls AA-readable on each theme.
+    3. Legacy aliases   (--bg, --surface-2, --text, --muted, --accent*, --hero*) -
+       kept so existing component CSS keeps working; they just point at the above.
+
+  Theme switching: <html data-theme="light|dark">. With no data-theme the OS
+  preference applies (see src/theme.js, which also persists the user's choice).
+*/
+
+:root {
+  /* ---- Shared, theme-independent ---- */
+  /* Max width of the page content area (right of the sidebar). */
+  --page-max: 1840px;
+
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  --font-display: 'Manrope', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* ---- LIGHT (default) ---- */
+  --background: #f8fafc;
+  --sidebar: #ffffff;
+  --header: #ffffff;
+  --card: #ffffff;
+  --surface: #f1f5f9;
+  --border: #e2e8f0;
+  --text-primary: #18181b;
+  --text-secondary: #64748b;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --on-primary: #ffffff;
+  --on-primary-hover: #ffffff;
+
+  /* derived */
+  --link: #6d28d9;
+  --primary-soft: #ede9fe;
+  --input-border: #7c889b; /* >= 3:1 against card (WCAG 1.4.11) */
+  --input-border-hover: #5b6678;
+  --overlay: rgba(15, 23, 42, 0.55);
+
+  --success-text: #15803d;
+  --success-soft: #dcfce7;
+  --warning-text: #b45309;
+  --warning-soft: #fef3c7;
+  --danger-text: #b91c1c;
+  --danger-soft: #fee2e2;
+  --danger-strong: #dc2626; /* filled destructive buttons, white text 4.8:1 */
+  --danger-hover: #b91c1c;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
+
+  color-scheme: light;
+}
+
+/* ---- DARK ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --background: #09090b;
+    --sidebar: #111113;
+    --header: #111113;
+    --card: #18181b;
+    --surface: #232326;
+    --border: #343438;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --primary: #8b5cf6;
+    --primary-hover: #a78bfa;
+    --on-primary: #ffffff;
+    --on-primary-hover: #09090b; /* white on #a78bfa is only 2.7:1 */
+
+    --link: #a78bfa;
+    --primary-soft: #2a2145;
+    --input-border: #71717a;
+    --input-border-hover: #a1a1aa;
+    --overlay: rgba(0, 0, 0, 0.65);
+
+    --success-text: #4ade80;
+    --success-soft: #14301f;
+    --warning-text: #fbbf24;
+    --warning-soft: #3a2a0c;
+    --danger-text: #f87171;
+    --danger-soft: #3b1618;
+    --danger-strong: #dc2626;
+    --danger-hover: #ef4444;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --background: #09090b;
+  --sidebar: #111113;
+  --header: #111113;
+  --card: #18181b;
+  --surface: #232326;
+  --border: #343438;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --primary: #8b5cf6;
+  --primary-hover: #a78bfa;
+  --on-primary: #ffffff;
+  --on-primary-hover: #09090b;
+
+  --link: #a78bfa;
+  --primary-soft: #2a2145;
+  --input-border: #71717a;
+  --input-border-hover: #a1a1aa;
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  --success-text: #4ade80;
+  --success-soft: #14301f;
+  --warning-text: #fbbf24;
+  --warning-soft: #3a2a0c;
+  --danger-text: #f87171;
+  --danger-soft: #3b1618;
+  --danger-strong: #dc2626;
+  --danger-hover: #ef4444;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* ---- Legacy aliases (do not use in new code) ---- */
+:root {
+  --bg: var(--background);
+  --surface-2: var(--surface);
+  --text: var(--text-primary);
+  /* nudged toward --text-primary so secondary text stays >= 4.5:1 on --surface too */
+  --muted: color-mix(in srgb, var(--text-secondary) 85%, var(--text-primary));
+  --accent: var(--primary);
+  --accent-strong: var(--link);
+  --accent-soft: var(--primary-soft);
+  --focus: var(--primary);
+  --hero: var(--primary);
+  --hero-2: var(--primary-hover);
+}
