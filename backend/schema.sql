@@ -170,7 +170,35 @@ CREATE TABLE IF NOT EXISTS customer_codes (
   id          TEXT PRIMARY KEY,
   user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   code        TEXT NOT NULL UNIQUE,
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  label       TEXT                -- optional note on a "virtual ID" -- added via migration
+);
+-- Max IDs per account: settings key `max_virtual_ids` (default 5, Admin-editable).
+
+
+-- -----------------------------------------------------------------------------
+-- User-set deletion schedules, executed by a background Timer in the server.
+--   kind 'data': one-off delete of the user's data_entries (optionally one
+--                customer_name and/or entry_date range) at run_at.
+--   kind 'chat': standing rule - messages (chat_scope 'all') or image
+--                attachments ('images') older than ttl_seconds in the
+--                conversation with friend_id are deleted for both sides.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS deletion_schedules (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN ('data', 'chat')),
+  customer_name  TEXT,
+  date_from      TEXT,
+  date_to        TEXT,
+  friend_id      TEXT REFERENCES users(id) ON DELETE CASCADE,
+  chat_scope     TEXT,
+  ttl_seconds    INTEGER,
+  run_at         TEXT,
+  status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'cancelled')),
+  deleted_count  INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL,
+  executed_at    TEXT
 );
 
 

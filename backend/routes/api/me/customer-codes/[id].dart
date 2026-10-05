@@ -1,16 +1,38 @@
+import 'dart:convert';
+
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
-import 'package:server/src/database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-Response onRequest(RequestContext context, String id) {
-  if (context.request.method != HttpMethod.delete) {
-    return Response(statusCode: 405, body: 'Method not allowed');
-  }
+/// DELETE removes one of the caller's Mã ID; PATCH `{label}` renames its label
+/// (empty clears it).
+Future<Response> onRequest(RequestContext context, String id) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
-
   final db = context.read<Database>();
-  db.execute('DELETE FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
-  return Response.json(body: {'ok': true});
+
+  switch (context.request.method) {
+    case HttpMethod.delete:
+      db.execute('DELETE FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
+      return Response.json(body: {'ok': true});
+    case HttpMethod.patch:
+      final Map<String, dynamic> body;
+      try {
+        body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
+      } catch (_) {
+        return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
+      }
+      final label = (body['label'] as String?)?.trim() ?? '';
+      if (label.length > 40) {
+        return Response.json(statusCode: 400, body: {'error': 'Nhãn tối đa 40 ký tự'});
+      }
+      db.execute(
+        'UPDATE customer_codes SET label = ? WHERE id = ? AND user_id = ?',
+        [label.isEmpty ? null : label, id, auth.userId],
+      );
+      if (db.updatedRows == 0) return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy mã ID'});
+      return Response.json(body: {'ok': true, 'label': label.isEmpty ? null : label});
+    default:
+      return Response(statusCode: 405, body: 'Method not allowed');
+  }
 }

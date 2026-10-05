@@ -61,7 +61,78 @@ AttachmentParse parseAttachment(Object? raw) {
   if (type.length > 100 || !_mimePattern.hasMatch(type)) {
     type = 'application/octet-stream';
   }
-  return AttachmentParse.ok(ParsedAttachment(name, type, bytes));
+  // Second line of defence for image privacy (K37/K38/S09): the client
+  // already redraws images through a canvas, but the client is untrusted, so
+  // JPEG/PNG bytes are scrubbed of EXIF/GPS/text metadata here as well -
+  // unless the sender explicitly opted to keep the original (`keepMetadata`).
+  final keep = raw['keepMetadata'] == true;
+  final data = keep ? bytes : stripImageMetadata(bytes);
+  return AttachmentParse.ok(ParsedAttachment(name, type, data));
+}
+
+/// Removes metadata blocks from a JPEG or PNG (detected by magic bytes, not
+/// by the declared type) and returns the cleaned bytes; anything else, or
+/// anything that doesn't parse cleanly, is returned untouched.
+///   - JPEG: drops every APPn segment except APP0 (JFIF) and APP14 (Adobe
+///     colour transform, needed to decode CMYK/YCCK correctly), plus COM
+///     comments - this removes EXIF, GPS, XMP, ICC and maker notes.
+///   - PNG: drops tEXt/zTXt/iTXt (text), eXIf (EXIF) and tIME (timestamp).
+/// Pixel data is never re-encoded, so image quality is unchanged.
+Uint8List stripImageMetadata(Uint8List b) {
+  if (b.length > 4 && b[0] == 0xFF && b[1] == 0xD8) return _stripJpeg(b);
+  if (b.length > 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) {
+    return _stripPng(b);
+  }
+  return b;
+}
+
+Uint8List _stripJpeg(Uint8List b) {
+  final out = BytesBuilder(copy: false)..add(const [0xFF, 0xD8]);
+  var i = 2;
+  while (i + 1 < b.length) {
+    if (b[i] != 0xFF) return b; // malformed - keep original rather than corrupt
+    final marker = b[i + 1];
+    if (marker == 0xFF) {
+      i++; // fill byte
+      continue;
+    }
+    // Start of scan: the rest is entropy-coded image data up to EOI.
+    if (marker == 0xDA) {
+      out.add(Uint8List.sublistView(b, i));
+      return out.toBytes();
+    }
+    // Standalone markers (no length): TEM, RSTn, SOI, EOI.
+    if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD9)) {
+      out.add(Uint8List.sublistView(b, i, i + 2));
+      i += 2;
+      continue;
+    }
+    if (i + 3 >= b.length) return b;
+    final len = (b[i + 2] << 8) | b[i + 3];
+    if (len < 2 || i + 2 + len > b.length) return b;
+    final isApp = marker >= 0xE0 && marker <= 0xEF;
+    final drop = (isApp && marker != 0xE0 && marker != 0xEE) || marker == 0xFE;
+    if (!drop) out.add(Uint8List.sublistView(b, i, i + 2 + len));
+    i += 2 + len;
+  }
+  return b; // never reached a scan - not a usable JPEG, leave as-is
+}
+
+const _pngDropChunks = {'tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME'};
+
+Uint8List _stripPng(Uint8List b) {
+  final out = BytesBuilder(copy: false)..add(Uint8List.sublistView(b, 0, 8));
+  var i = 8;
+  while (i + 12 <= b.length) {
+    final len = (b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3];
+    final end = i + 12 + len; // length + type + data + CRC
+    if (len < 0 || end > b.length) return b;
+    final type = String.fromCharCodes(b.sublist(i + 4, i + 8));
+    if (!_pngDropChunks.contains(type)) out.add(Uint8List.sublistView(b, i, end));
+    i = end;
+    if (type == 'IEND') break;
+  }
+  return out.toBytes();
 }
 
 /// JSON shape returned with a message (never the bytes themselves).

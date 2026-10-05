@@ -5,7 +5,8 @@
 
   API: GET/PATCH /me (edit own name/username), POST /me/password, POST /me/second-password,
        POST /me/wipe-password, GET/POST /me/customer-codes,
-       DELETE /me/customer-codes/:id, POST /me/delete-data
+       DELETE/PATCH /me/customer-codes/:id, POST /me/delete-data,
+       GET/POST /me/deletion-schedules (see DeletionSchedules.vue)
 -->
 <script setup>
 import { showConfirm } from '../confirm'
@@ -17,6 +18,7 @@ import { useCallStore } from '../stores/call'
 import AppIcon from '../components/AppIcon.vue'
 import PrivacySettings from '../components/PrivacySettings.vue'
 import RecoveryCodePanel from '../components/RecoveryCodePanel.vue'
+import DeletionSchedules from '../components/DeletionSchedules.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -253,6 +255,12 @@ const codes = ref([])
 const codesLoading = ref(true)
 const codesError = ref('')
 const generatingCode = ref(false)
+// Admin's per-account cap on Mã ID (settings.max_virtual_ids) and the form
+// for picking your own digits and a label (K22/K23/A05).
+const maxCodes = ref(5)
+const newCode = ref('')
+const newLabel = ref('')
+const atCodeLimit = computed(() => codes.value.length >= maxCodes.value)
 
 async function loadCodes() {
   codesLoading.value = true
@@ -260,6 +268,7 @@ async function loadCodes() {
   try {
     const res = await api.get('/me/customer-codes')
     codes.value = res.codes
+    if (res.maxCodes) maxCodes.value = res.maxCodes
   } catch (err) {
     codesError.value = err.message || 'Không tải được danh sách mã ID'
   } finally {
@@ -272,8 +281,14 @@ async function generateCode() {
   generatingCode.value = true
   codesError.value = ''
   try {
-    const code = await api.post('/me/customer-codes')
+    // Empty digits -> the server picks a random unique one.
+    const code = await api.post('/me/customer-codes', {
+      code: newCode.value.trim() || undefined,
+      label: newLabel.value.trim() || undefined,
+    })
     codes.value.unshift(code)
+    newCode.value = ''
+    newLabel.value = ''
   } catch (err) {
     codesError.value = err.message || 'Không tạo được mã ID'
   } finally {
@@ -293,6 +308,17 @@ async function deleteCode(code) {
     codes.value = codes.value.filter((c) => c.id !== code.id)
   } catch (err) {
     alert(err.message || 'Không xoá được mã ID')
+  }
+}
+
+async function editLabel(code) {
+  const label = prompt('Nhãn cho mã ID này (để trống để xoá nhãn):', code.label || '')
+  if (label === null) return
+  try {
+    const res = await api.patch(`/me/customer-codes/${code.id}`, { label })
+    code.label = res.label
+  } catch (err) {
+    codesError.value = err.message || 'Không đổi được nhãn'
   }
 }
 
@@ -419,20 +445,31 @@ async function deleteAllData() {
       <div class="card">
         <h3 style="margin-top: 0">Mã ID kết bạn</h3>
         <p class="page-subtitle" style="margin-bottom: 12px">
-          Tạo mã và gửi cho người khác để họ kết bạn với bạn.
+          Tạo mã và gửi cho người khác để họ kết bạn với bạn. Bạn có thể tự chọn dãy số (6-12 chữ số, không trùng,
+          không quá dễ đoán như 123456) hoặc để trống để hệ thống tạo ngẫu nhiên. Tối đa {{ maxCodes }} mã
+          ({{ codes.length }}/{{ maxCodes }} đã dùng).
         </p>
         <div v-if="codesError" class="alert alert-error">{{ codesError }}</div>
-        <button class="btn btn-secondary" @click="generateCode" :disabled="generatingCode">
-          {{ generatingCode ? 'Đang tạo...' : '+ Tạo mã mới' }}
-        </button>
+        <form class="code-form" @submit.prevent="generateCode">
+          <input v-model="newCode" type="text" inputmode="numeric" maxlength="12" placeholder="Dãy số mong muốn (tuỳ chọn)" aria-label="Dãy số mong muốn" />
+          <input v-model="newLabel" type="text" maxlength="40" placeholder="Nhãn (tuỳ chọn)" aria-label="Nhãn" />
+          <button type="submit" class="btn btn-secondary" :disabled="generatingCode || atCodeLimit">
+            {{ generatingCode ? 'Đang tạo...' : '+ Tạo mã mới' }}
+          </button>
+        </form>
+        <div v-if="atCodeLimit" class="page-subtitle" style="margin: 8px 0 0">Đã đạt giới hạn, hãy xoá bớt một mã để tạo mã mới.</div>
         <div v-if="codesLoading" style="margin-top: 12px">Đang tải...</div>
         <div v-else-if="codes.length === 0" class="page-subtitle" style="margin-top: 12px; margin-bottom: 0">
           Chưa có mã nào.
         </div>
         <div v-else class="code-list">
           <div v-for="c in codes" :key="c.id" class="code-item">
-            <code class="code-value">{{ c.code }}</code>
+            <div class="code-main">
+              <code class="code-value">{{ c.code }}</code>
+              <span v-if="c.label" class="code-label">{{ c.label }}</span>
+            </div>
             <div class="code-actions">
+              <button class="btn btn-ghost btn-sm" @click="editLabel(c)">Nhãn</button>
               <button class="btn btn-ghost btn-sm" @click="copyCode(c.code)">Sao chép</button>
               <button class="btn btn-ghost btn-sm" @click="deleteCode(c)">Xoá</button>
             </div>
@@ -547,6 +584,8 @@ async function deleteAllData() {
         <RecoveryCodePanel v-if="!auth.isAdmin" />
         <PrivacySettings />
       </div>
+      <!-- Scheduled deletion (K35/K36/S05) -->
+      <DeletionSchedules />
 
       <!-- Delete data -->
       <div class="card danger-card">
@@ -698,6 +737,27 @@ async function deleteAllData() {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
+}
+.code-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.code-form input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.code-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.code-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .code-value {
   font-size: 15px;

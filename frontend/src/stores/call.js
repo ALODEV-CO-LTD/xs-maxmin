@@ -1,4 +1,4 @@
-// Voice/video calling between friends - WebRTC peer-to-peer media, with
+// Voice-only calling between friends (video was removed, K31) - WebRTC peer-to-peer media, with
 // this store owning the signaling WebSocket (/ws/calls) and the small
 // control-message protocol: call-invite / call-accept / call-reject /
 // call-end / offer / answer / ice (see backend/routes/ws/calls.dart for
@@ -17,7 +17,7 @@ import { useAuthStore } from './auth'
 
 const STUN_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 const RING_TIMEOUT_MS = 30000
-// How long to wait on the browser's own mic/camera permission prompt before
+// How long to wait on the browser's own mic permission prompt before
 // giving up - a prompt the user ignores never settles on its own.
 const MEDIA_PROMPT_TIMEOUT_MS = 60000
 // How long to wait for the ICE path to come up after the answer before
@@ -28,8 +28,8 @@ const MEDIA_SETUP_TIMEOUT_MS = 25000
 // missing microphone explains itself (and how to fix it) instead of
 // surfacing the browser's raw "Permission denied". Returns null for
 // anything unrecognised so the caller can fall back to its own message.
-function mediaErrorMessage(err, video) {
-  const device = video ? 'micro và camera' : 'micro'
+function mediaErrorMessage(err) {
+  const device = 'micro'
   switch (err?.name) {
     case 'NotAllowedError':
     case 'SecurityError':
@@ -50,7 +50,7 @@ function mediaErrorMessage(err, video) {
 // getUserMedia with a timeout, and with a stream that arrives *after* the
 // timeout (user finally clicked Allow) stopped instead of leaked - a leaked
 // stream would leave the microphone silently recording with no call.
-function acquireMedia(video) {
+function acquireMedia() {
   if (!navigator.mediaDevices?.getUserMedia) {
     const e = new Error('mediaDevices unavailable')
     e.name = 'NotSupportedError' // missing on non-HTTPS pages and very old browsers
@@ -64,7 +64,7 @@ function acquireMedia(video) {
       e.name = 'NotAllowedError'
       reject(e)
     }, MEDIA_PROMPT_TIMEOUT_MS)
-    navigator.mediaDevices.getUserMedia({ audio: true, video }).then(
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(
       (stream) => {
         clearTimeout(timer)
         if (settled) {
@@ -99,12 +99,11 @@ export const useCallStore = defineStore('call', {
     socketReady: false,
     // 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected'
     status: 'idle',
-    // True while the browser's mic/camera permission prompt is open for a
+    // True while the browser's mic permission prompt is open for a
     // call we're about to place - status is still 'idle' then, so the call
     // buttons need this to stay disabled and avoid a second prompt.
     acquiring: false,
     peer: null, // { id, name }
-    video: false,
     muted: false,
     error: '',
     startedAt: null,
@@ -187,7 +186,6 @@ export const useCallStore = defineStore('call', {
           }
           this.peer = { id: msg.from, name: msg.fromName || 'Người dùng' }
           this.status = 'incoming'
-          this.video = !!msg.video
           this._armRingTimeout()
           break
         case 'call-accept':
@@ -216,7 +214,7 @@ export const useCallStore = defineStore('call', {
             // backend/routes/api/ws/calls.dart) - worth telling the user
             // why the call just vanished instead of leaving it silent.
             if (msg.reason === 'disconnected') this.error = 'Đối phương bị mất kết nối, cuộc gọi đã kết thúc'
-            else if (msg.reason === 'media-error') this.error = 'Đối phương không bật được micro/camera nên không nghe máy được'
+            else if (msg.reason === 'media-error') this.error = 'Đối phương không bật được micro nên không nghe máy được'
             else if (msg.reason === 'failed') this.error = 'Không thể kết nối trực tiếp giữa hai thiết bị (mạng đang chặn). Thử lại bằng mạng khác.'
             this._cleanup()
           }
@@ -257,13 +255,13 @@ export const useCallStore = defineStore('call', {
     },
 
     // ---- Outgoing call ----------------------------------------------
-    // The mic/camera permission prompt is raised here, straight from the
+    // The mic permission prompt is raised here, straight from the
     // click that starts the call, *before* anything is sent - not later when
     // the signaling socket delivers the other side's answer. Two reasons:
     // browsers (Safari/iOS especially) are strict about only showing the
     // prompt from a user gesture, and failing early means the other person's
     // phone is never made to ring for a call we then can't take.
-    async startCall(friend, { video = false } = {}) {
+    async startCall(friend) {
       if (this.status !== 'idle' || this.acquiring) return
       this.error = ''
       // Same rule the server enforces (see backend/routes/api/ws/calls.dart):
@@ -279,9 +277,9 @@ export const useCallStore = defineStore('call', {
       this.acquiring = true
       let stream
       try {
-        stream = await acquireMedia(video)
+        stream = await acquireMedia()
       } catch (err) {
-        this.error = mediaErrorMessage(err, video) || err.message || 'Không bật được micro'
+        this.error = mediaErrorMessage(err) || err.message || 'Không bật được micro'
         return
       } finally {
         this.acquiring = false
@@ -295,11 +293,10 @@ export const useCallStore = defineStore('call', {
         return
       }
       this.localStream = stream
-      this.video = video
       this.peer = { id: friend.id, name: friend.name }
       this.status = 'outgoing'
       const auth = useAuthStore()
-      this._sendTo(friend.id, { type: 'call-invite', video, fromName: auth.user?.name || 'Người dùng' })
+      this._sendTo(friend.id, { type: 'call-invite', fromName: auth.user?.name || 'Người dùng' })
       this._armRingTimeout()
     },
 
@@ -327,10 +324,10 @@ export const useCallStore = defineStore('call', {
       this.status = 'connecting' // shown while the permission prompt is open
       let stream
       try {
-        stream = await acquireMedia(this.video)
+        stream = await acquireMedia()
       } catch (err) {
         if (this.peer?.id === peerId) {
-          this._failCall(mediaErrorMessage(err, this.video) || err.message || 'Không bật được micro', 'media-error')
+          this._failCall(mediaErrorMessage(err) || err.message || 'Không bật được micro', 'media-error')
         }
         return
       }
@@ -519,27 +516,6 @@ export const useCallStore = defineStore('call', {
       for (const track of this.localStream.getAudioTracks()) track.enabled = !this.muted
     },
 
-    async toggleVideo() {
-      if (!this.localStream || !this.pc) return
-      if (this.video) {
-        for (const track of this.localStream.getVideoTracks()) {
-          track.stop()
-          this.localStream.removeTrack(track)
-        }
-        this.video = false
-        return
-      }
-      try {
-        const camStream = await navigator.mediaDevices.getUserMedia({ video: true })
-        const [camTrack] = camStream.getVideoTracks()
-        this.localStream.addTrack(camTrack)
-        this.pc.addTrack(camTrack, this.localStream)
-        this.video = true
-      } catch (err) {
-        this.error = mediaErrorMessage(err, true) || 'Không bật được camera'
-      }
-    },
-
     endCall() {
       if (this.peer && this.status !== 'idle') {
         this._sendTo(this.peer.id, { type: 'call-end' })
@@ -557,7 +533,6 @@ export const useCallStore = defineStore('call', {
       this.remoteStream = null
       this.status = 'idle'
       this.peer = null
-      this.video = false
       this.muted = false
       this.startedAt = null
       this._pendingCandidates = []
