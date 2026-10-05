@@ -246,6 +246,21 @@ CREATE TABLE IF NOT EXISTS security_events (
 );
 CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
 
+-- Call history (voice calls only), written by the signaling relay.
+CREATE TABLE IF NOT EXISTS call_logs (
+  id               TEXT PRIMARY KEY,
+  caller_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  callee_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status           TEXT NOT NULL,   -- ringing | in_progress | completed | missed | rejected | busy | failed
+  created_at       TEXT NOT NULL,
+  answered_at      TEXT,
+  ended_at         TEXT,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  callee_seen      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_id, created_at);
+
 
 -- =============================================================================
 -- Handy reference queries

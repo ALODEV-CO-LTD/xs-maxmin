@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dart_frog_web_socket/dart_frog_web_socket.dart';
+import 'package:server/src/call_log.dart';
 import 'package:server/src/call_signaling.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/security.dart';
@@ -34,6 +35,10 @@ import 'package:sqlite3/sqlite3.dart';
 /// sending one themselves - see [CallSignalingRegistry]'s active-peer
 /// tracking - so a closed tab or lost connection doesn't leave the other
 /// side stuck on "ringing"/"connecting" indefinitely.
+/// The only message types the relay forwards. Anything else is ignored.
+const _relayedTypes = {'call-invite', 'call-accept', 'call-reject', 'call-end', 'offer', 'answer', 'ice'};
+const _maxMessageChars = 64 * 1024;
+
 Future<Response> onRequest(RequestContext context) async {
   final token = context.request.uri.queryParameters['token'];
   var auth = token == null ? null : verifyToken(token);
@@ -51,15 +56,18 @@ Future<Response> onRequest(RequestContext context) async {
 
       channel.stream.listen(
         (raw) {
+          // Signaling messages are tiny (an SDP is a few KB); anything big is
+          // abuse, not a call.
+          if (raw is! String || raw.length > _maxMessageChars) return;
           final Map<String, dynamic> msg;
           try {
-            msg = jsonDecode(raw as String) as Map<String, dynamic>;
+            msg = jsonDecode(raw) as Map<String, dynamic>;
           } catch (_) {
             return;
           }
           final to = msg['to'] as String?;
           final type = msg['type'] as String?;
-          if (to == null || type == null) return;
+          if (to == null || type == null || !_relayedTypes.contains(type)) return;
 
           // Same trust boundary as text messages: only confirmed friends
           // can signal each other (see /me/friends/:friendId/messages.dart).
@@ -100,21 +108,64 @@ Future<Response> onRequest(RequestContext context) async {
           final payload = Map<String, dynamic>.from(msg)
             ..remove('to')
             ..['from'] = userId;
-          final delivered = registry.sendTo(to, payload);
-          if (!delivered && type == 'call-invite') {
-            channel.sink.add(jsonEncode({'type': 'call-unavailable', 'from': to}));
+
+          if (type == 'call-invite') {
+            // The caller's display name is read from the account, never
+            // taken from the client - otherwise anyone could ring a friend
+            // while showing up under someone else's name.
+            final nameRow = db.select('SELECT name FROM users WHERE id = ?', [userId]);
+            payload['fromName'] = nameRow.isEmpty ? 'Người dùng' : nameRow.first['name'];
+
+            if (!registry.allowInvite(userId)) {
+              channel.sink.add(jsonEncode({
+                'type': 'call-error',
+                'error': 'Bạn gọi quá nhiều lần liên tiếp, vui lòng thử lại sau ít phút.',
+              }));
+              return;
+            }
+            // Busy line: either side already ringing/talking. Answered here
+            // (not by the callee's client) so a callee in a call is never
+            // disturbed, and the missed call is still recorded for them.
+            if (registry.activePeerOf(to) != null || registry.activePeerOf(userId) != null) {
+              startCallLog(db, userId, to, status: 'busy');
+              channel.sink.add(jsonEncode({'type': 'call-reject', 'from': to, 'reason': 'busy'}));
+              return;
+            }
+            final delivered = registry.sendTo(to, payload);
+            if (!delivered) {
+              // Offline callee: no ring, but they will see a missed call.
+              startCallLog(db, userId, to, status: 'missed');
+              channel.sink.add(jsonEncode({'type': 'call-unavailable', 'from': to}));
+              return;
+            }
+            // A delivered invite already makes both sides part of the same
+            // call attempt, so pair them from that point - not just once they
+            // reach `connected` - otherwise a caller who vanishes while the
+            // other side is still ringing would leave them hanging until the
+            // client's own ring timeout, instead of right away.
+            registry.setActivePeer(userId, to, logId: startCallLog(db, userId, to));
+            // Tells the caller the other phone is ringing (UI: "Đang đổ chuông").
+            channel.sink.add(jsonEncode({'type': 'call-ringing', 'from': to}));
+            return;
           }
 
-          // Track "who is userId currently ringing/talking to" purely so a
-          // disconnect below can still tell that person the call is over
-          // (see CallSignalingRegistry's doc comment). A delivered invite
-          // already means both sides are now part of the same call
-          // attempt, so pair them from that point - not just once they
-          // reach `connected` - otherwise a caller who vanishes while the
-          // other side is still ringing would leave them hanging until the
-          // client's own 30s ring-timeout, instead of right away.
-          if (delivered && type == 'call-invite') registry.setActivePeer(userId, to);
-          if (type == 'call-end' || type == 'call-reject') registry.clearActivePeer(userId);
+          // Everything else only means something inside a call between these
+          // two people; a stray accept/offer/ice from a stranger is dropped.
+          final inCallWithTo = registry.activePeerOf(userId) == to;
+          if (!inCallWithTo && type != 'call-end') return;
+
+          final logId = registry.activeLogOf(userId);
+          switch (type) {
+            case 'call-accept':
+              applyCallEvent(db, logId, 'accept');
+            case 'call-reject':
+              applyCallEvent(db, logId, 'reject', reason: msg['reason'] as String?);
+            case 'call-end':
+              if (inCallWithTo) applyCallEvent(db, logId, 'end', reason: msg['reason'] as String?);
+          }
+
+          registry.sendTo(to, payload);
+          if (inCallWithTo && (type == 'call-end' || type == 'call-reject')) registry.clearActivePeer(userId);
         },
         onDone: () {
           // The client didn't get a chance to send call-end (closed tab,
@@ -123,6 +174,7 @@ Future<Response> onRequest(RequestContext context) async {
           // "Đang gọi…"/"Đang kết nối…" forever with no way to know.
           final peer = registry.activePeerOf(userId);
           if (peer != null) {
+            applyCallEvent(db, registry.activeLogOf(userId), 'end', reason: 'disconnected');
             registry.sendTo(peer, {'type': 'call-end', 'from': userId, 'reason': 'disconnected'});
             registry.clearActivePeer(userId);
           }

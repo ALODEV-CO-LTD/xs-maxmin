@@ -13,6 +13,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
 import CallOverlay from './CallOverlay.vue'
+import MessageToast from './MessageToast.vue'
+import { useNotifyStore } from '../stores/notify'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { showConfirm } from '../confirm'
 import AppIcon from './AppIcon.vue'
@@ -23,6 +25,15 @@ import { startSync } from '../offline'
 
 const auth = useAuthStore()
 const call = useCallStore()
+const notify = useNotifyStore()
+
+// Unread count shown next to a nav entry (new messages pushed by the server).
+function badgeFor(name) {
+  if (name === 'friends') return notify.friendUnread
+  if (name === 'feedback') return notify.supportUnread
+  if (name === 'admin-messages') return notify.adminSupportUnread
+  return 0
+}
 const router = useRouter()
 const route = useRoute()
 
@@ -86,11 +97,14 @@ onMounted(() => {
   // ring on any page, not only while the Bạn bè tab happens to be open.
   call.connect()
   startSync()
+  // Browsers only show the notification permission prompt after a click.
+  window.addEventListener('pointerdown', () => notify.askPermission(), { once: true })
 })
 
 async function logout() {
   if (!(await showConfirm({ title: 'Đăng xuất', message: 'Bạn có chắc muốn đăng xuất?', confirmText: 'Đăng xuất' }))) return
   call.disconnect()
+  notify.clearAll()
   auth.logout()
   router.push('/login')
 }
@@ -138,6 +152,7 @@ async function logout() {
         >
           <span class="nav-icon"><AppIcon :name="link.icon" /></span>
           <span>{{ link.label }}</span>
+          <span v-if="badgeFor(link.name)" class="nav-badge">{{ badgeFor(link.name) }}</span>
         </RouterLink>
       </nav>
 
@@ -164,11 +179,13 @@ async function logout() {
         >
           <span class="nav-icon"><AppIcon :name="link.icon" /></span>
           <span>{{ link.label }}</span>
+          <span v-if="badgeFor(link.name)" class="nav-badge">{{ badgeFor(link.name) }}</span>
         </RouterLink>
       </nav>
     </div>
 
     <CallOverlay />
+    <MessageToast />
     <ConfirmDialog />
   </div>
 </template>
@@ -280,6 +297,18 @@ async function logout() {
   overflow-y: auto;
 }
 
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--danger, #ef4444);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 18px;
+}
 .nav-link {
   position: relative;
   display: flex;

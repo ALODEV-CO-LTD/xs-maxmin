@@ -7,6 +7,7 @@
 import AppIcon from './AppIcon.vue'
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useCallStore } from '../stores/call'
+import { notifyIncoming, playEndTone, startRingback, startRingtone, stopNotify, stopSounds } from '../callSounds'
 
 const call = useCallStore()
 
@@ -66,7 +67,29 @@ watch(
   () => call.status,
   (st) => { if (st === 'idle') speakerBlocked.value = false },
 )
-onBeforeUnmount(() => clearInterval(timer))
+
+// Sounds: ring while a call is incoming, ringback tone for the caller once the
+// other phone is ringing, a short tone when a call that was up ends.
+watch(
+  [() => call.status, () => call.ringing],
+  ([st, ringing], [prevSt] = []) => {
+    stopSounds()
+    if (st !== 'incoming') stopNotify()
+    if (st === 'incoming') {
+      startRingtone()
+      notifyIncoming(call.peer?.name || 'Người dùng')
+    } else if (st === 'outgoing' && ringing) {
+      startRingback()
+    } else if (st === 'idle' && prevSt && prevSt !== 'idle') {
+      playEndTone()
+    }
+  },
+)
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  stopSounds()
+  stopNotify()
+})
 
 const durationLabel = computed(() => {
   const m = String(Math.floor(elapsed.value / 60)).padStart(2, '0')
@@ -101,7 +124,7 @@ watch(
       <template v-if="call.status === 'outgoing'">
         <div class="call-avatar">{{ call.peer?.name?.[0] || '?' }}</div>
         <div class="call-name">{{ call.peer?.name }}</div>
-        <div class="call-sub">Đang gọi...</div>
+        <div class="call-sub">{{ call.ringing ? 'Đang đổ chuông...' : 'Đang gọi...' }}</div>
         <button class="btn btn-danger btn-round" @click="call.endCall()"><AppIcon name="x" /> Huỷ</button>
       </template>
 
@@ -124,6 +147,7 @@ watch(
       <template v-else-if="call.status === 'connected'">
         <div class="call-name">{{ call.peer?.name }}</div>
         <div class="call-sub">{{ durationLabel }}</div>
+        <div v-if="call.reconnecting" class="call-health warn">Mất kết nối mạng, đang kết nối lại…</div>
         <div v-if="call.health.text" class="call-health" :class="call.health.level">{{ call.health.text }}</div>
         <button v-if="speakerBlocked" class="btn btn-primary btn-sm" @click="enableSpeaker"><AppIcon name="volume-2" /> Bấm để bật loa</button>
 

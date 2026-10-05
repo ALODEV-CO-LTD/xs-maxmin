@@ -25,11 +25,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useCallStore } from '../stores/call'
 import { useAuthStore } from '../stores/auth'
+import { useNotifyStore } from '../stores/notify'
 
 const route = useRoute()
 const router = useRouter()
 const call = useCallStore()
 const auth = useAuthStore()
+const notify = useNotifyStore()
 
 const friends = ref([])
 const loading = ref(true)
@@ -102,6 +104,65 @@ const newMessage = ref('')
 const sending = ref(false)
 const attachment = ref(null) // File waiting to be sent with the next message
 
+// Voice-call history with the open friend (GET /me/calls), shown inside the
+// conversation next to the messages, plus the per-friend count of missed
+// calls the user has not looked at yet (badge in the friend list).
+const calls = ref([])
+const unseenMissed = ref({})
+
+function callLine(c) {
+  const mins = Math.floor((c.durationSeconds || 0) / 60)
+  const secs = String((c.durationSeconds || 0) % 60).padStart(2, '0')
+  const dur = `${mins}:${secs}`
+  const out = c.direction === 'outgoing'
+  switch (c.status) {
+    case 'completed':
+      return `${out ? 'Cuộc gọi thoại đi' : 'Cuộc gọi thoại đến'} · ${dur}`
+    case 'missed':
+      return out ? 'Cuộc gọi đi · Không ai nghe máy' : 'Cuộc gọi nhỡ'
+    case 'busy':
+      return out ? 'Cuộc gọi đi · Máy bận' : 'Cuộc gọi nhỡ (bạn đang bận)'
+    case 'rejected':
+      return out ? 'Cuộc gọi đi · Bị từ chối' : 'Bạn đã từ chối cuộc gọi'
+    case 'failed':
+      return 'Cuộc gọi · Không kết nối được âm thanh'
+    default:
+      return 'Cuộc gọi thoại'
+  }
+}
+const isMissedCall = (c) => c.direction === 'incoming' && (c.status === 'missed' || c.status === 'busy')
+
+// Messages and call entries in one chronological list.
+const timeline = computed(() => {
+  const items = [
+    ...messages.value.map((m) => ({ kind: 'msg', key: m.id, at: m.createdAt, m })),
+    ...calls.value.map((c) => ({ kind: 'call', key: `call-${c.id}`, at: c.createdAt, c })),
+  ]
+  return items.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+})
+
+async function loadCalls(friendId) {
+  try {
+    const res = await api.get(`/me/calls?friendId=${encodeURIComponent(friendId)}&limit=50`)
+    calls.value = res.calls
+    unseenMissed.value = res.unseenMissed || {}
+    if (unseenMissed.value[friendId]) {
+      await api.post('/me/calls/seen', { friendId })
+      delete unseenMissed.value[friendId]
+    }
+  } catch {
+    /* history is a nicety; the conversation still works without it */
+  }
+}
+async function loadUnseenMissed() {
+  try {
+    const res = await api.get('/me/calls?limit=1')
+    unseenMissed.value = res.unseenMissed || {}
+  } catch {
+    /* ignore */
+  }
+}
+
 const selectedFriendId = computed(() => route.params.friendId || null)
 const selectedFriend = computed(() =>
   friends.value.find((f) => f.id === selectedFriendId.value) || null,
@@ -112,8 +173,8 @@ const selectedFriend = computed(() =>
 const canCall = computed(() => !auth.isAdmin && !!selectedFriend.value && !selectedFriend.value.isAdmin)
 
 
-async function loadFriends() {
-  loading.value = true
+async function loadFriends({ quiet = false } = {}) {
+  if (!quiet) loading.value = true
   loadError.value = ''
   try {
     const res = await api.get('/me/friends')
@@ -125,8 +186,8 @@ async function loadFriends() {
   }
 }
 
-async function loadMessages(friendId) {
-  messagesLoading.value = true
+async function loadMessages(friendId, { quiet = false } = {}) {
+  if (!quiet) messagesLoading.value = true
   messagesError.value = ''
   try {
     const res = await api.get(`/me/friends/${friendId}/messages`)
@@ -164,14 +225,49 @@ async function copyMyCode() {
 
 onMounted(() => {
   loadFriends()
-  if (!auth.isAdmin) loadMyCode()
+  if (!auth.isAdmin) {
+    loadMyCode()
+    loadUnseenMissed()
+  }
 })
+
+// A new chat message arrived over the WebSocket: refresh the open
+// conversation, or the friend list (last message preview) otherwise.
+watch(
+  () => notify.incomingTick,
+  () => {
+    const m = notify.lastIncoming
+    if (!m || m.source !== 'friend') return
+    if (selectedFriendId.value === m.from) {
+      loadMessages(m.from, { quiet: true })
+      notify.clear(`friend:${m.from}`)
+    } else {
+      loadFriends({ quiet: true })
+    }
+  },
+)
+
+// A call just ended (or was missed): refresh history and the badges.
+watch(
+  () => call.endedTick,
+  () => {
+    if (auth.isAdmin) return
+    if (selectedFriendId.value) loadCalls(selectedFriendId.value)
+    else loadUnseenMissed()
+  },
+)
 
 watch(
   selectedFriendId,
   (id) => {
-    if (id) loadMessages(id)
-    else messages.value = []
+    if (id) {
+      notify.clear(`friend:${id}`)
+      loadMessages(id)
+      if (!auth.isAdmin) loadCalls(id)
+    } else {
+      messages.value = []
+      calls.value = []
+    }
   },
   { immediate: true },
 )
@@ -314,7 +410,12 @@ async function sendMessage() {
               @click="openFriend(f)"
             >
               <div class="friend-info">
-                <strong>{{ f.name }}</strong>
+                <strong>
+                  {{ f.name }}
+                  <span v-if="unseenMissed[f.id]" class="missed-badge" title="Cuộc gọi nhỡ">
+                    <AppIcon name="phone" /> {{ unseenMissed[f.id] }}
+                  </span>
+                </strong>
                 <span class="friend-last">{{ f.lastMessage || 'Chưa có tin nhắn' }}</span>
               </div>
               <button class="btn btn-ghost btn-sm" @click.stop="removeFriend(f)">Xoá</button>
@@ -349,23 +450,34 @@ async function sendMessage() {
           <div v-if="messagesError" class="alert alert-error">{{ messagesError }}</div>
           <div class="card thread-body">
             <div v-if="messagesLoading">Đang tải tin nhắn...</div>
-            <div v-else-if="messages.length === 0" class="empty-thread">Chưa có tin nhắn nào.</div>
+            <div v-else-if="timeline.length === 0" class="empty-thread">Chưa có tin nhắn nào.</div>
             <div v-else class="messages">
-              <div
-                v-for="m in messages"
-                :key="m.id"
-                class="msg"
-                :class="{ mine: m.fromUserId !== selectedFriendId }"
-              >
-                <div class="msg-bubble">
-                  <span v-if="m.content">{{ m.content }}</span>
-                  <MessageAttachment
-                    v-if="m.attachment"
-                    :att="m.attachment"
-                    :path="`/me/friends/${selectedFriendId}/messages/${m.id}/attachment`"
-                  />
+              <template v-for="item in timeline" :key="item.key">
+                <div
+                  v-if="item.kind === 'msg'"
+                  class="msg"
+                  :class="{ mine: item.m.fromUserId !== selectedFriendId }"
+                >
+                  <div class="msg-bubble">
+                    <span v-if="item.m.content">{{ item.m.content }}</span>
+                    <MessageAttachment
+                      v-if="item.m.attachment"
+                      :att="item.m.attachment"
+                      :path="`/me/friends/${selectedFriendId}/messages/${item.m.id}/attachment`"
+                    />
+                  </div>
                 </div>
-              </div>
+                <div v-else class="call-line" :class="{ missed: isMissedCall(item.c) || item.c.status === 'failed' }">
+                  <AppIcon name="phone" />
+                  <span>{{ callLine(item.c) }}</span>
+                  <button
+                    v-if="canCall && (isMissedCall(item.c) || item.c.status === 'rejected' || item.c.status === 'failed')"
+                    class="btn btn-ghost btn-sm"
+                    :disabled="call.status !== 'idle' || call.acquiring"
+                    @click="selectedFriend && call.startCall(selectedFriend)"
+                  >Gọi lại</button>
+                </div>
+              </template>
             </div>
           </div>
           <AttachmentPreview v-if="attachment" :file="attachment" @remove="attachment = null" />
@@ -513,6 +625,32 @@ async function sendMessage() {
   color: var(--muted);
   text-align: center;
   padding: 24px 0;
+}
+.missed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--danger, #d64545);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.call-line {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+}
+.call-line.missed {
+  color: var(--danger, #d64545);
 }
 .messages {
   display: flex;
