@@ -49,8 +49,34 @@ watch(q, () => {
   searchTimer = setTimeout(loadList, 300)
 })
 
+// Active device sessions of the opened user (admin can revoke them).
+const userSessions = ref([])
+const sessionsError = ref('')
+
+async function loadUserSessions(id) {
+  sessionsError.value = ''
+  try {
+    userSessions.value = (await api.get(`/admin/users/${id}/sessions`)).sessions || []
+  } catch (err) {
+    userSessions.value = []
+    sessionsError.value = err instanceof ApiError ? err.message : 'Không thể tải danh sách thiết bị'
+  }
+}
+
+async function revokeUserSession(sid) {
+  sessionsError.value = ''
+  try {
+    if (sid) await api.del(`/admin/users/${selected.value.id}/sessions/${sid}`)
+    else await api.del(`/admin/users/${selected.value.id}/sessions`)
+    await loadUserSessions(selected.value.id)
+  } catch (err) {
+    sessionsError.value = err instanceof ApiError ? err.message : 'Không thể thu hồi phiên'
+  }
+}
+
 async function openUser(id) {
   selected.value = id
+  userSessions.value = []
   detailLoading.value = true
   detailError.value = ''
   actionError.value = ''
@@ -58,6 +84,7 @@ async function openUser(id) {
   try {
     const detail = await api.get(`/admin/users/${id}`)
     selected.value = detail
+    loadUserSessions(id)
   } catch (err) {
     detailError.value = err instanceof ApiError ? err.message : 'Không thể tải chi tiết'
     selected.value = null
@@ -236,6 +263,27 @@ onMounted(loadList)
             <p class="info-row">
               <strong>Hết hạn:</strong>
               <span>{{ selected.package.expiresAt ? new Date(selected.package.expiresAt).toLocaleString('vi-VN') : '-' }}</span>
+            </p>
+          </div>
+
+          <div class="info-card">
+            <p class="info-row">
+              <strong>Thiết bị đang đăng nhập ({{ userSessions.length }})</strong>
+              <button
+                v-if="userSessions.length > 0"
+                class="btn btn-secondary btn-sm"
+                @click="revokeUserSession(null)"
+              >
+                Thu hồi tất cả
+              </button>
+            </p>
+            <div v-if="sessionsError" class="alert alert-error">{{ sessionsError }}</div>
+            <p v-for="s in userSessions" :key="s.id" class="info-row">
+              <span>
+                {{ s.deviceLabel }} · IP {{ s.ip || '-' }}<br />
+                <small>Gần nhất: {{ s.lastSeen ? new Date(s.lastSeen).toLocaleString('vi-VN') : '-' }}</small>
+              </span>
+              <button class="btn btn-secondary btn-sm" @click="revokeUserSession(s.id)">Thu hồi</button>
             </p>
           </div>
 

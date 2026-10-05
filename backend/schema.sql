@@ -178,6 +178,42 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 
+-- -----------------------------------------------------------------------------
+-- Device sessions, login throttling and security event log
+-- (JWT carries device_sessions.id as the `sid` claim)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS device_sessions (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_label TEXT,
+  user_agent   TEXT,
+  ip           TEXT,
+  created_at   TEXT NOT NULL,
+  last_seen    TEXT NOT NULL,
+  revoked_at   TEXT,
+  revoked_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  key          TEXT PRIMARY KEY,  -- "<username lowercase>|<ip>"
+  fail_count   INTEGER NOT NULL DEFAULT 0,
+  last_fail_at TEXT NOT NULL,
+  locked_until TEXT
+);
+
+CREATE TABLE IF NOT EXISTS security_events (
+  id         TEXT PRIMARY KEY,
+  type       TEXT NOT NULL,       -- login_failed, login_locked, session_revoked, data_wiped
+  user_id    TEXT,
+  username   TEXT,
+  ip         TEXT,
+  detail     TEXT,                -- never a password or token
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
+
+
 -- =============================================================================
 -- Handy reference queries
 -- =============================================================================

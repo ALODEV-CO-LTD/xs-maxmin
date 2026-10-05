@@ -1,6 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import 'database.dart';
 import 'security.dart';
+import 'sessions.dart';
 
 /// Reads the `Authorization: Bearer <token>` header (if present) and
 /// provides the decoded [AuthTokenPayload] to downstream handlers.
@@ -12,7 +14,13 @@ Handler authProvider(Handler handler) {
       final header = context.request.headers['authorization'];
       if (header == null || !header.startsWith('Bearer ')) return null;
       final token = header.substring('Bearer '.length);
-      return verifyToken(token);
+      final payload = verifyToken(token);
+      if (payload == null) return null;
+      // Revoked device session => treated as not logged in (401 downstream).
+      // Uses appDatabase directly: this provider runs before the Database
+      // provider in routes/_middleware.dart is in scope.
+      if (!sessionIsActive(appDatabase, payload.userId, payload.sessionId)) return null;
+      return payload;
     }),
   );
 }

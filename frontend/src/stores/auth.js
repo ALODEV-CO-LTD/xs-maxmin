@@ -62,6 +62,9 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     logout() {
+      // Also revoke this device's session on the server (best effort - the
+      // token is read synchronously inside the call, before clear() below).
+      if (this.token) api.del('/me/sessions/current').catch(() => {})
       this.clear()
     },
     async fetchMe() {

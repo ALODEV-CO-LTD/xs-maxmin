@@ -85,6 +85,47 @@ void _ensureColumn(Database db, String table, String column, String type) {
 }
 
 void _createSchema(Database db) {
+  // Device sessions (K10/A04/A14/S04): the JWT carries the row id as `sid`;
+  // a row with revoked_at set is rejected by the auth middleware.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS device_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      device_label TEXT,
+      user_agent TEXT,
+      ip TEXT,
+      created_at TEXT NOT NULL,
+      last_seen TEXT NOT NULL,
+      revoked_at TEXT,
+      revoked_by TEXT
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id)');
+
+  // Failed-login counters per account+IP with temporary lock (K03/S03).
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      key TEXT PRIMARY KEY,
+      fail_count INTEGER NOT NULL DEFAULT 0,
+      last_fail_at TEXT NOT NULL,
+      locked_until TEXT
+    );
+  ''');
+
+  // Minimal security event log (NFR-07). Never stores passwords/tokens.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS security_events (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      user_id TEXT,
+      username TEXT,
+      ip TEXT,
+      detail TEXT,
+      created_at TEXT NOT NULL
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)');
+
   db.execute('''
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,

@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dart_frog_web_socket/dart_frog_web_socket.dart';
 import 'package:server/src/call_signaling.dart';
+import 'package:server/src/database.dart';
 import 'package:server/src/security.dart';
+import 'package:server/src/sessions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// `GET /api/ws/calls?token=<jwt>` - signaling relay for WebRTC voice/video
@@ -31,7 +33,8 @@ import 'package:sqlite3/sqlite3.dart';
 /// side stuck on "ringing"/"connecting" indefinitely.
 Future<Response> onRequest(RequestContext context) async {
   final token = context.request.uri.queryParameters['token'];
-  final auth = token == null ? null : verifyToken(token);
+  var auth = token == null ? null : verifyToken(token);
+  if (auth != null && !sessionIsActive(appDatabase, auth.userId, auth.sessionId)) auth = null;
   if (auth == null) {
     return Response.json(statusCode: 401, body: {'error': 'Chưa đăng nhập'});
   }
