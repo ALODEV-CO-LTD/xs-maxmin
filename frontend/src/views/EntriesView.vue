@@ -5,18 +5,26 @@
   two-step daily workflow (enter bets in the morning, enter results after
   the lottery draw) that used to be crammed into one form.
 
-  API: GET/POST /me/entries, PATCH /me/entries/:id (no DELETE endpoint
-  exists on the backend for entries - see note below).
+  API: GET/POST /me/entries, PATCH/DELETE /me/entries/:id,
+  GET/POST /me/syntax-templates (per-customer message syntax).
+
+  Also here (offline.js): entries typed while offline are queued in IndexedDB
+  and synced later, history is cached for offline viewing/searching; filters
+  (K17), copy (K18), and "Nhập từ tin nhắn" (K13/K16: paste -> preview ->
+  user confirms -> save; nothing is ever saved automatically).
 -->
 <script setup>
 import { showConfirm } from '../confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
+import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
+import { aliasesToText, fold, parseMessage, textToAliases, DEFAULT_STAKE_MARKERS } from '../messageParser'
+import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
 
 const auth = useAuthStore()
 
@@ -26,6 +34,7 @@ const router = useRouter()
 const entries = ref([])
 const loading = ref(true)
 const loadError = ref('')
+const fromCache = ref(false) // showing the copy saved on this device (offline)
 
 // Customer roster (Khách hàng page) - entry form must PICK a customer from
 // here rather than free-typing a name, so a typo can't silently create a
@@ -33,7 +42,7 @@ const loadError = ref('')
 const customers = ref([])
 async function loadCustomers() {
   try {
-    const { customers: list } = await api.get('/me/customers')
+    const { customers: list } = await cachedGet('/me/customers')
     customers.value = list
   } catch (_) {
     // Leave the list empty - the select will just show none.
@@ -46,7 +55,7 @@ async function loadCustomers() {
 const betTypes = ref(['de', 'lo'])
 async function loadBetTypes() {
   try {
-    const { rates } = await api.get('/me/scoring-settings')
+    const { rates } = await cachedGet('/me/scoring-settings')
     const keys = Object.keys(rates || {})
     if (keys.length) betTypes.value = keys
   } catch (_) {
@@ -127,6 +136,7 @@ function entryCount(name) {
 
 const submitting = ref(false)
 const formError = ref('')
+const notice = ref('') // informational (e.g. saved offline)
 
 const editingId = ref(null)
 const editForm = reactive({
@@ -271,11 +281,12 @@ async function loadAll() {
   loading.value = true
   loadError.value = ''
   try {
-    const [me, list] = await Promise.all([
-      auth.fetchMe(),
-      api.get('/me/entries'),
-    ])
+    // cachedGet/loadEntries fall back to the copy saved on this device when
+    // offline, so the page keeps working (see offline.js).
+    const [me, list] = await Promise.all([cachedGet('/me'), loadEntries()])
+    auth.user = me
     entries.value = list.entries
+    fromCache.value = list.fromCache
   } catch (err) {
     loadError.value = err.message || 'Không tải được dữ liệu'
   } finally {
@@ -285,6 +296,10 @@ async function loadAll() {
 
 onMounted(loadAll)
 onMounted(loadBetTypes)
+onMounted(loadTemplates)
+// after the offline queue synced / a conflict was resolved: reload the list
+const stopListening = onEntriesChanged(loadAll)
+onBeforeUnmount(stopListening)
 // Coming back from "+ Thêm khách hàng mới" (Khách hàng page): preselect the new customer.
 onMounted(async () => {
   await loadCustomers()
@@ -314,7 +329,7 @@ async function submitForm() {
   try {
     const results = await Promise.allSettled(
       tasks.map((task) =>
-        api.post('/me/entries', {
+        createEntry({
           customerName: form.customerName.trim(),
           value: task.row.value.trim(),
           entryDate: form.entryDate,
@@ -326,12 +341,14 @@ async function submitForm() {
     )
     const failed = []
     let anySucceeded = false
+    let queuedCount = 0
     for (let i = 0; i < results.length; i++) {
       const r = results[i]
       const task = tasks[i]
       if (r.status === 'fulfilled') {
-        entries.value.unshift(r.value)
-        if (auth.user?.stats) auth.user.stats.used += 1
+        entries.value.unshift(r.value.entry)
+        if (auth.user?.stats && !r.value.queued) auth.user.stats.used += 1
+        if (r.value.queued) queuedCount++
         anySucceeded = true
         const idx = rows.value.indexOf(task.row)
         if (idx !== -1) rows.value.splice(idx, 1)
@@ -343,6 +360,7 @@ async function submitForm() {
     // The form always shows at least one (possibly blank) row.
     if (rows.value.length === 0) rows.value.push(blankRow())
     if (failed.length) formError.value = failed.join(' · ')
+    if (queuedCount) notice.value = `Đang offline: ${queuedCount} số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.`
     if (anySucceeded) form.note = ''
     // Keep customerName + date - common to add several customers/entries
     // for the same day in a row.
@@ -393,17 +411,30 @@ async function saveEdit(id) {
   }
   editSubmitting.value = true
   try {
-    const updated = await api.patch(`/me/entries/${id}`, {
+    const changes = {
       customerName: editForm.customerName.trim(),
       value: editForm.value.trim(),
       entryDate: editForm.entryDate,
       score: editForm.score.trim(),
       betType: editForm.betType,
       note: editForm.note.trim(),
-    })
-    const idx = entries.value.findIndex((e) => e.id === id)
-    if (idx !== -1) entries.value[idx] = updated
-    editingId.value = null
+    }
+    const base = entries.value.find((e) => e.id === id)
+    try {
+      const { entry: updated, queued } = await updateEntry(base, changes)
+      const idx = entries.value.findIndex((e) => e.id === id)
+      if (idx !== -1) entries.value[idx] = updated
+      if (queued) notice.value = 'Đang offline: thay đổi đã lưu trên máy, sẽ tự đồng bộ khi có mạng.'
+      editingId.value = null
+    } catch (err) {
+      if (err.status === 409 && err.data?.conflict) {
+        // edited elsewhere meanwhile -> ask which version to keep (SyncStatus.vue)
+        addConflict(base, changes, err.data.server)
+        editingId.value = null
+      } else {
+        throw err
+      }
+    }
   } catch (err) {
     editError.value = err.message || 'Không lưu được thay đổi'
   } finally {
@@ -415,6 +446,10 @@ const deletingId = ref(null)
 const deleteErrors = reactive({}) // id -> error message
 
 async function deleteEntry(entry) {
+  if (entry.pending) {
+    deleteErrors[entry.id] = 'Số liệu đang chờ đồng bộ, hãy đợi đồng bộ xong rồi xoá.'
+    return
+  }
   if (!(await showConfirm({
     title: 'Xoá số liệu',
     message: `Xoá số liệu "${entry.value}" (${entry.customerName})? Không thể hoàn tác.`,
@@ -440,7 +475,7 @@ async function deleteEntry(entry) {
 const deletingAll = ref(false)
 const deleteAllError = ref('')
 async function deleteAllEntries() {
-  const list = [...visibleEntries.value]
+  const list = visibleEntries.value.filter((e) => !e.pending)
   if (!list.length) return
   if (!(await showConfirm({
     title: 'Xoá tất cả số liệu',
@@ -464,6 +499,196 @@ async function deleteAllEntries() {
   if (failed) deleteAllError.value = `${failed} số liệu không xoá được, thử lại.`
   deletingAll.value = false
 }
+// ---- Tìm kiếm & bộ lọc (K17) ------------------------------------------------
+// Runs locally on the loaded (or cached) entries, so it also works offline.
+const filters = reactive({ date: '', type: '', q: '', all: false })
+const hasFilter = computed(() => !!(filters.date || filters.type || filters.q.trim() || filters.all))
+const filteredEntries = computed(() => {
+  const q = fold(filters.q.trim())
+  return entries.value.filter((e) => {
+    if (!filters.all && (!form.customerName || e.customerName !== form.customerName)) return false
+    if (filters.date && e.entryDate !== filters.date) return false
+    if (filters.type && (e.betType || 'de') !== filters.type) return false
+    if (q) {
+      const hay = fold([e.customerName, e.entryDate, betTypeLabel(e.betType || 'de'), e.value, e.score, e.result, e.note].join(' '))
+      if (!hay.includes(q)) return false
+    }
+    return true
+  })
+})
+function clearFilters() {
+  filters.date = ''
+  filters.type = ''
+  filters.q = ''
+  filters.all = false
+}
+
+// ---- Sao chép (K18) ---------------------------------------------------------
+const confirmCopy = ref(confirmCopyEnabled())
+watch(confirmCopy, (on) => setConfirmCopy(on))
+const copyMessage = ref('')
+async function copyShown() {
+  copyMessage.value = ''
+  const label = [filters.all ? 'tất cả khách' : form.customerName, filters.date].filter(Boolean).join(', ')
+  const res = await copyEntries(filteredEntries.value, { label, withCustomer: filters.all })
+  if (res === 'copied') copyMessage.value = `Đã sao chép ${filteredEntries.value.length} số liệu`
+  else if (res === 'failed') copyMessage.value = 'Không sao chép được'
+}
+
+// ---- Nhập từ tin nhắn (K13) + mẫu cú pháp theo khách (K16) -------------------
+// Paste -> parse into a PREVIEW (uncertain lines highlighted, unticked) -> the
+// user edits/ticks and confirms -> only then are rows saved. The per-customer
+// syntax template is saved only when the user presses "Lưu mẫu", never learned.
+const pasteOpen = ref(false)
+const pasteText = ref('')
+const previewRows = ref([])
+const previewIgnored = ref([])
+const pasteError = ref('')
+const pasteSaving = ref(false)
+
+const templates = ref([]) // [{ id, customerName, config }]
+const templateOpen = ref(false)
+const templateDraft = reactive({ defaultType: '', aliasText: '', markersText: DEFAULT_STAKE_MARKERS.join(', ') })
+const templateMsg = ref('')
+const savedTemplate = computed(() => templates.value.find((t) => t.customerName === form.customerName) || null)
+
+async function loadTemplates() {
+  try {
+    templates.value = (await cachedGet('/me/syntax-templates')).templates
+  } catch (_) {
+    // no templates yet / offline without cache - parsing still works with the defaults
+  }
+}
+function loadDraft() {
+  const cfg = savedTemplate.value?.config
+  templateDraft.defaultType = cfg?.defaultType || ''
+  templateDraft.aliasText = aliasesToText(cfg?.typeAliases)
+  templateDraft.markersText = (cfg?.stakeMarkers?.length ? cfg.stakeMarkers : DEFAULT_STAKE_MARKERS).join(', ')
+  templateMsg.value = ''
+}
+watch(() => form.customerName, loadDraft)
+watch(templates, loadDraft)
+
+function draftConfig() {
+  return {
+    defaultType: templateDraft.defaultType,
+    typeAliases: textToAliases(templateDraft.aliasText, betTypes.value),
+    stakeMarkers: templateDraft.markersText
+      .split(/[,;\s]+/)
+      .map((m) => m.trim())
+      .filter(Boolean),
+  }
+}
+
+function analyzeMessage() {
+  pasteError.value = ''
+  const { rows: parsed, ignored } = parseMessage(pasteText.value, { betTypes: betTypes.value, template: draftConfig() })
+  previewIgnored.value = ignored
+  previewRows.value = parsed.map((r) => ({ ...r, uid: ++rowSeq, selected: !r.uncertain }))
+  if (!parsed.length) pasteError.value = 'Không tìm thấy số nào trong tin nhắn.'
+}
+
+const previewSelected = computed(() => previewRows.value.filter((r) => r.selected))
+const previewUncertain = computed(() => previewRows.value.filter((r) => r.uncertain).length)
+
+function clearPreview() {
+  previewRows.value = []
+  previewIgnored.value = []
+  pasteError.value = ''
+}
+
+function previewRowComplete(r) {
+  return r.type && r.value.trim() && String(r.score ?? '').trim()
+}
+
+// Put the ticked rows into the manual-entry rows above (to review/edit there).
+function previewToRows() {
+  const picked = previewSelected.value
+  if (!picked.length) return
+  const fresh = picked.map((r) => ({ uid: ++rowSeq, type: r.type, value: r.value, score: r.score }))
+  const empty = rows.value.every((r) => !r.value.trim() && !r.score.trim())
+  rows.value = empty ? fresh : [...rows.value, ...fresh]
+  previewRows.value = previewRows.value.filter((r) => !r.selected)
+}
+
+async function savePreview() {
+  pasteError.value = ''
+  const picked = previewSelected.value
+  if (!form.customerName) {
+    pasteError.value = 'Chọn khách hàng trước khi lưu.'
+    return
+  }
+  if (!picked.length) {
+    pasteError.value = 'Chưa chọn dòng nào để lưu.'
+    return
+  }
+  if (!picked.every(previewRowComplete)) {
+    pasteError.value = 'Các dòng đã chọn cần đủ Hạng mục, Số và Điểm vào.'
+    return
+  }
+  const unsure = picked.filter((r) => r.uncertain).length
+  if (!(await showConfirm({
+    title: 'Lưu số liệu từ tin nhắn',
+    message: `Lưu ${picked.length} số liệu cho khách hàng "${form.customerName}", ngày ${form.entryDate}?${unsure ? ` Trong đó ${unsure} dòng chưa chắc chắn, hãy chắc là đã kiểm tra.` : ''}`,
+    confirmText: 'Lưu',
+  }))) return
+  pasteSaving.value = true
+  let queued = 0
+  const failed = []
+  try {
+    for (const r of picked) {
+      try {
+        const res = await createEntry({
+          customerName: form.customerName.trim(),
+          value: r.value.trim(),
+          entryDate: form.entryDate,
+          score: String(r.score).trim(),
+          betType: r.type,
+          note: form.note.trim() || undefined,
+        })
+        entries.value.unshift(res.entry)
+        if (res.queued) queued++
+        else if (auth.user?.stats) auth.user.stats.used += 1
+        previewRows.value = previewRows.value.filter((x) => x.uid !== r.uid)
+      } catch (err) {
+        failed.push(`${betTypeLabel(r.type)} "${r.value}": ${err.message || 'lỗi không rõ'}`)
+      }
+    }
+  } finally {
+    pasteSaving.value = false
+  }
+  if (failed.length) pasteError.value = failed.join(' · ')
+  if (queued) notice.value = `Đang offline: ${queued} số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.`
+  if (!previewRows.value.length) pasteText.value = ''
+}
+
+async function saveTemplate() {
+  templateMsg.value = ''
+  if (!form.customerName) return
+  if (!(await showConfirm({
+    title: 'Lưu mẫu cú pháp',
+    message: `Lưu cách viết này làm mẫu riêng cho khách hàng "${form.customerName}"? Lần sau dán tin nhắn của khách này sẽ được phân tích theo mẫu.`,
+    confirmText: 'Lưu mẫu',
+  }))) return
+  try {
+    const saved = await api.post('/me/syntax-templates', { customerName: form.customerName, config: draftConfig() })
+    templates.value = [...templates.value.filter((t) => t.customerName !== saved.customerName), saved]
+    templateMsg.value = 'Đã lưu mẫu cho khách này.'
+  } catch (err) {
+    templateMsg.value = err.message || 'Không lưu được mẫu'
+  }
+}
+async function deleteTemplate() {
+  const t = savedTemplate.value
+  if (!t) return
+  try {
+    await api.del(`/me/syntax-templates/${t.id}`)
+    templates.value = templates.value.filter((x) => x.id !== t.id)
+    templateMsg.value = 'Đã xoá mẫu.'
+  } catch (err) {
+    templateMsg.value = err.message || 'Không xoá được mẫu'
+  }
+}
 </script>
 
 <template>
@@ -472,6 +697,14 @@ async function deleteAllEntries() {
 
     <div v-if="!canAdd && stats" class="alert alert-warning">
       Gói của bạn đã hết hạn. Vui lòng gia hạn ở mục Gói dịch vụ để tiếp tục nhập số liệu.
+    </div>
+
+    <div v-if="fromCache" class="alert alert-warning">
+      Đang offline: hiển thị số liệu đã lưu trên máy. Số liệu bạn nhập sẽ được gửi lên khi có mạng.
+    </div>
+    <div v-if="notice" class="alert alert-success notice-row">
+      <span>{{ notice }}</span>
+      <button type="button" class="btn btn-ghost btn-sm" @click="notice = ''">Đóng</button>
     </div>
 
     <div class="entries-layout">
@@ -528,6 +761,89 @@ async function deleteAllEntries() {
               <div class="ocr-text-wrap">
                 <label>Văn bản đọc được (để đối chiếu)</label>
                 <textarea v-model="ocrRawText" rows="3" class="ocr-raw"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nhập từ tin nhắn: paste -> preview -> confirm. Nothing is saved until "Lưu". -->
+          <div class="paste-box">
+            <button type="button" class="btn btn-secondary btn-block" :aria-expanded="pasteOpen" @click="pasteOpen = !pasteOpen">
+              Nhập từ tin nhắn (dán nội dung)
+            </button>
+            <div v-if="pasteOpen" class="paste-body">
+              <p class="ocr-hint">
+                Dán tin nhắn của khách, bấm Phân tích để xem trước. Dòng chưa chắc chắn được tô màu và chưa được chọn. Chỉ khi bạn bấm Lưu mới ghi vào dữ liệu.
+              </p>
+              <textarea
+                v-model="pasteText"
+                rows="5"
+                class="ocr-raw"
+                placeholder="Vd:&#10;de 12 34 56 x 10&#10;lo 45 78 con 3"
+                aria-label="Nội dung tin nhắn"
+              ></textarea>
+              <div class="paste-actions">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="!pasteText.trim()" @click="analyzeMessage">Phân tích</button>
+                <button type="button" class="btn btn-ghost btn-sm" @click="templateOpen = !templateOpen">
+                  Mẫu cú pháp của khách này {{ savedTemplate ? '(đã lưu)' : '(chưa lưu)' }}
+                </button>
+              </div>
+
+              <div v-if="templateOpen" class="tpl-box">
+                <p class="ocr-hint">
+                  Mô tả cách khách này hay viết để phân tích đúng hơn. Mẫu chỉ được lưu khi bạn bấm Lưu mẫu, hệ thống không tự học thêm.
+                </p>
+                <div class="tpl-grid">
+                  <div class="field">
+                    <label for="tpl-type">Hạng mục mặc định</label>
+                    <AppSelect id="tpl-type" v-model="templateDraft.defaultType">
+                      <option value="">Không đặt (dòng không ghi hạng mục sẽ bị đánh dấu)</option>
+                      <option v-for="t in betTypes" :key="t" :value="t">{{ betTypeLabel(t) }}</option>
+                    </AppSelect>
+                  </div>
+                  <div class="field">
+                    <label for="tpl-alias">Cách viết hạng mục</label>
+                    <div class="input-wrap"><input id="tpl-alias" v-model="templateDraft.aliasText" type="text" placeholder="vd: dd=de, l=lo" /></div>
+                  </div>
+                  <div class="field">
+                    <label for="tpl-markers">Dấu ngăn điểm</label>
+                    <div class="input-wrap"><input id="tpl-markers" v-model="templateDraft.markersText" type="text" placeholder="vd: x, con, =" /></div>
+                  </div>
+                </div>
+                <div class="paste-actions">
+                  <button type="button" class="btn btn-secondary btn-sm" @click="saveTemplate">Lưu mẫu cho {{ form.customerName }}</button>
+                  <button v-if="savedTemplate" type="button" class="btn btn-ghost btn-sm" @click="deleteTemplate">Xoá mẫu</button>
+                </div>
+                <p v-if="templateMsg" class="ocr-hint">{{ templateMsg }}</p>
+              </div>
+
+              <div v-if="pasteError" class="alert alert-error" style="margin-top: 8px">{{ pasteError }}</div>
+
+              <div v-if="previewRows.length" class="preview">
+                <p class="ocr-hint">
+                  Đã chọn {{ previewSelected.length }}/{{ previewRows.length }} dòng<span v-if="previewUncertain">, {{ previewUncertain }} dòng chưa chắc chắn (tô vàng)</span>.
+                </p>
+                <div
+                  v-for="r in previewRows"
+                  :key="r.uid"
+                  class="pv-row"
+                  :class="{ 'is-uncertain': r.uncertain }"
+                >
+                  <label class="mr-check"><input v-model="r.selected" type="checkbox" :aria-label="`Chọn dòng ${r.value}`" /></label>
+                  <AppSelect v-model="r.type" class="mr-type" aria-label="Hạng mục">
+                    <option v-for="t in betTypes" :key="t" :value="t">{{ betTypeLabel(t) }}</option>
+                  </AppSelect>
+                  <input v-model="r.value" type="text" class="mr-input mr-number" aria-label="Số" />
+                  <input v-model="r.score" type="text" inputmode="decimal" class="mr-input" placeholder="Điểm vào" aria-label="Điểm vào" />
+                  <div v-if="r.uncertain" class="pv-reason">Chưa chắc chắn: {{ r.reasons.join('; ') }} (dòng gốc: {{ r.raw }})</div>
+                </div>
+                <p v-if="previewIgnored.length" class="ocr-hint">Bỏ qua {{ previewIgnored.length }} dòng không có số: {{ previewIgnored.join(' / ') }}</p>
+                <div class="paste-actions">
+                  <button type="button" class="btn btn-primary btn-sm" :disabled="pasteSaving || !canAdd || !previewSelected.length" @click="savePreview">
+                    {{ pasteSaving ? 'Đang lưu...' : `Xác nhận và lưu ${previewSelected.length} dòng` }}
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" :disabled="!previewSelected.length" @click="previewToRows">Đưa vào bảng nhập tay để sửa</button>
+                  <button type="button" class="btn btn-ghost btn-sm" @click="clearPreview">Bỏ xem trước</button>
+                </div>
               </div>
             </div>
           </div>
@@ -630,15 +946,49 @@ async function deleteAllEntries() {
 
         <section class="card list-card">
           <div class="list-inner">
-            <h3 class="list-title">Danh sách số liệu {{ form.customerName ? `: ${form.customerName}` : '' }}</h3>
+            <h3 class="list-title">Danh sách số liệu {{ form.customerName && !filters.all ? `: ${form.customerName}` : '' }}</h3>
+
+            <!-- Tìm kiếm & bộ lọc (K17): chạy ngay trên dữ liệu đã tải, dùng được cả khi offline -->
+            <div class="filter-bar" role="search">
+              <div class="field filter-q">
+                <div class="input-wrap">
+                  <AppIcon name="search" class="filter-icon" />
+                  <input v-model="filters.q" type="search" placeholder="Từ khoá (số, ghi chú, điểm...)" aria-label="Tìm theo từ khoá" />
+                </div>
+              </div>
+              <div class="field filter-date">
+                <div class="input-wrap"><input v-model="filters.date" type="date" aria-label="Lọc theo ngày" /></div>
+              </div>
+              <AppSelect v-model="filters.type" class="filter-type" aria-label="Lọc theo loại">
+                <option value="">Mọi hạng mục</option>
+                <option v-for="t in betTypes" :key="t" :value="t">{{ betTypeLabel(t) }}</option>
+              </AppSelect>
+              <label class="filter-all">
+                <input v-model="filters.all" type="checkbox" /> Tất cả khách hàng
+              </label>
+              <button v-if="hasFilter" type="button" class="btn btn-ghost btn-sm" @click="clearFilters">Xoá lọc</button>
+            </div>
+            <div class="copy-bar">
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="filteredEntries.length === 0" @click="copyShown">
+                Sao chép {{ filteredEntries.length }} số liệu đang hiện
+              </button>
+              <label class="filter-all">
+                <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
+              </label>
+              <span v-if="copyMessage" class="copy-msg" role="status">{{ copyMessage }}</span>
+            </div>
+
             <div v-if="loading" class="list-empty">Đang tải...</div>
             <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
-            <div v-else-if="!form.customerName" class="list-empty">Chọn khách hàng để xem và nhập số liệu.</div>
-            <div v-else-if="visibleEntries.length === 0" class="list-empty">Khách hàng này chưa có số liệu nào.</div>
+            <div v-else-if="!form.customerName && !filters.all" class="list-empty">Chọn khách hàng để xem và nhập số liệu.</div>
+            <div v-else-if="filteredEntries.length === 0" class="list-empty">
+              {{ hasFilter ? 'Không có số liệu nào khớp bộ lọc.' : 'Khách hàng này chưa có số liệu nào.' }}
+            </div>
             <div v-else class="entries-table-wrap">
               <table class="table entries-table stack-table">
                 <thead>
                   <tr>
+                    <th v-if="filters.all">Khách hàng</th>
                     <th>Ngày</th>
                     <th>Hạng mục</th>
                     <th>Số</th>
@@ -650,9 +1000,10 @@ async function deleteAllEntries() {
                   </tr>
                 </thead>
                 <tbody>
-                  <template v-for="entry in visibleEntries" :key="entry.id">
+                  <template v-for="entry in filteredEntries" :key="entry.id">
                     <tr>
-                      <td data-label="Ngày">{{ entry.entryDate }}</td>
+                      <td v-if="filters.all" data-label="Khách hàng">{{ entry.customerName }}</td>
+                      <td data-label="Ngày">{{ entry.entryDate }}<span v-if="entry.pending" class="chip pending-chip">Chờ đồng bộ</span></td>
                       <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}</td>
                       <td data-label="Số" class="cell-num">{{ entry.value }}</td>
                       <td data-label="Điểm vào" class="cell-points">{{ entry.score || '-' }}</td>
@@ -668,13 +1019,13 @@ async function deleteAllEntries() {
                       </td>
                     </tr>
                     <tr v-if="deleteErrors[entry.id]" class="row-error">
-                      <td colspan="8"><div class="alert alert-error">{{ deleteErrors[entry.id] }}</div></td>
+                      <td :colspan="filters.all ? 9 : 8"><div class="alert alert-error">{{ deleteErrors[entry.id] }}</div></td>
                     </tr>
                   </template>
                 </tbody>
               </table>
             </div>
-            <div v-if="!loading && !loadError && form.customerName" class="list-stats">
+            <div v-if="!loading && !loadError && form.customerName && !filters.all" class="list-stats">
               <h3 class="stats-title">Thống kê: {{ form.customerName }}</h3>
               <p class="page-subtitle" style="margin-top: -8px">
                 Tính trên {{ visibleEntries.length }} số liệu của khách hàng đang chọn (điểm vào/ra để trống được tính là 0).
@@ -752,6 +1103,110 @@ async function deleteAllEntries() {
 </template>
 
 <style scoped>
+/* K17 filters, K18 copy, K13 paste preview, offline markers */
+.notice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.filter-bar,
+.copy-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.filter-bar .field {
+  margin-bottom: 0;
+}
+.filter-q {
+  flex: 1 1 200px;
+}
+.filter-date {
+  flex: 0 1 170px;
+}
+.filter-type {
+  flex: 0 1 170px;
+}
+.filter-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.filter-q input {
+  padding-left: 38px;
+}
+.filter-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filter-all input {
+  width: 18px;
+  height: 18px;
+}
+.copy-msg {
+  font-size: 14px;
+  font-weight: 700;
+}
+.pending-chip {
+  margin-left: 6px;
+  font-size: 11px;
+}
+.paste-box {
+  margin-bottom: 16px;
+}
+.paste-body {
+  margin-top: 8px;
+}
+.paste-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tpl-box,
+.preview {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0 12px;
+}
+.pv-row {
+  display: grid;
+  grid-template-columns: 28px minmax(88px, 1fr) minmax(64px, 1fr) minmax(72px, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.pv-row.is-uncertain {
+  background: var(--warning-soft);
+}
+.pv-reason {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--warning-text);
+}
+
 /* Page-local control tokens: a border that stays >=3:1 against the card in
    both themes, and one shared control height so every input lines up. */
 .page {

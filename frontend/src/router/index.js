@@ -13,6 +13,8 @@
 //   - `meta.requiresAdmin: true`     -> additionally requires role==='admin'.
 //                                        Guard redirects non-admins to `/`
 //                                        (not a broken page).
+//   - `meta.parent`                  -> route name of the parent screen; AppShell
+//                                        shows a "Quay lại" button to it (K44).
 //   - `meta.title`                   -> human-readable page title, used by
 //                                        PlaceholderView and can be reused
 //                                        for <title>/breadcrumbs by real
@@ -39,6 +41,8 @@ import AdminSettingsView from '../views/admin/SettingsView.vue'
 import AdminRenewalsView from '../views/admin/RenewalsView.vue'
 import AdminPaymentRequestsView from '../views/admin/PaymentRequestsView.vue'
 import AdminMessagesView from '../views/admin/MessagesView.vue'
+import AdminNoticesView from '../views/admin/NoticesView.vue'
+import AdminBackupsView from '../views/admin/BackupsView.vue'
 import AdminMessageThreadView from '../views/admin/MessageThreadView.vue'
 
 const routes = [
@@ -54,7 +58,7 @@ const routes = [
     path: '/scoring-settings',
     name: 'scoring-settings',
     component: ScoringSettingsView,
-    meta: { userOnly: true, title: 'Cấu hình tính điểm' },
+    meta: { userOnly: true, title: 'Cấu hình tính điểm', parent: 'scoring' },
   },
   { path: '/customers', name: 'customers', component: CustomersView, meta: { userOnly: true, title: 'Khách hàng' } },
   { path: '/friends', name: 'friends', component: FriendsView, meta: { userOnly: true, title: 'Bạn bè & tin nhắn' } },
@@ -111,7 +115,19 @@ const routes = [
     path: '/admin/messages/:userId',
     name: 'admin-messages-thread',
     component: AdminMessageThreadView,
-    meta: { title: 'Cuộc trò chuyện', requiresAdmin: true },
+    meta: { title: 'Cuộc trò chuyện', requiresAdmin: true, parent: 'admin-messages' },
+  },
+  {
+    path: '/admin/notices',
+    name: 'admin-notices',
+    component: AdminNoticesView,
+    meta: { title: 'Thông báo & bảo trì', requiresAdmin: true },
+  },
+  {
+    path: '/admin/backups',
+    name: 'admin-backups',
+    component: AdminBackupsView,
+    meta: { title: 'Sao lưu dữ liệu', requiresAdmin: true },
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
