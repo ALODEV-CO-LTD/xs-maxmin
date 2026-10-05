@@ -4,6 +4,9 @@
     'second_password_required'   -> ask second password, POST /api/auth/step2
                                      (which can itself return 'done' or
                                      'wipe_confirmation_required')
+    'recover' / 'recover_code'   -> "Quên mật khẩu": username + mã khôi phục +
+                                     new password (POST /api/auth/recover), then
+                                     the NEW code is shown once
     'wipe_confirmation_required' -> explicit destructive-confirm dialog,
                                      only then POST /api/auth/confirm-wipe
 -->
@@ -13,12 +16,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { api, ApiError } from '../api'
 import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/AuthLayout.vue'
+import PasswordInput from '../components/PasswordInput.vue'
+import RecoveryCodeDisplay from '../components/RecoveryCodeDisplay.vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-// 'credentials' | 'second_password' | 'wipe_confirm' | 'wipe_done'
+// 'credentials' | 'second_password' | 'wipe_confirm' | 'wipe_done' | 'recover' | 'recover_code'
 const stage = ref('credentials')
 const loading = ref(false)
 const error = ref('')
@@ -112,6 +117,59 @@ async function confirmWipe() {
   }
 }
 
+const recoverUsername = ref('')
+const recoverCode = ref('')
+const recoverNewPassword = ref('')
+const recoverConfirm = ref('')
+const newRecoveryCode = ref('')
+
+function startRecover() {
+  error.value = ''
+  recoverUsername.value = username.value.trim()
+  recoverCode.value = ''
+  recoverNewPassword.value = ''
+  recoverConfirm.value = ''
+  stage.value = 'recover'
+}
+
+async function submitRecover() {
+  error.value = ''
+  if (!recoverUsername.value.trim() || !recoverCode.value.trim()) {
+    error.value = 'Vui lòng nhập tên đăng nhập và mã khôi phục'
+    return
+  }
+  if (recoverNewPassword.value.length < 6) {
+    error.value = 'Mật khẩu mới phải có ít nhất 6 ký tự'
+    return
+  }
+  if (recoverNewPassword.value !== recoverConfirm.value) {
+    error.value = 'Mật khẩu nhập lại không khớp'
+    return
+  }
+  loading.value = true
+  try {
+    const res = await api.post('/auth/recover', {
+      username: recoverUsername.value.trim(),
+      recoveryCode: recoverCode.value.trim(),
+      newPassword: recoverNewPassword.value,
+    })
+    newRecoveryCode.value = res.recoveryCode
+    recoverCode.value = ''
+    recoverNewPassword.value = ''
+    recoverConfirm.value = ''
+    stage.value = 'recover_code'
+  } catch (e) {
+    error.value = e instanceof ApiError ? e.message : 'Đã xảy ra lỗi, vui lòng thử lại'
+  } finally {
+    loading.value = false
+  }
+}
+
+function recoverDone() {
+  newRecoveryCode.value = ''
+  backToCredentials()
+}
+
 function backToCredentials() {
   stage.value = 'credentials'
   password.value = ''
@@ -168,6 +226,9 @@ function backToCredentials() {
       </button>
 
       <p class="auth-footer">
+        <a href="#" @click.prevent="startRecover">Quên mật khẩu?</a>
+      </p>
+      <p class="auth-footer">
         Chưa có tài khoản? <RouterLink to="/register">Đăng ký</RouterLink>
       </p>
     </form>
@@ -202,6 +263,43 @@ function backToCredentials() {
       </button>
       <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Quay lại</button>
     </form>
+
+    <form v-else-if="stage === 'recover'" @submit.prevent="submitRecover">
+      <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
+      <p style="color: var(--muted); font-size: 15px; margin-bottom: 24px">
+        Nhập tên đăng nhập và mã khôi phục để đặt mật khẩu mới. Sau khi đặt lại, bạn sẽ nhận một mã khôi phục mới (mã cũ
+        không dùng được nữa).
+      </p>
+      <div class="field">
+        <label for="rec-username">Tên đăng nhập</label>
+        <div class="input-wrap">
+          <input id="rec-username" v-model="recoverUsername" type="text" autocomplete="username" :disabled="loading" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="rec-code">Mã khôi phục</label>
+        <div class="input-wrap">
+          <input id="rec-code" v-model="recoverCode" type="text" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX" :disabled="loading" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="rec-new">Mật khẩu mới</label>
+        <PasswordInput id="rec-new" v-model="recoverNewPassword" autocomplete="new-password" placeholder="Ít nhất 6 ký tự" :disabled="loading" />
+      </div>
+      <div class="field">
+        <label for="rec-confirm">Nhập lại mật khẩu mới</label>
+        <PasswordInput id="rec-confirm" v-model="recoverConfirm" autocomplete="new-password" :disabled="loading" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
+        {{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}
+      </button>
+      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Quay lại đăng nhập</button>
+    </form>
+
+    <div v-else-if="stage === 'recover_code'">
+      <div class="alert alert-success">Đã đặt lại mật khẩu. Đây là mã khôi phục mới của bạn.</div>
+      <RecoveryCodeDisplay :code="newRecoveryCode" continue-text="Về trang đăng nhập" @confirmed="recoverDone" />
+    </div>
 
     <div v-else-if="stage === 'wipe_confirm'">
       <div class="alert alert-warning">

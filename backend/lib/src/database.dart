@@ -75,6 +75,14 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'direct_messages', 'attachment_type', 'TEXT');
   _ensureColumn(db, 'direct_messages', 'attachment_size', 'INTEGER');
   _ensureColumn(db, 'direct_messages', 'attachment_data', 'BLOB');
+  // Mã khôi phục (K07/K08): only a bcrypt hash of the code is stored, never
+  // the code itself (see recovery_codes.dart). The failed-attempt counter and
+  // lock-until timestamp throttle guessing on /api/auth/recover. All nullable
+  // / defaulted so existing accounts simply have "no code yet".
+  _ensureColumn(db, 'users', 'recovery_code_hash', 'TEXT');
+  _ensureColumn(db, 'users', 'recovery_code_created_at', 'TEXT');
+  _ensureColumn(db, 'users', 'recovery_failed_attempts', 'INTEGER NOT NULL DEFAULT 0');
+  _ensureColumn(db, 'users', 'recovery_locked_until', 'TEXT');
 }
 
 void _ensureColumn(Database db, String table, String column, String type) {

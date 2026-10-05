@@ -5,6 +5,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:server/src/package_plans.dart';
+import 'package:server/src/recovery_codes.dart';
 import 'package:server/src/security.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -114,10 +115,15 @@ Future<Response> onRequest(RequestContext context) async {
   // Every customer gets a Mã ID right away so others can find them by it.
   ensureCustomerCode(db, id);
 
+  // Mã khôi phục: shown to the user exactly once in this response (only its
+  // hash is stored) - the client must make them confirm they saved it.
+  final recoveryCode = rotateRecoveryCode(db, id);
+
   // The account now has a second password, so the client must still go
   // through step 2 before it gets a real session - same as any login.
   return Response.json(statusCode: 201, body: {
     'stage': 'second_password_required',
     'pendingToken': issuePendingSecondFactorToken(id),
+    'recoveryCode': recoveryCode,
   });
 }
