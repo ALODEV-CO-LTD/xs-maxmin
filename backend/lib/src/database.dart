@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package_plans.dart';
 import 'customer_codes.dart';
+import 'deletion_scheduler.dart';
 
 const _uuid = Uuid();
 
@@ -41,6 +42,8 @@ Database _openAppDatabase() {
   for (final u in db.select("SELECT id FROM users WHERE role = 'user'")) {
     ensureCustomerCode(db, u['id'] as String);
   }
+  // Background job that carries out the deletion schedules (K35/K36/S05).
+  startDeletionScheduler(db);
   return db;
 }
 
@@ -75,6 +78,8 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'direct_messages', 'attachment_type', 'TEXT');
   _ensureColumn(db, 'direct_messages', 'attachment_size', 'INTEGER');
   _ensureColumn(db, 'direct_messages', 'attachment_data', 'BLOB');
+  // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
+  _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
 }
 
 void _ensureColumn(Database db, String table, String column, String type) {
@@ -237,6 +242,30 @@ void _createSchema(Database db) {
       name TEXT NOT NULL,
       created_at TEXT NOT NULL,
       UNIQUE (user_id, name)
+    );
+  ''');
+
+  // User-set deletion schedules (K35/K36/S05). `kind` is 'data' (the user's
+  // own saved entries, optionally narrowed by customer and/or date range) or
+  // 'chat' (messages/images in one friend conversation older than
+  // `ttl_seconds`, re-applied every run until cancelled). 'data' schedules
+  // run once at `run_at`; `friend_id`/`ttl_seconds` apply to 'chat' only.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS deletion_schedules (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('data', 'chat')),
+      customer_name TEXT,
+      date_from TEXT,
+      date_to TEXT,
+      friend_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      chat_scope TEXT,
+      ttl_seconds INTEGER,
+      run_at TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'cancelled')),
+      deleted_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      executed_at TEXT
     );
   ''');
 }

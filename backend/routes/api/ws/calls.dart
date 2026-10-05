@@ -6,7 +6,7 @@ import 'package:server/src/call_signaling.dart';
 import 'package:server/src/security.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// `GET /api/ws/calls?token=<jwt>` - signaling relay for WebRTC voice/video
+/// `GET /api/ws/calls?token=<jwt>` - signaling relay for WebRTC voice
 /// calls between friends, used by FriendsView's call button. A browser's
 /// WebSocket handshake can't carry a custom `Authorization` header, so
 /// unlike every other route the JWT travels as a query param here and is
@@ -20,6 +20,9 @@ import 'package:sqlite3/sqlite3.dart';
 ///     if they're not connected right now.
 ///   - `offer` / `answer` / `ice` - standard WebRTC SDP/ICE exchange.
 ///   - `call-reject` / `call-end` - hang up before or during a call.
+/// Voice only: the product has no video calling, so any message flagged
+/// `video: true` (or an offer/answer SDP that carries a video m-line) is
+/// refused with a `call-error` instead of being relayed.
 /// Every inbound message is re-broadcast to `to` unchanged except `to` is
 /// replaced with `from: <sender's own id>` so the receiver knows who it's
 /// from without being able to spoof it.
@@ -84,6 +87,13 @@ Future<Response> onRequest(RequestContext context) async {
             return;
           }
 
+          // Voice-only rule (K31): enforced here because the client is
+          // untrusted - hiding the video button is not enough.
+          if (_wantsVideo(msg)) {
+            channel.sink.add(jsonEncode({'type': 'call-error', 'error': 'Chỉ hỗ trợ gọi thoại, không hỗ trợ gọi video.'}));
+            return;
+          }
+
           final payload = Map<String, dynamic>.from(msg)
             ..remove('to')
             ..['from'] = userId;
@@ -125,4 +135,16 @@ Future<Response> onRequest(RequestContext context) async {
   );
 
   return handler(context);
+}
+
+/// True when a signaling message asks for video: an explicit `video: true`
+/// flag (call-invite) or an SDP offer/answer containing a video media line.
+bool _wantsVideo(Map<String, dynamic> msg) {
+  final video = msg['video'];
+  if (video == true || video == 'true' || video == 1) return true;
+  final sdp = msg['sdp'];
+  if (sdp is Map && sdp['sdp'] is String && RegExp(r'^m=video ', multiLine: true).hasMatch(sdp['sdp'] as String)) {
+    return true;
+  }
+  return false;
 }
