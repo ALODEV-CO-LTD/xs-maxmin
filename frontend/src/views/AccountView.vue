@@ -15,6 +15,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
 import AppIcon from '../components/AppIcon.vue'
+import PrivacySettings from '../components/PrivacySettings.vue'
+import RecoveryCodePanel from '../components/RecoveryCodePanel.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -460,6 +462,12 @@ async function deleteAllData() {
           {{ wipeSubmitting ? 'Đang lưu...' : user?.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu' }}
         </button>
       </form>
+      </div>
+
+      <!-- Mã khôi phục + quyền riêng tư (components/RecoveryCodePanel, PrivacySettings) -->
+      <div class="account-top">
+        <RecoveryCodePanel v-if="!auth.isAdmin" />
+        <PrivacySettings />
       </div>
 
       <!-- Delete data -->
