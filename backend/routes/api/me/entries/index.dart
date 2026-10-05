@@ -37,6 +37,7 @@ Response _list(RequestContext context, String userId) {
             'betType': r['bet_type'],
             'note': r['note'],
             'createdAt': r['created_at'],
+            'updatedAt': r['updated_at'] ?? r['created_at'],
           },
       ],
     },
@@ -77,6 +78,22 @@ Future<Response> _create(RequestContext context, String userId) async {
     }
   }
 
+  // Offline queue replay: the client picks the id up front so a retry after a
+  // lost response can't create a duplicate - an existing row with the same id
+  // (same user) is simply returned again.
+  final clientId = (body['clientId'] as String?)?.trim();
+  final hasClientId = clientId != null && RegExp(r'^[A-Za-z0-9-]{8,64}$').hasMatch(clientId);
+  if (hasClientId) {
+    final dup = context.read<Database>().select('SELECT * FROM data_entries WHERE id = ?', [clientId]);
+    if (dup.isNotEmpty) {
+      final r = dup.first;
+      if (r['user_id'] != userId) {
+        return Response.json(statusCode: 409, body: {'error': 'Mã bản ghi đã tồn tại'});
+      }
+      return Response.json(body: _entryJson(r));
+    }
+  }
+
   final self = loadSelfRow(context, userId);
   if (self == null) return unauthorized('Tài khoản không tồn tại');
 
@@ -100,14 +117,14 @@ Future<Response> _create(RequestContext context, String userId) async {
   }
 
   final db = context.read<Database>();
-  final id = newId();
+  final id = hasClientId ? clientId : newId();
   final createdAt = now.toIso8601String();
   db.execute(
     '''
-    INSERT INTO data_entries (id, user_id, customer_name, entry_date, value, score, result, bet_type, note, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO data_entries (id, user_id, customer_name, entry_date, value, score, result, bet_type, note, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''',
-    [id, userId, customerName, entryDate, value, score, result, betType, note, createdAt],
+    [id, userId, customerName, entryDate, value, score, result, betType, note, createdAt, createdAt],
   );
   db.execute('UPDATE users SET data_used = data_used + 1 WHERE id = ?', [userId]);
 
@@ -123,6 +140,20 @@ Future<Response> _create(RequestContext context, String userId) async {
       'betType': betType,
       'note': note,
       'createdAt': createdAt,
+      'updatedAt': createdAt,
     },
   );
 }
+
+Map<String, Object?> _entryJson(Row r) => {
+      'id': r['id'],
+      'customerName': r['customer_name'],
+      'entryDate': r['entry_date'],
+      'value': r['value'],
+      'score': r['score'],
+      'result': r['result'],
+      'betType': r['bet_type'],
+      'note': r['note'],
+      'createdAt': r['created_at'],
+      'updatedAt': r['updated_at'] ?? r['created_at'],
+    };

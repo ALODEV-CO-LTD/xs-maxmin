@@ -42,6 +42,34 @@ Future<Response> onRequest(RequestContext context, String id) async {
   }
 
   final row = existing.first;
+
+  // Conflict check (offline sync): the client sends the `updatedAt` it last
+  // saw as `baseUpdatedAt`. If the row changed since, answer 409 with the
+  // current server copy unless the user chose to overwrite (`force: true`).
+  final currentVersion = (row['updated_at'] ?? row['created_at']) as String;
+  final baseUpdatedAt = (body['baseUpdatedAt'] as String?)?.trim();
+  if (baseUpdatedAt != null && baseUpdatedAt.isNotEmpty && body['force'] != true && baseUpdatedAt != currentVersion) {
+    return Response.json(
+      statusCode: 409,
+      body: {
+        'error': 'Số liệu đã được sửa ở nơi khác',
+        'conflict': true,
+        'server': {
+          'id': id,
+          'customerName': row['customer_name'],
+          'entryDate': row['entry_date'],
+          'value': row['value'],
+          'score': row['score'],
+          'result': row['result'],
+          'betType': row['bet_type'],
+          'note': row['note'],
+          'createdAt': row['created_at'],
+          'updatedAt': currentVersion,
+        },
+      },
+    );
+  }
+
   final value = (body['value'] as String?)?.trim() ?? row['value'] as String;
   final customerName =
       (body['customerName'] as String?)?.trim() ?? row['customer_name'] as String?;
@@ -75,13 +103,14 @@ Future<Response> onRequest(RequestContext context, String id) async {
       ? (body['note'] as String?)?.trim()
       : row['note'] as String?;
 
+  final updatedAt = DateTime.now().toUtc().toIso8601String();
   db.execute(
     '''
     UPDATE data_entries
-    SET customer_name = ?, entry_date = ?, value = ?, score = ?, result = ?, bet_type = ?, note = ?
+    SET customer_name = ?, entry_date = ?, value = ?, score = ?, result = ?, bet_type = ?, note = ?, updated_at = ?
     WHERE id = ? AND user_id = ?
     ''',
-    [customerName, entryDate, value, score, result, betType, note, id, auth.userId],
+    [customerName, entryDate, value, score, result, betType, note, updatedAt, id, auth.userId],
   );
 
   return Response.json(
@@ -95,6 +124,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
       'betType': betType,
       'note': note,
       'createdAt': row['created_at'],
+      'updatedAt': updatedAt,
     },
   );
 }

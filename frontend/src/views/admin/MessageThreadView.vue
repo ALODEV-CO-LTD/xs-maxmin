@@ -66,7 +66,6 @@ onMounted(load)
 
 <template>
   <div class="page">
-    <button class="btn btn-ghost btn-sm" style="margin-bottom: 8px" @click="goBack"><AppIcon name="arrow-left" /> Quay lại</button>
     <h1 class="page-title">Cuộc trò chuyện</h1>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>

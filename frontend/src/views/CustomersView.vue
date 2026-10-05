@@ -18,10 +18,11 @@
 -->
 <script setup>
 import { showConfirm } from '../confirm'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../api'
 import AppIcon from '../components/AppIcon.vue'
+import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
 
 const route = useRoute()
 const router = useRouter()
@@ -180,6 +181,28 @@ function toggle(name) {
   expanded.value = name
   nextTick(() => detailBox.value?.focus())
 }
+// Sao chép (K18): the customer's entries, optionally only one day. Asks first
+// when the user turned on "Hỏi xác nhận trước khi sao chép".
+const copyDate = ref('')
+const confirmCopy = ref(confirmCopyEnabled())
+const copyMessage = ref('')
+watch(confirmCopy, (on) => setConfirmCopy(on))
+watch(expanded, () => {
+  copyDate.value = ''
+  copyMessage.value = ''
+})
+const copyList = computed(() => {
+  const list = detail.value?.entries || []
+  return copyDate.value ? list.filter((e) => e.entryDate === copyDate.value) : list
+})
+async function copyDetail() {
+  copyMessage.value = ''
+  const label = [detail.value.name, copyDate.value].filter(Boolean).join(', ')
+  const res = await copyEntries(copyList.value, { label })
+  if (res === 'copied') copyMessage.value = `Đã sao chép ${copyList.value.length} số liệu`
+  else if (res === 'failed') copyMessage.value = 'Không có số liệu để sao chép hoặc không sao chép được'
+}
+
 async function removeFromDetail(c) {
   await removeCustomer(c.rosterId, c.name)
   if (!roster.value.some((r) => r.id === c.rosterId)) expanded.value = null
@@ -282,6 +305,19 @@ async function removeFromDetail(c) {
               <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'">{{ formatNumber(detail.chenhLech) }}</dd>
             </div>
           </dl>
+          <div class="cd-copy">
+            <label class="cd-copy-date">
+              Ngày
+              <input v-model="copyDate" type="date" aria-label="Chỉ sao chép số liệu của ngày" />
+            </label>
+            <button type="button" class="btn btn-secondary" :disabled="copyList.length === 0" @click="copyDetail">
+              Sao chép {{ copyList.length }} số liệu
+            </button>
+            <label class="cd-copy-confirm">
+              <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
+            </label>
+            <span v-if="copyMessage" class="cd-copy-msg" role="status">{{ copyMessage }}</span>
+          </div>
           <div class="cd-actions">
             <button
               v-if="detail.rosterId"
@@ -428,6 +464,35 @@ async function removeFromDetail(c) {
 }
 .cd-stat dd.calc-out {
   color: var(--danger-text);
+}
+.cd-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.cd-copy-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cd-copy-date input {
+  min-height: 40px;
+}
+.cd-copy-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cd-copy-msg {
+  font-size: 14px;
+  font-weight: 700;
 }
 .cd-actions {
   display: flex;
