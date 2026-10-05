@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS users (
   data_used             INTEGER NOT NULL DEFAULT 0,
   status                TEXT NOT NULL DEFAULT 'active',
   created_at            TEXT NOT NULL,
-  scoring_rates         TEXT                -- JSON: {typeKey: {rate, tiers[]}} -- added via migration
+  scoring_rates         TEXT,               -- JSON: {typeKey: {rate, tiers[]}} -- added via migration
+  -- Mã khôi phục: bcrypt hash only (never the code), + throttle state -- added via migration
+  recovery_code_hash        TEXT,
+  recovery_code_created_at  TEXT,
+  recovery_failed_attempts  INTEGER NOT NULL DEFAULT 0,
+  recovery_locked_until     TEXT
 );
 
 

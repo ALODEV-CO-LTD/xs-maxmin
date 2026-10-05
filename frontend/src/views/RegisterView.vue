@@ -14,11 +14,13 @@ import { useAuthStore } from '../stores/auth'
 import AuthLayout from '../components/AuthLayout.vue'
 import AppIcon from '../components/AppIcon.vue'
 import PasswordInput from '../components/PasswordInput.vue'
+import RecoveryCodeDisplay from '../components/RecoveryCodeDisplay.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 
-const stage = ref('form') // 'form' | 'second_password'
+const stage = ref('form') // 'form' | 'recovery_code' | 'second_password'
+const recoveryCode = ref('') // shown once, then dropped
 const loading = ref(false)
 const error = ref('') // server / network errors only; field errors are inline
 
@@ -114,7 +116,9 @@ async function submitForm() {
     if (res.stage === 'second_password_required') {
       pendingToken.value = res.pendingToken
       step2Password.value = ''
-      stage.value = 'second_password'
+      // Mã khôi phục is shown once; the user must confirm they saved it first.
+      recoveryCode.value = res.recoveryCode || ''
+      stage.value = recoveryCode.value ? 'recovery_code' : 'second_password'
     } else {
       error.value = 'Phản hồi không xác định từ máy chủ'
     }
@@ -123,6 +127,11 @@ async function submitForm() {
   } finally {
     loading.value = false
   }
+}
+
+function recoveryConfirmed() {
+  recoveryCode.value = ''
+  stage.value = 'second_password'
 }
 
 async function submitStep2() {
@@ -303,6 +312,10 @@ async function submitStep2() {
         Đã có tài khoản? <RouterLink to="/login">Đăng nhập</RouterLink>
       </p>
     </form>
+
+    <div v-else-if="stage === 'recovery_code'">
+      <RecoveryCodeDisplay :code="recoveryCode" continue-text="Tiếp tục" @confirmed="recoveryConfirmed" />
+    </div>
 
     <form v-else @submit.prevent="submitStep2">
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
