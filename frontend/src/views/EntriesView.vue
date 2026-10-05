@@ -180,21 +180,13 @@ async function onImageSelected(e) {
   ocrRunning.value = true
   ocrProgress.value = 0
   try {
-    const { createWorker } = await import('tesseract.js')
-    const worker = await createWorker('vie', 1, {
-      logger: (m) => {
-        if (m.status === 'recognizing text') ocrProgress.value = Math.round((m.progress || 0) * 100)
-      },
-    })
-    try {
-      const { data } = await worker.recognize(file)
-      ocrRawText.value = (data.text || '').trim()
-      applyOcrGuess(ocrRawText.value)
-    } finally {
-      await worker.terminate()
-    }
+    const { recognizeText } = await import('../ocr')
+    const { text } = await recognizeText(file, { onProgress: (p) => (ocrProgress.value = p) })
+    ocrRawText.value = text.trim()
+    applyOcrGuess(ocrRawText.value)
   } catch (err) {
-    ocrError.value = 'Không đọc được ảnh (có thể do mạng chậm khi tải mô hình OCR lần đầu). Bạn có thể nhập tay.'
+    const { describeOcrError } = await import('../ocr')
+    ocrError.value = describeOcrError(err)
   } finally {
     ocrRunning.value = false
   }

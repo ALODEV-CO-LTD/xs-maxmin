@@ -344,20 +344,12 @@ async function onLrImageSelected(e) {
   lrOcrRunning.value = true
   lrOcrProgress.value = 0
   try {
-    const { createWorker } = await import('tesseract.js')
-    const worker = await createWorker('vie', 1, {
-      logger: (m) => {
-        if (m.status === 'recognizing text') lrOcrProgress.value = Math.round((m.progress || 0) * 100)
-      },
-    })
-    try {
-      const { data } = await worker.recognize(file)
-      applyLrOcrGuess(data.text || '')
-    } finally {
-      await worker.terminate()
-    }
+    const { recognizeLotteryTable } = await import('../ocr')
+    const { text } = await recognizeLotteryTable(file, { onProgress: (p) => (lrOcrProgress.value = p) })
+    applyLrOcrGuess(text)
   } catch (err) {
-    lrOcrError.value = 'Không đọc được ảnh. Bạn có thể nhập tay.'
+    const { describeOcrError } = await import('../ocr')
+    lrOcrError.value = describeOcrError(err)
   } finally {
     lrOcrRunning.value = false
   }
