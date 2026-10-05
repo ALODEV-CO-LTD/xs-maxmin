@@ -4,6 +4,7 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -40,6 +41,7 @@ Future<Response> onRequest(RequestContext context) async {
   db.execute('DELETE FROM messages WHERE user_id = ?', [userId]);
   db.execute('DELETE FROM transactions WHERE user_id = ?', [userId]);
   db.execute('UPDATE users SET data_used = 0 WHERE id = ?', [userId]);
+  logSecurityEvent(db, 'data_wiped', userId: userId, ip: clientIp(context), detail: 'Người dùng tự xoá dữ liệu');
 
   return Response.json(body: {'ok': true});
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/security.dart';
+import 'package:server/src/sessions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// Step 1 of login: verifies username + primary password. If the account
@@ -35,12 +36,16 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final db = context.read<Database>();
+  // K03/S03: too many wrong tries for this account+IP => temporary lock with
+  // growing backoff. Checked first, before any password work, and the reply
+  // is generic (never says which field was wrong). Nothing is deleted.
+  final ip = clientIp(context);
+  final wait = lockedSecondsLeft(db, username, ip);
+  if (wait > 0) return lockedResponse(wait);
+
   final rows = db.select('SELECT * FROM users WHERE username = ?', [username]);
   if (rows.isEmpty) {
-    return Response.json(
-      statusCode: 401,
-      body: {'error': 'Tên đăng nhập hoặc mật khẩu không đúng'},
-    );
+    return _loginFailed(db, username, ip, null);
   }
 
   final row = rows.first;
@@ -73,10 +78,7 @@ Future<Response> onRequest(RequestContext context) async {
         );
       }
     }
-    return Response.json(
-      statusCode: 401,
-      body: {'error': 'Tên đăng nhập hoặc mật khẩu không đúng'},
-    );
+    return _loginFailed(db, username, ip, row['id'] as String);
   }
 
   final userId = row['id'] as String;
@@ -89,12 +91,25 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final token = issueToken(userId: userId, role: row['role'] as String);
+  clearLoginFailures(db, username, ip);
+  final sessionId = createSession(db, userId, context);
+  final token = issueToken(userId: userId, role: row['role'] as String, sessionId: sessionId);
   return Response.json(
     body: {
       'stage': 'done',
       'token': token,
       'role': row['role'],
     },
+  );
+}
+
+/// Counts the wrong attempt and answers with the same generic message
+/// whichever field was wrong (or 429 if this attempt triggered a lock).
+Response _loginFailed(Database db, String username, String ip, String? userId) {
+  final lock = recordLoginFailure(db, username, ip, userId: userId);
+  if (lock > 0) return lockedResponse(lock);
+  return Response.json(
+    statusCode: 401,
+    body: {'error': 'Tên đăng nhập hoặc mật khẩu không đúng'},
   );
 }

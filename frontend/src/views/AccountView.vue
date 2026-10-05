@@ -46,6 +46,50 @@ async function loadMe() {
 }
 onMounted(loadMe)
 
+// --- Signed-in devices (remote sign-out) ---
+const sessions = ref([])
+const sessionsLoading = ref(true)
+const sessionsError = ref('')
+
+async function loadSessions() {
+  sessionsError.value = ''
+  try {
+    const data = await api.get('/me/sessions')
+    sessions.value = data.sessions || []
+  } catch (err) {
+    sessionsError.value = err.message || 'Không tải được danh sách thiết bị'
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+onMounted(loadSessions)
+
+async function revokeSession(s) {
+  if (!(await showConfirm({ title: 'Đăng xuất thiết bị', message: `Đăng xuất "${s.deviceLabel}" khỏi tài khoản?`, confirmText: 'Đăng xuất' }))) return
+  sessionsError.value = ''
+  try {
+    await api.del(`/me/sessions/${s.id}`)
+    await loadSessions()
+  } catch (err) {
+    sessionsError.value = err.message || 'Không đăng xuất được thiết bị'
+  }
+}
+
+async function revokeOtherSessions() {
+  if (!(await showConfirm({ title: 'Đăng xuất thiết bị khác', message: 'Đăng xuất tất cả thiết bị khác, chỉ giữ thiết bị này?', confirmText: 'Đăng xuất' }))) return
+  sessionsError.value = ''
+  try {
+    await api.del('/me/sessions')
+    await loadSessions()
+  } catch (err) {
+    sessionsError.value = err.message || 'Không đăng xuất được các thiết bị khác'
+  }
+}
+
+function fmtSeen(iso) {
+  return iso ? new Date(iso).toLocaleString('vi-VN') : '-'
+}
+
 // --- Edit own profile (name + username) ---
 const editingProfile = ref(false)
 const profileForm = reactive({ name: '', username: '', currentPassword: '' })
@@ -394,6 +438,40 @@ async function deleteAllData() {
         </div>
       </div>
 
+      </div>
+
+      <!-- Signed-in devices -->
+      <div class="card" style="margin-bottom: 16px">
+        <div class="card-head">
+          <h3 style="margin-top: 0">Thiết bị đang đăng nhập</h3>
+          <button
+            v-if="sessions.length > 1"
+            type="button"
+            class="btn btn-secondary btn-sm"
+            @click="revokeOtherSessions"
+          >
+            Đăng xuất thiết bị khác
+          </button>
+        </div>
+        <div v-if="sessionsError" class="alert alert-error">{{ sessionsError }}</div>
+        <div v-if="sessionsLoading">Đang tải...</div>
+        <div v-else-if="sessions.length === 0" class="page-subtitle" style="margin-bottom: 0">
+          Chưa có thông tin thiết bị (phiên đăng nhập cũ). Đăng nhập lại để theo dõi thiết bị.
+        </div>
+        <div v-else class="code-list">
+          <div v-for="s in sessions" :key="s.id" class="code-item">
+            <div>
+              <strong>{{ s.deviceLabel }}</strong>
+              <span v-if="s.current" class="chip chip-accent" style="margin-left: 8px">Thiết bị này</span>
+              <div class="page-subtitle" style="margin: 2px 0 0">
+                Hoạt động gần nhất: {{ fmtSeen(s.lastSeen) }} · IP {{ s.ip || '-' }}
+              </div>
+            </div>
+            <div v-if="!s.current" class="code-actions">
+              <button class="btn btn-ghost btn-sm" @click="revokeSession(s)">Đăng xuất</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="security-grid">

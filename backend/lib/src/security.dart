@@ -18,15 +18,20 @@ String _loadJwtSecret() {
   return base64UrlEncode(List<int>.generate(48, (_) => rng.nextInt(256)));
 }
 
-String issueToken({required String userId, required String role}) {
-  final jwt = JWT({'sub': userId, 'role': role});
+/// [sessionId] points at the `device_sessions` row (see sessions.dart) so the
+/// session can be revoked server-side; it is the JWT's `sid` claim.
+String issueToken({required String userId, required String role, String? sessionId}) {
+  final jwt = JWT({'sub': userId, 'role': role, if (sessionId != null) 'sid': sessionId});
   return jwt.sign(SecretKey(_jwtSecret), expiresIn: const Duration(days: 30));
 }
 
 class AuthTokenPayload {
-  AuthTokenPayload({required this.userId, required this.role});
+  AuthTokenPayload({required this.userId, required this.role, this.sessionId});
   final String userId;
   final String role;
+
+  /// Null for tokens issued before device sessions existed.
+  final String? sessionId;
 }
 
 AuthTokenPayload? verifyToken(String token) {
@@ -36,6 +41,7 @@ AuthTokenPayload? verifyToken(String token) {
     return AuthTokenPayload(
       userId: payload['sub'] as String,
       role: payload['role'] as String,
+      sessionId: payload['sid'] as String?,
     );
   } on JWTException {
     return null;

@@ -166,7 +166,27 @@ async function resetPrice(wire) {
   await save()
 }
 
+// Recent security events (failed logins, lockouts, session revocations, wipes)
+const events = ref([])
+const eventsError = ref('')
+const EVENT_LABELS = {
+  login_failed: 'Đăng nhập sai',
+  login_locked: 'Khoá tạm đăng nhập',
+  session_revoked: 'Thu hồi phiên',
+  data_wiped: 'Xoá dữ liệu',
+}
+
+async function loadEvents() {
+  eventsError.value = ''
+  try {
+    events.value = (await api.get('/admin/security-events?limit=50')).events || []
+  } catch (err) {
+    eventsError.value = err instanceof ApiError ? err.message : 'Không thể tải nhật ký bảo mật'
+  }
+}
+
 onMounted(load)
+onMounted(loadEvents)
 </script>
 
 <template>
@@ -231,6 +251,33 @@ onMounted(load)
       </button>
     </form>
     </template>
+
+    <h2 style="margin-top: 32px">Nhật ký bảo mật gần đây</h2>
+    <p class="page-subtitle">Không ghi mật khẩu hay token.</p>
+    <div v-if="eventsError" class="alert alert-error">{{ eventsError }}</div>
+    <div class="card" style="padding: 0">
+      <div v-if="events.length === 0" style="padding: 16px">Chưa có sự kiện nào.</div>
+      <table v-else class="table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Sự kiện</th>
+            <th>Tài khoản</th>
+            <th>IP</th>
+            <th>Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="e in events" :key="e.id">
+            <td>{{ new Date(e.createdAt).toLocaleString('vi-VN') }}</td>
+            <td>{{ EVENT_LABELS[e.type] || e.type }}</td>
+            <td>{{ e.username || '-' }}</td>
+            <td>{{ e.ip || '-' }}</td>
+            <td>{{ e.detail || '' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <template v-if="!loading && otherKeys.length > 0">
       <h2 style="margin-top: 32px">Các khoá cài đặt khác</h2>
