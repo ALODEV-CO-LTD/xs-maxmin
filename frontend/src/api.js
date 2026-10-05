@@ -18,9 +18,11 @@
 import { useAuthStore } from './stores/auth'
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, data = null) {
     super(message)
     this.status = status
+    // Parsed JSON body of the error response (e.g. the 409 conflict payload).
+    this.data = data
   }
 }
 
@@ -60,7 +62,7 @@ async function apiFetch(path, { method = 'GET', body, headers = {} } = {}) {
       auth.clear()
     }
     const message = data && typeof data.error === 'string' ? data.error : `Lỗi máy chủ (${res.status})`
-    throw new ApiError(res.status, message)
+    throw new ApiError(res.status, message, data)
   }
 
   return data
