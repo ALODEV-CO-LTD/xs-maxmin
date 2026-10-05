@@ -33,6 +33,16 @@ Future<Response> _put(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
+  // Per-account cap on Mã ID ("ID ảo", K23/A05): a whole number 1-100.
+  final cap = body['max_virtual_ids'];
+  if (cap != null) {
+    final n = int.tryParse(cap.toString().trim());
+    if (n == null || n < 1 || n > 100) {
+      return Response.json(statusCode: 400, body: {'error': 'Giới hạn ID ảo phải là số nguyên từ 1 đến 100'});
+    }
+    body['max_virtual_ids'] = n;
+  }
+
   final db = context.read<Database>();
   for (final entry in body.entries) {
     db.execute(
