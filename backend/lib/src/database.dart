@@ -143,6 +143,26 @@ void _createSchema(Database db) {
   ''');
   db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)');
 
+  // Call history (voice calls only). Written by the signaling relay, see
+  // call_log.dart. status: ringing | in_progress | completed | missed |
+  // rejected | busy | failed. callee_seen = 0 marks a missed call the callee
+  // has not looked at yet (drives the "cuộc gọi nhỡ" badge).
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS call_logs (
+      id TEXT PRIMARY KEY,
+      caller_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      callee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      answered_at TEXT,
+      ended_at TEXT,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      callee_seen INTEGER NOT NULL DEFAULT 0
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_id, created_at)');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_id, created_at)');
+
   db.execute('''
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,

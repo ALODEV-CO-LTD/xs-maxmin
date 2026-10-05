@@ -7,7 +7,8 @@
   API: GET /admin/messages -> { conversations: [{ userId, userName, avatar, lastMessage, lastMessageAt, unreadCount }] }
 -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useNotifyStore } from '../../stores/notify'
 import { useRouter } from 'vue-router'
 import { api, ApiError } from '../../api'
 
@@ -32,6 +33,15 @@ async function load() {
 function openThread(userId) {
   router.push({ name: 'admin-messages-thread', params: { userId } })
 }
+
+const notify = useNotifyStore()
+// A customer just wrote to Admin: refresh the list (pushed over the WebSocket).
+watch(
+  () => notify.incomingTick,
+  () => {
+    if (notify.lastIncoming?.source === 'support') load()
+  },
+)
 
 onMounted(load)
 </script>

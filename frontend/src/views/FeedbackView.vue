@@ -9,7 +9,8 @@
        POST /me/messages { content }
 -->
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useNotifyStore } from '../stores/notify'
 import { api } from '../api'
 import ChatAttachButtons from '../components/ChatAttachButtons.vue'
 import AttachmentPreview from '../components/AttachmentPreview.vue'
@@ -76,7 +77,21 @@ function timeLabel(iso) {
   return isNaN(d) ? '' : d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 }
 
+const notify = useNotifyStore()
+// The server pushes new replies over the WebSocket: show them right away
+// instead of waiting for the next poll.
+watch(
+  () => notify.incomingTick,
+  () => {
+    if (notify.lastIncoming?.source === 'support') {
+      load()
+      notify.clear('support')
+    }
+  },
+)
+
 onMounted(() => {
+  notify.clear('support')
   load({ initial: true })
   timer = setInterval(() => load(), POLL_MS)
 })

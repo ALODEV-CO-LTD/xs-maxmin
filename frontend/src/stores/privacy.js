@@ -20,6 +20,7 @@
 //     preview; blur only reduces what is left visible while the page is away.
 import { defineStore } from 'pinia'
 import { api } from '../api'
+import { useCallStore } from './call'
 
 const SETTINGS_KEY = 'xoso_privacy'
 const LOCKED_KEY = 'xoso_locked'
@@ -56,6 +57,17 @@ function loadSettings() {
   }
 }
 
+// A voice call must never be interrupted by the auto-lock or the blur: the
+// user is talking, not idle, and the call screen has to stay answerable.
+function inCall() {
+  try {
+    const call = useCallStore()
+    return call.status !== 'idle' || call.acquiring
+  } catch {
+    return false
+  }
+}
+
 let timer = null
 let hiddenAt = 0
 let lastWrite = 0
@@ -84,7 +96,7 @@ export const usePrivacyStore = defineStore('privacy', {
     },
 
     lock() {
-      if (this.locked) return
+      if (this.locked || inCall()) return
       this.locked = true
       writeStorage(LOCKED_KEY, '1')
     },
@@ -110,6 +122,11 @@ export const usePrivacyStore = defineStore('privacy', {
     // Locks if the idle limit has already passed (also covers sleep / reload).
     checkIdle() {
       if (this.locked || !this.autoLockMinutes) return
+      // Time on a call counts as activity, so the idle clock restarts when it ends.
+      if (inCall()) {
+        this.touch(true)
+        return
+      }
       const last = lastActive || Number(readStorage(ACTIVE_KEY)) || Date.now()
       if (Date.now() - last >= this.autoLockMinutes * 60000) this.lock()
     },
@@ -129,7 +146,7 @@ export const usePrivacyStore = defineStore('privacy', {
       events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
 
       const goAway = () => {
-        if (this.blurOnHide) this.away = true
+        if (this.blurOnHide && !inCall()) this.away = true
       }
       const comeBack = () => {
         this.away = false
