@@ -108,6 +108,7 @@ const attachment = ref(null) // File waiting to be sent with the next message
 // conversation next to the messages, plus the per-friend count of missed
 // calls the user has not looked at yet (badge in the friend list).
 const calls = ref([])
+const threadBody = ref(null) // scroll box of the open conversation
 const unseenMissed = ref({})
 
 function callLine(c) {
@@ -132,13 +133,14 @@ function callLine(c) {
 }
 const isMissedCall = (c) => c.direction === 'incoming' && (c.status === 'missed' || c.status === 'busy')
 
-// Messages and call entries in one chronological list.
+// Messages and call entries in one list, newest on top.
 const timeline = computed(() => {
   const items = [
     ...messages.value.map((m) => ({ kind: 'msg', key: m.id, at: m.createdAt, m })),
     ...calls.value.map((c) => ({ kind: 'call', key: `call-${c.id}`, at: c.createdAt, c })),
   ]
-  return items.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+  // Newest first: the latest message is always at the top, no scrolling down.
+  return items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 })
 
 async function loadCalls(friendId) {
@@ -326,6 +328,7 @@ async function sendMessage() {
     if (attachment.value) body.attachment = await fileToPayload(attachment.value)
     const msg = await api.post(`/me/friends/${selectedFriendId.value}/messages`, body)
     messages.value.push(msg)
+    threadBody.value && (threadBody.value.scrollTop = 0)
     newMessage.value = ''
     attachment.value = null
   } catch (err) {
@@ -412,11 +415,14 @@ async function sendMessage() {
               <div class="friend-info">
                 <strong>
                   {{ f.name }}
+                  <span v-if="notify.unread[`friend:${f.id}`]" class="unread-badge" title="Tin nhắn chưa đọc">
+                    {{ notify.unread[`friend:${f.id}`] > 99 ? '99+' : notify.unread[`friend:${f.id}`] }}
+                  </span>
                   <span v-if="unseenMissed[f.id]" class="missed-badge" title="Cuộc gọi nhỡ">
                     <AppIcon name="phone" /> {{ unseenMissed[f.id] }}
                   </span>
                 </strong>
-                <span class="friend-last">{{ f.lastMessage || 'Chưa có tin nhắn' }}</span>
+                <span class="friend-last" :class="{ 'has-unread': notify.unread[`friend:${f.id}`] }">{{ f.lastMessage || 'Chưa có tin nhắn' }}</span>
               </div>
               <button class="btn btn-ghost btn-sm" @click.stop="removeFriend(f)">Xoá</button>
             </div>
@@ -448,7 +454,7 @@ async function sendMessage() {
             @applied="loadMessages(selectedFriendId)"
           />
           <div v-if="messagesError" class="alert alert-error">{{ messagesError }}</div>
-          <div class="card thread-body">
+          <div ref="threadBody" class="card thread-body">
             <div v-if="messagesLoading">Đang tải tin nhắn...</div>
             <div v-else-if="timeline.length === 0" class="empty-thread">Chưa có tin nhắn nào.</div>
             <div v-else class="messages">
@@ -625,6 +631,22 @@ async function sendMessage() {
   color: var(--muted);
   text-align: center;
   padding: 24px 0;
+}
+.unread-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--danger, #ef4444);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.friend-last.has-unread {
+  color: var(--text);
+  font-weight: 600;
 }
 .missed-badge {
   display: inline-flex;

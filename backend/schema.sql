@@ -210,6 +210,16 @@ CREATE TABLE IF NOT EXISTS settings (
   value  TEXT NOT NULL
 );
 
+-- Read markers for the unread badges (peer_key = other user's id, or 'support'
+-- for a customer's conversation with Admin). Messages older than the
+-- 'unread_epoch' setting count as read when no marker exists.
+CREATE TABLE IF NOT EXISTS message_reads (
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  peer_key     TEXT NOT NULL,
+  last_read_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, peer_key)
+);
+
 
 -- -----------------------------------------------------------------------------
 -- Device sessions, login throttling and security event log

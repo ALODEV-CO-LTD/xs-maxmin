@@ -233,6 +233,25 @@ void _createSchema(Database db) {
     );
   ''');
 
+  // Read markers for the unread badges. One row per (user, conversation):
+  // peer_key is the other person's user id, or 'support' for a customer's
+  // conversation with Admin. A message counts as unread when it is newer than
+  // the marker - or, with no marker yet, newer than `unread_epoch` (the moment
+  // this feature was first switched on), so existing history is not reported as
+  // hundreds of unread messages.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS message_reads (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      peer_key TEXT NOT NULL,
+      last_read_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, peer_key)
+    );
+  ''');
+  db.execute(
+    "INSERT OR IGNORE INTO settings (key, value) VALUES ('unread_epoch', ?)",
+    [DateTime.now().toUtc().toIso8601String()],
+  );
+
   // A purchase/renew no longer applies instantly - the user transfers money
   // manually (bank info from `settings`, see package_plans.dart) and this
   // row sits 'pending' until an admin confirms the money arrived and

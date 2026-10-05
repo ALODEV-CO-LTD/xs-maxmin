@@ -164,6 +164,8 @@ export const useCallStore = defineStore('call', {
       socket.onopen = () => {
         this.socketReady = true
         loadIceServers()
+        // Messages may have arrived while the socket was down.
+        useNotifyStore().refresh()
       }
       socket.onclose = () => {
         this.socketReady = false

@@ -4,12 +4,15 @@
 // toast list, plays the ping, and bumps `incomingTick` so the open page
 // (friend chat / Phản hồi) reloads its conversation live.
 //
-// Unread counters live in memory only: they reset on a full page reload.
+// Unread counters are kept on the server (GET /me/unread, POST
+// /me/unread/read) so they survive a reload and include messages that arrived
+// while the user was offline; pushes only bump them in between refreshes.
 //
 // Unread keys: `friend:<friendId>` (chat), `support` (customer's Phản hồi),
 // `support:<userId>` (Admin's inbox, one per customer).
 import { defineStore } from 'pinia'
 import { askNotificationPermission, notifyMessage, playMessageTone } from '../callSounds'
+import { api } from '../api'
 import { router } from '../router'
 
 const TOAST_MS = 7000
@@ -77,8 +80,27 @@ export const useNotifyStore = defineStore('notify', {
       router.push(toast.to)
     },
 
+    // Loads the real counts from the server (page load, reconnect, tab focus).
+    async refresh() {
+      try {
+        const res = await api.get('/me/unread')
+        const next = {}
+        for (const [id, n] of Object.entries(res.friends || {})) if (n > 0) next[`friend:${id}`] = n
+        if (res.support > 0) next.support = res.support
+        for (const [id, n] of Object.entries(res.supportByUser || {})) if (n > 0) next[`support:${id}`] = n
+        this.unread = next
+      } catch {
+        /* badges are a nicety - keep whatever we have */
+      }
+    },
+
+    // The conversation is being read: drop its badge and tell the server so it
+    // stays read after a reload.
     clear(key) {
-      if (this.unread[key]) delete this.unread[key]
+      const had = !!this.unread[key]
+      if (had) delete this.unread[key]
+      const peerId = key === 'support' ? 'support' : key.split(':')[1]
+      if (peerId) api.post('/me/unread/read', { peerId }).catch(() => {})
     },
 
     clearAll() {

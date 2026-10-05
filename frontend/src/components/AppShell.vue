@@ -8,7 +8,7 @@
   route `name`/`path` values already match what's in src/router/index.js.
 -->
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
@@ -99,7 +99,15 @@ onMounted(() => {
   startSync()
   // Browsers only show the notification permission prompt after a click.
   window.addEventListener('pointerdown', () => notify.askPermission(), { once: true })
+  // Real unread counts from the server now, and again whenever the tab is
+  // brought back to the front.
+  notify.refresh()
+  document.addEventListener('visibilitychange', onVisible)
 })
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisible))
+function onVisible() {
+  if (!document.hidden) notify.refresh()
+}
 
 async function logout() {
   if (!(await showConfirm({ title: 'Đăng xuất', message: 'Bạn có chắc muốn đăng xuất?', confirmText: 'Đăng xuất' }))) return
@@ -127,6 +135,7 @@ async function logout() {
           @keydown="onMenuKey"
         >
           <AppIcon name="menu" />
+          <span v-if="notify.total" class="hdr-badge">{{ notify.total > 99 ? '99+' : notify.total }}</span>
         </button>
         <RouterLink :to="{ name: 'account' }" class="hdr-btn hdr-only-small" active-class="hdr-btn-active" aria-label="Tài khoản">
           <AppIcon name="user" />
@@ -297,6 +306,21 @@ async function logout() {
   overflow-y: auto;
 }
 
+.hdr-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger, #ef4444);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--bg, #111);
+}
 .nav-badge {
   margin-left: auto;
   min-width: 20px;
@@ -406,6 +430,7 @@ async function logout() {
 
 /* Header buttons (menu + account), phones/small tablets only */
 .hdr-btn {
+  position: relative;
   width: 40px;
   height: 40px;
   flex: none;
