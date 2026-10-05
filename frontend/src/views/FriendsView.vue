@@ -8,7 +8,7 @@
        GET/POST /me/friends/:friendId/messages,
        GET /me/friends/search?q= (find people by name/username to add)
 
-  Voice/video calling (the 📞/🎥 buttons on the thread header) goes through
+  Voice-only calling (the 📞 button on the thread header; no video) goes through
   useCallStore, not this component - it just tells the store who to call;
   the actual call UI is CallOverlay.vue, mounted globally in AppShell.vue.
 -->
@@ -17,6 +17,7 @@ import { showConfirm } from '../confirm'
 import AppIcon from '../components/AppIcon.vue'
 import ChatAttachButtons from '../components/ChatAttachButtons.vue'
 import AttachmentPreview from '../components/AttachmentPreview.vue'
+import ChatRetentionPanel from '../components/ChatRetentionPanel.vue'
 import MessageAttachment from '../components/MessageAttachment.vue'
 import { fileToPayload } from '../attachments'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -333,20 +334,18 @@ async function sendMessage() {
                 class="btn btn-ghost btn-sm"
                 title="Gọi thoại"
                 :disabled="call.status !== 'idle' || call.acquiring"
-                @click="selectedFriend && call.startCall(selectedFriend, { video: false })"
+                @click="selectedFriend && call.startCall(selectedFriend)"
               >
                 <AppIcon name="phone" />
               </button>
-              <button
-                class="btn btn-ghost btn-sm"
-                title="Gọi video"
-                :disabled="call.status !== 'idle' || call.acquiring"
-                @click="selectedFriend && call.startCall(selectedFriend, { video: true })"
-              >
-                <AppIcon name="video" />
-              </button>
             </div>
           </div>
+          <ChatRetentionPanel
+            v-if="!selectedFriend?.isAdmin"
+            :friend-id="selectedFriendId"
+            :friend-name="selectedFriend?.name || ''"
+            @applied="loadMessages(selectedFriendId)"
+          />
           <div v-if="messagesError" class="alert alert-error">{{ messagesError }}</div>
           <div class="card thread-body">
             <div v-if="messagesLoading">Đang tải tin nhắn...</div>
