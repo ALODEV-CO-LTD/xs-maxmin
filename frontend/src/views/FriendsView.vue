@@ -341,25 +341,28 @@ async function sendMessage() {
 
 <template>
   <div class="page friends-page">
-    <h1 class="page-title">Bạn bè & tin nhắn</h1>
-    <p class="page-subtitle">Kết bạn bằng mã ID và nhắn tin trực tiếp.</p>
+    <div class="page-head">
+      <div class="page-head-text">
+        <h1 class="page-title">Bạn bè & tin nhắn</h1>
+        <p class="page-subtitle">Kết bạn bằng mã ID và nhắn tin trực tiếp.</p>
+      </div>
+      <!-- Your own ID, top-right corner of the page -->
+      <div v-if="myCode" class="my-id-corner">
+        <span class="my-id-label">ID của bạn</span>
+        <span class="my-id-code">{{ myCode }}</span>
+        <button type="button" class="btn btn-secondary btn-sm" @click="copyMyCode">
+          {{ codeCopied ? 'Đã chép' : 'Sao chép' }}
+        </button>
+      </div>
+    </div>
 
     <div class="split" :class="{ 'show-thread': !!selectedFriendId }">
       <div class="list-pane">
-        <div v-if="myCode" class="card my-id">
-          <div>
-            <div class="my-id-label">ID của bạn</div>
-            <div class="my-id-code">{{ myCode }}</div>
-          </div>
-          <button type="button" class="btn btn-secondary btn-sm" @click="copyMyCode">
-            {{ codeCopied ? 'Đã chép' : 'Sao chép' }}
-          </button>
-        </div>
         <div class="card search-form">
           <label for="searchQuery" style="font-size: 13px; font-weight: 700; color: var(--muted)">
-            Tìm người theo tên, tài khoản hoặc mã ID
+            Tìm kiếm
           </label>
-          <input id="searchQuery" v-model="searchQuery" type="text" placeholder="Nhập tên, tài khoản hoặc mã ID..." style="margin-top: 6px" />
+          <input id="searchQuery" v-model="searchQuery" type="text" placeholder="Tên, tài khoản hoặc mã ID..." style="margin-top: 6px" />
           <div v-if="searchError" class="alert alert-error" style="margin: 8px 0 0">{{ searchError }}</div>
 
           <div v-if="searchQuery.trim()" class="search-results">
@@ -499,13 +502,6 @@ async function sendMessage() {
 </template>
 
 <style scoped>
-.my-id {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
 .my-id-label {
   font-size: 12px;
   font-weight: 700;
@@ -713,7 +709,13 @@ async function sendMessage() {
 
 @media (max-width: 800px) {
   .split {
-    grid-template-columns: 1fr;
+    /* minmax(0, ...) lets the column shrink to the screen; a plain 1fr stretched to the
+       widest content inside it and pushed the cards past the right edge on phones. */
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .list-pane,
+  .thread-pane {
+    min-width: 0;
   }
   .list-pane {
     display: block;
@@ -732,10 +734,13 @@ async function sendMessage() {
   }
 }
 /* ---- One unified left panel (ID, search, add by ID, friend list) ---- */
-.split {
-  grid-template-columns: 380px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
+/* wide screens only: on phones the single-column rule in the media query above must win */
+@media (min-width: 801px) {
+  .split {
+    grid-template-columns: 380px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
 }
 .list-pane {
   padding: 16px;
@@ -745,7 +750,6 @@ async function sendMessage() {
   box-shadow: var(--shadow-sm);
 }
 /* the former small cards become flat sections separated by hairlines */
-.list-pane > .my-id,
 .list-pane > .search-form,
 .list-pane > .add-form {
   margin: 0 0 16px;
@@ -768,7 +772,7 @@ async function sendMessage() {
   line-height: 1.2;
   color: var(--text-primary);
 }
-.my-id .btn,
+.my-id-corner .btn,
 .search-item .btn,
 .add-row .btn {
   min-height: 36px;
@@ -970,5 +974,42 @@ async function sendMessage() {
 }
 .call-buttons .btn:disabled {
   opacity: 0.45;
+}
+
+/* Page header: title on the left, own ID in the top-right corner */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.page-head .page-subtitle {
+  margin-bottom: 0;
+}
+.my-id-corner {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+.my-id-corner .my-id-code {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1.15;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+.my-id-corner .btn {
+  margin-top: 4px;
+}
+@media (max-width: 480px) {
+  .my-id-corner .my-id-code {
+    font-size: 19px;
+    letter-spacing: 1px;
+  }
 }
 </style>
