@@ -24,6 +24,9 @@ Map<String, dynamic> meJson(Row row) {
     'role': row['role'],
     'hasSecondPassword': row['second_password_hash'] != null,
     'hasWipePassword': row['wipe_password_hash'] != null,
+    // Only whether a mã khôi phục exists - the code itself is stored hashed
+    // and is never exposed (not here, not to admins).
+    'hasRecoveryCode': row['recovery_code_hash'] != null,
     'package': {
       'type': pkg.wireValue,
       'label': pkg.label,
