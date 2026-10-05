@@ -17,6 +17,9 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import { showConfirm } from '../confirm'
 import AppIcon from './AppIcon.vue'
 import ThemeToggle from './ThemeToggle.vue'
+import SyncStatus from './SyncStatus.vue'
+import AnnouncementBanner from './AnnouncementBanner.vue'
+import { startSync } from '../offline'
 
 const auth = useAuthStore()
 const call = useCallStore()
@@ -53,6 +56,8 @@ const adminLinks = [
   { name: 'admin-payment-requests', label: 'Duyệt thanh toán', icon: 'circle-check' },
   { name: 'admin-renewals', label: 'Gia hạn', icon: 'refresh-cw' },
   { name: 'admin-messages', label: 'Phản hồi', icon: 'message-square-more' },
+  { name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
+  { name: 'admin-backups', label: 'Sao lưu', icon: 'refresh-cw' },
   { name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
   // Admin dùng chung trang /account với khách hàng (đổi mật khẩu...). Admin
   // không có mục "Bạn bè": liên hệ với khách chỉ qua "Phản hồi" ở trên.
@@ -60,6 +65,16 @@ const adminLinks = [
 ]
 
 const links = computed(() => (auth.isAdmin ? adminLinks : userLinks))
+
+// Back button (K44): child screens declare `meta.parent` (route name) in
+// router/index.js; /customers opened from Nhập số goes back there. The same
+// button, size and place on every child screen.
+const backTarget = computed(() => {
+  const parent = route.meta.parent || (route.name === 'customers' && route.query.from === 'entries' ? 'entries' : null)
+  if (!parent) return null
+  const target = router.resolve({ name: parent })
+  return { name: parent, title: target.meta?.title || '' }
+})
 
 const displayName = computed(() => auth.user?.name || (auth.isAdmin ? 'Quản trị viên' : 'Người dùng'))
 
@@ -70,6 +85,7 @@ onMounted(() => {
   // Mounted once for the whole authenticated app - so an incoming call can
   // ring on any page, not only while the Bạn bè tab happens to be open.
   call.connect()
+  startSync()
 })
 
 async function logout() {
@@ -85,6 +101,7 @@ async function logout() {
     <header class="topbar">
       <div class="brand">XOSO</div>
       <div class="topbar-right">
+        <SyncStatus />
         <ThemeToggle />
         <button
           type="button"
@@ -125,6 +142,12 @@ async function logout() {
       </nav>
 
       <main class="content">
+        <AnnouncementBanner />
+        <div v-if="backTarget" class="back-bar">
+          <button type="button" class="back-btn" @click="router.push({ name: backTarget.name })">
+            <AppIcon name="arrow-left" /> Quay lại<span v-if="backTarget.title" class="back-to">: {{ backTarget.title }}</span>
+          </button>
+        </div>
         <RouterView />
       </main>
     </div>
@@ -315,6 +338,41 @@ async function logout() {
 .content {
   flex: 1;
   min-width: 0;
+}
+
+/* Back button for child screens - 44px touch target */
+.back-bar {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 12px 16px 0;
+}
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px 0 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.back-btn:hover {
+  border-color: var(--input-border-hover);
+  background: var(--surface-2);
+}
+.back-btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 2px;
+}
+.back-to {
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 /* Header buttons (menu + account), phones/small tablets only */

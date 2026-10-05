@@ -88,6 +88,10 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'users', 'recovery_locked_until', 'TEXT');
   // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
   _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
+  // Last-change timestamp of an entry (ISO-8601 UTC). The offline client
+  // sends the value it last saw when it replays an edit; a mismatch means the
+  // entry was changed elsewhere meanwhile (conflict, see entries/[id].dart).
+  _ensureColumn(db, 'data_entries', 'updated_at', 'TEXT');
 }
 
 void _ensureColumn(Database db, String table, String column, String type) {
@@ -275,6 +279,34 @@ void _createSchema(Database db) {
       giai_bay TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+  ''');
+
+  // Admin broadcast notices (bảo trì, đổi chính sách...) shown as a banner
+  // to every user (A16). `active = 0` hides one without deleting it.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL DEFAULT 'info' CHECK (kind IN ('info', 'maintenance', 'policy')),
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      created_by TEXT REFERENCES users(id)
+    );
+  ''');
+
+  // Per-customer entry-syntax template (K16): the user confirms how THIS
+  // customer writes their messages (type aliases, stake markers...). `config`
+  // is a JSON object. Never learned automatically - only saved on request.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS customer_syntax_templates (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      customer_name TEXT NOT NULL,
+      config TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (user_id, customer_name)
     );
   ''');
 
