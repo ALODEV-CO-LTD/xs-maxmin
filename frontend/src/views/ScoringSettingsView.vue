@@ -19,7 +19,8 @@
 -->
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
-import { ref, watch, onMounted } from 'vue'
+import AddBetTypeDialog from '../components/AddBetTypeDialog.vue'
+import { nextTick, ref, watch, onMounted } from 'vue'
 import { api, ApiError } from '../api'
 import { betTypeLabel, PRIZE_TIERS } from '../betTypes'
 
@@ -43,8 +44,10 @@ const saved = ref(false)
 const saving = ref(false)
 
 const rows = ref([])
-const newKey = ref('')
-const newRate = ref('')
+// "Thêm loại đánh" dialog + the row just added (briefly highlighted)
+const addOpen = ref(false)
+const justAdded = ref('')
+let justAddedTimer = null
 
 // Adding a type (or editing a rate/tier) only changes `rows` locally - it
 // has NOT reached the backend (and so won't show up on Nhập số/Tính điểm)
@@ -90,23 +93,17 @@ async function load() {
   }
 }
 
-function addRow() {
-  // <input type="number"> makes Vue's v-model hold a Number (or '' when
-  // empty), never a string - so this must NOT call .trim() on newRate.
-  const key = newKey.value.trim().toLowerCase().replace(/\s+/g, '-')
-  const rate = newRate.value
-  if (!key || rate === '' || rate === null || !Number.isFinite(Number(rate))) return
-  if (rows.value.some((r) => r.key === key)) {
-    error.value = `Loại "${key}" đã tồn tại`
-    return
-  }
+async function onAdd(payload) {
+  // Validation (name, rate, at least one prize group, no duplicate) is done by the dialog.
+  if (rows.value.some((r) => r.key === payload.key)) return
   error.value = ''
-  // New custom types default to checking every tier - the safer, more
-  // inclusive starting point (matches "lô"-style comparison); the user can
-  // narrow it down (e.g. to just "Đặc biệt" for a đề-style type).
-  rows.value.push({ key, rate: String(rate), tiers: PRIZE_TIERS.map((t) => t.key), digits: 2 })
-  newKey.value = ''
-  newRate.value = ''
+  rows.value.push({ key: payload.key, rate: String(payload.rate), tiers: payload.tiers, digits: payload.digits })
+  addOpen.value = false
+  justAdded.value = payload.key
+  clearTimeout(justAddedTimer)
+  justAddedTimer = setTimeout(() => (justAdded.value = ''), 4000)
+  await nextTick()
+  document.querySelector('tr.row-new')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
 }
 
 function removeRow(key) {
@@ -175,6 +172,11 @@ onMounted(load)
     <div v-if="loading">Đang tải...</div>
 
     <template v-else>
+      <div class="types-bar">
+        <h2 class="types-title">Các loại đánh <span class="types-count">{{ rows.length }}</span></h2>
+        <button type="button" class="btn btn-primary" @click="addOpen = true">+ Thêm loại đánh</button>
+      </div>
+
       <div class="card table-wrap" style="padding: 0">
         <table class="table type-table stack-table">
           <colgroup>
@@ -194,7 +196,7 @@ onMounted(load)
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in rows" :key="row.key">
+            <tr v-for="row in rows" :key="row.key" :class="{ 'row-new': row.key === justAdded }">
               <td class="type-cell" data-label="Loại đánh">{{ betTypeLabel(row.key) }} <span class="page-subtitle">({{ row.key }})</span></td>
               <td data-label="Tỉ lệ ăn">
                 <input v-model="row.rate" type="number" min="1" class="rate-input" />
@@ -220,15 +222,6 @@ onMounted(load)
                 <button type="button" class="btn btn-ghost btn-sm btn-remove" @click="removeRow(row.key)">Xoá</button>
               </td>
             </tr>
-            <tr class="new-row">
-              <td data-label="Loại đánh"><input v-model="newKey" type="text" placeholder="mã loại mới, vd: xien2" class="new-key-input" /></td>
-              <td data-label="Tỉ lệ ăn"><input v-model="newRate" type="number" min="1" placeholder="tỉ lệ" class="rate-input" /></td>
-              <td data-label="So khớp" class="page-subtitle">2 số cuối</td>
-              <td data-label="Đối chiếu với" class="page-subtitle">Mặc định: đối chiếu tất cả các giải</td>
-              <td>
-                <button type="button" class="btn btn-secondary btn-sm" @click="addRow">+ Thêm</button>
-              </td>
-            </tr>
           </tbody>
         </table>
       </div>
@@ -242,6 +235,15 @@ onMounted(load)
         </button>
       </div>
     </template>
+
+    <AddBetTypeDialog
+      :open="addOpen"
+      :existing-keys="rows.map((r) => r.key)"
+      :digit-options="digitOptions()"
+      :tiers="PRIZE_TIERS"
+      @close="addOpen = false"
+      @add="onAdd"
+    />
   </div>
 </template>
 
@@ -301,19 +303,6 @@ onMounted(load)
   width: 14px;
   height: 14px;
 }
-.new-key-input {
-  min-width: 140px;
-  padding: 6px 10px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-}
-.new-key-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
 /* ---- Table: column widths, readable inputs, clear hierarchy ---- */
 .table-wrap {
   border-radius: 14px;
@@ -342,7 +331,7 @@ onMounted(load)
 .type-table td {
   padding: 12px 16px;
 }
-.type-table tbody tr:not(.new-row):hover {
+.type-table tbody tr:hover {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 .type-cell {
@@ -356,8 +345,7 @@ onMounted(load)
 }
 
 .rate-input,
-.digits-select,
-.new-key-input {
+.digits-select {
   height: 40px;
   padding: 0 12px;
   font-size: 15px;
@@ -374,18 +362,12 @@ onMounted(load)
   width: 100%;
   cursor: pointer;
 }
-.new-key-input {
-  width: 100%;
-  min-width: 140px;
-}
 .rate-input:hover,
-.digits-select:hover,
-.new-key-input:hover {
+.digits-select:hover {
   border-color: var(--input-border-hover);
 }
 .rate-input:focus,
-.digits-select:focus,
-.new-key-input:focus {
+.digits-select:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
@@ -411,18 +393,7 @@ onMounted(load)
   accent-color: var(--primary);
 }
 
-/* "Thêm mới" row is visually its own band */
-.new-row td {
-  background: var(--surface);
-  border-top: 1px dashed var(--input-border);
-}
-.new-row .page-subtitle {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-/* Buttons: light destructive "Xoá", secondary "+ Thêm" */
+/* Buttons: light destructive "Xoá" */
 .type-table .btn-sm {
   min-height: 36px;
   padding: 0 14px;
@@ -485,12 +456,51 @@ onMounted(load)
   .type-table td:has(.tier-grid)::before {
     margin-bottom: 4px;
   }
-  .type-table .digits-select,
-  .type-table .new-key-input {
+  .type-table .digits-select {
     width: 160px;
   }
-  .type-table .new-row td {
-    border-top: 0;
+}
+
+/* Section header above the table: title on the left, the single "Thêm loại đánh" button on the right */
+.types-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+.types-title {
+  margin: 0;
+  font-size: 16px;
+}
+.types-count {
+  display: inline-block;
+  min-width: 22px;
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+}
+.types-bar .btn {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+/* the row that was just added flashes so it is easy to find in a long table */
+.type-table tbody tr.row-new td {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  transition: background 0.4s;
+}
+@media (max-width: 480px) {
+  .types-bar .btn {
+    padding: 0 12px;
   }
 }
 </style>
