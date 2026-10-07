@@ -227,6 +227,10 @@ export const useCallStore = defineStore('call', {
         case 'new-message':
           useNotifyStore().receive(msg, { isAdmin: useAuthStore().isAdmin })
           break
+        case 'payment-decided':
+          useNotifyStore().paymentDecided(msg)
+          useAuthStore().fetchMe().catch(() => {})
+          break
         case 'call-ringing':
           if (this.status === 'outgoing' && msg.from === this.peer?.id) this.ringing = true
           break

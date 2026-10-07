@@ -1,7 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
-import 'package:server/src/database.dart';
 import 'package:server/src/package_plans.dart';
+import 'package:server/src/payments.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -43,5 +44,13 @@ Future<Response> onRequest(RequestContext context, String id) async {
     [now, auth.userId, id],
   );
 
+  logSecurityEvent(
+    db,
+    'payment_approved',
+    userId: request['user_id'] as String,
+    ip: clientIp(context),
+    detail: 'Admin duyệt ${request['reference_code'] ?? id}: ${request['package_type']} - ${request['amount']} đ',
+  );
+  pushPaymentDecision(request['user_id'] as String, status: 'approved', reference: '${request['reference_code'] ?? ''}');
   return Response.json(body: {'ok': true});
 }

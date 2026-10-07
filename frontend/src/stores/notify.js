@@ -27,6 +27,7 @@ export const useNotifyStore = defineStore('notify', {
     unread: {}, // key -> count
     toasts: [], // { id, title, body, to }
     incomingTick: 0,
+    paymentTick: 0, // bumps when Admin decides this user's payment request
     lastIncoming: null, // the last raw event, so views can tell if it is theirs
   }),
   getters: {
@@ -69,6 +70,22 @@ export const useNotifyStore = defineStore('notify', {
       setTimeout(() => this.dismiss(id), TOAST_MS)
       playMessageTone()
       notifyMessage(toast.title, toast.body, () => router.push(to))
+    },
+
+    // Admin approved / rejected the user's payment request (WebSocket push).
+    paymentDecided(msg) {
+      this.paymentTick++
+      const approved = msg.status === 'approved'
+      const id = `${Date.now()}-${Math.random()}`
+      this.toasts.push({
+        id,
+        title: approved ? 'Thanh toán đã được duyệt' : 'Thanh toán bị từ chối',
+        body: approved ? 'Gói dịch vụ của bạn đã được cập nhật.' : msg.reason ? `Lý do: ${msg.reason}` : 'Xem chi tiết ở trang Gói dịch vụ.',
+        to: { name: 'packages' },
+      })
+      if (this.toasts.length > 3) this.toasts.shift()
+      setTimeout(() => this.dismiss(id), TOAST_MS)
+      playMessageTone()
     },
 
     dismiss(id) {
