@@ -277,7 +277,7 @@ async function submitStep2() {
           <span class="optional-badge">Không bắt buộc</span>
         </h2>
         <p class="optional-desc">
-          Nếu đặt, khi nhập mật khẩu này ở màn hình đăng nhập, bạn sẽ được đưa tới bước xoá toàn bộ dữ liệu tài khoản.
+          Nếu đặt, khi nhập mật khẩu này ở màn hình đăng nhập, bạn sẽ được đưa tới bước xoá dữ liệu (số liệu, khách hàng, mẫu cú pháp, lịch xoá, nhật ký cuộc gọi, tin nhắn phản hồi Admin, lịch sử giao dịch; tài khoản và bạn bè được giữ lại). Phải khác 2 mật khẩu còn lại.
           Bạn cũng có thể đặt sau trong mục Tài khoản.
         </p>
         <p class="optional-warn">

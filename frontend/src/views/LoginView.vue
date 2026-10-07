@@ -303,15 +303,16 @@ function backToCredentials() {
 
     <div v-else-if="stage === 'wipe_confirm'">
       <div class="alert alert-warning">
-        Cảnh báo: mật khẩu bạn vừa nhập là <strong>mật khẩu xoá dữ liệu</strong>. Nếu tiếp tục, TOÀN BỘ số liệu, tin nhắn
-        và lịch sử giao dịch của tài khoản này sẽ bị xoá <strong>vĩnh viễn và không thể khôi phục</strong>. Thao tác này
+        Cảnh báo: mật khẩu bạn vừa nhập là <strong>mật khẩu xoá dữ liệu</strong>. Nếu tiếp tục, số liệu đã nhập, danh sách khách hàng, mẫu cú pháp, lịch xoá tự động,
+        nhật ký cuộc gọi, tin nhắn phản hồi với Admin, lịch sử giao dịch và yêu cầu thanh toán chưa duyệt của tài khoản này
+        sẽ bị xoá <strong>vĩnh viễn và không thể khôi phục</strong>. Tài khoản, bạn bè và tin nhắn với bạn bè được giữ nguyên. Thao tác này
         sẽ không đăng nhập bạn vào tài khoản.
       </div>
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
 
       <label style="display: flex; gap: 8px; align-items: flex-start; font-size: 14px; margin-bottom: 16px; cursor: pointer">
         <input v-model="wipeAck" type="checkbox" style="margin-top: 3px" />
-        <span>Tôi hiểu rằng thao tác này sẽ xoá vĩnh viễn toàn bộ dữ liệu của tài khoản này.</span>
+        <span>Tôi hiểu rằng thao tác này sẽ xoá vĩnh viễn các dữ liệu nêu trên của tài khoản này.</span>
       </label>
 
       <button type="button" class="btn btn-danger btn-block" :disabled="!wipeAck || loading" @click="confirmWipe">

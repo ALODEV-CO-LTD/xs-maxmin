@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/data_wipe.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/security.dart';
 import 'package:server/src/sessions.dart';
@@ -47,10 +48,7 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  db.execute('DELETE FROM data_entries WHERE user_id = ?', [userId]);
-  db.execute('DELETE FROM messages WHERE user_id = ?', [userId]);
-  db.execute('DELETE FROM transactions WHERE user_id = ?', [userId]);
-  db.execute('UPDATE users SET data_used = 0 WHERE id = ?', [userId]);
+  wipeUserData(db, userId); // same scope as POST /me/delete-data
   logSecurityEvent(db, 'data_wiped', userId: userId, ip: ip, detail: 'Xoá dữ liệu bằng mật khẩu xoá (đăng nhập)');
 
   return Response.json(body: {'ok': true});

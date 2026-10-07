@@ -1,9 +1,10 @@
 import 'dart:convert';
 
-import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/data_wipe.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/reauth_limit.dart';
 import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -11,8 +12,11 @@ import 'package:sqlite3/sqlite3.dart';
 /// User-initiated, transparent data wipe: the app must show a confirmation
 /// warning before collecting the password for this call, and must show the
 /// result afterward - this is never triggered implicitly from login.
-/// Deletes the user's own data_entries, messages and transactions; the
-/// account itself (and its package/subscription) is untouched.
+/// Deletes what [wipeUserData] defines (entries, customers, syntax templates,
+/// deletion schedules, call logs, support messages, transactions, pending
+/// payment requests); account, friends and friend chat are untouched.
+/// Wrong password -> 403 (never 401, which would log the user out); repeated
+/// failures -> 429 (see reauth_limit.dart).
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
     return Response(statusCode: 405, body: 'Method not allowed');
@@ -30,18 +34,21 @@ Future<Response> onRequest(RequestContext context) async {
   final self = loadSelfRow(context, auth.userId);
   if (self == null) return unauthorized('Tài khoản không tồn tại');
 
-  final password = body['password'] as String?;
-  if (password == null || !BCrypt.checkpw(password, self['password_hash'] as String)) {
-    return Response.json(statusCode: 401, body: {'error': 'Mật khẩu không đúng'});
-  }
-
   final db = context.read<Database>();
   final userId = auth.userId;
-  db.execute('DELETE FROM data_entries WHERE user_id = ?', [userId]);
-  db.execute('DELETE FROM messages WHERE user_id = ?', [userId]);
-  db.execute('DELETE FROM transactions WHERE user_id = ?', [userId]);
-  db.execute('UPDATE users SET data_used = 0 WHERE id = ?', [userId]);
-  logSecurityEvent(db, 'data_wiped', userId: userId, ip: clientIp(context), detail: 'Người dùng tự xoá dữ liệu');
+  final ip = clientIp(context);
+  final denied = checkReauthPassword(
+    db,
+    self,
+    body['password'] as String?,
+    action: 'Xoá dữ liệu',
+    ip: ip,
+    wrongMessage: 'Mật khẩu không đúng',
+  );
+  if (denied != null) return denied;
 
-  return Response.json(body: {'ok': true});
+  final counts = wipeUserData(db, userId);
+  logSecurityEvent(db, 'data_wiped', userId: userId, ip: ip, detail: 'Người dùng tự xoá dữ liệu');
+
+  return Response.json(body: {'ok': true, 'deleted': counts});
 }

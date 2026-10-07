@@ -1,18 +1,18 @@
 import 'dart:convert';
 
-import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/reauth_limit.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 /// `POST` body `{"password": "..."}` - used by the client's auto-lock screen
 /// (K09/K40): checks the caller's login password OR second-layer password
 /// without issuing a new token. Wrong password answers 403 (not 401) on
 /// purpose so the client does not treat it as an expired session and log out.
-/// Failures are throttled per user in memory.
-final _failures = <String, List<DateTime>>{};
-const _maxFailures = 5;
-const _window = Duration(minutes: 5);
+/// Failures are throttled per user in the database (reauth_limit.dart), so
+/// the counter survives a server restart.
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -35,23 +35,15 @@ Future<Response> onRequest(RequestContext context) async {
   final self = loadSelfRow(context, auth.userId);
   if (self == null) return unauthorized('Tài khoản không tồn tại');
 
-  final now = DateTime.now();
-  final recent = (_failures[auth.userId] ?? []).where((t) => now.difference(t) < _window).toList();
-  if (recent.length >= _maxFailures) {
-    _failures[auth.userId] = recent;
-    return Response.json(
-      statusCode: 429,
-      body: {'error': 'Nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.'},
-    );
-  }
-
-  final second = self['second_password_hash'] as String?;
-  final ok = BCrypt.checkpw(password, self['password_hash'] as String) ||
-      (second != null && BCrypt.checkpw(password, second));
-  if (!ok) {
-    _failures[auth.userId] = [...recent, now];
-    return Response.json(statusCode: 403, body: {'error': 'Mật khẩu không đúng'});
-  }
-  _failures.remove(auth.userId);
+  final denied = checkReauthPassword(
+    context.read<Database>(),
+    self,
+    password,
+    action: 'Mở khoá màn hình',
+    ip: clientIp(context),
+    wrongMessage: 'Mật khẩu không đúng',
+    allowSecond: true,
+  );
+  if (denied != null) return denied;
   return Response.json(body: {'ok': true});
 }
