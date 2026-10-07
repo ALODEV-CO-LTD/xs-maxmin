@@ -1,9 +1,10 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/text_fold.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// `GET ?q=` - finds other customers by name, username or their exact Mã ID
+/// `GET ?q=` - finds other customers by name (accents ignored), username or their exact Mã ID
 /// (the number each customer sees on Bạn bè / Tài khoản), so a customer can
 /// find and add a friend without needing to be handed a customer code
 /// out-of-band first. Admin accounts are never returned: Admin is reached
@@ -23,19 +24,27 @@ Response onRequest(RequestContext context) {
   }
 
   final db = context.read<Database>();
-  final rows = db.select(
+  // SQLite's LIKE does not ignore Vietnamese accents, so candidates are read and matched here
+  // with foldVi ("do ngoc" finds "Đỗ Ngọc Mai"). An exact Mã ID always matches.
+  final needle = foldVi(q);
+  final candidates = db.select(
     '''
     SELECT u.id, u.name, u.username, u.role,
-      EXISTS(SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = u.id) AS is_friend
+      EXISTS(SELECT 1 FROM friendships WHERE user_id = ?1 AND friend_id = u.id) AS is_friend,
+      EXISTS(SELECT 1 FROM customer_codes WHERE user_id = u.id AND code = ?2) AS by_code
     FROM users u
-    WHERE u.id != ? AND u.role != 'admin'
-      AND (u.name LIKE ? OR u.username LIKE ?
-           OR u.id IN (SELECT user_id FROM customer_codes WHERE code = ?))
-    ORDER BY u.name COLLATE NOCASE
-    LIMIT 20
+    WHERE u.id != ?1 AND u.role != 'admin'
     ''',
-    [auth.userId, auth.userId, '%$q%', '%$q%', q],
+    [auth.userId, q],
   );
+  final matched = [
+    for (final r in candidates)
+      if ((r['by_code'] as int) == 1 ||
+          foldVi(r['name'] as String).contains(needle) ||
+          foldVi(r['username'] as String).contains(needle))
+        r,
+  ]..sort((a, b) => foldVi(a['name'] as String).compareTo(foldVi(b['name'] as String)));
+  final rows = matched.take(20).toList();
 
   return Response.json(
     body: {

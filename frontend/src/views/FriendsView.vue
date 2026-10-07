@@ -14,6 +14,7 @@
 -->
 <script setup>
 import { showConfirm } from '../confirm'
+import { fold } from '../messageParser'
 import AppIcon from '../components/AppIcon.vue'
 import ChatAttachButtons from '../components/ChatAttachButtons.vue'
 import AttachmentPreview from '../components/AttachmentPreview.vue'
@@ -37,15 +38,22 @@ const friends = ref([])
 const loading = ref(true)
 const loadError = ref('')
 
-// Filters the already-added friend list client-side (no round trip needed).
-const listFilter = ref('')
+// One search box does two things at once (see the template):
+//   - filters the friends you already have, instantly and without accents
+//     ("do ngoc" finds "Đỗ Ngọc Mai"), and
+//   - looks for other people on the server by name, username or exact Mã ID so
+//     they can be added (the "kết bạn bằng mã ID" box is no longer separate).
+// A friend that only matched by Mã ID (not by name) is kept in the list too.
 const filteredFriends = computed(() => {
-  const q = listFilter.value.trim().toLowerCase()
+  const q = fold(searchQuery.value.trim())
   if (!q) return friends.value
+  const matchedById = new Set(searchResults.value.filter((r) => r.isFriend).map((r) => r.id))
   return friends.value.filter(
-    (f) => f.name.toLowerCase().includes(q) || f.username.toLowerCase().includes(q),
+    (f) => fold(f.name).includes(q) || fold(f.username).includes(q) || matchedById.has(f.id),
   )
 })
+// People from the server search who are not friends yet (friends are shown in the list below).
+const newPeople = computed(() => searchResults.value.filter((r) => !r.isFriend))
 
 // Search-to-add: finds accounts by name/username via GET /me/friends/search
 // so people don't have to exchange a customer code just to add each other.
@@ -92,10 +100,6 @@ async function addFromSearch(result) {
     addingId.value = null
   }
 }
-
-const addCode = ref('')
-const addError = ref('')
-const adding = ref(false)
 
 const messages = ref([])
 const messagesLoading = ref(false)
@@ -282,26 +286,6 @@ function backToList() {
   router.push({ name: 'friends' })
 }
 
-async function addFriend() {
-  addError.value = ''
-  const code = addCode.value.trim()
-  if (!code) {
-    addError.value = 'Vui lòng nhập mã ID'
-    return
-  }
-  adding.value = true
-  try {
-    const friend = await api.post('/me/friends', { code })
-    const idx = friends.value.findIndex((f) => f.id === friend.id)
-    if (idx === -1) friends.value.unshift(friend)
-    addCode.value = ''
-  } catch (err) {
-    addError.value = err.message || 'Không thêm được bạn bè'
-  } finally {
-    adding.value = false
-  }
-}
-
 async function removeFriend(friend) {
   if (!(await showConfirm({
     title: 'Xoá bạn bè',
@@ -362,51 +346,36 @@ async function sendMessage() {
           <label for="searchQuery" style="font-size: 13px; font-weight: 700; color: var(--muted)">
             Tìm kiếm
           </label>
-          <input id="searchQuery" v-model="searchQuery" type="text" placeholder="Tên, tài khoản hoặc mã ID..." style="margin-top: 6px" />
+          <input id="searchQuery" v-model="searchQuery" type="text" placeholder="Tên, tài khoản hoặc mã ID..." autocomplete="off" style="margin-top: 6px" />
+          <p class="search-sub">Lọc bạn bè của bạn và tìm người mới để kết bạn.</p>
           <div v-if="searchError" class="alert alert-error" style="margin: 8px 0 0">{{ searchError }}</div>
 
-          <div v-if="searchQuery.trim()" class="search-results">
-            <div v-if="searching" class="search-hint">Đang tìm...</div>
-            <div v-else-if="searchResults.length === 0" class="search-hint">Không tìm thấy ai phù hợp.</div>
-            <div v-else v-for="r in searchResults" :key="r.id" class="search-item">
+          <!-- people who are not friends yet -->
+          <div v-if="searchQuery.trim() && (searching || newPeople.length > 0)" class="search-results">
+            <div class="search-group">Người mới</div>
+            <div v-if="searching && newPeople.length === 0" class="search-hint">Đang tìm...</div>
+            <div v-for="r in newPeople" :key="r.id" class="search-item">
               <div class="friend-info">
                 <strong>{{ r.name }} <span v-if="r.isAdmin" class="chip chip-brand" style="font-size: 10px; padding: 1px 6px">Admin</span></strong>
                 <span class="friend-last">@{{ r.username }}</span>
               </div>
-              <button
-                v-if="!r.isFriend"
-                class="btn btn-secondary btn-sm"
-                :disabled="addingId === r.id"
-                @click="addFromSearch(r)"
-              >
+              <button class="btn btn-secondary btn-sm" :disabled="addingId === r.id" @click="addFromSearch(r)">
                 {{ addingId === r.id ? '...' : 'Kết bạn' }}
               </button>
-              <span v-else class="chip chip-accent">Đã là bạn</span>
             </div>
           </div>
         </div>
 
-        <details class="card add-form">
-          <summary style="font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer">
-            Hoặc kết bạn bằng mã ID
-          </summary>
-          <form class="add-row" style="margin-top: 8px" @submit.prevent="addFriend">
-            <input id="addCode" v-model="addCode" type="text" placeholder="Nhập mã ID" />
-            <button type="submit" class="btn btn-primary btn-sm" :disabled="adding">
-              {{ adding ? '...' : 'Thêm' }}
-            </button>
-          </form>
-          <div v-if="addError" class="alert alert-error" style="margin: 8px 0 0">{{ addError }}</div>
-        </details>
-
         <div v-if="loading" class="card">Đang tải...</div>
         <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
         <template v-else>
-          <div v-if="friends.length > 0" class="field" style="margin-bottom: 10px">
-            <input v-model="listFilter" type="text" placeholder="Lọc trong danh sách bạn bè..." />
-          </div>
+          <div v-if="searchQuery.trim() && filteredFriends.length > 0" class="search-group list-group">Bạn bè</div>
           <div v-if="friends.length === 0" class="card">Chưa có bạn bè nào.</div>
-          <div v-else-if="filteredFriends.length === 0" class="card">Không có bạn bè nào khớp.</div>
+          <div v-else-if="filteredFriends.length === 0 && searchQuery.trim()">
+            <div v-if="!searching && newPeople.length === 0" class="card">
+              Không tìm thấy ai khớp với "{{ searchQuery.trim() }}". Nếu là mã ID, hãy kiểm tra lại các chữ số.
+            </div>
+          </div>
           <div v-else class="friend-list">
             <div
               v-for="f in filteredFriends"
@@ -522,8 +491,7 @@ async function sendMessage() {
 .search-form {
   margin-bottom: 10px;
 }
-.search-form input,
-.add-row input {
+.search-form input {
   width: 100%;
   flex: 1;
   font-family: var(--font-body);
@@ -555,14 +523,6 @@ async function sendMessage() {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
-}
-.add-form {
-  margin-bottom: 12px;
-}
-.add-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
 }
 .friend-list {
   display: flex;
@@ -750,8 +710,7 @@ async function sendMessage() {
   box-shadow: var(--shadow-sm);
 }
 /* the former small cards become flat sections separated by hairlines */
-.list-pane > .search-form,
-.list-pane > .add-form {
+.list-pane > .search-form {
   margin: 0 0 16px;
   padding: 0 0 16px;
   background: transparent;
@@ -773,8 +732,7 @@ async function sendMessage() {
   color: var(--text-primary);
 }
 .my-id-corner .btn,
-.search-item .btn,
-.add-row .btn {
+.search-item .btn {
   min-height: 36px;
   padding: 0 14px;
   font-size: 14px;
@@ -1011,5 +969,23 @@ async function sendMessage() {
     font-size: 19px;
     letter-spacing: 1px;
   }
+}
+
+/* the single search box: short explanation, and small group headings for its two kinds of results */
+.search-sub {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.search-group {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.list-group {
+  margin-top: 0;
 }
 </style>
