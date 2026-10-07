@@ -1,10 +1,11 @@
 import 'dart:convert';
 
-import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/deletion_scheduler.dart';
+import 'package:server/src/reauth_limit.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -175,10 +176,16 @@ Future<Response> _create(RequestContext context, String userId) async {
   if (kind == 'data') {
     final self = loadSelfRow(context, userId);
     if (self == null) return unauthorized('Tài khoản không tồn tại');
-    final password = body['password'] as String?;
-    if (password == null || !BCrypt.checkpw(password, self['password_hash'] as String)) {
-      return Response.json(statusCode: 401, body: {'error': 'Mật khẩu không đúng'});
-    }
+    // Shared throttle (403 wrong / 429 locked), never 401.
+    final denied = checkReauthPassword(
+      db,
+      self,
+      body['password'] as String?,
+      action: 'Lịch xoá dữ liệu',
+      ip: clientIp(context),
+      wrongMessage: 'Mật khẩu không đúng',
+    );
+    if (denied != null) return denied;
   } else {
     // One rule per conversation: a new one replaces whatever either friend set.
     db.execute(

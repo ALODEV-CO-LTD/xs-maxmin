@@ -12,7 +12,7 @@ import 'package:sqlite3/sqlite3.dart';
 /// client is required to show the user an explicit "this will permanently
 /// delete your data - confirm?" dialog before it ever calls this endpoint;
 /// nothing here runs implicitly or silently. Deletes data_entries,
-/// messages and transactions for the account and returns a plain result -
+/// the account's data (see wipeUserData) and returns a plain result -
 /// it never issues a session token, so this never logs anyone in.
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -49,6 +49,8 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   wipeUserData(db, userId); // same scope as POST /me/delete-data
+  // The wipe-password may have been typed by a stranger: sign out every device.
+  revokeAllSessions(db, userId, by: userId, ip: ip);
   logSecurityEvent(db, 'data_wiped', userId: userId, ip: ip, detail: 'Xoá dữ liệu bằng mật khẩu xoá (đăng nhập)');
 
   return Response.json(body: {'ok': true});

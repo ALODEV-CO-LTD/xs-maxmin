@@ -1,9 +1,10 @@
 import 'dart:convert';
 
-import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/reauth_limit.dart';
 import 'package:server/src/recovery_codes.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -32,11 +33,16 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(statusCode: 403, body: {'error': 'Tài khoản quản trị không dùng mã khôi phục'});
   }
 
-  final currentPassword = body['currentPassword'] as String?;
-  if (currentPassword == null || !BCrypt.checkpw(currentPassword, self['password_hash'] as String)) {
-    return Response.json(statusCode: 401, body: {'error': 'Mật khẩu hiện tại không đúng'});
-  }
-
   final db = context.read<Database>();
+  // Shared throttle (403 wrong / 429 locked), never 401 (would log the user out).
+  final denied = checkReauthPassword(
+    db,
+    self,
+    body['currentPassword'] as String?,
+    action: 'Tạo mã khôi phục',
+    ip: clientIp(context),
+  );
+  if (denied != null) return denied;
+
   return Response.json(body: {'recoveryCode': rotateRecoveryCode(db, auth.userId)});
 }
