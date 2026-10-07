@@ -43,7 +43,7 @@ import { api } from '../api'
 import { loadAllEntries } from '../offline'
 import { betTypeLabel } from '../betTypes'
 import { localDateString } from '../dates'
-import { mask } from '../stores/mask'
+import { mask, REVEAL_CHOICES } from '../stores/mask'
 
 const entries = ref([])
 const loading = ref(true)
@@ -401,6 +401,30 @@ function onVerified() {
   if (promptPurpose.value === 'disable') mask.disable()
   else mask.reveal()
 }
+// How long the figures stay on screen after the password, and the live countdown.
+const revealSeconds = computed({
+  get: () => mask.state.revealSeconds,
+  set: (v) => mask.setRevealSeconds(Number(v)),
+})
+const secondsLeft = ref(0)
+let countdownTimer = null
+watch(
+  () => mask.state.revealUntil,
+  (until) => {
+    clearInterval(countdownTimer)
+    if (!until) {
+      secondsLeft.value = 0
+      return
+    }
+    const tick = () => (secondsLeft.value = Math.max(0, Math.ceil((mask.state.revealUntil - Date.now()) / 1000)))
+    tick()
+    countdownTimer = setInterval(tick, 500)
+  },
+)
+onBeforeUnmount(() => clearInterval(countdownTimer))
+function secondsLabel(n) {
+  return n >= 60 ? `${n / 60} phút` : `${n} giây`
+}
 
 // ---- Xóa số liệu / Đặt lịch xóa -----------------------------------------------
 
@@ -455,6 +479,15 @@ onBeforeUnmount(() => mask.detach())
         <button v-else-if="maskEnabled" type="button" class="btn btn-secondary btn-sm" @click="mask.cover()">
           <AppIcon name="eye-off" /> Che lại
         </button>
+        <span v-if="maskEnabled && !masked" class="mask-countdown" role="timer" aria-live="off">
+          Tự che sau {{ secondsLeft }}s
+        </span>
+        <label v-if="maskEnabled" class="mask-time">
+          <span>Hiện trong</span>
+          <select v-model.number="revealSeconds" aria-label="Thời gian hiện số liệu sau khi nhập mật khẩu">
+            <option v-for="n in REVEAL_CHOICES" :key="n" :value="n">{{ secondsLabel(n) }}</option>
+          </select>
+        </label>
       </div>
       <div class="toolbar-actions">
         <button type="button" class="btn btn-secondary btn-sm" @click="openDelete('')">Xóa số liệu</button>
@@ -744,6 +777,32 @@ onBeforeUnmount(() => mask.detach())
   color: var(--on-primary);
   background: var(--primary);
   border-color: var(--primary);
+}
+/* live countdown + "Hiện trong" choice, next to the switch */
+.mask-countdown {
+  padding: 4px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  border-radius: 999px;
+}
+.mask-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.mask-time select {
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
 }
 .mask-state {
   padding: 1px 8px;
