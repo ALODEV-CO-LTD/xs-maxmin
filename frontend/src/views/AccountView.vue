@@ -311,12 +311,22 @@ async function deleteCode(code) {
   }
 }
 
-async function editLabel(code) {
-  const label = prompt('Nhãn cho mã ID này (để trống để xoá nhãn):', code.label || '')
-  if (label === null) return
+// Label edit happens inline in the row (Lưu/Huỷ) instead of a browser prompt().
+const vFocus = { mounted: (el) => el.focus() }
+const editingLabelId = ref(null)
+const labelDraft = ref('')
+function editLabel(code) {
+  editingLabelId.value = code.id
+  labelDraft.value = code.label || ''
+}
+function cancelLabel() {
+  editingLabelId.value = null
+}
+async function saveLabel(code) {
   try {
-    const res = await api.patch(`/me/customer-codes/${code.id}`, { label })
+    const res = await api.patch(`/me/customer-codes/${code.id}`, { label: labelDraft.value })
     code.label = res.label
+    editingLabelId.value = null
   } catch (err) {
     codesError.value = err.message || 'Không đổi được nhãn'
   }
@@ -454,7 +464,7 @@ async function deleteAllData() {
         </p>
         <div v-if="codesError" class="alert alert-error">{{ codesError }}</div>
         <form class="code-form" @submit.prevent="generateCode">
-          <input v-model="newCode" type="text" inputmode="numeric" maxlength="12" placeholder="Dãy số mong muốn (tuỳ chọn)" aria-label="Dãy số mong muốn" />
+          <input v-model="newCode" type="text" inputmode="numeric" maxlength="12" placeholder="Dãy số (tuỳ chọn)" aria-label="Dãy số mong muốn" />
           <input v-model="newLabel" type="text" maxlength="40" placeholder="Nhãn (tuỳ chọn)" aria-label="Nhãn" />
           <button type="submit" class="btn btn-secondary" :disabled="generatingCode || atCodeLimit">
             {{ generatingCode ? 'Đang tạo...' : '+ Tạo mã mới' }}
@@ -476,6 +486,11 @@ async function deleteAllData() {
               <button class="btn btn-ghost btn-sm" @click="copyCode(c.code)">Sao chép</button>
               <button class="btn btn-ghost btn-sm" @click="deleteCode(c)">Xoá</button>
             </div>
+            <form v-if="editingLabelId === c.id" class="label-edit" @submit.prevent="saveLabel(c)" @keydown.esc="cancelLabel">
+              <input v-model="labelDraft" v-focus type="text" maxlength="40" placeholder="Nhãn (để trống để xoá)" aria-label="Nhãn cho mã ID này" />
+              <button type="submit" class="btn btn-primary btn-sm">Lưu</button>
+              <button type="button" class="btn btn-secondary btn-sm" @click="cancelLabel">Huỷ</button>
+            </form>
           </div>
         </div>
       </div>
@@ -735,6 +750,7 @@ async function deleteAllData() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 6px 6px 12px;
   background: var(--surface);
@@ -756,7 +772,7 @@ async function deleteAllData() {
   min-width: 0;
 }
 .code-label {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -770,6 +786,16 @@ async function deleteAllData() {
 .code-actions {
   display: flex;
   gap: 4px;
+}
+.label-edit {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 8px;
+  padding: 0 6px 6px 0;
+}
+.label-edit input {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* ---- Security forms ---- */

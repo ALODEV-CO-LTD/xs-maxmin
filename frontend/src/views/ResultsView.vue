@@ -596,7 +596,7 @@ function clearLotteryForm() {
   border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
 }
 .ocr-box {
   margin-bottom: 14px;
@@ -604,7 +604,7 @@ function clearLotteryForm() {
   border-bottom: 1px dashed var(--border);
 }
 .ocr-hint {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
   margin: 6px 0 0;
 }
@@ -630,7 +630,7 @@ function clearLotteryForm() {
 .tier-row > label {
   width: 84px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--muted);
 }
@@ -682,7 +682,7 @@ function clearLotteryForm() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   white-space: nowrap;
 }
@@ -726,7 +726,7 @@ function clearLotteryForm() {
   margin-bottom: 4px;
 }
 .result-meta {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   margin-bottom: 10px;
 }
@@ -1052,7 +1052,7 @@ function clearLotteryForm() {
   }
   .ocr-hint {
     margin-top: 4px;
-    font-size: 13px;
+    font-size: 14px;
   }
   /* labels stay left-aligned; only the numbers are centred in the space beside them */
   .tier-row {
@@ -1061,7 +1061,7 @@ function clearLotteryForm() {
     padding: 5px 0;
   }
   .tier-row > label {
-    font-size: 13px;
+    font-size: 14px;
   }
   .tier-inputs {
     gap: 6px;

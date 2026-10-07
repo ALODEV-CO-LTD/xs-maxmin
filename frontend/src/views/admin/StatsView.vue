@@ -192,7 +192,7 @@ onMounted(load)
 
 .stats-table th {
   padding: 12px 20px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
   background: var(--surface);

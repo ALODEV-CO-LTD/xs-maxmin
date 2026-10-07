@@ -109,7 +109,7 @@ async function choose(choice) {
   gap: 6px;
   min-height: 32px;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   border-radius: 999px;

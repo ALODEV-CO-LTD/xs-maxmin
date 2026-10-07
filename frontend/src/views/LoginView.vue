@@ -11,7 +11,7 @@
                                      only then POST /api/auth/confirm-wipe
 -->
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api, ApiError } from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -25,6 +25,8 @@ const auth = useAuthStore()
 
 // 'credentials' | 'second_password' | 'wipe_confirm' | 'wipe_done' | 'recover' | 'recover_code'
 const stage = ref('credentials')
+// Cursor starts in the username box.
+onMounted(() => document.getElementById('username')?.focus({ preventScroll: true }))
 const loading = ref(false)
 const error = ref('')
 

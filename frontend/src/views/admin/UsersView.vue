@@ -410,7 +410,7 @@ onMounted(loadList)
 }
 .users-table th {
   padding: 14px 20px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
   background: var(--surface-2);
@@ -447,7 +447,7 @@ onMounted(loadList)
   gap: 8px;
 }
 .users-table .chip {
-  font-size: 13px;
+  font-size: 14px;
   padding: 4px 12px;
   white-space: nowrap;
 }
@@ -552,7 +552,7 @@ onMounted(loadList)
   margin-bottom: 16px;
 }
 .detail-panel .chip {
-  font-size: 12px;
+  font-size: 14px;
   padding: 4px 10px;
 }
 

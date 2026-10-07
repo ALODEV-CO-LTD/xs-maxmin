@@ -348,7 +348,7 @@ async function sendMessage() {
     <div class="split" :class="{ 'show-thread': !!selectedFriendId }">
       <div class="list-pane">
         <div class="card search-form">
-          <label for="searchQuery" style="font-size: 13px; font-weight: 700; color: var(--muted)">
+          <label for="searchQuery" style="font-size: 14px; font-weight: 700; color: var(--muted)">
             Tìm kiếm
           </label>
           <input id="searchQuery" v-model="searchQuery" type="text" placeholder="Tên, tài khoản hoặc mã ID..." autocomplete="off" style="margin-top: 6px" />
@@ -361,7 +361,7 @@ async function sendMessage() {
             <div v-if="searching && newPeople.length === 0" class="search-hint">Đang tìm...</div>
             <div v-for="r in newPeople" :key="r.id" class="search-item">
               <div class="friend-info">
-                <strong>{{ r.name }} <span v-if="r.isAdmin" class="chip chip-brand" style="font-size: 10px; padding: 1px 6px">Admin</span></strong>
+                <strong>{{ r.name }} <span v-if="r.isAdmin" class="chip chip-brand" style="font-size: 14px; padding: 1px 6px">Admin</span></strong>
                 <span class="friend-last">@{{ r.username }}</span>
               </div>
               <button class="btn btn-secondary btn-sm" :disabled="addingId === r.id" @click="addFromSearch(r)">
@@ -477,7 +477,7 @@ async function sendMessage() {
 
 <style scoped>
 .my-id-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--muted);
 }
@@ -516,7 +516,7 @@ async function sendMessage() {
 }
 .search-hint {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   padding: 6px 2px;
 }
 .search-item {
@@ -553,7 +553,7 @@ async function sendMessage() {
   min-width: 0;
 }
 .friend-last {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -630,7 +630,7 @@ async function sendMessage() {
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 .call-line.missed {
   color: var(--danger, #d64545);
@@ -727,7 +727,7 @@ async function sendMessage() {
 
 /* ID + copy */
 .my-id-label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .my-id-code {
@@ -815,14 +815,14 @@ async function sendMessage() {
   font-size: 15px;
 }
 .friend-last {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
   max-width: none;
 }
 .friend-item .btn-ghost {
   min-height: 32px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .friend-item .btn-ghost:hover {
@@ -896,6 +896,9 @@ async function sendMessage() {
   color: var(--text-primary);
 }
 .send-row input {
+  /* min-width:0 lets the box shrink; otherwise its intrinsic width pushed "Gửi" off a phone screen */
+  flex: 1 1 0;
+  min-width: 0;
   height: 44px;
   padding: 0 14px;
   font-size: 15px;
@@ -910,6 +913,7 @@ async function sendMessage() {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 .send-row .btn {
+  flex: none;
   min-height: 44px;
   padding: 0 20px;
   border-radius: 10px;
@@ -923,9 +927,9 @@ async function sendMessage() {
 
 /* call buttons: icons the same 20px as the rest of the app's icons */
 .call-buttons .btn {
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
   font-size: 20px;
   color: var(--text-secondary);
@@ -979,12 +983,12 @@ async function sendMessage() {
 /* the single search box: short explanation, and small group headings for its two kinds of results */
 .search-sub {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 .search-group {
   margin: 12px 0 6px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;

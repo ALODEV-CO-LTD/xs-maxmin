@@ -203,7 +203,7 @@ function onKey(e) {
 }
 .bt-sub {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.45;
   color: var(--text-secondary);
 }
@@ -254,12 +254,12 @@ function onKey(e) {
 }
 .bt-hint {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .bt-error {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--danger-text);
 }
 .bt-quick {
@@ -269,7 +269,7 @@ function onKey(e) {
 .bt-link {
   padding: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--primary);
   background: none;

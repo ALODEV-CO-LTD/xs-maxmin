@@ -132,8 +132,14 @@ onMounted(load)
 function onKeydown(e) {
   if (e.key === 'Escape') expanded.value = null
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('popstate', onPopState)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('popstate', onPopState)
+})
 onMounted(loadRoster)
 onMounted(() => {
   if (fromEntries) nextTick(() => addInput.value?.focus())
@@ -185,6 +191,28 @@ const filteredCustomers = computed(() => {
 
 const detailBox = ref(null)
 const detail = computed(() => customers.value.find((c) => c.name === expanded.value) || null)
+// The detail box owns one history entry while open, so the browser/phone Back
+// button closes the box instead of leaving the page. Closing by button/Esc/overlay
+// removes that entry again (history.back) so no ping-pong state is left behind.
+let detailHistory = false
+function onPopState() {
+  if (detailHistory) {
+    detailHistory = false // the entry was already popped by the browser
+    expanded.value = null
+  }
+}
+watch(
+  () => !!detail.value,
+  (open) => {
+    if (open && !detailHistory) {
+      history.pushState({ ...history.state, customerDetail: true }, '')
+      detailHistory = true
+    } else if (!open && detailHistory) {
+      detailHistory = false
+      history.back()
+    }
+  },
+)
 function toggle(name) {
   expanded.value = name
   nextTick(() => detailBox.value?.focus())
@@ -297,7 +325,12 @@ async function removeFromDetail(c) {
     <Teleport to="body">
       <div v-if="detail" class="cd-overlay" @mousedown.self="expanded = null" @keydown.esc="expanded = null">
         <div class="cd-box" role="dialog" aria-modal="true" aria-labelledby="cd-title" tabindex="-1" ref="detailBox">
-          <h2 id="cd-title" class="cd-name">{{ detail.name }}</h2>
+          <div class="cd-head">
+            <button type="button" class="cd-close" aria-label="Đóng" title="Đóng" @click="expanded = null">
+              <AppIcon name="arrow-left" />
+            </button>
+            <h2 id="cd-title" class="cd-name">{{ detail.name }}</h2>
+          </div>
           <dl class="cd-stats">
             <div class="cd-stat">
               <dt>Số lượt chơi</dt>
@@ -395,7 +428,7 @@ async function removeFromDetail(c) {
   background: var(--surface-2);
 }
 .customer-meta {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
   margin-bottom: 8px;
 }
@@ -409,7 +442,7 @@ async function removeFromDetail(c) {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: 14px;
 }
 .mini-value {
   font-weight: 700;
@@ -440,8 +473,33 @@ async function removeFromDetail(c) {
   box-shadow: var(--shadow-lg);
   outline: none;
 }
+.cd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 12px -10px;
+}
+.cd-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 24px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.cd-close:hover {
+  background: var(--surface);
+}
 .cd-name {
-  margin: 0 0 16px;
+  margin: 0;
+  min-width: 0;
   font-size: 20px;
   line-height: 1.3;
   overflow-wrap: anywhere;
@@ -460,7 +518,7 @@ async function removeFromDetail(c) {
 }
 .cd-stat dt {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .cd-stat dd {
@@ -511,7 +569,7 @@ async function removeFromDetail(c) {
   gap: 8px;
 }
 .cd-actions .btn {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: 10px;
 }
@@ -584,7 +642,7 @@ async function removeFromDetail(c) {
 }
 .table-wrap th {
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   background: var(--surface);
   white-space: nowrap;
@@ -649,7 +707,7 @@ async function removeFromDetail(c) {
 
 /* Expanded detail */
 .customer-meta {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .mini-entry {
@@ -750,7 +808,7 @@ async function removeFromDetail(c) {
     min-width: 0;
     max-width: 180px;
     padding: 0 6px;
-    font-size: 13px;
+    font-size: 14px;
     white-space: nowrap;
     justify-content: center;
   }

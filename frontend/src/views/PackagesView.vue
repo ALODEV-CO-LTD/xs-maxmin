@@ -205,7 +205,7 @@ async function purchase(plan) {
 }
 .current-detail {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 .plans-grid {
   display: grid;
@@ -227,7 +227,7 @@ async function purchase(plan) {
 }
 .plan-detail {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   margin-top: 2px;
 }
 .bank-card {
@@ -274,7 +274,7 @@ async function purchase(plan) {
 }
 .req-detail {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 /* ---- Layout: readable column, compact spacing ---- */
 .current-card,
@@ -305,7 +305,7 @@ async function purchase(plan) {
 }
 .current-card h3 {
   margin-bottom: 8px !important;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -446,7 +446,7 @@ async function purchase(plan) {
   margin: 0;
 }
 .req-item .chip {
-  font-size: 13px;
+  font-size: 14px;
   padding: 3px 12px;
 }
 .req-detail {

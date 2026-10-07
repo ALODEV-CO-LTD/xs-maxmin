@@ -64,7 +64,7 @@ const notify = useNotifyStore()
 }
 .toast-text span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

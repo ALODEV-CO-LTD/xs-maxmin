@@ -559,6 +559,15 @@ function loadDraft() {
   templateMsg.value = ''
 }
 watch(() => form.customerName, loadDraft)
+// Picking a customer puts the cursor in the first "Số" box so numbers can be typed straight away;
+// preventScroll keeps the page still on phones.
+watch(
+  () => form.customerName,
+  (name) => {
+    if (!name) return
+    nextTick(() => document.querySelector('.manual-rows .mr-number')?.focus({ preventScroll: true }))
+  },
+)
 watch(templates, loadDraft)
 
 function draftConfig() {
@@ -945,7 +954,7 @@ async function deleteTemplate() {
               <div class="field filter-q">
                 <div class="input-wrap">
                   <AppIcon name="search" class="filter-icon" />
-                  <input v-model="filters.q" type="search" placeholder="Từ khoá (số, ghi chú, điểm...)" aria-label="Tìm theo từ khoá" />
+                  <input v-model="filters.q" type="search" placeholder="Tìm số, ghi chú, điểm" aria-label="Tìm theo từ khoá" />
                 </div>
               </div>
               <div class="field filter-date">
@@ -1152,7 +1161,7 @@ async function deleteTemplate() {
 }
 .pending-chip {
   margin-left: 6px;
-  font-size: 11px;
+  font-size: 14px;
 }
 .paste-box {
   margin-bottom: 16px;
@@ -1195,7 +1204,7 @@ async function deleteTemplate() {
 }
 .pv-reason {
   grid-column: 1 / -1;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--warning-text);
 }
 
@@ -1248,7 +1257,7 @@ async function deleteTemplate() {
   margin-top: 4px;
 }
 .quota-card .chip {
-  font-size: 13px;
+  font-size: 14px;
   padding: 6px 14px;
   white-space: nowrap;
 }
@@ -1351,7 +1360,7 @@ async function deleteTemplate() {
   gap: 0 16px;
 }
 .hint {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
   color: var(--muted);
   margin: 8px 0 0;
@@ -1401,7 +1410,7 @@ async function deleteTemplate() {
   background: color-mix(in srgb, var(--accent) 22%, var(--card));
 }
 .ocr-hint {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
   margin: 8px 0 0;
@@ -1427,7 +1436,7 @@ async function deleteTemplate() {
   gap: 8px;
 }
 .ocr-text-wrap label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--muted);
 }
@@ -1471,7 +1480,7 @@ async function deleteTemplate() {
 .type-row-label {
   align-self: flex-start;
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1611,7 +1620,7 @@ async function deleteTemplate() {
   font-size: 16px;
 }
 .entry-top .chip {
-  font-size: 13px;
+  font-size: 14px;
   padding: 4px 12px;
 }
 .entry-top .chip:nth-of-type(1) {
@@ -1763,7 +1772,7 @@ async function deleteTemplate() {
 }
 .type-row-label {
   padding: 0;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   color: var(--text-secondary);
   background: transparent;
@@ -1863,7 +1872,7 @@ async function deleteTemplate() {
 }
 .rail-title {
   padding: 0 8px 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1937,6 +1946,9 @@ async function deleteTemplate() {
   color: var(--text-secondary);
 }
 .rail-add {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   margin: 8px 8px 0;
   padding-top: 12px;
   border-top: 1px solid var(--border);
@@ -2103,7 +2115,7 @@ async function deleteTemplate() {
   color: var(--text-primary);
 }
 .em-info .chip {
-  font-size: 12px;
+  font-size: 14px;
   padding: 3px 10px;
   background: var(--card);
   border: 1px solid var(--border);
@@ -2215,7 +2227,7 @@ async function deleteTemplate() {
   }
   .quota-numbers {
     margin-top: 0;
-    font-size: 13px;
+    font-size: 14px;
   }
   .page > .alert {
     margin-bottom: 12px;
@@ -2269,14 +2281,14 @@ async function deleteTemplate() {
   }
   .ocr-hint {
     margin-top: 4px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .add-form .field {
     margin-bottom: 6px;
   }
   .add-form .field label {
     margin-bottom: 3px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .grid-2 {
     grid-template-columns: 1fr 180px;
@@ -2287,7 +2299,7 @@ async function deleteTemplate() {
   }
   .add-form > .page-subtitle {
     margin-bottom: 8px !important;
-    font-size: 13px;
+    font-size: 14px;
   }
   .type-grid {
     grid-template-columns: 1fr;
@@ -2311,7 +2323,7 @@ async function deleteTemplate() {
     right: 10px;
     min-height: 30px;
     padding: 0 10px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .type-row-label {
     min-height: 30px;
@@ -2334,7 +2346,7 @@ async function deleteTemplate() {
   .entries-main > .page-subtitle,
   .entries-main > h3 + .page-subtitle {
     margin: 0 0 8px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .entries-main .calc-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2348,7 +2360,7 @@ async function deleteTemplate() {
   }
   .entries-main .calc-label {
     margin-bottom: 2px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .entries-main > .card:not(.add-form):not(.entry-card):not(.list-card) {
     min-height: 0;
@@ -2419,7 +2431,7 @@ async function deleteTemplate() {
 }
 .mr-head {
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-secondary);
 }
@@ -2510,7 +2522,7 @@ async function deleteTemplate() {
   top: 0;
   z-index: 1;
   padding: 10px 8px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -2553,7 +2565,7 @@ async function deleteTemplate() {
 .entries-table .col-btn .btn {
   min-height: 32px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   border-radius: 8px;
 }
@@ -2667,7 +2679,7 @@ async function deleteTemplate() {
 }
 .list-stats .page-subtitle {
   margin: 0 0 8px !important;
-  font-size: 13px;
+  font-size: 14px;
 }
 .list-stats .calc-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2682,7 +2694,7 @@ async function deleteTemplate() {
 }
 .list-stats .calc-label {
   margin-bottom: 2px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* table: fixed column widths (Ghi chú takes the rest) + vertical rules */
@@ -2700,7 +2712,7 @@ async function deleteTemplate() {
   table-layout: fixed;
   width: 100%;
   min-width: 540px;
-  font-size: 13px;
+  font-size: 14px;
   border-collapse: separate;
   border-spacing: 0;
 }

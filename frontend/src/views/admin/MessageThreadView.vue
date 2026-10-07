@@ -158,7 +158,7 @@ onMounted(() => {
 }
 
 .msg-time {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
   margin-top: 4px;
 }
@@ -170,7 +170,8 @@ onMounted(() => {
 }
 
 .reply-row input {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0; /* lets the box shrink so "Gửi" stays on screen on phones */
   font-family: var(--font-body);
   font-size: 15px;
   color: var(--text);
@@ -189,5 +190,10 @@ onMounted(() => {
 .reply-row {
   align-items: center;
   gap: 8px;
+}
+
+.reply-row .btn {
+  flex: none;
+  min-height: 44px;
 }
 </style>
