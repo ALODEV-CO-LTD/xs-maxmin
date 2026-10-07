@@ -255,6 +255,20 @@ watch(
   },
 )
 
+// Fallback when the push never arrived: the periodic unread refresh (AppShell) changed the
+// counters, so bring the list order/preview - and the open conversation - up to date too.
+watch(
+  () => JSON.stringify(notify.unread),
+  () => {
+    const open = selectedFriendId.value
+    if (open && notify.unread[`friend:${open}`]) {
+      loadMessages(open, { quiet: true })
+      notify.clear(`friend:${open}`)
+    }
+    loadFriends({ quiet: true })
+  },
+)
+
 // A call just ended (or was missed): refresh history and the badges.
 watch(
   () => call.endedTick,

@@ -114,8 +114,17 @@ onMounted(() => {
   // brought back to the front.
   notify.refresh()
   document.addEventListener('visibilitychange', onVisible)
+  // Safety net: if the WebSocket push is blocked or silently dropped (mobile
+  // networks, proxies), badges and the open chat still catch up within seconds.
+  pollTimer = setInterval(() => {
+    if (!document.hidden) notify.refresh()
+  }, 10000)
 })
-onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisible))
+let pollTimer = null
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisible)
+  clearInterval(pollTimer)
+})
 function onVisible() {
   if (!document.hidden) notify.refresh()
 }
