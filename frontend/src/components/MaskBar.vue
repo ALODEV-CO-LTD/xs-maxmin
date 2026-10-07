@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
       <!-- State + the one action that makes sense right now -->
       <span v-if="masked" class="mb-status" role="status"><AppIcon name="eye-off" /> Số liệu đang ẩn</span>
       <span v-else class="mb-status mb-live" role="timer" aria-live="off">
-        <AppIcon name="eye" /> Tự che sau <strong>{{ secondsLeft }}s</strong>
+        <AppIcon name="eye" /> Không thao tác, che sau <strong>{{ secondsLeft }}s</strong>
         <span class="mb-bar" aria-hidden="true"><span class="mb-fill" :style="{ width: progress + '%' }"></span></span>
       </span>
       <button v-if="masked" type="button" class="mb-btn mb-primary" @click="openPrompt('reveal')">
@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
         </button>
         <div v-if="menuOpen" class="mb-menu" role="group" aria-label="Tuỳ chọn ẩn số liệu" @keydown.esc="menuOpen = false">
           <label class="mb-field">
-            <span>Hiện số liệu trong</span>
+            <span>Tự che khi không thao tác sau</span>
             <select v-model.number="revealSeconds" aria-label="Thời gian hiện số liệu sau khi nhập mật khẩu">
               <option v-for="n in REVEAL_CHOICES" :key="n" :value="n">{{ secondsLabel(n) }}</option>
             </select>
@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
       :description="
         promptPurpose === 'disable'
           ? 'Nhập mật khẩu đăng nhập để tắt chế độ ẩn số liệu.'
-          : `Nhập mật khẩu đăng nhập để xem số liệu. Số liệu sẽ tự ẩn lại sau ${secondsLabel(mask.state.revealSeconds)}, hoặc ngay khi bạn rời cửa sổ này.`
+          : `Nhập mật khẩu đăng nhập để xem số liệu. Số liệu tự ẩn lại sau ${secondsLabel(mask.state.revealSeconds)} không thao tác (đang thao tác thì không ẩn), hoặc ngay khi bạn rời cửa sổ này.`
       "
       @verified="onVerified"
       @close="promptOpen = false"

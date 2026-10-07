@@ -1,13 +1,13 @@
 // "Ẩn số liệu" (hide figures) - a screen-only mask, not encryption. When
 // `enabled` (persisted per device), every figure shows as "••••" until the
 // user re-enters the account password (POST /me/verify-password, done by
-// PasswordPromptDialog) which reveals them for a SHORT time (30 s by default;
-// the user can pick 10 s / 20 s / 30 s / 1 min / 5 min, remembered per device).
-// They are covered again as soon as ANY of these happens: the time is up, the
-// window loses focus (another app / window in front, a screenshot tool taking
-// over), the tab goes to the background, or the page is left. The shorter the
-// time they are on screen, the smaller the chance for a screenshot or a
-// glance over the shoulder.
+// PasswordPromptDialog) which reveals them. The chosen time (30 s by default;
+// 10 s / 20 s / 30 s / 1 min / 5 min, remembered per device) is an IDLE time:
+// every touch / click / key press / scroll restarts it, so figures never
+// disappear while the user is working - they are covered only after that long
+// WITHOUT any action. They are covered at once, whatever the timer says, when
+// the window loses focus (another app / window in front, a screenshot tool
+// taking over), the tab goes to the background, or the page is left.
 //
 // Components read `mask.masked` (see MaskedValue.vue) and never receive the
 // real value while it is true.
@@ -69,6 +69,30 @@ function clearTimer() {
   revealTimer = null
 }
 
+function revealMs() {
+  return limit('revealMs', state.revealSeconds * 1000)
+}
+
+// Idle timer: fires at revealUntil; if the user acted meanwhile revealUntil moved on, so wait again.
+function armIdleTimer() {
+  clearTimer()
+  revealTimer = setTimeout(() => {
+    if (state.revealed && Date.now() < state.revealUntil) armIdleTimer()
+    else cover()
+  }, Math.max(0, state.revealUntil - Date.now()))
+}
+
+// Any action by the user while figures are shown restarts the idle time.
+let lastActivity = 0
+function onActivity() {
+  if (!state.revealed) return
+  const now = Date.now()
+  if (now - lastActivity < 400) return // pointermove/scroll fire a lot
+  lastActivity = now
+  state.revealUntil = now + revealMs()
+}
+const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'scroll', 'touchstart', 'touchmove']
+
 function cover() {
   clearTimer()
   if (graceTimer) clearTimeout(graceTimer)
@@ -123,13 +147,12 @@ export const mask = {
   },
   /** Call only after the password was verified. */
   reveal() {
-    const ms = limit('revealMs', state.revealSeconds * 1000)
     state.revealed = true
-    state.revealUntil = Date.now() + ms
-    clearTimer()
-    revealTimer = setTimeout(cover, ms)
+    state.revealUntil = Date.now() + revealMs()
+    lastActivity = Date.now()
+    armIdleTimer()
   },
-  /** How long figures stay visible after the password; remembered per device. */
+  /** Idle time after which figures are covered again; remembered per device. */
   setRevealSeconds(n) {
     if (!REVEAL_CHOICES.includes(n)) return
     state.revealSeconds = n
@@ -148,6 +171,7 @@ export const mask = {
     window.addEventListener('blur', onBlur)
     window.addEventListener('focus', onFocus)
     window.addEventListener('pagehide', onPageHide)
+    for (const ev of ACTIVITY_EVENTS) window.addEventListener(ev, onActivity, { capture: true, passive: true })
   },
   detach() {
     users = Math.max(0, users - 1)
@@ -157,5 +181,6 @@ export const mask = {
     window.removeEventListener('blur', onBlur)
     window.removeEventListener('focus', onFocus)
     window.removeEventListener('pagehide', onPageHide)
+    for (const ev of ACTIVITY_EVENTS) window.removeEventListener(ev, onActivity, { capture: true })
   },
 }
