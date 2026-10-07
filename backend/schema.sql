@@ -291,3 +291,13 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_id, created_
 
 -- An account's own payout config (parse the JSON in application code)
 -- SELECT scoring_rates FROM users WHERE id = :userId;
+
+-- Per-customer entry-syntax template (K16); config is a JSON object.
+CREATE TABLE IF NOT EXISTS customer_syntax_templates (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  customer_name TEXT NOT NULL,
+  config        TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  UNIQUE (user_id, customer_name)
+);

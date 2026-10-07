@@ -48,6 +48,9 @@ Future<Response> onRequest(RequestContext context) async {
   if (denied != null) return denied;
 
   final counts = wipeUserData(db, userId);
+  // The password may have been typed by a stranger holding a stolen token:
+  // keep only this session, every other device must log in again.
+  revokeAllSessions(db, userId, by: userId, exceptSessionId: auth.sessionId, ip: ip);
   logSecurityEvent(db, 'data_wiped', userId: userId, ip: ip, detail: 'Người dùng tự xoá dữ liệu');
 
   return Response.json(body: {'ok': true, 'deleted': counts});
