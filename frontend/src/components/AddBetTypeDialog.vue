@@ -5,8 +5,7 @@
     2. Tỉ lệ ăn      (payout multiple: điểm ra = điểm vào × tỉ lệ)
     3. So khớp       (how many trailing digits are compared)
     4. Đối chiếu với (which prize groups of the lottery result count)
-  It only collects and validates; the parent adds the row (and the user still has to
-  press "Lưu cài đặt" there to store it).
+  It only collects and validates; the parent adds the row and saves it at once.
   Props:  open, existingKeys (string[]), digitOptions (number[]), tiers ([{key,label}])
   Emits:  close, add({ key, rate, digits, tiers })
 -->
@@ -108,7 +107,7 @@ function onKey(e) {
       <form ref="box" class="bt-box" role="dialog" aria-modal="true" aria-labelledby="bt-title" novalidate @submit.prevent="submit">
         <header class="bt-head">
           <h2 id="bt-title" class="bt-title">Thêm loại đánh</h2>
-          <p class="bt-sub">Điền thông tin cho loại đánh mới. Sau khi thêm, nhớ bấm "Lưu cài đặt" để áp dụng.</p>
+          <p class="bt-sub">Điền thông tin cho loại đánh mới. Loại đánh được lưu và áp dụng ngay khi bạn bấm "Thêm loại đánh".</p>
         </header>
 
         <section class="bt-section">

@@ -105,6 +105,8 @@ async function onAdd(payload) {
   justAddedTimer = setTimeout(() => (justAdded.value = ''), 4000)
   await nextTick()
   document.querySelector('tr.row-new')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  // A new type takes effect at once - no separate "Lưu cài đặt" step to forget.
+  await save()
 }
 
 function removeRow(key) {
