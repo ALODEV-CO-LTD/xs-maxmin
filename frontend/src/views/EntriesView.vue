@@ -268,6 +268,14 @@ const totals = computed(() => {
   return { vao, ra, chenhLech: vao - ra }
 })
 
+// Points are free text; plain numbers get thousands separators (5.000, 2.000.000) so rows
+// line up with the totals underneath, anything else is shown as typed.
+function fmtPoints(v) {
+  const t = String(v ?? '').trim()
+  if (!t) return '-'
+  return /^-?\d+(\.\d+)?$/.test(t) ? Number(t).toLocaleString('vi-VN') : t
+}
+
 function formatNumber(n) {
   return new Intl.NumberFormat('vi-VN').format(n)
 }
@@ -996,13 +1004,13 @@ async function deleteTemplate() {
               <table class="table entries-table stack-table">
                 <thead>
                   <tr>
-                    <th v-if="filters.all">Khách hàng</th>
-                    <th>Ngày</th>
-                    <th>Hạng mục</th>
-                    <th>Số</th>
-                    <th>Điểm vào</th>
-                    <th>Điểm ra</th>
-                    <th>Ghi chú</th>
+                    <th v-if="filters.all" class="col-cust">Khách hàng</th>
+                    <th class="col-date">Ngày</th>
+                    <th class="col-type">Hạng mục</th>
+                    <th class="col-val">Số</th>
+                    <th class="col-pts">Điểm vào</th>
+                    <th class="col-pts">Điểm ra</th>
+                    <th class="col-note">Ghi chú</th>
                     <th class="col-btn">Sửa</th>
                     <th class="col-btn">Xoá</th>
                   </tr>
@@ -1014,8 +1022,8 @@ async function deleteTemplate() {
                       <td data-label="Ngày">{{ entry.entryDate }}<span v-if="entry.pending" class="chip pending-chip">Chờ đồng bộ</span></td>
                       <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}</td>
                       <td data-label="Số" class="cell-num"><MaskedValue :text="entry.value" /></td>
-                      <td data-label="Điểm vào" class="cell-points"><MaskedValue :text="entry.score || '-'" /></td>
-                      <td data-label="Điểm ra" class="cell-points"><MaskedValue :text="entry.result || '-'" /></td>
+                      <td data-label="Điểm vào" class="cell-points"><MaskedValue :text="fmtPoints(entry.score)" /></td>
+                      <td data-label="Điểm ra" class="cell-points"><MaskedValue :text="fmtPoints(entry.result)" /></td>
                       <td data-label="Ghi chú" class="cell-note"><MaskedValue :text="entry.note || '-'" /></td>
                       <td class="col-btn">
                         <button class="btn btn-secondary btn-sm" @click="startEdit(entry)">Sửa</button>
@@ -2718,7 +2726,7 @@ async function deleteTemplate() {
 .entries-table {
   table-layout: fixed;
   width: 100%;
-  min-width: 540px;
+  min-width: 640px;
   font-size: 14px;
   border-collapse: separate;
   border-spacing: 0;
@@ -2731,13 +2739,13 @@ async function deleteTemplate() {
 .entries-table td:last-child {
   border-right: 0;
 }
-.entries-table th:nth-child(1) { width: 90px; }
-.entries-table th:nth-child(2) { width: 76px; }
-.entries-table th:nth-child(3) { width: 56px; }
-.entries-table th:nth-child(4),
-.entries-table th:nth-child(5) { width: 78px; }
-.entries-table th:nth-child(7),
-.entries-table th:nth-child(8) { width: 54px; }
+.entries-table .col-cust { width: 130px; }
+.entries-table .col-date { width: 108px; }
+.entries-table .col-type { width: 104px; }
+.entries-table .col-val { width: 76px; }
+.entries-table .col-pts { width: 112px; }
+.entries-table .col-note { min-width: 120px; }
+.entries-table th.col-btn { width: 64px; }
 .entries-table td {
   border-bottom: 1px solid var(--border);
 }
