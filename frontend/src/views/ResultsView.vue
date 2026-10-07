@@ -25,6 +25,8 @@ import AppIcon from '../components/AppIcon.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { onMounted, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { loadAllEntries } from '../offline'
+import { today } from '../dates'
 
 const entries = ref([])
 const loading = ref(true)
@@ -46,7 +48,7 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const list = await api.get('/me/entries')
+    const list = await loadAllEntries({ overlay: false })
     entries.value = list.entries
     for (const e of list.entries) draft[e.id] = e.result || ''
   } catch (err) {
@@ -179,7 +181,6 @@ function fillResultsFromLottery(lr, date) {
 
 // ---- Kết quả xổ số Miền Bắc ------------------------------------------
 
-const today = () => new Date().toISOString().slice(0, 10)
 const lotteryDate = ref(today())
 const lotteryLoading = ref(false)
 const lotteryError = ref('')

@@ -21,6 +21,8 @@ import { showConfirm } from '../confirm'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../api'
+import { cachedGet, loadAllEntries } from '../offline'
+import { fold } from '../messageParser'
 import AppIcon from '../components/AppIcon.vue'
 import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
 
@@ -33,6 +35,8 @@ const addInput = ref(null)
 const entries = ref([])
 const loading = ref(true)
 const loadError = ref('')
+const fromCache = ref(false) // showing the copy saved on this device (offline)
+const OFFLINE_WRITE = 'Đang offline: thêm/xoá khách hàng cần có mạng, vui lòng thử lại khi kết nối lại.'
 const search = ref('')
 const expanded = ref(null)
 
@@ -44,7 +48,8 @@ const deletingId = ref(null)
 
 async function loadRoster() {
   try {
-    const { customers: list } = await api.get('/me/customers')
+    // cachedGet: last saved copy when offline
+    const { customers: list } = await cachedGet('/me/customers')
     roster.value = list
   } catch (err) {
     // Non-fatal - the page still works from entries alone, just without
@@ -67,7 +72,7 @@ async function addCustomer() {
       return
     }
   } catch (err) {
-    addError.value = err instanceof ApiError ? err.message : 'Không thêm được khách hàng'
+    addError.value = err instanceof ApiError ? (err.status === 0 ? OFFLINE_WRITE : err.message) : 'Không thêm được khách hàng'
   } finally {
     addingCustomer.value = false
   }
@@ -85,7 +90,7 @@ async function removeCustomer(id, name) {
     await api.del(`/me/customers/${id}`)
     roster.value = roster.value.filter((c) => c.id !== id)
   } catch (err) {
-    addError.value = err instanceof ApiError ? err.message : 'Không xoá được'
+    addError.value = err instanceof ApiError ? (err.status === 0 ? OFFLINE_WRITE : err.message) : 'Không xoá được'
   } finally {
     deletingId.value = null
   }
@@ -111,8 +116,11 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const list = await api.get('/me/entries')
+    // every page of the history (counts/totals must not miss old records);
+    // the saved copy when offline
+    const list = await loadAllEntries()
     entries.value = list.entries
+    fromCache.value = list.fromCache
   } catch (err) {
     loadError.value = err.message || 'Không tải được số liệu'
   } finally {
@@ -170,9 +178,9 @@ const customers = computed(() => {
 })
 
 const filteredCustomers = computed(() => {
-  const q = search.value.trim().toLowerCase()
+  const q = fold(search.value.trim()) // accent-insensitive: "do ngoc" finds "Đỗ Ngọc Mai"
   if (!q) return customers.value
-  return customers.value.filter((c) => c.name.toLowerCase().includes(q))
+  return customers.value.filter((c) => fold(c.name).includes(q))
 })
 
 const detailBox = ref(null)
@@ -228,6 +236,9 @@ async function removeFromDetail(c) {
       <div v-if="addError" class="alert alert-error add-customer-error">{{ addError }}</div>
     </div>
 
+    <div v-if="fromCache" class="alert alert-warning">
+      Đang offline: hiển thị số liệu đã lưu trên máy. Thêm/xoá khách hàng cần có mạng.
+    </div>
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>

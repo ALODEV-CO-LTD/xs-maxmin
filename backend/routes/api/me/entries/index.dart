@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/entry_list.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -19,27 +20,16 @@ Future<Response> onRequest(RequestContext context) async {
 
 Response _list(RequestContext context, String userId) {
   final db = context.read<Database>();
-  final rows = db.select(
-    'SELECT * FROM data_entries WHERE user_id = ? ORDER BY entry_date DESC, created_at DESC LIMIT 200',
-    [userId],
-  );
+  // Paged: ?limit= (default 500, max 1000) & ?offset=. `hasMore` tells the
+  // client to fetch the next page (frontend loadAllEntries does that).
+  final q = context.request.uri.queryParameters;
+  final page = listEntriesPage(db, userId, limitParam: q['limit'], offsetParam: q['offset']);
   return Response.json(
     body: {
-      'entries': [
-        for (final r in rows)
-          {
-            'id': r['id'],
-            'customerName': r['customer_name'],
-            'entryDate': r['entry_date'],
-            'value': r['value'],
-            'score': r['score'],
-            'result': r['result'],
-            'betType': r['bet_type'],
-            'note': r['note'],
-            'createdAt': r['created_at'],
-            'updatedAt': r['updated_at'] ?? r['created_at'],
-          },
-      ],
+      'entries': [for (final r in page.rows) _entryJson(r)],
+      'total': page.total,
+      'offset': page.offset,
+      'hasMore': page.offset + page.rows.length < page.total,
     },
   );
 }
@@ -69,7 +59,7 @@ Future<Response> _create(RequestContext context, String userId) async {
   final requestedDate = (body['entryDate'] as String?)?.trim();
   String entryDate;
   if (requestedDate == null || requestedDate.isEmpty) {
-    entryDate = now.toIso8601String().substring(0, 10);
+    entryDate = vietnamToday(now); // not the UTC date: 0-7h in Vietnam is still "yesterday" in UTC
   } else {
     try {
       entryDate = DateTime.parse(requestedDate).toIso8601String().substring(0, 10);

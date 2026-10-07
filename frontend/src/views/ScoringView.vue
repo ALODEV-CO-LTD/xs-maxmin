@@ -28,6 +28,7 @@ import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { onMounted, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { loadAllEntries } from '../offline'
 import { betTypeLabel } from '../betTypes'
 
 const entries = ref([])
@@ -63,7 +64,8 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const list = await api.get('/me/entries')
+    // every page; no local pending edits (records are PATCHed straight to the server here)
+    const list = await loadAllEntries({ overlay: false })
     entries.value = list.entries
   } catch (err) {
     loadError.value = err.message || 'Không tải được số liệu'

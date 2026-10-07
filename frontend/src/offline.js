@@ -172,23 +172,46 @@ async function overlayPending(list) {
   return out.map((e) => (pendingIds.has(e.id) ? { ...e, pending: true } : e))
 }
 
-/** Loads the entry history; falls back to the cached copy when offline. */
-export async function loadEntries() {
+const PAGE_SIZE = 500 // server pages (max 1000); several pages keep each response small
+
+/** Fetches EVERY page of GET /me/entries (the server pages with limit/offset
+ *  and answers {entries, total, hasMore}). Rows are de-duplicated by id in
+ *  case a record was added between two pages. */
+async function fetchAllPages() {
+  const byId = new Map()
+  let offset = 0
+  for (;;) {
+    const page = await api.get(`/me/entries?limit=${PAGE_SIZE}&offset=${offset}`)
+    for (const e of page.entries) byId.set(e.id, e)
+    offset += page.entries.length
+    if (!page.hasMore || page.entries.length === 0) break
+  }
+  return [...byId.values()]
+}
+
+/** Loads the COMPLETE entry history (all pages) - use this everywhere a list
+ *  of records is read, so counts/totals/scoring never miss old records.
+ *  The full list is cached in IndexedDB for offline use; offline the cached
+ *  copy is returned. `overlay: false` skips the not-yet-synced local edits
+ *  (for pages that PATCH records straight to the server). */
+export async function loadAllEntries({ overlay = true } = {}) {
   const key = `entries:${currentUserId()}`
+  const lay = (list) => (overlay ? overlayPending(list) : list)
   try {
-    const { entries } = await api.get('/me/entries')
+    const entries = await fetchAllPages()
     syncState.online = true
     kvSet(key, entries)
     await refreshPending()
-    return { entries: await overlayPending(entries), fromCache: false }
+    return { entries: await lay(entries), fromCache: false }
   } catch (err) {
     if (!isNetworkError(err)) throw err
     markOffline()
     const cached = await kvGet(key)
     await refreshPending()
-    return { entries: await overlayPending(cached || []), fromCache: true }
+    return { entries: await lay(cached || []), fromCache: true, noCache: !cached }
   }
 }
+export const loadEntries = loadAllEntries
 
 async function cacheEntryLocally(entry) {
   const key = `entries:${currentUserId()}`
