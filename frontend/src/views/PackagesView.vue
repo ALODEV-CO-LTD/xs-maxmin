@@ -17,9 +17,10 @@
 -->
 <script setup>
 import { showConfirm } from '../confirm'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useNotifyStore } from '../stores/notify'
 
 const auth = useAuthStore()
 
@@ -46,7 +47,7 @@ const qrUrl = computed(() => {
   if (!info?.bankBin || !info?.bankAccountNumber || !req) return null
   const params = new URLSearchParams({
     amount: String(req.amount),
-    addInfo: `${auth.user?.username || ''} ${req.packageType}`.trim(),
+    addInfo: req.referenceCode || `${auth.user?.username || ''} ${req.packageType}`.trim(),
     accountName: info.bankAccountHolder || '',
   })
   return `https://img.vietqr.io/image/${info.bankBin}-${info.bankAccountNumber}-compact2.png?${params}`
@@ -67,12 +68,59 @@ function formatDateTime(iso) {
 }
 
 function statusLabel(status) {
-  return { pending: 'Đang chờ duyệt', approved: 'Đã duyệt', rejected: 'Bị từ chối' }[status] || status
+  return { pending: 'Đang chờ duyệt', approved: 'Đã duyệt', rejected: 'Bị từ chối', cancelled: 'Đã huỷ' }[status] || status
 }
 
 function statusChipClass(status) {
-  return { pending: 'chip-warning', approved: 'chip-accent', rejected: 'chip-danger' }[status] || ''
+  return { pending: 'chip-warning', approved: 'chip-accent', rejected: 'chip-danger', cancelled: '' }[status] || ''
 }
+
+function planLabel(type) {
+  return plans.value.find((p) => p.type === type)?.label || type
+}
+
+// "Nội dung chuyển khoản": copy button next to the reference code
+const copied = ref(false)
+async function copyReference(code) {
+  try {
+    await navigator.clipboard.writeText(code)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  } catch {
+    /* clipboard blocked - the code is selectable on screen anyway */
+  }
+}
+
+const cancelling = ref(false)
+async function cancelPending() {
+  const r = pendingRequest.value
+  if (!r) return
+  if (!(await showConfirm({
+    title: 'Huỷ yêu cầu',
+    message: `Huỷ yêu cầu gói "${planLabel(r.packageType)}" (${r.referenceCode})? Nếu bạn đã chuyển khoản, hãy liên hệ admin trước khi huỷ.`,
+    confirmText: 'Huỷ yêu cầu',
+    danger: true,
+  }))) return
+  cancelling.value = true
+  purchaseError.value = ''
+  try {
+    await api.post(`/me/payment-requests/${r.id}/cancel`)
+    purchaseSuccess.value = 'Đã huỷ yêu cầu.'
+    await loadAll()
+  } catch (err) {
+    purchaseError.value = err.message || 'Không huỷ được yêu cầu'
+    await loadAll()
+  } finally {
+    cancelling.value = false
+  }
+}
+
+// Admin decided while this page is open (push) -> reload status + package
+const notify = useNotifyStore()
+watch(
+  () => notify.paymentTick,
+  () => loadAll(),
+)
 
 async function loadAll() {
   loading.value = true
@@ -139,9 +187,18 @@ async function purchase(plan) {
         </div>
       </div>
 
-      <div v-if="pendingRequest" class="alert alert-warning">
-        Bạn có một yêu cầu mua gói "{{ pendingRequest.packageType }}" đang chờ admin xác nhận. Chuyển khoản theo
-        thông tin bên dưới nếu chưa thực hiện.
+      <div v-if="pendingRequest" class="alert alert-warning pending-box">
+        <div>
+          Yêu cầu gói "{{ planLabel(pendingRequest.packageType) }}" ({{ formatVnd(pendingRequest.amount) }}) đang chờ admin xác nhận.
+          Chuyển khoản đúng số tiền và ghi nội dung
+          <strong class="ref-code">{{ pendingRequest.referenceCode }}</strong> để được duyệt nhanh.
+        </div>
+        <div class="pending-actions">
+          <button type="button" class="btn btn-secondary btn-sm" @click="copyReference(pendingRequest.referenceCode)">
+            {{ copied ? 'Đã sao chép' : 'Sao chép nội dung' }}
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" :disabled="cancelling" @click="cancelPending">Huỷ yêu cầu</button>
+        </div>
       </div>
       <div v-if="purchaseError" class="alert alert-error">{{ purchaseError }}</div>
       <div v-if="purchaseSuccess" class="alert alert-success">{{ purchaseSuccess }}</div>
@@ -169,6 +226,10 @@ async function purchase(plan) {
           <div class="bank-row"><span>Ngân hàng</span><strong>{{ bankInfo.bankName }}</strong></div>
           <div class="bank-row"><span>Số tài khoản</span><strong>{{ bankInfo.bankAccountNumber }}</strong></div>
           <div class="bank-row"><span>Chủ tài khoản</span><strong>{{ bankInfo.bankAccountHolder }}</strong></div>
+          <template v-if="pendingRequest">
+            <div class="bank-row"><span>Số tiền</span><strong>{{ formatVnd(pendingRequest.amount) }}</strong></div>
+            <div class="bank-row"><span>Nội dung</span><strong class="ref-code">{{ pendingRequest.referenceCode }}</strong></div>
+          </template>
           <div v-if="qrUrl" class="qr-wrap">
             <img :src="qrUrl" alt="Mã QR chuyển khoản" class="qr-img" />
             <p class="page-subtitle" style="text-align: center; margin: 8px 0 0">
@@ -184,10 +245,13 @@ async function purchase(plan) {
       <div v-else class="req-list">
         <div v-for="r in requests" :key="r.id" class="card req-item">
           <div class="req-top">
-            <strong>{{ r.packageType }}</strong>
+            <strong>{{ planLabel(r.packageType) }}</strong>
             <span class="chip" :class="statusChipClass(r.status)">{{ statusLabel(r.status) }}</span>
           </div>
-          <div class="req-detail">{{ formatVnd(r.amount) }} · {{ formatDateTime(r.createdAt) }}</div>
+          <div class="req-detail">
+            {{ formatVnd(r.amount) }} · {{ formatDateTime(r.createdAt) }}<template v-if="r.referenceCode"> · {{ r.referenceCode }}</template>
+          </div>
+          <div v-if="r.status === 'rejected' && r.rejectReason" class="req-reason">Lý do: {{ r.rejectReason }}</div>
         </div>
       </div>
     </template>
@@ -477,5 +541,26 @@ async function purchase(plan) {
     margin-left: 0;
     width: 100%;
   }
+}
+.pending-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.pending-actions {
+  display: flex;
+  gap: 8px;
+}
+.ref-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+.req-reason {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--danger-text);
 }
 </style>

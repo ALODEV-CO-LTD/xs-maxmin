@@ -55,11 +55,12 @@ Future<Response> onRequest(RequestContext context) async {
 
   final priceVnd = resolvedPriceVnd(db, pkg);
   final id = newId();
+  final reference = newPaymentReference(db);
   final now = DateTime.now().toUtc().toIso8601String();
   db.execute(
-    'INSERT INTO payment_requests (id, user_id, package_type, amount, status, created_at) '
-    "VALUES (?, ?, ?, ?, 'pending', ?)",
-    [id, auth.userId, pkg.wireValue, priceVnd, now],
+    'INSERT INTO payment_requests (id, user_id, package_type, amount, status, created_at, reference_code) '
+    "VALUES (?, ?, ?, ?, 'pending', ?, ?)",
+    [id, auth.userId, pkg.wireValue, priceVnd, now, reference],
   );
 
   return Response.json(
@@ -69,6 +70,7 @@ Future<Response> onRequest(RequestContext context) async {
       'packageType': pkg.wireValue,
       'amount': priceVnd,
       'status': 'pending',
+      'referenceCode': reference,
       'createdAt': now,
     },
   );

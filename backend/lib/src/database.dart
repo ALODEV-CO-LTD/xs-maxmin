@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:io';
 
 import 'package:bcrypt/bcrypt.dart';
@@ -89,6 +90,15 @@ void _migrateSchema(Database db) {
   // Epoch seconds: access tokens WITHOUT a session id issued at/before this are
   // rejected (revokes pre-session tokens; set by revokeAllSessions).
   _ensureColumn(db, 'users', 'tokens_valid_after', 'INTEGER');
+  // Quản lý thanh toán (A18): a short transfer reference ("nội dung chuyển khoản") the user puts
+  // in the bank note so the admin can match the money, the reason shown to the user when a request
+  // is rejected, and `cancelled` = the user withdrew a still-pending request (stored as status
+  // 'rejected' so the CHECK constraint stays; the API reports it as 'cancelled').
+  _ensureColumn(db, 'payment_requests', 'reference_code', 'TEXT');
+  _ensureColumn(db, 'payment_requests', 'reject_reason', 'TEXT');
+  _ensureColumn(db, 'payment_requests', 'cancelled', 'INTEGER NOT NULL DEFAULT 0');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_payment_requests_created ON payment_requests(created_at)');
+  backfillPaymentReferences(db);
   // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
   _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
   // Last-change timestamp of an entry (ISO-8601 UTC). The offline client
@@ -471,3 +481,22 @@ void _seed(Database db) {
 }
 
 String newId() => _uuid.v4();
+
+const _refAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I: easy to read out and type
+
+/// A fresh, unique "XS" + 6 character reference for a payment request.
+String newPaymentReference(Database db) {
+  final rnd = Random.secure();
+  while (true) {
+    final code = 'XS${List.generate(6, (_) => _refAlphabet[rnd.nextInt(_refAlphabet.length)]).join()}';
+    if (db.select('SELECT 1 FROM payment_requests WHERE reference_code = ?', [code]).isEmpty) return code;
+  }
+}
+
+/// Requests created before references existed get one too.
+void backfillPaymentReferences(Database db) {
+  final rows = db.select('SELECT id FROM payment_requests WHERE reference_code IS NULL');
+  for (final r in rows) {
+    db.execute('UPDATE payment_requests SET reference_code = ? WHERE id = ?', [newPaymentReference(db), r['id']]);
+  }
+}
