@@ -12,7 +12,7 @@
 import { showConfirm } from '../confirm'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '../api'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
 import AppIcon from '../components/AppIcon.vue'
@@ -22,6 +22,29 @@ import DeletionSchedules from '../components/DeletionSchedules.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+
+// Sections are split into small tabs (the page used to be one very long scroll).
+const TABS = [
+  { key: 'profile', label: 'Hồ sơ' },
+  { key: 'security', label: 'Mật khẩu' },
+  { key: 'devices', label: 'Thiết bị & riêng tư' },
+  { key: 'data', label: 'Dữ liệu' },
+]
+const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'profile')
+function selectTab(key) {
+  tab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
+function onTabKey(e) {
+  const i = TABS.findIndex((t) => t.key === tab.value)
+  const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null
+  if (next === null) return
+  e.preventDefault()
+  const t = TABS[(next + TABS.length) % TABS.length]
+  selectTab(t.key)
+  document.getElementById(`acct-tab-${t.key}`)?.focus()
+}
 const call = useCallStore()
 
 // Logout lives here on phones/tablets (the header button is hidden below 860px).
@@ -381,6 +404,25 @@ async function deleteAllData() {
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
+      <div class="acct-tabs" role="tablist" aria-label="Mục tài khoản" @keydown="onTabKey">
+        <button
+          v-for="t in TABS"
+          :id="`acct-tab-${t.key}`"
+          :key="t.key"
+          type="button"
+          role="tab"
+          class="acct-tab"
+          :class="{ active: tab === t.key }"
+          :aria-selected="tab === t.key"
+          :aria-controls="`acct-panel-${t.key}`"
+          :tabindex="tab === t.key ? 0 : -1"
+          @click="selectTab(t.key)"
+        >
+          {{ t.label }}
+        </button>
+      </div>
+
+      <div v-show="tab === 'profile'" id="acct-panel-profile" role="tabpanel" aria-labelledby="acct-tab-profile">
       <div class="account-top">
       <div class="card profile-card">
         <div class="card-head">
@@ -496,41 +538,9 @@ async function deleteAllData() {
       </div>
 
       </div>
-
-      <!-- Signed-in devices -->
-      <div class="card" style="margin-bottom: 16px">
-        <div class="card-head">
-          <h3 style="margin-top: 0">Thiết bị đang đăng nhập</h3>
-          <button
-            v-if="sessions.length > 1"
-            type="button"
-            class="btn btn-secondary btn-sm"
-            @click="revokeOtherSessions"
-          >
-            Đăng xuất thiết bị khác
-          </button>
-        </div>
-        <div v-if="sessionsError" class="alert alert-error">{{ sessionsError }}</div>
-        <div v-if="sessionsLoading">Đang tải...</div>
-        <div v-else-if="sessions.length === 0" class="page-subtitle" style="margin-bottom: 0">
-          Chưa có thông tin thiết bị (phiên đăng nhập cũ). Đăng nhập lại để theo dõi thiết bị.
-        </div>
-        <div v-else class="code-list">
-          <div v-for="s in sessions" :key="s.id" class="code-item">
-            <div>
-              <strong>{{ s.deviceLabel }}</strong>
-              <span v-if="s.current" class="chip chip-accent" style="margin-left: 8px">Thiết bị này</span>
-              <div class="page-subtitle" style="margin: 2px 0 0">
-                Hoạt động gần nhất: {{ fmtSeen(s.lastSeen) }} · IP {{ s.ip || '-' }}
-              </div>
-            </div>
-            <div v-if="!s.current" class="code-actions">
-              <button class="btn btn-ghost btn-sm" @click="revokeSession(s)">Đăng xuất</button>
-            </div>
-          </div>
-        </div>
       </div>
 
+      <div v-show="tab === 'security'" id="acct-panel-security" role="tabpanel" aria-labelledby="acct-tab-security">
       <div class="security-grid">
       <!-- Change password -->
       <form class="card sec-card sec-password" @submit.prevent="submitPasswordChange">
@@ -597,11 +607,51 @@ async function deleteAllData() {
       </form>
       </div>
 
+      </div>
+
+      <div v-show="tab === 'devices'" id="acct-panel-devices" role="tabpanel" aria-labelledby="acct-tab-devices">
+      <!-- Signed-in devices -->
+      <div class="card" style="margin-bottom: 16px">
+        <div class="card-head">
+          <h3 style="margin-top: 0">Thiết bị đang đăng nhập</h3>
+          <button
+            v-if="sessions.length > 1"
+            type="button"
+            class="btn btn-secondary btn-sm"
+            @click="revokeOtherSessions"
+          >
+            Đăng xuất thiết bị khác
+          </button>
+        </div>
+        <div v-if="sessionsError" class="alert alert-error">{{ sessionsError }}</div>
+        <div v-if="sessionsLoading">Đang tải...</div>
+        <div v-else-if="sessions.length === 0" class="page-subtitle" style="margin-bottom: 0">
+          Chưa có thông tin thiết bị (phiên đăng nhập cũ). Đăng nhập lại để theo dõi thiết bị.
+        </div>
+        <div v-else class="code-list">
+          <div v-for="s in sessions" :key="s.id" class="code-item">
+            <div>
+              <strong>{{ s.deviceLabel }}</strong>
+              <span v-if="s.current" class="chip chip-accent" style="margin-left: 8px">Thiết bị này</span>
+              <div class="page-subtitle" style="margin: 2px 0 0">
+                Hoạt động gần nhất: {{ fmtSeen(s.lastSeen) }} · IP {{ s.ip || '-' }}
+              </div>
+            </div>
+            <div v-if="!s.current" class="code-actions">
+              <button class="btn btn-ghost btn-sm" @click="revokeSession(s)">Đăng xuất</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Mã khôi phục + quyền riêng tư (components/RecoveryCodePanel, PrivacySettings) -->
       <div class="account-top">
         <RecoveryCodePanel v-if="!auth.isAdmin" />
         <PrivacySettings />
       </div>
+      </div>
+
+      <div v-show="tab === 'data'" id="acct-panel-data" role="tabpanel" aria-labelledby="acct-tab-data">
       <!-- Scheduled deletion (K35/K36/S05) -->
       <DeletionSchedules />
 
@@ -616,6 +666,7 @@ async function deleteAllData() {
         <button class="btn btn-danger" @click="deleteAllData" :disabled="deleting">
           {{ deleting ? 'Đang xoá...' : 'Xoá toàn bộ dữ liệu' }}
         </button>
+      </div>
       </div>
     </template>
   </div>
@@ -885,5 +936,41 @@ async function deleteAllData() {
   .security-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.acct-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 4px;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+}
+.acct-tab {
+  flex: 1 0 auto;
+  min-height: 44px;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.acct-tab:hover {
+  color: var(--text-primary);
+}
+.acct-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+}
+.acct-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 </style>
