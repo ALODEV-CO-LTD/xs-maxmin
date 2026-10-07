@@ -177,6 +177,13 @@ CREATE TABLE IF NOT EXISTS customer_codes (
 );
 -- Max IDs per account: settings key `max_virtual_ids` (default 5, Admin-editable).
 
+-- Deleted Mã ID reserved for 90 days (only the previous owner may re-create one).
+CREATE TABLE IF NOT EXISTS retired_codes (
+  code        TEXT PRIMARY KEY,
+  user_id     TEXT,
+  retired_at  TEXT
+);
+
 
 -- -----------------------------------------------------------------------------
 -- User-set deletion schedules, executed by a background Timer in the server.

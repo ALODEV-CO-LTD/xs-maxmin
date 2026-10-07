@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/customer_codes.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// DELETE removes one of the caller's Mã ID; PATCH `{label}` renames its label
@@ -13,6 +14,10 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   switch (context.request.method) {
     case HttpMethod.delete:
+      final mine = db.select('SELECT code FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
+      if (mine.isEmpty) return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy mã ID'});
+      // Quarantine the number (90 days) before freeing it, so it cannot be re-registered by someone else.
+      retireCode(db, mine.first['code'] as String, auth.userId);
       db.execute('DELETE FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
       return Response.json(body: {'ok': true});
     case HttpMethod.patch:
@@ -22,7 +27,11 @@ Future<Response> onRequest(RequestContext context, String id) async {
       } catch (_) {
         return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
       }
-      final label = (body['label'] as String?)?.trim() ?? '';
+      final rawLabel = body['label'];
+      if (rawLabel != null && rawLabel is! String) {
+        return Response.json(statusCode: 400, body: {'error': 'Nhãn phải là chuỗi'});
+      }
+      final label = (rawLabel as String?)?.trim() ?? '';
       if (label.length > 40) {
         return Response.json(statusCode: 400, body: {'error': 'Nhãn tối đa 40 ký tự'});
       }

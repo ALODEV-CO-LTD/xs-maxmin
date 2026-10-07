@@ -231,6 +231,16 @@ void _createSchema(Database db) {
     );
   ''');
 
+  // Mã ID removed by its owner stay reserved for 90 days (see customer_codes.dart)
+  // so nobody can grab the number and inherit friend requests meant for the old owner.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS retired_codes (
+      code TEXT PRIMARY KEY,
+      user_id TEXT,
+      retired_at TEXT
+    );
+  ''');
+
   db.execute('''
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,

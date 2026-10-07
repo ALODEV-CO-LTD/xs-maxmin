@@ -207,14 +207,16 @@ async function loadMessages(friendId, { quiet = false } = {}) {
 
 // The customer's own Mã ID, shown at the top so they can read it out to
 // someone who wants to add them. The server gives every account one; an
-// account that somehow has none (created before that) gets one made here
-// instead of being left with nothing to share.
+// account that has none is NOT given one here (just opening this page must
+// not create an ID) - it is pointed to Tài khoản instead.
 const myCode = ref('')
+const noMyCode = ref(false)
 const codeCopied = ref(false)
 async function loadMyCode() {
   try {
     const res = await api.get('/me/customer-codes')
-    myCode.value = res.codes?.[0]?.code || (await api.post('/me/customer-codes', {})).code || ''
+    myCode.value = res.codes?.[0]?.code || ''
+    noMyCode.value = !myCode.value
   } catch {
     /* the card simply stays hidden - adding friends still works without it */
   }
@@ -337,6 +339,9 @@ async function sendMessage() {
         <button type="button" class="btn btn-secondary btn-sm" @click="copyMyCode">
           {{ codeCopied ? 'Đã chép' : 'Sao chép' }}
         </button>
+      </div>
+      <div v-else-if="noMyCode" class="my-id-corner">
+        <span class="my-id-label">Chưa có ID. <router-link to="/account">Tạo ID trong Tài khoản.</router-link></span>
       </div>
     </div>
 

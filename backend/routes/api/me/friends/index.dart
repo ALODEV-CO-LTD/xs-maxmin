@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/rate_gate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 Future<Response> onRequest(RequestContext context) async {
@@ -25,6 +26,12 @@ Future<Response> _add(RequestContext context, String userId) async {
   } catch (_) {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
+  if ((body['userId'] != null && body['userId'] is! String) || (body['code'] != null && body['code'] is! String)) {
+    return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
+  }
+  // Too many failed lookups (someone sweeping IDs): wait before trying again.
+  final locked = checkFriendAddLock(context, userId);
+  if (locked != null) return locked;
   final directId = (body['userId'] as String?)?.trim();
   if (directId != null && directId.isNotEmpty) {
     return _addById(context, userId, directId);
@@ -39,6 +46,7 @@ Future<Response> _addById(RequestContext context, String userId, String friendId
   final db = context.read<Database>();
   final friendRows = db.select('SELECT id, name, username, role FROM users WHERE id = ?', [friendId]);
   if (friendRows.isEmpty) {
+    recordFriendAddFailure(context, userId);
     return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy người dùng'});
   }
   return _createFriendship(db, userId, friendRows.first);
@@ -92,6 +100,7 @@ Response _addByCode(RequestContext context, String userId, Map<String, dynamic> 
   final db = context.read<Database>();
   final codeRows = db.select('SELECT user_id FROM customer_codes WHERE code = ?', [code]);
   if (codeRows.isEmpty) {
+    recordFriendAddFailure(context, userId);
     return Response.json(statusCode: 404, body: {'error': 'Mã ID không tồn tại'});
   }
   final friendId = codeRows.first['user_id'] as String;

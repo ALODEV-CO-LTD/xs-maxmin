@@ -9,16 +9,43 @@ const _uuid = Uuid();
 /// Length of the numeric "Mã ID" a customer hands out to be added as a friend.
 const customerCodeLength = 6;
 
-/// A fresh numeric code, unique across every user's codes, so it is safe to
-/// hand to someone else without colliding with anyone else's.
+/// A fresh numeric code, unique across every user's codes, not quarantined
+/// (see [retiredCodeConflict]) and not guessable (passes [validateCustomCode]),
+/// so it is safe to hand to someone else.
 String generateUniqueCustomerCode(Database db) {
   final max = pow(10, customerCodeLength).toInt();
   while (true) {
     final code = _random.nextInt(max).toString().padLeft(customerCodeLength, '0');
-    if (db.select('SELECT 1 FROM customer_codes WHERE code = ?', [code]).isEmpty) {
-      return code;
+    if (validateCustomCode(code) != null) continue;
+    if (db.select('SELECT 1 FROM customer_codes WHERE code = ?', [code]).isNotEmpty) continue;
+    // An auto-generated code never reuses a quarantined one, not even for its old owner.
+    if (db.select('SELECT 1 FROM retired_codes WHERE code = ? AND retired_at > ?', [code, _quarantineCutoff()]).isNotEmpty) {
+      continue;
     }
+    return code;
   }
+}
+
+/// A deleted Mã ID stays reserved for this long: friend requests / lookups
+/// aimed at the old owner must never land on whoever grabs the number next.
+const retiredCodeQuarantine = Duration(days: 90);
+
+String _quarantineCutoff() => DateTime.now().toUtc().subtract(retiredCodeQuarantine).toIso8601String();
+
+/// Records [code] as just removed from [userId] (called when a Mã ID is deleted).
+void retireCode(Database db, String code, String userId) {
+  db.execute(
+    'INSERT OR REPLACE INTO retired_codes (code, user_id, retired_at) VALUES (?, ?, ?)',
+    [code, userId, DateTime.now().toUtc().toIso8601String()],
+  );
+}
+
+/// Vietnamese error if [code] is quarantined and [userId] is not its previous
+/// owner, else null. The previous owner may take their own number back.
+String? retiredCodeConflict(Database db, String code, String userId) {
+  final rows = db.select('SELECT user_id FROM retired_codes WHERE code = ? AND retired_at > ?', [code, _quarantineCutoff()]);
+  if (rows.isEmpty || rows.first['user_id'] == userId) return null;
+  return 'Mã này vừa được gỡ khỏi một tài khoản, chưa thể dùng lại trong 90 ngày';
 }
 
 /// Makes sure [userId] has at least one Mã ID. Every customer needs an ID to
@@ -60,9 +87,16 @@ String? validateCustomCode(String code) {
   }
   final d = code.codeUnits.map((c) => c - 48).toList();
   if (d.every((x) => x == d.first)) return 'Mã ID quá dễ đoán (lặp một chữ số)';
+  final counts = List.filled(10, 0);
+  for (final x in d) {
+    counts[x]++;
+  }
+  if (counts.any((n) => n >= 5)) return 'Mã ID quá dễ đoán (có từ 5 chữ số giống nhau)';
+  if (code.endsWith('0000')) return 'Mã ID quá dễ đoán (kết thúc bằng nhiều số 0)';
+  if (code == code.split('').reversed.join()) return 'Mã ID quá dễ đoán (số đối xứng)';
   final step = d[1] - d[0];
-  if ((step == 1 || step == -1) && [for (var i = 1; i < d.length; i++) d[i] - d[i - 1]].every((x) => x == step)) {
-    return 'Mã ID quá dễ đoán (dãy số tăng/giảm dần)';
+  if ([for (var i = 1; i < d.length; i++) d[i] - d[i - 1]].every((x) => x == step)) {
+    return 'Mã ID quá dễ đoán (dãy số tăng/giảm đều)';
   }
   for (var n = 1; n <= d.length ~/ 2; n++) {
     if (d.length % n == 0 && [for (var i = n; i < d.length; i++) d[i] == d[i - n]].every((x) => x)) {

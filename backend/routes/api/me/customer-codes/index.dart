@@ -60,19 +60,28 @@ Future<Response> _create(RequestContext context, String userId) async {
     );
   }
 
-  final label = (body['label'] as String?)?.trim();
+  // `label` / `code` must be strings (a number etc. is a 400, not a 500).
+  final rawLabel = body['label'];
+  final rawCode = body['code'];
+  if ((rawLabel != null && rawLabel is! String) || (rawCode != null && rawCode is! String)) {
+    return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ: mã và nhãn phải là chuỗi'});
+  }
+  final label = (rawLabel as String?)?.trim();
   if (label != null && label.length > 40) {
     return Response.json(statusCode: 400, body: {'error': 'Nhãn tối đa 40 ký tự'});
   }
 
   final String code;
-  final wanted = (body['code'] as String?)?.trim();
+  final wanted = (rawCode as String?)?.trim();
   if (wanted != null && wanted.isNotEmpty) {
     final problem = validateCustomCode(wanted);
     if (problem != null) return Response.json(statusCode: 400, body: {'error': problem});
     if (db.select('SELECT 1 FROM customer_codes WHERE code = ?', [wanted]).isNotEmpty) {
       return Response.json(statusCode: 409, body: {'error': 'Mã ID này đã có người dùng, hãy chọn dãy số khác'});
     }
+    // Quarantine after deletion: only the previous owner may take the number back.
+    final retired = retiredCodeConflict(db, wanted, userId);
+    if (retired != null) return Response.json(statusCode: 409, body: {'error': retired});
     code = wanted;
   } else {
     code = generateUniqueCustomerCode(db);
@@ -85,5 +94,7 @@ Future<Response> _create(RequestContext context, String userId) async {
     'INSERT INTO customer_codes (id, user_id, code, label, created_at) VALUES (?, ?, ?, ?, ?)',
     [id, userId, code, cleanLabel, now],
   );
+  // The previous owner has taken their number back: the reservation is over.
+  db.execute('DELETE FROM retired_codes WHERE code = ? AND user_id = ?', [code, userId]);
   return Response.json(statusCode: 201, body: {'id': id, 'code': code, 'label': cleanLabel, 'createdAt': now});
 }
