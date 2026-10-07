@@ -334,11 +334,14 @@ async function copyCode(code) {
 const deleteError = ref('')
 const deleteSuccess = ref('')
 const deleting = ref(false)
+// Must match backend/lib/src/data_wipe.dart (the single definition of the scope).
+const WIPE_DELETES = 'số liệu đã nhập, danh sách khách hàng, mẫu cú pháp, lịch xoá tự động, nhật ký cuộc gọi, tin nhắn phản hồi với Admin, lịch sử giao dịch và các yêu cầu thanh toán chưa duyệt'
+const WIPE_KEEPS = 'Tài khoản, gói dịch vụ, danh sách bạn bè, tin nhắn trò chuyện với bạn bè, Mã ID và cấu hình tính điểm được giữ nguyên.'
 
 async function deleteAllData() {
   if (!(await showConfirm({
     title: 'Xoá toàn bộ dữ liệu',
-    message: 'CẢNH BÁO: Thao tác này sẽ xoá toàn bộ số liệu, tin nhắn phản hồi và lịch sử giao dịch của bạn. Tài khoản và gói dịch vụ vẫn giữ nguyên. Bạn có chắc chắn muốn tiếp tục?',
+    message: `CẢNH BÁO: Thao tác này sẽ xoá vĩnh viễn: ${WIPE_DELETES}. ${WIPE_KEEPS} Bạn có chắc chắn muốn tiếp tục?`,
     confirmText: 'Xoá dữ liệu',
     danger: true,
   }))) {
@@ -561,7 +564,7 @@ async function deleteAllData() {
       <form class="card sec-card sec-wipe" @submit.prevent="submitWipePassword">
         <h3 style="margin-top: 0">Mật khẩu xoá dữ liệu</h3>
         <p class="page-subtitle" style="margin-bottom: 12px">
-          Nếu bạn đăng nhập bằng mật khẩu này thay vì mật khẩu chính, hệ thống sẽ hỏi xác nhận xoá toàn bộ dữ liệu thay vì đăng nhập bình thường. {{ user?.hasWipePassword ? 'Chỉ có thể đổi, không thể tắt.' : 'Tuỳ chọn, bỏ trống nếu không cần.' }}
+          Nếu bạn đăng nhập bằng mật khẩu này thay vì mật khẩu chính, hệ thống sẽ hỏi xác nhận xoá dữ liệu (số liệu, khách hàng, mẫu cú pháp, lịch xoá, nhật ký cuộc gọi, tin nhắn phản hồi Admin, lịch sử giao dịch; giữ lại tài khoản, bạn bè và tin nhắn bạn bè) thay vì đăng nhập bình thường. Mật khẩu này phải khác mật khẩu lớp hai. {{ user?.hasWipePassword ? 'Chỉ có thể đổi, không thể tắt.' : 'Tuỳ chọn, bỏ trống nếu không cần.' }}
         </p>
         <div v-if="wipeError" class="alert alert-error">{{ wipeError }}</div>
         <div v-if="wipeSuccess" class="alert alert-success">{{ wipeSuccess }}</div>
@@ -591,7 +594,7 @@ async function deleteAllData() {
       <div class="card danger-card">
         <h3 style="margin-top: 0; color: var(--danger-text)">Xoá toàn bộ dữ liệu</h3>
         <p class="page-subtitle" style="margin-bottom: 12px">
-          Xoá toàn bộ số liệu đã nhập, tin nhắn phản hồi và lịch sử giao dịch. Tài khoản và gói dịch vụ của bạn vẫn giữ nguyên. Không thể hoàn tác.
+          Xoá: {{ WIPE_DELETES }}. {{ WIPE_KEEPS }} Không thể hoàn tác.
         </p>
         <div v-if="deleteError" class="alert alert-error">{{ deleteError }}</div>
         <div v-if="deleteSuccess" class="alert alert-success">{{ deleteSuccess }}</div>

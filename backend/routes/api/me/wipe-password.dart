@@ -4,6 +4,8 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/reauth_limit.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -29,12 +31,15 @@ Future<Response> onRequest(RequestContext context) async {
   final self = loadSelfRow(context, auth.userId);
   if (self == null) return unauthorized('Tài khoản không tồn tại');
 
-  final currentPassword = body['currentPassword'] as String?;
-  if (currentPassword == null || !BCrypt.checkpw(currentPassword, self['password_hash'] as String)) {
-    return Response.json(statusCode: 401, body: {'error': 'Mật khẩu hiện tại không đúng'});
-  }
-
   final db = context.read<Database>();
+  final denied = checkReauthPassword(
+    db,
+    self,
+    body['currentPassword'] as String?,
+    action: 'Đặt mật khẩu xoá dữ liệu',
+    ip: clientIp(context),
+  );
+  if (denied != null) return denied;
   final wipePassword = body['wipePassword'] as String?;
   final alreadyEnabled = self['wipe_password_hash'] != null;
 

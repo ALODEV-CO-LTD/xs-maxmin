@@ -26,6 +26,24 @@ export class ApiError extends Error {
   }
 }
 
+// Endpoints that ask the logged-in user to re-type a password. A 401 from
+// these means "wrong password" (older servers) - show the message at the form
+// instead of treating the session as expired. Newer servers answer 403.
+const REAUTH_PATHS = [
+  '/me/password',
+  '/me/second-password',
+  '/me/wipe-password',
+  '/me/delete-data',
+  '/me/recovery-code',
+  '/me/verify-password',
+]
+function isReauthRequest(path, method) {
+  const p = path.split('?')[0]
+  if (p.startsWith('/auth/')) return true
+  if (p === '/me' && method !== 'GET') return true // username change asks for the password
+  return REAUTH_PATHS.includes(p)
+}
+
 async function apiFetch(path, { method = 'GET', body, headers = {} } = {}) {
   const auth = useAuthStore()
   const finalHeaders = { ...headers }
@@ -56,9 +74,11 @@ async function apiFetch(path, { method = 'GET', body, headers = {} } = {}) {
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
+    if (res.status === 401 && !isReauthRequest(path, method)) {
       // Session invalid/expired - clear it so the router guard redirects
       // to /login instead of retry-looping against a dead token.
+      // (Not for "type your current password again" requests: there a 401
+      // only means the password was wrong, and must not log the user out.)
       auth.clear()
     }
     const message = data && typeof data.error === 'string' ? data.error : `Lỗi máy chủ (${res.status})`
