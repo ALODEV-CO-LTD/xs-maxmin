@@ -527,7 +527,7 @@ async function deleteAllData() {
           <div class="input-wrap"><input v-model="pwForm.currentPassword" type="password" /></div>
         </div>
         <div class="field">
-          <label>Mật khẩu mới (tối thiểu 6 ký tự)</label>
+          <label>Mật khẩu mới (tối thiểu 8 ký tự, không quá dễ đoán)</label>
           <div class="input-wrap"><input v-model="pwForm.newPassword" type="password" /></div>
         </div>
         <div class="field">
