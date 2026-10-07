@@ -19,6 +19,7 @@
 -->
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
+import AppIcon from '../components/AppIcon.vue'
 import AddBetTypeDialog from '../components/AddBetTypeDialog.vue'
 import { nextTick, ref, watch, onMounted } from 'vue'
 import { api, ApiError } from '../api'
@@ -227,8 +228,14 @@ onMounted(load)
       </div>
 
       <div class="action-bar">
-        <button type="button" class="btn btn-secondary btn-sm" :disabled="saving" @click="resetDefaultLocally">
-          Đặt lại mặc định (Đề: Đặc biệt × 70, Lô: tất cả × 20)
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm reset-btn"
+          :disabled="saving"
+          title="Đề: Đặc biệt × 70, Lô: tất cả × 20"
+          @click="resetDefaultLocally"
+        >
+          <AppIcon name="refresh-cw" /> Đặt lại mặc định
         </button>
         <button type="button" class="btn btn-primary" :disabled="saving" @click="save">
           {{ saving ? 'Đang lưu...' : 'Lưu cài đặt' }}
@@ -418,6 +425,13 @@ onMounted(load)
   align-items: center;
   gap: 8px;
   margin-top: 16px;
+}
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  color: var(--text-secondary);
 }
 .action-bar .btn {
   min-height: 40px;
