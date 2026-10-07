@@ -15,7 +15,14 @@ const auth = useAuthStore()
 watch(
   () => auth.isAuthenticated,
   (ok) => {
+    if (ok) auth.signedOutByUser = false
     if (ok || route.meta.public) return
+    // An explicit logout navigates to a clean /login itself; do not leave the next person
+    // (maybe another account) a link back to the page the previous one was on.
+    if (auth.signedOutByUser) {
+      auth.signedOutByUser = false
+      return
+    }
     router.replace({ path: '/login', query: { redirect: route.fullPath } })
   },
 )

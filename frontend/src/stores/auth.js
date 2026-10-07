@@ -24,6 +24,7 @@ export const useAuthStore = defineStore('auth', {
     role: null,
     user: null,
     ready: false,
+    signedOutByUser: false, // true only for the instant after an explicit logout (see App.vue)
   }),
   getters: {
     isAuthenticated: (state) => !!state.token,
@@ -62,6 +63,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     logout() {
+      this.signedOutByUser = true
       // Also revoke this device's session on the server (best effort - the
       // token is read synchronously inside the call, before clear() below).
       if (this.token) api.del('/me/sessions/current').catch(() => {})

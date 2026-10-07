@@ -1061,7 +1061,7 @@ async function deleteTemplate() {
         <!-- "Sửa số liệu" popup: customer / type / date are shown as read-only info -->
         <Teleport to="body">
           <div v-if="editingId && editingEntry" class="em-overlay" @mousedown.self="!editSubmitting && cancelEdit()" @keydown.esc="!editSubmitting && cancelEdit()">
-            <form class="em-box" role="dialog" aria-modal="true" aria-labelledby="em-title" @submit.prevent="saveEdit(editingId)">
+            <form class="em-box" :class="{ 'em-masked': mask.masked.value }" role="dialog" aria-modal="true" aria-labelledby="em-title" @submit.prevent="saveEdit(editingId)">
               <div class="em-head">
                 <h2 id="em-title" class="em-title">Chỉnh sửa số liệu</h2>
                 <button type="button" class="em-close" aria-label="Đóng" :disabled="editSubmitting" @click="cancelEdit">
@@ -1088,7 +1088,7 @@ async function deleteTemplate() {
                 </div>
               </div>
               <p v-if="editingEntry.result" class="em-result">
-                Điểm ra: {{ editingEntry.result }} (sửa ở trang Nhập kết quả)
+                Điểm ra: <MaskedValue :text="editingEntry.result" /> (sửa ở trang Nhập kết quả)
               </p>
               <div class="field">
                 <label for="em-note">Ghi chú</label>
@@ -2875,6 +2875,11 @@ async function deleteTemplate() {
   max-height: 340px;
   overflow-y: auto;
   padding: 2px 2px 0 0;
+}
+/* the editor shows real figures: while the mask is on (e.g. window lost focus) blur it */
+.em-masked :is(input, textarea, .em-info) {
+  filter: blur(8px);
+  pointer-events: none;
 }
 .mask-row {
   margin-bottom: 12px;
