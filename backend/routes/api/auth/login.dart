@@ -11,6 +11,11 @@ import 'package:sqlite3/sqlite3.dart';
 /// token - it returns a short-lived pending token that only unlocks
 /// `/api/auth/step2` (see that route), so the caller still needs the
 /// second password before they can reach any user data.
+///
+/// Account enumeration: an unknown username is checked against a dummy bcrypt
+/// hash so it takes as long as a wrong password, and "tài khoản bị khoá" is
+/// only said AFTER the password was right - a wrong password on a locked
+/// account gets the same generic 401 as any other account.
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
     return Response(statusCode: 405, body: 'Method not allowed');
@@ -23,6 +28,9 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
+  if (!fieldsAreStrings(body, ['username', 'password'])) {
+    return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
+  }
   final username = (body['username'] as String?)?.trim();
   final password = body['password'] as String?;
   if (username == null ||
@@ -44,42 +52,35 @@ Future<Response> onRequest(RequestContext context) async {
   if (wait > 0) return lockedResponse(wait);
 
   final rows = db.select('SELECT * FROM users WHERE username = ?', [username]);
-  if (rows.isEmpty) {
-    return _loginFailed(db, username, ip, null);
+  final row = rows.isEmpty ? null : rows.first;
+  final passwordHash = row == null ? dummyPasswordHash : row['password_hash'] as String;
+  final secondPasswordHash = row?['second_password_hash'] as String?;
+  // Always exactly one bcrypt here, whether or not the account exists.
+  final passwordOk = BCrypt.checkpw(password, passwordHash);
+  if (row == null || !passwordOk) {
+    // Not the login password. If this account has no second-layer password
+    // (so there is no step 2 to check it in) the wipe-password is checked
+    // here instead - see routes/api/auth/step2.dart for the other case.
+    // A second bcrypt runs on EVERY failure (against a dummy when there is no
+    // wipe hash) so timing does not reveal whether the account exists / has one.
+    final wipePasswordHash = row?['wipe_password_hash'] as String?;
+    final checkWipe = row != null && secondPasswordHash == null && wipePasswordHash != null;
+    final wipeOk = BCrypt.checkpw(password, checkWipe ? wipePasswordHash : dummyPasswordHash) && checkWipe;
+    if (row != null && wipeOk) {
+      if (row['status'] == 'locked') return _lockedAccount();
+      return Response.json(
+        body: {
+          'stage': 'wipe_confirmation_required',
+          'wipeToken': issuePendingWipeToken(row['id'] as String),
+        },
+      );
+    }
+    return _loginFailed(db, username, ip, row?['id'] as String?);
   }
 
-  final row = rows.first;
-  if (row['status'] == 'locked') {
-    // Set by an admin via PATCH /api/admin/users/:id (see that route) -
-    // blocks login entirely regardless of password correctness.
-    return Response.json(
-      statusCode: 403,
-      body: {'error': 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.'},
-    );
-  }
-  final passwordHash = row['password_hash'] as String;
-  final secondPasswordHash = row['second_password_hash'] as String?;
-  if (!BCrypt.checkpw(password, passwordHash)) {
-    // Not the login password. If this account has a second-layer password,
-    // the wipe-password is checked there instead (routes/api/auth/step2.dart)
-    // - same single prompt the user already types their second password
-    // into, rather than a second place to remember. Only accounts with no
-    // second-layer password (so there is no step 2 to check it in) fall
-    // back to checking it here.
-    if (secondPasswordHash == null) {
-      final wipePasswordHash = row['wipe_password_hash'] as String?;
-      if (wipePasswordHash != null &&
-          BCrypt.checkpw(password, wipePasswordHash)) {
-        return Response.json(
-          body: {
-            'stage': 'wipe_confirmation_required',
-            'wipeToken': issuePendingWipeToken(row['id'] as String),
-          },
-        );
-      }
-    }
-    return _loginFailed(db, username, ip, row['id'] as String);
-  }
+  // Password was right: only now is it safe to say the account is locked
+  // (set by an admin via PATCH /api/admin/users/:id) - blocks login entirely.
+  if (row['status'] == 'locked') return _lockedAccount();
 
   final userId = row['id'] as String;
   if (secondPasswordHash != null) {
@@ -102,6 +103,11 @@ Future<Response> onRequest(RequestContext context) async {
     },
   );
 }
+
+Response _lockedAccount() => Response.json(
+      statusCode: 403,
+      body: {'error': 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.'},
+    );
 
 /// Counts the wrong attempt and answers with the same generic message
 /// whichever field was wrong (or 429 if this attempt triggered a lock).

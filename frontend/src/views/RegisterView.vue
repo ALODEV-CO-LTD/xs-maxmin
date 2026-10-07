@@ -44,7 +44,7 @@ const show = (f) => submitted.value || touched[f]
 const fieldErrors = computed(() => ({
   name: name.value.trim() ? '' : 'Vui lòng nhập tên hiển thị',
   username: username.value.trim().length >= 3 ? '' : 'Tên đăng nhập phải có ít nhất 3 ký tự',
-  password: password.value.length >= 6 ? '' : 'Mật khẩu phải có ít nhất 6 ký tự',
+  password: password.value.length >= 8 ? '' : 'Mật khẩu phải có ít nhất 8 ký tự',
   confirmPassword: !confirmPassword.value
     ? 'Vui lòng nhập lại mật khẩu'
     : confirmPassword.value !== password.value
@@ -219,7 +219,7 @@ async function submitStep2() {
           id="reg-password"
           v-model="password"
           autocomplete="new-password"
-          placeholder="Ít nhất 6 ký tự"
+          placeholder="Ít nhất 8 ký tự"
           :disabled="loading"
           :aria-invalid="state('password') === 'error'"
           :data-valid="state('password') === 'ok'"

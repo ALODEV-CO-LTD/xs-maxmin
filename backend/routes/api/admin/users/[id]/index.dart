@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -82,24 +83,47 @@ Future<Response> _patch(RequestContext context, String id) async {
     );
   }
 
+  final hasNewPassword = newPassword is String && newPassword.trim().isNotEmpty;
+  // Validate before changing anything, so a bad password does not leave a
+  // half-applied lock/unlock behind.
+  if (newPassword is String && hasNewPassword && newPassword.trim().length < 4) {
+    return Response.json(
+      statusCode: 400,
+      body: {'error': 'Mật khẩu mới cần ít nhất 4 ký tự'},
+    );
+  }
+
+  final ip = clientIp(context);
+  final adminId = requireAuth(context)!.userId;
+  final username = target.first['username'] as String;
+
   if (locked is bool) {
     db.execute('UPDATE users SET status = ? WHERE id = ?', [
       locked ? 'locked' : 'active',
       id,
     ]);
+    if (locked) {
+      // A locked account must not keep working: sign out every device now
+      // (the auth middleware also rejects locked accounts on each request).
+      revokeAllSessions(db, id, by: adminId, ip: ip);
+    }
+    logSecurityEvent(db, locked ? 'account_locked' : 'account_unlocked',
+        userId: id,
+        username: username,
+        ip: ip,
+        detail: locked ? 'Admin khoá tài khoản; đã đăng xuất mọi thiết bị' : 'Admin mở khoá tài khoản');
   }
 
-  if (newPassword is String && newPassword.trim().isNotEmpty) {
-    if (newPassword.trim().length < 4) {
-      return Response.json(
-        statusCode: 400,
-        body: {'error': 'Mật khẩu mới cần ít nhất 4 ký tự'},
-      );
-    }
+  if (newPassword is String && hasNewPassword) {
     db.execute('UPDATE users SET password_hash = ? WHERE id = ?', [
       BCrypt.hashpw(newPassword.trim(), BCrypt.gensalt()),
       id,
     ]);
+    // Whoever knew the old password is signed out everywhere. The event never
+    // contains the new password.
+    revokeAllSessions(db, id, by: adminId, ip: ip);
+    logSecurityEvent(db, 'admin_password_reset',
+        userId: id, username: username, ip: ip, detail: 'Admin đặt lại mật khẩu; đã đăng xuất mọi thiết bị');
   }
 
   final updated = db.select('SELECT * FROM users WHERE id = ?', [id]);

@@ -42,7 +42,7 @@ const _maxMessageChars = 64 * 1024;
 Future<Response> onRequest(RequestContext context) async {
   final token = context.request.uri.queryParameters['token'];
   var auth = token == null ? null : verifyToken(token);
-  if (auth != null && !sessionIsActive(appDatabase, auth.userId, auth.sessionId)) auth = null;
+  if (auth != null && !sessionIsActive(appDatabase, auth.userId, auth.sessionId, issuedAtSeconds: auth.issuedAt)) auth = null;
   if (auth == null) {
     return Response.json(statusCode: 401, body: {'error': 'Chưa đăng nhập'});
   }

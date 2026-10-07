@@ -86,6 +86,9 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'users', 'recovery_code_created_at', 'TEXT');
   _ensureColumn(db, 'users', 'recovery_failed_attempts', 'INTEGER NOT NULL DEFAULT 0');
   _ensureColumn(db, 'users', 'recovery_locked_until', 'TEXT');
+  // Epoch seconds: access tokens WITHOUT a session id issued at/before this are
+  // rejected (revokes pre-session tokens; set by revokeAllSessions).
+  _ensureColumn(db, 'users', 'tokens_valid_after', 'INTEGER');
   // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
   _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
   // Last-change timestamp of an entry (ISO-8601 UTC). The offline client

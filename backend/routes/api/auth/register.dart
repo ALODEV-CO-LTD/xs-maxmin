@@ -5,6 +5,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:server/src/package_plans.dart';
+import 'package:server/src/password_policy.dart';
 import 'package:server/src/recovery_codes.dart';
 import 'package:server/src/security.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -21,6 +22,9 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
+  if (!fieldsAreStrings(body, ['name', 'username', 'password', 'secondPassword', 'wipePassword'])) {
+    return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
+  }
   final name = (body['name'] as String?)?.trim();
   final username = (body['username'] as String?)?.trim();
   final password = body['password'] as String?;
@@ -36,11 +40,9 @@ Future<Response> onRequest(RequestContext context) async {
       body: {'error': 'Tên đăng nhập phải có ít nhất 3 ký tự'},
     );
   }
-  if (password == null || password.length < 6) {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Mật khẩu phải có ít nhất 6 ký tự'},
-    );
+  final passwordError = password == null ? 'Vui lòng nhập mật khẩu' : validateNewPassword(password);
+  if (password == null || passwordError != null) {
+    return Response.json(statusCode: 400, body: {'error': passwordError});
   }
   if (secondPassword == null || secondPassword.length < 4) {
     return Response.json(

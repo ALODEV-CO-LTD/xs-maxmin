@@ -68,7 +68,10 @@ int lockedSecondsLeft(Database db, String identity, String ip) {
 /// Counts one wrong attempt; once past [_freeAttempts] the account+IP is
 /// locked with an exponentially growing delay (30s, 60s, 120s ... max 15 min).
 /// Returns the lock length in seconds if this failure triggered a lock, else 0.
-int recordLoginFailure(Database db, String identity, String ip, {String? userId}) {
+///
+/// [freeAttempts] lets a caller use a looser threshold for a shared counter
+/// (e.g. one per IP across many account names); default is [_freeAttempts].
+int recordLoginFailure(Database db, String identity, String ip, {String? userId, int freeAttempts = _freeAttempts}) {
   final key = _attemptKey(identity, ip);
   final now = DateTime.now().toUtc();
   var count = 0;
@@ -80,8 +83,8 @@ int recordLoginFailure(Database db, String identity, String ip, {String? userId}
   count += 1;
   var lockSeconds = 0;
   String? lockedUntil;
-  if (count >= _freeAttempts) {
-    lockSeconds = min(_baseLockSeconds * (1 << min(count - _freeAttempts, 10)), _maxLockSeconds);
+  if (count >= freeAttempts) {
+    lockSeconds = min(_baseLockSeconds * (1 << min(count - freeAttempts, 10)), _maxLockSeconds);
     lockedUntil = now.add(Duration(seconds: lockSeconds)).toIso8601String();
   }
   db.execute(
@@ -168,8 +171,21 @@ String createSession(Database db, String userId, RequestContext context) {
 /// user). A token WITHOUT a session id (issued before this feature) is
 /// accepted as before, so existing logins are not kicked out.
 /// Also refreshes `last_seen`, at most once a minute per session.
-bool sessionIsActive(Database db, String userId, String? sessionId) {
-  if (sessionId == null) return true;
+///
+/// Also false when the account no longer exists or an admin locked it
+/// (`users.status = 'locked'`) - one primary-key lookup on `users`, so a
+/// locked account's existing tokens (and its call WebSocket) stop working
+/// immediately. A token with no session id is additionally rejected when it
+/// was issued ([issuedAtSeconds], JWT `iat`) at or before the account's
+/// `tokens_valid_after` (set by [revokeAllSessions]), so the pre-session
+/// tokens that cannot be revoked row by row are revoked as well.
+bool sessionIsActive(Database db, String userId, String? sessionId, {int? issuedAtSeconds}) {
+  final u = db.select('SELECT status, tokens_valid_after FROM users WHERE id = ?', [userId]);
+  if (u.isEmpty || u.first['status'] == 'locked') return false;
+  if (sessionId == null) {
+    final after = u.first['tokens_valid_after'] as int?;
+    return after == null || (issuedAtSeconds != null && issuedAtSeconds > after);
+  }
   final rows = db.select(
     'SELECT user_id, revoked_at, last_seen FROM device_sessions WHERE id = ?',
     [sessionId],
@@ -224,6 +240,9 @@ int revokeAllSessions(Database db, String userId, {required String by, String? e
     [DateTime.now().toUtc().toIso8601String(), by, userId, exceptSessionId ?? ''],
   );
   final n = db.updatedRows;
+  // Tokens issued before device sessions existed have no row to revoke; this
+  // marker revokes them instead (checked in sessionIsActive).
+  db.execute('UPDATE users SET tokens_valid_after = ? WHERE id = ?', [DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000, userId]);
   if (n > 0) {
     logSecurityEvent(db, 'session_revoked', userId: userId, ip: ip, detail: 'Thu hồi $n phiên (${by == userId ? 'người dùng' : 'admin'})');
   }

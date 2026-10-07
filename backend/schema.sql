@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS users (
   recovery_code_hash        TEXT,
   recovery_code_created_at  TEXT,
   recovery_failed_attempts  INTEGER NOT NULL DEFAULT 0,
-  recovery_locked_until     TEXT
+  recovery_locked_until     TEXT,
+  tokens_valid_after        INTEGER           -- epoch s; revokes session-less tokens issued before it
 );
 
 

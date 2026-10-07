@@ -19,7 +19,8 @@ Handler authProvider(Handler handler) {
       // Revoked device session => treated as not logged in (401 downstream).
       // Uses appDatabase directly: this provider runs before the Database
       // provider in routes/_middleware.dart is in scope.
-      if (!sessionIsActive(appDatabase, payload.userId, payload.sessionId)) return null;
+      // Same for an account an admin locked or that no longer exists.
+      if (!sessionIsActive(appDatabase, payload.userId, payload.sessionId, issuedAtSeconds: payload.issuedAt)) return null;
       return payload;
     }),
   );

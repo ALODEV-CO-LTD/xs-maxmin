@@ -21,6 +21,9 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
+  if (!fieldsAreStrings(body, ['pendingToken', 'password'])) {
+    return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
+  }
   final pendingToken = body['pendingToken'] as String?;
   final password = body['password'] as String?;
   if (pendingToken == null || password == null || password.isEmpty) {
@@ -28,12 +31,7 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final userId = verifyPendingSecondFactorToken(pendingToken);
-  if (userId == null) {
-    return Response.json(
-      statusCode: 401,
-      body: {'error': 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'},
-    );
-  }
+  if (userId == null) return _expired();
 
   final db = context.read<Database>();
   final rows = db.select('SELECT * FROM users WHERE id = ?', [userId]);
@@ -42,6 +40,14 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final row = rows.first;
+  // The pending token proves the login password was right, so saying "locked"
+  // here reveals nothing new. An admin-locked account never gets a token.
+  if (row['status'] == 'locked') {
+    return Response.json(
+      statusCode: 403,
+      body: {'error': 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.'},
+    );
+  }
   // Same counter as login (account+IP) so step 2 can't be brute-forced by
   // re-running step 1 - see routes/api/auth/login.dart.
   final username = row['username'] as String;
@@ -50,6 +56,8 @@ Future<Response> onRequest(RequestContext context) async {
   if (wait > 0) return lockedResponse(wait);
   final secondPasswordHash = row['second_password_hash'] as String?;
   if (secondPasswordHash != null && BCrypt.checkpw(password, secondPasswordHash)) {
+    // The pending token is single-use: spent here, a replay gets 401.
+    if (!spendPendingSecondFactorToken(pendingToken)) return _expired();
     clearLoginFailures(db, username, ip);
     final sessionId = createSession(db, userId, context);
     final token = issueToken(userId: userId, role: row['role'] as String, sessionId: sessionId);
@@ -64,6 +72,7 @@ Future<Response> onRequest(RequestContext context) async {
   // before calling `/api/auth/confirm-wipe`.
   final wipePasswordHash = row['wipe_password_hash'] as String?;
   if (wipePasswordHash != null && BCrypt.checkpw(password, wipePasswordHash)) {
+    if (!spendPendingSecondFactorToken(pendingToken)) return _expired();
     return Response.json(body: {
       'stage': 'wipe_confirmation_required',
       'wipeToken': issuePendingWipeToken(userId),
@@ -74,3 +83,8 @@ Future<Response> onRequest(RequestContext context) async {
   if (lock > 0) return lockedResponse(lock);
   return Response.json(statusCode: 401, body: {'error': 'Mật khẩu lớp hai không đúng'});
 }
+
+Response _expired() => Response.json(
+      statusCode: 401,
+      body: {'error': 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'},
+    );
