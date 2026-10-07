@@ -41,21 +41,63 @@ export function entriesToText(entries, { withCustomer = false } = {}) {
   return lines.join('\n')
 }
 
-async function writeClipboard(text) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text)
-    return
-  }
-  // fallback for insecure origins / old browsers
+const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** The same table as HTML where every cell is formatted as TEXT
+ *  (mso-number-format), so Excel keeps "05" instead of turning it into 5.
+ *  Plain-text targets still get the tab separated text. */
+function textToHtml(text) {
+  const rows = text.split('\n').map((line) => {
+    const cells = line.split('\t').map((c) => `<td style="mso-number-format:'\\@'">${escHtml(c)}</td>`)
+    return `<tr>${cells.join('')}</tr>`
+  })
+  return `<table>${rows.join('')}</table>`
+}
+
+// last resort for insecure origins / old browsers / a refused permission
+function execCommandCopy(text) {
   const ta = document.createElement('textarea')
   ta.value = text
+  ta.setAttribute('readonly', '')
   ta.style.position = 'fixed'
   ta.style.opacity = '0'
   document.body.appendChild(ta)
   ta.select()
-  const ok = document.execCommand('copy')
-  document.body.removeChild(ta)
+  let ok = false
+  try {
+    ok = document.execCommand('copy')
+  } finally {
+    document.body.removeChild(ta)
+  }
   if (!ok) throw new Error('copy failed')
+}
+
+async function writeClipboard(text) {
+  // 1) rich copy (text + HTML with text-formatted cells) so leading zeros survive in Excel
+  if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+          'text/html': new Blob([textToHtml(text)], { type: 'text/html' }),
+        }),
+      ])
+      return
+    } catch {
+      /* fall through to plain text */
+    }
+  }
+  // 2) plain text
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      /* permission refused: fall through */
+    }
+  }
+  // 3) execCommand fallback (throws if that fails too)
+  execCommandCopy(text)
 }
 
 /** Copies `entries`; asks first when the user enabled the confirmation.

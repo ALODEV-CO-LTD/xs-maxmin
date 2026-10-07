@@ -95,6 +95,8 @@ void _migrateSchema(Database db) {
   // sends the value it last saw when it replays an edit; a mismatch means the
   // entry was changed elsewhere meanwhile (conflict, see entries/[id].dart).
   _ensureColumn(db, 'data_entries', 'updated_at', 'TEXT');
+  // Paged listing (GET /me/entries) reads one user's rows sorted by date.
+  db.execute('CREATE INDEX IF NOT EXISTS idx_data_entries_user_date ON data_entries(user_id, entry_date, created_at)');
 }
 
 void _ensureColumn(Database db, String table, String column, String type) {

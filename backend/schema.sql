@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS data_entries (
   created_at     TEXT NOT NULL,
   bet_type       TEXT             -- key into the owning user's scoring_rates, e.g. 'de' / 'lo' -- added via migration
 );
+CREATE INDEX IF NOT EXISTS idx_data_entries_user_date ON data_entries(user_id, entry_date, created_at);
 
 
 -- -----------------------------------------------------------------------------

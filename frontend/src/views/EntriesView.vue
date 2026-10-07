@@ -22,6 +22,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
+import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
 import { aliasesToText, fold, parseMessage, textToAliases, DEFAULT_STAKE_MARKERS } from '../messageParser'
 import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
@@ -63,7 +64,6 @@ async function loadBetTypes() {
   }
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
 
 const form = reactive({
   customerName: '',
