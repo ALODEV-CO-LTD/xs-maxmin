@@ -27,6 +27,7 @@ import { onMounted, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { loadAllEntries } from '../offline'
 import { today } from '../dates'
+import { useRoute } from 'vue-router'
 
 const entries = ref([])
 const loading = ref(true)
@@ -181,7 +182,9 @@ function fillResultsFromLottery(lr, date) {
 
 // ---- Kết quả xổ số Miền Bắc ------------------------------------------
 
-const lotteryDate = ref(today())
+// ?date=YYYY-MM-DD (link from the Tính điểm day cards) opens that day.
+const queryDate = String(useRoute().query.date || '')
+const lotteryDate = ref(/^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : today())
 const lotteryLoading = ref(false)
 const lotteryError = ref('')
 const lotterySaving = ref(false)
