@@ -62,7 +62,7 @@ function writeEnabled(on) {
 const state = reactive({ enabled: readEnabled(), revealed: false, revealSeconds: readSeconds(), revealUntil: 0 })
 let revealTimer = null
 let graceTimer = null
-let listening = false
+let users = 0 // pages currently using the mask (each calls attach/detach)
 
 function clearTimer() {
   if (revealTimer) clearTimeout(revealTimer)
@@ -136,21 +136,26 @@ export const mask = {
     writeSeconds(n)
   },
   cover,
-  /** A page calls attach() on mount and detach() on unmount. */
+  /**
+   * A page (or the shared <MaskBar />) calls attach() on mount and detach() on unmount; the
+   * browser listeners exist while at least one page uses the mask. Leaving a page always
+   * covers the figures again.
+   */
   attach() {
-    if (listening) return
+    users++
+    if (users > 1) return
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('blur', onBlur)
     window.addEventListener('focus', onFocus)
     window.addEventListener('pagehide', onPageHide)
-    listening = true
   },
   detach() {
+    users = Math.max(0, users - 1)
+    cover()
+    if (users > 0) return
     document.removeEventListener('visibilitychange', onVisibility)
     window.removeEventListener('blur', onBlur)
     window.removeEventListener('focus', onFocus)
     window.removeEventListener('pagehide', onPageHide)
-    listening = false
-    cover()
   },
 }

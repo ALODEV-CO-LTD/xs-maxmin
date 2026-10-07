@@ -24,6 +24,9 @@ import { api, ApiError } from '../api'
 import { cachedGet, loadAllEntries } from '../offline'
 import { fold } from '../messageParser'
 import AppIcon from '../components/AppIcon.vue'
+import MaskBar from '../components/MaskBar.vue'
+import MaskedValue from '../components/MaskedValue.vue'
+import { mask } from '../stores/mask'
 import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
 
 const route = useRoute()
@@ -232,6 +235,7 @@ const copyList = computed(() => {
   return copyDate.value ? list.filter((e) => e.entryDate === copyDate.value) : list
 })
 async function copyDetail() {
+  if (mask.masked.value) return
   copyMessage.value = ''
   const label = [detail.value.name, copyDate.value].filter(Boolean).join(', ')
   const res = await copyEntries(copyList.value, { label })
@@ -270,6 +274,7 @@ async function removeFromDetail(c) {
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
+      <MaskBar class="mask-row" />
       <div class="field search-field">
         <div class="input-wrap">
           <AppIcon name="search" class="search-icon" />
@@ -297,9 +302,9 @@ async function removeFromDetail(c) {
               <tr class="row-clickable" @click="toggle(c.name)">
                 <td data-label="STT">{{ i + 1 }}</td>
                 <td data-label="Tên">{{ c.name }}</td>
-                <td data-label="Điểm đầu vào">{{ formatNumber(c.vao) }}</td>
-                <td data-label="Điểm đầu ra">{{ formatNumber(c.ra) }}</td>
-                <td data-label="Lợi nhuận" :class="c.chenhLech >= 0 ? 'calc-in' : 'calc-out'">{{ formatNumber(c.chenhLech) }}</td>
+                <td data-label="Điểm đầu vào"><MaskedValue :text="formatNumber(c.vao)" /></td>
+                <td data-label="Điểm đầu ra"><MaskedValue :text="formatNumber(c.ra)" /></td>
+                <td data-label="Lợi nhuận" :class="c.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(c.chenhLech)" /></td>
                 <td class="actions-cell">
                   <button type="button" class="btn btn-secondary btn-sm btn-detail" @click.stop="toggle(c.name)">
                     Xem chi tiết
@@ -334,19 +339,19 @@ async function removeFromDetail(c) {
           <dl class="cd-stats">
             <div class="cd-stat">
               <dt>Số lượt chơi</dt>
-              <dd>{{ formatNumber(detail.count) }}</dd>
+              <dd><MaskedValue :text="formatNumber(detail.count)" /></dd>
             </div>
             <div class="cd-stat">
               <dt>Điểm đầu vào</dt>
-              <dd>{{ formatNumber(detail.vao) }}</dd>
+              <dd><MaskedValue :text="formatNumber(detail.vao)" /></dd>
             </div>
             <div class="cd-stat">
               <dt>Điểm đầu ra</dt>
-              <dd>{{ formatNumber(detail.ra) }}</dd>
+              <dd><MaskedValue :text="formatNumber(detail.ra)" /></dd>
             </div>
             <div class="cd-stat">
               <dt>Lợi nhuận</dt>
-              <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'">{{ formatNumber(detail.chenhLech) }}</dd>
+              <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(detail.chenhLech)" /></dd>
             </div>
           </dl>
           <div class="cd-copy">
@@ -354,8 +359,8 @@ async function removeFromDetail(c) {
               Ngày
               <input v-model="copyDate" type="date" aria-label="Chỉ sao chép số liệu của ngày" />
             </label>
-            <button type="button" class="btn btn-secondary" :disabled="copyList.length === 0" @click="copyDetail">
-              Sao chép {{ copyList.length }} số liệu
+            <button type="button" class="btn btn-secondary" :disabled="copyList.length === 0 || mask.masked.value" :title="mask.masked.value ? 'Đang ẩn số liệu: bấm Hiện để sao chép' : undefined" @click="copyDetail">
+              Sao chép {{ mask.masked.value ? '•••' : copyList.length }} số liệu
             </button>
             <label class="cd-copy-confirm">
               <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
@@ -849,5 +854,8 @@ async function removeFromDetail(c) {
     margin: 0 0 4px;
     justify-content: center;
   }
+}
+.mask-row {
+  margin-bottom: 12px;
 }
 </style>

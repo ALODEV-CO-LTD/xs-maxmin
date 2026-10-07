@@ -17,6 +17,9 @@
 import { showConfirm } from '../confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
+import MaskBar from '../components/MaskBar.vue'
+import MaskedValue from '../components/MaskedValue.vue'
+import { mask } from '../stores/mask'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
@@ -444,7 +447,7 @@ async function deleteEntry(entry) {
   }
   if (!(await showConfirm({
     title: 'Xoá số liệu',
-    message: `Xoá số liệu "${entry.value}" (${entry.customerName})? Không thể hoàn tác.`,
+    message: `Xoá số liệu ${mask.masked.value ? 'này' : `"${entry.value}"`} (${entry.customerName})? Không thể hoàn tác.`,
     confirmText: 'Xoá',
     danger: true,
   }))) return
@@ -502,7 +505,9 @@ const filteredEntries = computed(() => {
     if (filters.date && e.entryDate !== filters.date) return false
     if (filters.type && (e.betType || 'de') !== filters.type) return false
     if (q) {
-      const hay = fold([e.customerName, e.entryDate, betTypeLabel(e.betType || 'de'), e.value, e.score, e.result, e.note].join(' '))
+      // while the figures are masked, searching must not reveal them either
+    const figures = mask.masked.value ? [] : [e.value, e.score, e.result, e.note]
+    const hay = fold([e.customerName, e.entryDate, betTypeLabel(e.betType || 'de'), ...figures].join(' '))
       if (!hay.includes(q)) return false
     }
     return true
@@ -520,6 +525,7 @@ const confirmCopy = ref(confirmCopyEnabled())
 watch(confirmCopy, (on) => setConfirmCopy(on))
 const copyMessage = ref('')
 async function copyShown() {
+  if (mask.masked.value) return
   copyMessage.value = ''
   const label = [filters.all ? 'tất cả khách' : form.customerName, filters.date].filter(Boolean).join(', ')
   const res = await copyEntries(filteredEntries.value, { label, withCustomer: filters.all })
@@ -695,6 +701,7 @@ async function deleteTemplate() {
 <template>
   <div class="page">
     <h1 class="page-title">Nhập số</h1>
+    <MaskBar class="mask-row" />
 
     <div v-if="!canAdd && stats" class="alert alert-warning">
       Gói của bạn đã hết hạn. Vui lòng gia hạn ở mục Gói dịch vụ để tiếp tục nhập số liệu.
@@ -716,7 +723,7 @@ async function deleteTemplate() {
         <!-- phones / small tablets: dropdown instead of the side list -->
         <AppSelect v-else v-model="form.customerName" class="rail-select" aria-label="Khách hàng">
           <option value="">-- Chọn khách hàng --</option>
-          <option v-for="c in customers" :key="c.id" :value="c.name">{{ c.name }} ({{ entryCount(c.name) }})</option>
+          <option v-for="c in customers" :key="c.id" :value="c.name">{{ c.name }}{{ mask.masked.value ? '' : ` (${entryCount(c.name)})` }}</option>
         </AppSelect>
         <ul v-if="customers.length > 0" class="rail-list">
           <li v-for="c in customers" :key="c.id">
@@ -728,7 +735,7 @@ async function deleteTemplate() {
               @click="selectCustomer(c.name)"
             >
               <span class="rail-name">{{ c.name }}</span>
-              <span class="rail-count">{{ entryCount(c.name) }}</span>
+              <span class="rail-count"><MaskedValue :text="entryCount(c.name)" /></span>
             </button>
           </li>
         </ul>
@@ -970,8 +977,8 @@ async function deleteTemplate() {
               <button v-if="hasFilter" type="button" class="btn btn-ghost btn-sm" @click="clearFilters">Xoá lọc</button>
             </div>
             <div class="copy-bar">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="filteredEntries.length === 0" @click="copyShown">
-                Sao chép {{ filteredEntries.length }} số liệu đang hiện
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="filteredEntries.length === 0 || mask.masked.value" :title="mask.masked.value ? 'Đang ẩn số liệu: bấm Hiện để sao chép' : undefined" @click="copyShown">
+                Sao chép {{ mask.masked.value ? '•••' : filteredEntries.length }} số liệu đang hiện
               </button>
               <label class="filter-all">
                 <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
@@ -1006,10 +1013,10 @@ async function deleteTemplate() {
                       <td v-if="filters.all" data-label="Khách hàng">{{ entry.customerName }}</td>
                       <td data-label="Ngày">{{ entry.entryDate }}<span v-if="entry.pending" class="chip pending-chip">Chờ đồng bộ</span></td>
                       <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}</td>
-                      <td data-label="Số" class="cell-num">{{ entry.value }}</td>
-                      <td data-label="Điểm vào" class="cell-points">{{ entry.score || '-' }}</td>
-                      <td data-label="Điểm ra" class="cell-points">{{ entry.result || '-' }}</td>
-                      <td data-label="Ghi chú" class="cell-note">{{ entry.note || '-' }}</td>
+                      <td data-label="Số" class="cell-num"><MaskedValue :text="entry.value" /></td>
+                      <td data-label="Điểm vào" class="cell-points"><MaskedValue :text="entry.score || '-'" /></td>
+                      <td data-label="Điểm ra" class="cell-points"><MaskedValue :text="entry.result || '-'" /></td>
+                      <td data-label="Ghi chú" class="cell-note"><MaskedValue :text="entry.note || '-'" /></td>
                       <td class="col-btn">
                         <button class="btn btn-secondary btn-sm" @click="startEdit(entry)">Sửa</button>
                       </td>
@@ -1029,21 +1036,21 @@ async function deleteTemplate() {
             <div v-if="!loading && !loadError && form.customerName && !filters.all" class="list-stats">
               <h3 class="stats-title">Thống kê: {{ form.customerName }}</h3>
               <p class="page-subtitle" style="margin-top: -8px">
-                Tính trên {{ visibleEntries.length }} số liệu của khách hàng đang chọn (điểm vào/ra để trống được tính là 0).
+                Tính trên <MaskedValue :text="visibleEntries.length" /> số liệu của khách hàng đang chọn (điểm vào/ra để trống được tính là 0).
               </p>
               <div class="calc-grid">
                 <div class="card calc-card">
                   <div class="calc-label">Tổng điểm vào</div>
-                  <div class="calc-value calc-in">{{ formatNumber(totals.vao) }}</div>
+                  <div class="calc-value calc-in"><MaskedValue :text="formatNumber(totals.vao)" /></div>
                 </div>
                 <div class="card calc-card">
                   <div class="calc-label">Tổng điểm ra</div>
-                  <div class="calc-value calc-out">{{ formatNumber(totals.ra) }}</div>
+                  <div class="calc-value calc-out"><MaskedValue :text="formatNumber(totals.ra)" /></div>
                 </div>
                 <div class="card calc-card">
                   <div class="calc-label">Chênh lệch (vào − ra)</div>
                   <div class="calc-value" :class="totals.chenhLech >= 0 ? 'calc-in' : 'calc-out'">
-                    {{ formatNumber(totals.chenhLech) }}
+                    <MaskedValue :text="formatNumber(totals.chenhLech)" />
                   </div>
                 </div>
               </div>
@@ -2868,5 +2875,8 @@ async function deleteTemplate() {
   max-height: 340px;
   overflow-y: auto;
   padding: 2px 2px 0 0;
+}
+.mask-row {
+  margin-bottom: 12px;
 }
 </style>

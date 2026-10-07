@@ -35,7 +35,6 @@ import AppIcon from '../components/AppIcon.vue'
 import AppDatePicker from '../components/AppDatePicker.vue'
 import MaskedValue from '../components/MaskedValue.vue'
 import ModalDialog from '../components/ModalDialog.vue'
-import PasswordPromptDialog from '../components/PasswordPromptDialog.vue'
 import DeleteDataDialog from '../components/DeleteDataDialog.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
@@ -43,7 +42,8 @@ import { api } from '../api'
 import { loadAllEntries } from '../offline'
 import { betTypeLabel } from '../betTypes'
 import { localDateString } from '../dates'
-import { mask, REVEAL_CHOICES } from '../stores/mask'
+import { mask } from '../stores/mask'
+import MaskBar from '../components/MaskBar.vue'
 
 const entries = ref([])
 const loading = ref(true)
@@ -382,49 +382,8 @@ function recalc() {
   calcVersion.value++
 }
 
-// ---- Ẩn số liệu ---------------------------------------------------------------
-
+// ---- Ẩn số liệu: điều khiển nằm trong <MaskBar />; trang chỉ cần biết đang che hay không ----
 const masked = mask.masked
-const maskEnabled = computed(() => mask.state.enabled)
-const promptOpen = ref(false)
-const promptPurpose = ref('reveal') // 'reveal' | 'disable'
-function toggleMask() {
-  if (!mask.state.enabled) mask.enable()
-  else openPrompt('disable')
-}
-function openPrompt(purpose) {
-  promptPurpose.value = purpose
-  promptOpen.value = true
-}
-function onVerified() {
-  promptOpen.value = false
-  if (promptPurpose.value === 'disable') mask.disable()
-  else mask.reveal()
-}
-// How long the figures stay on screen after the password, and the live countdown.
-const revealSeconds = computed({
-  get: () => mask.state.revealSeconds,
-  set: (v) => mask.setRevealSeconds(Number(v)),
-})
-const secondsLeft = ref(0)
-let countdownTimer = null
-watch(
-  () => mask.state.revealUntil,
-  (until) => {
-    clearInterval(countdownTimer)
-    if (!until) {
-      secondsLeft.value = 0
-      return
-    }
-    const tick = () => (secondsLeft.value = Math.max(0, Math.ceil((mask.state.revealUntil - Date.now()) / 1000)))
-    tick()
-    countdownTimer = setInterval(tick, 500)
-  },
-)
-onBeforeUnmount(() => clearInterval(countdownTimer))
-function secondsLabel(n) {
-  return n >= 60 ? `${n / 60} phút` : `${n} giây`
-}
 
 // ---- Xóa số liệu / Đặt lịch xóa -----------------------------------------------
 
@@ -444,10 +403,8 @@ async function onDeleted(n) {
 }
 
 onMounted(async () => {
-  mask.attach()
   await Promise.all([load(), loadRates(), loadCustomers()])
 })
-onBeforeUnmount(() => mask.detach())
 </script>
 
 <template>
@@ -460,35 +417,7 @@ onBeforeUnmount(() => mask.detach())
     </p>
 
     <div class="toolbar card">
-      <div class="toolbar-mask">
-        <button
-          type="button"
-          class="mask-switch"
-          role="switch"
-          :aria-checked="maskEnabled"
-          :class="{ on: maskEnabled }"
-          @click="toggleMask"
-        >
-          <AppIcon :name="maskEnabled ? 'eye-off' : 'eye'" />
-          Ẩn số liệu
-          <span class="mask-state">{{ maskEnabled ? 'Bật' : 'Tắt' }}</span>
-        </button>
-        <button v-if="maskEnabled && masked" type="button" class="btn btn-secondary btn-sm" @click="openPrompt('reveal')">
-          <AppIcon name="eye" /> Hiện
-        </button>
-        <button v-else-if="maskEnabled" type="button" class="btn btn-secondary btn-sm" @click="mask.cover()">
-          <AppIcon name="eye-off" /> Che lại
-        </button>
-        <span v-if="maskEnabled && !masked" class="mask-countdown" role="timer" aria-live="off">
-          Tự che sau {{ secondsLeft }}s
-        </span>
-        <label v-if="maskEnabled" class="mask-time">
-          <span>Hiện trong</span>
-          <select v-model.number="revealSeconds" aria-label="Thời gian hiện số liệu sau khi nhập mật khẩu">
-            <option v-for="n in REVEAL_CHOICES" :key="n" :value="n">{{ secondsLabel(n) }}</option>
-          </select>
-        </label>
-      </div>
+      <MaskBar />
       <div class="toolbar-actions">
         <button type="button" class="btn btn-secondary btn-sm" @click="openDelete('')">Xóa số liệu</button>
         <button type="button" class="btn btn-secondary btn-sm" @click="scheduleOpen = true">Đặt lịch xóa</button>
@@ -699,17 +628,6 @@ onBeforeUnmount(() => mask.detach())
       </template>
     </template>
 
-    <PasswordPromptDialog
-      :open="promptOpen"
-      :title="promptPurpose === 'disable' ? 'Tắt ẩn số liệu' : 'Hiện số liệu'"
-      :description="
-        promptPurpose === 'disable'
-          ? 'Nhập mật khẩu đăng nhập để tắt chế độ ẩn số liệu.'
-          : 'Nhập mật khẩu đăng nhập để xem số liệu. Số liệu sẽ tự ẩn lại sau 5 phút.'
-      "
-      @verified="onVerified"
-      @close="promptOpen = false"
-    />
     <DeleteDataDialog
       :open="deleteOpen"
       :customer-name="selectedCustomer"
