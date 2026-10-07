@@ -165,10 +165,14 @@ async function submit() {
   try {
     // Step 1: the server describes exactly what would be deleted and when.
     const preview = await api.post('/me/deletion-schedules', body)
-    const lines = [`CẢNH BÁO: ${preview.scopeText}`]
-    if (repeat && !/lặp/i.test(preview.scopeText || '')) lines.push(`Lặp lại mỗi ${repeatText(repeat)}.`)
-    lines.push(`Thời điểm xoá${repeat ? ' lần đầu' : ''}: ${fmt(preview.runAt || body.runAt)}.`)
-    if (typeof preview.willDeleteNow === 'number') lines.push(`Nếu chạy ngay bây giờ sẽ xoá ${preview.willDeleteNow} số liệu.`)
+    // The server's scopeText already says the scope, the repeat, the first run time and how many
+    // rows a run right now would delete, so it is shown as is; the lines below are only added when
+    // that text is missing the information (older server).
+    const scope = preview.scopeText || ''
+    const lines = [`CẢNH BÁO: ${scope}`]
+    if (repeat && !/lặp/i.test(scope)) lines.push(`Lặp lại mỗi ${repeatText(repeat)}.`)
+    if (!/lần đầu|lúc \d/i.test(scope)) lines.push(`Thời điểm xoá${repeat ? ' lần đầu' : ''}: ${fmt(preview.runAt || body.runAt)}.`)
+    if (typeof preview.willDeleteNow === 'number' && !/xoá ngay|xóa ngay|chạy ngay/i.test(scope)) lines.push(`Nếu chạy ngay bây giờ sẽ xoá ${preview.willDeleteNow} số liệu.`)
     lines.push('Bạn có thể huỷ lịch trước thời điểm này.')
     const ok = await showConfirm({
       title: 'Xác nhận lịch xoá dữ liệu',
