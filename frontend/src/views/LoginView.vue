@@ -181,17 +181,18 @@ function backToCredentials() {
 </script>
 
 <template>
-  <AuthLayout subtitle="Đăng nhập để nhập số liệu và quản lý gói dịch vụ">
+  <AuthLayout
+    mode="login"
+    :show-tabs="stage === 'credentials'"
+    :title="stage === 'credentials' ? 'Chào mừng trở lại' : stage === 'second_password' ? 'Xác minh tài khoản' : stage === 'recover' ? 'Khôi phục mật khẩu' : stage === 'recover_code' ? 'Lưu mã khôi phục mới' : stage === 'wipe_confirm' ? 'Xác nhận xoá dữ liệu' : 'Hoàn tất'"
+    subtitle="Dữ liệu của bạn, trong tầm kiểm soát"
+  >
     <form v-if="stage === 'credentials'" @submit.prevent="submitCredentials">
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
 
-      <div class="field has-icon">
+      <div class="field">
         <label for="username">Tên đăng nhập</label>
         <div class="input-wrap">
-          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="8" r="5" />
-            <path d="M20 21a8 8 0 0 0-16 0" />
-          </svg>
           <input
             id="username"
             v-model="username"
@@ -204,60 +205,40 @@ function backToCredentials() {
         </div>
       </div>
 
-      <div class="field has-icon">
+      <div class="field">
         <label for="password">Mật khẩu</label>
-        <div class="input-wrap">
-          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="Nhập mật khẩu"
-            :disabled="loading"
-            :aria-invalid="!!error"
-          />
-        </div>
+        <PasswordInput
+          id="password"
+          v-model="password"
+          autocomplete="current-password"
+          placeholder="Nhập mật khẩu"
+          :disabled="loading"
+          :aria-invalid="!!error"
+        />
       </div>
+
+      <div class="auth-link-row"><button type="button" class="auth-link-button" @click="startRecover">Quên mật khẩu?</button></div>
 
       <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
         {{ loading ? 'Đang xử lý...' : 'Đăng nhập' }}
       </button>
 
-      <p class="auth-footer">
-        <a href="#" @click.prevent="startRecover">Quên mật khẩu?</a>
-      </p>
-      <p class="auth-footer">
-        Chưa có tài khoản? <RouterLink to="/register">Đăng ký</RouterLink>
-      </p>
     </form>
 
     <form v-else-if="stage === 'second_password'" @submit.prevent="submitSecondPassword">
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
-      <p style="color: var(--muted); font-size: 15px; margin-bottom: 24px">
-        Tài khoản của bạn được bảo vệ bằng mật khẩu lớp hai. Vui lòng nhập để tiếp tục.
-      </p>
+      <p class="auth-stage-description">Nhập mật khẩu lớp hai để tiếp tục.</p>
 
-      <div class="field has-icon">
+      <div class="field">
         <label for="second-password">Mật khẩu lớp hai</label>
-        <div class="input-wrap">
-          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          <input
-            id="second-password"
-            v-model="secondPassword"
-            type="password"
-            autocomplete="off"
-            placeholder="Nhập mật khẩu lớp hai"
-            :disabled="loading"
-            :aria-invalid="!!error"
-          />
-        </div>
+        <PasswordInput
+          id="second-password"
+          v-model="secondPassword"
+          autocomplete="off"
+          placeholder="Nhập mật khẩu lớp hai"
+          :disabled="loading"
+          :aria-invalid="!!error"
+        />
       </div>
 
       <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
@@ -268,7 +249,7 @@ function backToCredentials() {
 
     <form v-else-if="stage === 'recover'" @submit.prevent="submitRecover">
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
-      <p style="color: var(--muted); font-size: 15px; margin-bottom: 24px">
+      <p class="auth-stage-description">
         Nhập tên đăng nhập và mã khôi phục để đặt mật khẩu mới. Sau khi đặt lại, bạn sẽ nhận một mã khôi phục mới (mã cũ
         không dùng được nữa).
       </p>
@@ -329,3 +310,34 @@ function backToCredentials() {
     </div>
   </AuthLayout>
 </template>
+
+<style scoped>
+.auth-link-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 8px;
+}
+
+.auth-link-button {
+  border: 0;
+  padding: 8px 0;
+  background: transparent;
+  color: var(--link);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-link-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.auth-stage-description {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+</style>

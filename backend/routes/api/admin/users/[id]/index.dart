@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/password_policy.dart';
+import 'package:server/src/recovery_codes.dart';
 import 'package:server/src/sessions.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -20,6 +22,13 @@ import 'package:sqlite3/sqlite3.dart';
 /// is stored), so this is the only way admin can give a customer a working
 /// password again; it's shown to admin once, right after they set it,
 /// since the client already knows the plaintext it just typed.
+///
+/// Account-recovery support (A06). Setting `newPassword` also (a) signs the
+/// account out everywhere, (b) clears every login / re-auth / recovery throttle
+/// so the person can actually get back in, and (c) issues a NEW recovery code
+/// (the old one may be exactly what leaked) - returned once as `recoveryCode`.
+/// `{"reissueRecoveryCode": true}` does only (c) (+ clears the recovery lock) and
+/// `{"clearLockouts": true}` only (b), for "I am locked out" tickets.
 ///
 /// `DELETE` - permanently removes the account. `data_entries`,
 /// `transactions`, `messages` and `customer_codes` all reference
@@ -63,11 +72,16 @@ Future<Response> _patch(RequestContext context, String id) async {
   }
   final locked = body['locked'];
   final newPassword = body['newPassword'];
+  final reissueCode = body['reissueRecoveryCode'] == true;
+  final clearLockouts = body['clearLockouts'] == true;
 
-  if (locked is! bool && (newPassword is! String || newPassword.trim().isEmpty)) {
+  if (locked is! bool &&
+      !reissueCode &&
+      !clearLockouts &&
+      (newPassword is! String || newPassword.trim().isEmpty)) {
     return Response.json(
       statusCode: 400,
-      body: {'error': "Thiếu trường 'locked' (true/false) hoặc 'newPassword'"},
+      body: {'error': "Thiếu trường 'locked', 'newPassword', 'reissueRecoveryCode' hoặc 'clearLockouts'"},
     );
   }
 
@@ -86,11 +100,9 @@ Future<Response> _patch(RequestContext context, String id) async {
   final hasNewPassword = newPassword is String && newPassword.trim().isNotEmpty;
   // Validate before changing anything, so a bad password does not leave a
   // half-applied lock/unlock behind.
-  if (newPassword is String && hasNewPassword && newPassword.trim().length < 4) {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Mật khẩu mới cần ít nhất 4 ký tự'},
-    );
+  if (newPassword is String && hasNewPassword) {
+    final problem = validateNewPassword(newPassword.trim());
+    if (problem != null) return Response.json(statusCode: 400, body: {'error': problem});
   }
 
   final ip = clientIp(context);
@@ -126,8 +138,37 @@ Future<Response> _patch(RequestContext context, String id) async {
         userId: id, username: username, ip: ip, detail: 'Admin đặt lại mật khẩu; đã đăng xuất mọi thiết bị');
   }
 
+  String? newRecoveryCode;
+  if ((newPassword is String && hasNewPassword) || reissueCode) {
+    newRecoveryCode = rotateRecoveryCode(db, id);
+    logSecurityEvent(db, 'admin_recovery_code_issued',
+        userId: id, username: username, ip: ip, detail: 'Admin cấp lại mã khôi phục (mã cũ vô hiệu)');
+  }
+  if ((newPassword is String && hasNewPassword) || clearLockouts) {
+    _clearLockouts(db, id, username);
+    logSecurityEvent(db, 'admin_lockouts_cleared',
+        userId: id, username: username, ip: ip, detail: 'Admin gỡ khoá đăng nhập/xác thực/khôi phục');
+  }
+
   final updated = db.select('SELECT * FROM users WHERE id = ?', [id]);
-  return Response.json(body: adminSubscriberJson(updated.first));
+  return Response.json(body: {
+    ...adminSubscriberJson(updated.first),
+    if (newRecoveryCode != null) 'recoveryCode': newRecoveryCode,
+  });
+}
+
+/// Forget every throttle that could keep the person out: wrong-password locks
+/// for their username (any IP), the re-auth limiter and the recovery-code lock.
+void _clearLockouts(Database db, String userId, String username) {
+  db.execute('DELETE FROM login_attempts WHERE key LIKE ? ESCAPE ? OR key = ?', [
+    '${username.toLowerCase().replaceAll('%', r'\%').replaceAll('_', r'\_')}|%',
+    r'\',
+    'reauth:$userId|-',
+  ]);
+  db.execute(
+    'UPDATE users SET recovery_failed_attempts = 0, recovery_locked_until = NULL WHERE id = ?',
+    [userId],
+  );
 }
 
 Response _delete(RequestContext context, String id) {

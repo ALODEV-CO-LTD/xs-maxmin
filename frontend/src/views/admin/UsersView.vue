@@ -27,6 +27,48 @@ const confirmDelete = ref(false)
 const showResetPassword = ref(false)
 const newPassword = ref('')
 const lastSetPassword = ref('')
+const lastRecoveryCode = ref('') // shown once, right after a reset / re-issue
+const supportNote = ref('')
+const copied = ref('')
+
+// Random password that passes the server policy (8+ chars, not a common/sequential one).
+function generatePassword() {
+  const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
+  const digits = '23456789'
+  const all = letters + digits
+  const buf = new Uint32Array(10)
+  crypto.getRandomValues(buf)
+  const chars = [...buf].map((n, i) => (i === 3 || i === 7 ? digits[n % digits.length] : all[n % all.length]))
+  newPassword.value = chars.join('')
+}
+async function copyText(text, key) {
+  try {
+    await navigator.clipboard.writeText(text)
+    copied.value = key
+    setTimeout(() => (copied.value = ''), 2000)
+  } catch {
+    /* clipboard blocked - the value is on screen to copy by hand */
+  }
+}
+
+// Recovery support without changing the password: re-issue the code / lift lockouts.
+async function supportAction(kind) {
+  if (!selected.value) return
+  actionBusy.value = true
+  actionError.value = ''
+  supportNote.value = ''
+  try {
+    const body = kind === 'code' ? { reissueRecoveryCode: true } : { clearLockouts: true }
+    const updated = await api.patch(`/admin/users/${selected.value.id}`, body)
+    if (updated.recoveryCode) lastRecoveryCode.value = updated.recoveryCode
+    supportNote.value = kind === 'code' ? 'Đã cấp mã khôi phục mới (mã cũ không còn dùng được).' : 'Đã gỡ mọi khoá đăng nhập/xác thực/khôi phục của tài khoản.'
+    selected.value = { ...selected.value, ...updated }
+  } catch (err) {
+    actionError.value = err instanceof ApiError ? err.message : 'Không thể thực hiện'
+  } finally {
+    actionBusy.value = false
+  }
+}
 
 let searchTimer = null
 
@@ -100,6 +142,8 @@ function closeDetail() {
   showResetPassword.value = false
   newPassword.value = ''
   lastSetPassword.value = ''
+  lastRecoveryCode.value = ''
+  supportNote.value = ''
 }
 
 async function resetPassword() {
@@ -111,6 +155,8 @@ async function resetPassword() {
       newPassword: newPassword.value.trim(),
     })
     lastSetPassword.value = newPassword.value.trim()
+    lastRecoveryCode.value = updated.recoveryCode || ''
+    supportNote.value = ''
     newPassword.value = ''
     showResetPassword.value = false
     selected.value = { ...selected.value, ...updated }
@@ -288,9 +334,24 @@ onMounted(loadList)
           </div>
 
           <div v-if="actionError" class="alert alert-error">{{ actionError }}</div>
-          <div v-if="lastSetPassword" class="alert alert-success">
-            Đã đặt mật khẩu mới: <strong>{{ lastSetPassword }}</strong>. Hãy gửi cho khách hàng ngay, mật khẩu này sẽ
-            không hiển thị lại được nữa.
+          <div v-if="supportNote" class="alert alert-success">{{ supportNote }}</div>
+          <div v-if="lastSetPassword || lastRecoveryCode" class="alert alert-success recovery-result">
+            <p v-if="lastSetPassword">
+              Mật khẩu mới: <strong>{{ lastSetPassword }}</strong>
+              <button type="button" class="btn btn-ghost btn-sm" @click="copyText(lastSetPassword, 'pw')">
+                {{ copied === 'pw' ? 'Đã chép' : 'Chép' }}
+              </button>
+            </p>
+            <p v-if="lastRecoveryCode">
+              Mã khôi phục mới: <strong>{{ lastRecoveryCode }}</strong>
+              <button type="button" class="btn btn-ghost btn-sm" @click="copyText(lastRecoveryCode, 'rc')">
+                {{ copied === 'rc' ? 'Đã chép' : 'Chép' }}
+              </button>
+            </p>
+            <p class="recovery-hint">
+              Gửi cho khách hàng qua kênh riêng ngay bây giờ: hai giá trị này không xem lại được. Mọi thiết bị của
+              khách đã bị đăng xuất, các khoá đăng nhập đã được gỡ và mã khôi phục cũ không còn dùng được.
+            </p>
           </div>
 
           <!-- Mật khẩu gốc được mã hoá một chiều nên không thể xem lại - đây
@@ -298,7 +359,10 @@ onMounted(loadList)
           <div v-if="showResetPassword" class="reset-box">
             <label class="reset-label" for="new-password">Mật khẩu mới cho tài khoản này</label>
             <div class="reset-row">
-              <input id="new-password" v-model="newPassword" type="text" placeholder="Nhập mật khẩu mới..." />
+              <input id="new-password" v-model="newPassword" type="text" placeholder="Tối thiểu 8 ký tự" autocomplete="off" />
+              <button class="btn btn-secondary btn-sm" :disabled="actionBusy" type="button" @click="generatePassword">
+                Tạo ngẫu nhiên
+              </button>
               <button class="btn btn-primary btn-sm" :disabled="actionBusy || !newPassword.trim()" @click="resetPassword">
                 Lưu
               </button>
@@ -325,6 +389,12 @@ onMounted(loadList)
               @click="showResetPassword = true; lastSetPassword = ''"
             >
               Đặt lại mật khẩu
+            </button>
+            <button class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('code')">
+              Cấp lại mã khôi phục
+            </button>
+            <button class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('unlock')">
+              Gỡ khoá đăng nhập
             </button>
             </div>
 
@@ -719,5 +789,17 @@ onMounted(loadList)
   .actions-danger .btn {
     flex: 1 1 100%;
   }
+}
+.recovery-result p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.recovery-result strong {
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.05em;
+}
+.recovery-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
 }
 </style>

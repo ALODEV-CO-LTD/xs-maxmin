@@ -8,6 +8,9 @@ import ThemeToggle from './ThemeToggle.vue'
 
 defineProps({
   subtitle: { type: String, default: '' },
+  title: { type: String, default: '' },
+  mode: { type: String, default: '' },
+  showTabs: { type: Boolean, default: true },
 })
 </script>
 
@@ -17,9 +20,14 @@ defineProps({
     <main class="auth-card">
       <header class="auth-brand">
         <div class="auth-logo" aria-hidden="true">XS</div>
-        <h1>XOSO</h1>
+        <h1>XS Maxmin</h1>
         <p v-if="subtitle" class="auth-subtitle">{{ subtitle }}</p>
       </header>
+      <nav v-if="showTabs" class="auth-tabs" aria-label="Tài khoản">
+        <RouterLink to="/login" :class="{ active: mode === 'login' }" :aria-current="mode === 'login' ? 'page' : undefined">Đăng nhập</RouterLink>
+        <RouterLink to="/register" :class="{ active: mode === 'register' }" :aria-current="mode === 'register' ? 'page' : undefined">Đăng ký</RouterLink>
+      </nav>
+      <h2 v-if="title" class="auth-title">{{ title }}</h2>
       <slot />
     </main>
   </div>
@@ -53,24 +61,24 @@ defineProps({
 
 .auth-card {
   width: 100%;
-  max-width: 400px;
-  padding: 40px 32px;
+  max-width: 440px;
+  padding: 32px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 /* ---- Brand: logo -> title -> description ---- */
 .auth-brand {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .auth-logo {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 16px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
   border-radius: 14px;
   background: var(--primary);
   color: #fff;
@@ -79,13 +87,51 @@ defineProps({
   justify-content: center;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .auth-brand h1 {
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1.2;
   margin: 0 0 8px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.auth-tabs a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-tabs a.active {
+  background: var(--card);
+  color: var(--link);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-tabs a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.auth-title {
+  margin: 0 0 20px;
+  font-size: 20px;
+  line-height: 1.3;
 }
 
 .auth-subtitle {
@@ -103,7 +149,7 @@ defineProps({
 
 .auth-card :deep(.field label) {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   margin-bottom: 8px;
 }
@@ -117,6 +163,8 @@ defineProps({
   border: 1px solid var(--auth-input-border);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+.auth-card :deep(.field-msg:empty) { display: none; }
 
 .auth-card :deep(.field.has-icon input) {
   padding-left: 54px;
@@ -272,7 +320,7 @@ defineProps({
 }
 
 .auth-card :deep(form > .btn-primary) {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .auth-card :deep(.btn-primary) {
@@ -362,14 +410,14 @@ defineProps({
 @media (max-width: 480px) {
   .auth-page {
     align-items: flex-start;
-    padding: 24px 16px;
+    padding: 16px 12px;
   }
   .auth-card {
-    padding: 32px 24px;
+    padding: 24px 20px;
     max-width: none;
   }
   .auth-brand {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
 }
 </style>

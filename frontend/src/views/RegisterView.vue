@@ -19,7 +19,7 @@ import RecoveryCodeDisplay from '../components/RecoveryCodeDisplay.vue'
 const router = useRouter()
 const auth = useAuthStore()
 
-const stage = ref('form') // 'form' | 'recovery_code' | 'second_password'
+const stage = ref('account') // 'account' | 'security' | 'recovery_code' | 'second_password'
 const recoveryCode = ref('') // shown once, then dropped
 const loading = ref(false)
 const error = ref('') // server / network errors only; field errors are inline
@@ -30,6 +30,7 @@ const password = ref('')
 const confirmPassword = ref('') // client-side only, never sent to the API
 const secondPassword = ref('')
 const wipePassword = ref('')
+const showWipePassword = ref(false)
 
 const pendingToken = ref('')
 const step2Password = ref('')
@@ -56,7 +57,7 @@ const fieldErrors = computed(() => ({
       : secondPassword.value === password.value
         ? 'Mật khẩu lớp hai phải khác mật khẩu đăng nhập'
         : '',
-  wipePassword: !wipePassword.value
+  wipePassword: !showWipePassword.value || !wipePassword.value
     ? ''
     : wipePassword.value.length < 4
       ? 'Mật khẩu xoá dữ liệu phải có ít nhất 4 ký tự'
@@ -65,20 +66,11 @@ const fieldErrors = computed(() => ({
         : '',
 }))
 
-const okMessages = {
-  name: 'Hợp lệ',
-  username: 'Tên đăng nhập hợp lệ',
-  password: 'Mật khẩu hợp lệ',
-  confirmPassword: 'Mật khẩu khớp',
-  secondPassword: 'Mật khẩu lớp hai hợp lệ',
-  wipePassword: 'Mật khẩu xoá dữ liệu hợp lệ',
-}
-
-// 'error' | 'ok' | '' (nothing to show yet, or an optional field left empty)
+// Show only actionable errors. Successful fields do not add extra text to the form.
 function state(f) {
-  if (f === 'wipePassword' && !wipePassword.value) return ''
+  if (f === 'wipePassword' && (!showWipePassword.value || !wipePassword.value)) return ''
   if (!show(f)) return ''
-  return fieldErrors.value[f] ? 'error' : 'ok'
+  return fieldErrors.value[f] ? 'error' : ''
 }
 
 const fieldIds = {
@@ -90,18 +82,48 @@ const fieldIds = {
   wipePassword: 'reg-wipe-password',
 }
 
-async function focusFirstInvalid() {
-  const first = Object.keys(fieldIds).find((f) => fieldErrors.value[f])
+const accountFields = ['name', 'username', 'password', 'confirmPassword']
+const securityFields = ['secondPassword', 'wipePassword']
+
+async function focusFirstInvalid(fields) {
+  const first = fields.find((f) => fieldErrors.value[f])
   if (!first) return
   await nextTick()
   document.getElementById(fieldIds[first])?.focus()
 }
 
+function goToSecurity() {
+  submitted.value = true
+  if (accountFields.some((f) => fieldErrors.value[f])) {
+    focusFirstInvalid(accountFields)
+    return
+  }
+  error.value = ''
+  submitted.value = false
+  stage.value = 'security'
+}
+
+function goToAccount() {
+  error.value = ''
+  submitted.value = false
+  stage.value = 'account'
+}
+
+function toggleWipePassword() {
+  showWipePassword.value = !showWipePassword.value
+  if (!showWipePassword.value) wipePassword.value = ''
+}
+
 async function submitForm() {
   error.value = ''
   submitted.value = true
-  if (Object.values(fieldErrors.value).some(Boolean)) {
-    focusFirstInvalid()
+  if (accountFields.some((f) => fieldErrors.value[f])) {
+    stage.value = 'account'
+    focusFirstInvalid(accountFields)
+    return
+  }
+  if (securityFields.some((f) => fieldErrors.value[f])) {
+    focusFirstInvalid(securityFields)
     return
   }
   loading.value = true
@@ -165,8 +187,14 @@ async function submitStep2() {
 </script>
 
 <template>
-  <AuthLayout subtitle="Tạo tài khoản mới để bắt đầu sử dụng XOSO">
-    <form v-if="stage === 'form'" novalidate @submit.prevent="submitForm">
+  <AuthLayout
+    mode="register"
+    :show-tabs="stage === 'account' || stage === 'security'"
+    :title="stage === 'account' ? 'Tạo tài khoản' : stage === 'security' ? 'Bảo vệ tài khoản' : stage === 'recovery_code' ? 'Lưu mã khôi phục' : 'Xác minh lần cuối'"
+    subtitle="Dùng thử miễn phí 30 ngày"
+  >
+    <form v-if="stage === 'account'" novalidate @submit.prevent="goToSecurity">
+      <div class="step-progress" aria-label="Bước 1 trong 2">Bước 1/2 · Thông tin tài khoản</div>
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
 
       <div class="field">
@@ -180,14 +208,12 @@ async function submitStep2() {
             placeholder="Nguyễn Văn A"
             :disabled="loading"
             :aria-invalid="state('name') === 'error'"
-            :data-valid="state('name') === 'ok'"
             aria-describedby="msg-name"
             @blur="touch('name')"
           />
         </div>
         <p id="msg-name" class="field-msg" :class="state('name')" aria-live="polite">
           <template v-if="state('name') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.name }}</template>
-          <template v-else-if="state('name') === 'ok'"><AppIcon name="circle-check" />{{ okMessages.name }}</template>
         </p>
       </div>
 
@@ -202,14 +228,12 @@ async function submitStep2() {
             placeholder="Ít nhất 3 ký tự"
             :disabled="loading"
             :aria-invalid="state('username') === 'error'"
-            :data-valid="state('username') === 'ok'"
             aria-describedby="msg-username"
             @blur="touch('username')"
           />
         </div>
         <p id="msg-username" class="field-msg" :class="state('username')" aria-live="polite">
           <template v-if="state('username') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.username }}</template>
-          <template v-else-if="state('username') === 'ok'"><AppIcon name="circle-check" />{{ okMessages.username }}</template>
         </p>
       </div>
 
@@ -222,13 +246,11 @@ async function submitStep2() {
           placeholder="Ít nhất 8 ký tự"
           :disabled="loading"
           :aria-invalid="state('password') === 'error'"
-          :data-valid="state('password') === 'ok'"
           aria-describedby="msg-password"
           @blur="touch('password')"
         />
         <p id="msg-password" class="field-msg" :class="state('password')" aria-live="polite">
           <template v-if="state('password') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.password }}</template>
-          <template v-else-if="state('password') === 'ok'"><AppIcon name="circle-check" />{{ okMessages.password }}</template>
         </p>
       </div>
 
@@ -241,18 +263,24 @@ async function submitStep2() {
           placeholder="Nhập lại mật khẩu"
           :disabled="loading"
           :aria-invalid="state('confirmPassword') === 'error'"
-          :data-valid="state('confirmPassword') === 'ok'"
           aria-describedby="msg-confirm-password"
           @blur="touch('confirmPassword')"
         />
         <p id="msg-confirm-password" class="field-msg" :class="state('confirmPassword')" aria-live="polite">
           <template v-if="state('confirmPassword') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.confirmPassword }}</template>
-          <template v-else-if="state('confirmPassword') === 'ok'"><AppIcon name="circle-check" />{{ okMessages.confirmPassword }}</template>
         </p>
       </div>
 
+      <button type="submit" class="btn btn-primary btn-block">Tiếp tục</button>
+    </form>
+
+    <form v-else-if="stage === 'security'" novalidate @submit.prevent="submitForm">
+      <div class="step-progress" aria-label="Bước 2 trong 2">Bước 2/2 · Bảo mật</div>
+      <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
+      <p class="security-intro">Mật khẩu lớp hai được hỏi thêm mỗi lần đăng nhập. Hãy đặt mật khẩu khác với mật khẩu đăng nhập.</p>
+
       <div class="field">
-        <label for="reg-second-password">Mật khẩu lớp hai</label>
+        <label for="reg-second-password">Mật khẩu lớp hai <span class="required-note">Bắt buộc</span></label>
         <PasswordInput
           id="reg-second-password"
           v-model="secondPassword"
@@ -260,57 +288,43 @@ async function submitStep2() {
           placeholder="Ít nhất 4 ký tự"
           :disabled="loading"
           :aria-invalid="state('secondPassword') === 'error'"
-          :data-valid="state('secondPassword') === 'ok'"
           aria-describedby="msg-second-password"
           @blur="touch('secondPassword')"
         />
         <p id="msg-second-password" class="field-msg" :class="state('secondPassword')" aria-live="polite">
           <template v-if="state('secondPassword') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.secondPassword }}</template>
-          <template v-else-if="state('secondPassword') === 'ok'"><AppIcon name="circle-check" />{{ okMessages.secondPassword }}</template>
-          <template v-else>Phải khác mật khẩu đăng nhập. Được yêu cầu thêm mỗi lần đăng nhập để bảo vệ tài khoản.</template>
+          <template v-else>Ít nhất 4 ký tự và khác mật khẩu đăng nhập.</template>
         </p>
       </div>
 
-      <section class="optional-box" aria-labelledby="wipe-title">
-        <h2 id="wipe-title" class="optional-title">
-          Mật khẩu xoá dữ liệu
-          <span class="optional-badge">Không bắt buộc</span>
-        </h2>
-        <p class="optional-desc">
-          Nếu đặt, khi nhập mật khẩu này ở màn hình đăng nhập, bạn sẽ được đưa tới bước xoá dữ liệu (số liệu, khách hàng, mẫu cú pháp, lịch xoá, nhật ký cuộc gọi, tin nhắn phản hồi Admin, lịch sử giao dịch; tài khoản và bạn bè được giữ lại). Phải khác 2 mật khẩu còn lại.
-          Bạn cũng có thể đặt sau trong mục Tài khoản.
-        </p>
-        <p class="optional-warn">
-          <AppIcon name="triangle-alert" />
-          <span>Cảnh báo: xoá dữ liệu là vĩnh viễn và không thể khôi phục. Phải khác 2 mật khẩu còn lại.</span>
-        </p>
+      <button type="button" class="optional-toggle" :aria-expanded="showWipePassword" aria-controls="wipe-password-fields" @click="toggleWipePassword">
+        <span><strong>Mật khẩu xoá dữ liệu</strong><small>Không bắt buộc · Có thể đặt sau trong Tài khoản</small></span>
+        <span aria-hidden="true">{{ showWipePassword ? '−' : '+' }}</span>
+      </button>
+      <div v-if="showWipePassword" id="wipe-password-fields" class="optional-content">
+        <p class="optional-desc">Nếu nhập mật khẩu này khi đăng nhập, ứng dụng sẽ mở bước xác nhận xoá dữ liệu vĩnh viễn. Mật khẩu này phải khác hai mật khẩu trên.</p>
         <div class="field">
-          <label for="reg-wipe-password">Nhập mật khẩu xoá dữ liệu</label>
+          <label for="reg-wipe-password">Mật khẩu xoá dữ liệu</label>
           <PasswordInput
             id="reg-wipe-password"
             v-model="wipePassword"
             autocomplete="off"
-            placeholder="Để trống nếu không cần"
+            placeholder="Ít nhất 4 ký tự"
             :disabled="loading"
             :aria-invalid="state('wipePassword') === 'error'"
-            :data-valid="state('wipePassword') === 'ok'"
             aria-describedby="msg-wipe-password"
             @blur="touch('wipePassword')"
           />
           <p id="msg-wipe-password" class="field-msg" :class="state('wipePassword')" aria-live="polite">
             <template v-if="state('wipePassword') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.wipePassword }}</template>
-            <template v-else-if="state('wipePassword') === 'ok'"><AppIcon name="circle-check" />{{ okMessages.wipePassword }}</template>
           </p>
         </div>
-      </section>
+      </div>
 
       <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang xử lý...' : 'Đăng ký' }}
+        {{ loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản' }}
       </button>
-
-      <p class="auth-footer">
-        Đã có tài khoản? <RouterLink to="/login">Đăng nhập</RouterLink>
-      </p>
+      <button type="button" class="btn btn-ghost btn-block" :disabled="loading" @click="goToAccount">Quay lại</button>
     </form>
 
     <div v-else-if="stage === 'recovery_code'">
@@ -319,9 +333,7 @@ async function submitStep2() {
 
     <form v-else @submit.prevent="submitStep2">
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
-      <p style="color: var(--muted); font-size: 15px; margin-bottom: 24px">
-        Vui lòng nhập lại mật khẩu lớp hai bạn vừa đặt để hoàn tất đăng ký.
-      </p>
+      <p class="security-intro">Nhập lại mật khẩu lớp hai bạn vừa đặt để hoàn tất đăng ký.</p>
 
       <div class="field">
         <label for="step2-password">Mật khẩu lớp hai</label>
@@ -341,3 +353,65 @@ async function submitStep2() {
     </form>
   </AuthLayout>
 </template>
+
+<style scoped>
+.step-progress {
+  width: fit-content;
+  margin: 0 0 18px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  color: var(--link);
+  background: var(--primary-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.security-intro {
+  margin: 0 0 22px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.required-note {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.optional-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.optional-toggle span:first-child { display: grid; gap: 3px; }
+.optional-toggle strong { font-size: 14px; }
+.optional-toggle small { color: var(--muted); font-size: 12px; }
+.optional-toggle span:last-child { color: var(--link); font-size: 22px; line-height: 1; }
+.optional-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.optional-content {
+  padding: 14px 16px 2px;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+}
+
+.optional-desc {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+</style>
