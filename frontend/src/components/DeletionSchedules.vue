@@ -166,7 +166,7 @@ async function submit() {
     // Step 1: the server describes exactly what would be deleted and when.
     const preview = await api.post('/me/deletion-schedules', body)
     const lines = [`CẢNH BÁO: ${preview.scopeText}`]
-    if (repeat) lines.push(`Lặp lại mỗi ${repeatText(repeat)}.`)
+    if (repeat && !/lặp/i.test(preview.scopeText || '')) lines.push(`Lặp lại mỗi ${repeatText(repeat)}.`)
     lines.push(`Thời điểm xoá${repeat ? ' lần đầu' : ''}: ${fmt(preview.runAt || body.runAt)}.`)
     if (typeof preview.willDeleteNow === 'number') lines.push(`Nếu chạy ngay bây giờ sẽ xoá ${preview.willDeleteNow} số liệu.`)
     lines.push('Bạn có thể huỷ lịch trước thời điểm này.')

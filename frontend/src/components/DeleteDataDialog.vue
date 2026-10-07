@@ -86,9 +86,10 @@ watch([scope, from, to, keepDays], () => {
   }
 })
 
+const vn = (d) => (d ? d.split('-').reverse().join('/') : '...')
 const scopeText = computed(() => {
   const who = scope.value === 'customer' ? `khách "${props.customerName}"` : 'TẤT CẢ khách'
-  const range = from.value || to.value ? `ngày ${from.value || '...'} đến ${to.value || '...'}` : 'mọi ngày'
+  const range = from.value || to.value ? from.value && from.value === to.value ? `ngày ${vn(from.value)}` : `ngày ${vn(from.value)} đến ${vn(to.value)}` : 'mọi ngày'
   return `${who}, ${range}${keep.value ? `, giữ lại ${keep.value} ngày gần nhất` : ''}`
 })
 

@@ -686,7 +686,7 @@ onBeforeUnmount(() => mask.detach())
       @deleted="onDeleted"
       @close="deleteOpen = false"
     />
-    <ModalDialog :open="scheduleOpen" title="Đặt lịch xóa" wide @close="scheduleOpen = false">
+    <ModalDialog :open="scheduleOpen" title="Đặt lịch xóa" description="Hệ thống tự xóa số liệu theo lịch, một lần hoặc lặp lại. Dữ liệu đã xóa không thể khôi phục." wide @close="scheduleOpen = false">
       <DeletionSchedules embedded :customer-name="selectedCustomer" />
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="scheduleOpen = false">Đóng</button>
