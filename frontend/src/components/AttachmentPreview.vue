@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
 }
 .att-privacy {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .att-privacy-toggle {
@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 .att-size {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .att-remove {

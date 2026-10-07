@@ -69,7 +69,7 @@ const hideOptions = [
 }
 .priv-note {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--text-secondary);
 }

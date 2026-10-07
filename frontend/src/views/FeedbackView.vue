@@ -171,13 +171,13 @@ onBeforeUnmount(() => clearInterval(timer))
   color: var(--accent-strong);
 }
 .msg-from {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--accent-strong);
   margin-bottom: 2px;
 }
 .msg-time {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
   margin-top: 4px;
 }
@@ -241,12 +241,12 @@ onBeforeUnmount(() => clearInterval(timer))
   color: var(--text-primary);
 }
 .msg-from {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: 2px;
 }
 .msg-time {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.2;
   color: var(--text-secondary);
   margin-top: 6px;
@@ -270,6 +270,7 @@ onBeforeUnmount(() => clearInterval(timer))
   background: var(--surface);
   border: 1px solid var(--input-border);
   border-radius: 10px;
+  flex: 1 1 0;
   min-width: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }

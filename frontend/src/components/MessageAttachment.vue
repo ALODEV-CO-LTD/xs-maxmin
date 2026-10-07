@@ -118,7 +118,7 @@ async function download() {
   font-weight: 600;
 }
 .ma-file-size {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 </style>

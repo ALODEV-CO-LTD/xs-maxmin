@@ -168,7 +168,7 @@ defineProps({
   align-items: flex-start;
   gap: 6px;
   margin: 8px 0 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
   color: var(--muted);
 }
@@ -227,7 +227,7 @@ defineProps({
 
 .auth-card :deep(.optional-desc) {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -236,7 +236,7 @@ defineProps({
   display: flex;
   gap: 8px;
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--auth-warn);
 }

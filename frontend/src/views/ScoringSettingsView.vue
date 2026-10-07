@@ -265,7 +265,7 @@ onMounted(load)
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
 }
 .rate-input:focus {
@@ -278,7 +278,7 @@ onMounted(load)
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .digits-select:focus {
@@ -295,7 +295,7 @@ onMounted(load)
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text);
   white-space: nowrap;
 }
@@ -324,7 +324,7 @@ onMounted(load)
 }
 .type-table th {
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: 14px;
   background: var(--surface);
   white-space: nowrap;
 }
@@ -339,7 +339,7 @@ onMounted(load)
 }
 .type-cell .page-subtitle {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary);
 }

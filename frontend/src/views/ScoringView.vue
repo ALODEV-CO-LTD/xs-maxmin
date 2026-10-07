@@ -223,8 +223,8 @@ watch(selectedCustomer, () => {
     <h1 class="page-title">Tính điểm</h1>
     <p class="page-subtitle">
       Điểm ra được máy tự động tính và lưu, theo kết quả xổ số đã nhập ở trang
-      <RouterLink :to="{ name: 'results' }">Nhập kết quả</RouterLink>. Đổi tỉ lệ ăn ở trang
-      <RouterLink :to="{ name: 'scoring-settings' }">Cấu hình tính điểm</RouterLink>.
+      <RouterLink :to="{ name: 'results' }" class="tap-link">Nhập kết quả</RouterLink>. Đổi tỉ lệ ăn ở trang
+      <RouterLink :to="{ name: 'scoring-settings' }" class="tap-link">Cấu hình tính điểm</RouterLink>.
     </p>
 
     <div v-if="autoCalcError" class="alert alert-error">{{ autoCalcError }}</div>
@@ -335,7 +335,7 @@ watch(selectedCustomer, () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   white-space: nowrap;
 }
@@ -379,7 +379,7 @@ watch(selectedCustomer, () => {
   min-width: 60px;
 }
 .cell-label {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
 }
 .cell-value {
@@ -494,7 +494,7 @@ watch(selectedCustomer, () => {
 }
 
 .cell-label {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 @media (max-width: 640px) {
@@ -544,7 +544,7 @@ watch(selectedCustomer, () => {
   margin: 0;
 }
 .result-row-top .chip {
-  font-size: 12px;
+  font-size: 14px;
   padding: 3px 10px;
   background: var(--card);
   border: 1px solid var(--border);
@@ -566,7 +566,7 @@ watch(selectedCustomer, () => {
   gap: 2px;
 }
 .cell-label {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .cell-value {

@@ -16,8 +16,8 @@ const label = computed(() => (isDark.value ? 'Chuyển sang giao diện sáng' :
 
 <style scoped>
 .theme-toggle {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: inline-flex;
   align-items: center;

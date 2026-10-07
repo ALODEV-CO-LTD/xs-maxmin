@@ -233,7 +233,7 @@ onMounted(load)
 }
 .ann-date {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .ann-actions {

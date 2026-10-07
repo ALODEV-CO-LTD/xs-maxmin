@@ -87,6 +87,17 @@ const backTarget = computed(() => {
   return { name: parent, title: target.meta?.title || '' }
 })
 
+// Go to the parent screen. When the browser history's previous entry already is that
+// parent (the usual case) step back so Back/forward stay in sync; otherwise (deep link,
+// reload) replace the current entry, so no parent<->child ping-pong is built up.
+function goBack() {
+  if (!backTarget.value) return
+  const parentPath = router.resolve({ name: backTarget.value.name }).path
+  const prev = typeof window.history.state?.back === 'string' ? window.history.state.back.split('?')[0] : ''
+  if (prev === parentPath) router.back()
+  else router.replace({ name: backTarget.value.name })
+}
+
 const displayName = computed(() => auth.user?.name || (auth.isAdmin ? 'Quản trị viên' : 'Người dùng'))
 
 onMounted(() => {
@@ -168,7 +179,7 @@ async function logout() {
       <main class="content">
         <AnnouncementBanner />
         <div v-if="backTarget" class="back-bar">
-          <button type="button" class="back-btn" @click="router.push({ name: backTarget.name })">
+          <button type="button" class="back-btn" @click="goBack">
             <AppIcon name="arrow-left" /> Quay lại<span v-if="backTarget.title" class="back-to">: {{ backTarget.title }}</span>
           </button>
         </div>
@@ -251,7 +262,7 @@ async function logout() {
 }
 
 .who .chip {
-  font-size: 12px;
+  font-size: 14px;
   padding: 4px 10px;
   color: color-mix(in srgb, var(--text-secondary) 80%, var(--text-primary));
   background: var(--surface);
@@ -431,8 +442,8 @@ async function logout() {
 /* Header buttons (menu + account), phones/small tablets only */
 .hdr-btn {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: inline-flex;
   align-items: center;

@@ -197,7 +197,7 @@ watch(
 }
 .call-error {
   color: var(--danger-text);
-  font-size: 13px;
+  font-size: 14px;
   margin-bottom: 4px;
 }
 .call-card.error-only .call-error {
@@ -228,12 +228,12 @@ watch(
   color: var(--text);
 }
 .call-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   margin-bottom: 10px;
 }
 .call-health {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   padding: 4px 10px;
   border-radius: 999px;

@@ -192,7 +192,7 @@ async function cancel(s) {
   font-size: 14px;
 }
 .sched-status {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 </style>

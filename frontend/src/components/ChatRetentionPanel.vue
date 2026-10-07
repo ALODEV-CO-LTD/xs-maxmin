@@ -108,7 +108,7 @@ async function cancel() {
 <style scoped>
 .retention {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .retention-line {
   display: flex;
