@@ -30,11 +30,26 @@ void runDueDeletions(Database db, {DateTime? now}) {
     for (final s in due) {
       try {
         if (s['kind'] == 'data') {
-          final n = deleteScheduledData(db, s);
-          db.execute(
-            "UPDATE deletion_schedules SET status = 'done', deleted_count = ?, executed_at = ? WHERE id = ?",
-            [n, nowIso, s['id']],
-          );
+          final n = deleteScheduledData(db, s, now: nowUtc);
+          final every = s['repeat_every'] as int?;
+          final unit = s['repeat_unit'] as String?;
+          if (every != null && every >= 1 && unit != null) {
+            // Recurring: stay 'pending', jump to the next FUTURE occurrence
+            // (cycles missed while the server was off are skipped, not replayed).
+            final current = DateTime.parse(s['run_at'] as String).toUtc();
+            final anchor = DateTime.tryParse((s['first_run_at'] ?? s['run_at']) as String)?.toUtc() ?? current;
+            final next = nextRunAfter(anchor, every, unit, after: nowUtc.isAfter(current) ? nowUtc : current);
+            db.execute(
+              'UPDATE deletion_schedules SET run_at = ?, deleted_count = deleted_count + ?, '
+              'run_count = run_count + 1, executed_at = ? WHERE id = ?',
+              [next.toIso8601String(), n, nowIso, s['id']],
+            );
+          } else {
+            db.execute(
+              "UPDATE deletion_schedules SET status = 'done', deleted_count = ?, run_count = run_count + 1, executed_at = ? WHERE id = ?",
+              [n, nowIso, s['id']],
+            );
+          }
         } else {
           final ttl = s['ttl_seconds'] as int;
           final cutoff = nowUtc.subtract(Duration(seconds: ttl)).toIso8601String();
@@ -54,9 +69,85 @@ void runDueDeletions(Database db, {DateTime? now}) {
   }
 }
 
+/// Vietnam has no DST: local time is always UTC+7.
+const vietnamOffset = Duration(hours: 7);
+
+/// Calendar date (YYYY-MM-DD) in Vietnam time of the instant [t].
+String vnDate(DateTime t) {
+  final v = t.toUtc().add(vietnamOffset);
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${v.year.toString().padLeft(4, '0')}-${two(v.month)}-${two(v.day)}';
+}
+
+/// [anchor] + [count] units in Vietnam local time, keeping the time of day.
+/// Months are calendar months, clamped to the last day (31/1 + 1 month = 28/2
+/// or 29/2). Always computed from the anchor, so a clamp never drifts later
+/// occurrences (31/1 -> 28/2 -> 31/3, not 28/3).
+DateTime addRepeat(DateTime anchor, int count, String unit) {
+  final v = anchor.toUtc().add(vietnamOffset);
+  final DateTime local;
+  switch (unit) {
+    case 'week':
+      local = v.add(Duration(days: 7 * count));
+    case 'month':
+      final idx = v.year * 12 + (v.month - 1) + count;
+      final y = idx ~/ 12;
+      final m = idx % 12 + 1;
+      final last = DateTime.utc(y, m + 1, 0).day;
+      local = DateTime.utc(y, m, v.day > last ? last : v.day, v.hour, v.minute, v.second, v.millisecond);
+    default:
+      local = v.add(Duration(days: count));
+  }
+  return local.subtract(vietnamOffset);
+}
+
+/// First occurrence (anchor + k*every units, k >= 1) strictly after [after].
+DateTime nextRunAfter(DateTime anchor, int every, String unit, {required DateTime after}) {
+  var k = 1;
+  var t = addRepeat(anchor, every, unit);
+  while (!t.isAfter(after) && k < 200000) {
+    k++;
+    t = addRepeat(anchor, k * every, unit);
+  }
+  return t;
+}
+
+bool _isRealDate(String d) {
+  final y = int.parse(d.substring(0, 4)), m = int.parse(d.substring(5, 7)), day = int.parse(d.substring(8, 10));
+  final t = DateTime.utc(y, m, day);
+  return t.year == y && t.month == m && t.day == day;
+}
+
+final _scopeDatePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+/// Vietnamese error for a bad date range / keepDays, or null when valid.
+/// Shared by the schedule route and bulk-delete.
+String? validateDataScope(String? from, String? to, int keepDays) {
+  for (final d in [from, to]) {
+    if (d != null && (!_scopeDatePattern.hasMatch(d) || !_isRealDate(d))) {
+      return 'Ngày không hợp lệ (định dạng YYYY-MM-DD)';
+    }
+  }
+  if (from != null && to != null && from.compareTo(to) > 0) {
+    return 'Ngày bắt đầu phải trước ngày kết thúc';
+  }
+  if (keepDays < 0 || keepDays > 3650) return 'Số ngày giữ lại phải từ 0 đến 3650';
+  return null;
+}
+
 /// WHERE clause (+ params) selecting the user's data_entries a 'data'
-/// schedule covers. Shared by the preview, the creation warning and the run.
-(String, List<Object?>) dataEntriesFilter(String userId, String? customer, String? from, String? to) {
+/// schedule / manual bulk delete covers. THE single source of truth: preview,
+/// dry run, creation warning, scheduled run and bulk-delete all use it.
+/// [keepDays] keeps the newest N days: only entries dated on or before
+/// (Vietnam date of [now]) - keepDays match.
+(String, List<Object?>) dataEntriesFilter(
+  String userId,
+  String? customer,
+  String? from,
+  String? to, {
+  int keepDays = 0,
+  DateTime? now,
+}) {
   final where = StringBuffer('user_id = ?');
   final params = <Object?>[userId];
   if (customer != null && customer.isNotEmpty) {
@@ -71,25 +162,41 @@ void runDueDeletions(Database db, {DateTime? now}) {
     where.write(' AND entry_date <= ?');
     params.add(to);
   }
+  if (keepDays > 0) {
+    where.write(' AND entry_date <= ?');
+    params.add(vnDate((now ?? DateTime.now()).toUtc().subtract(Duration(days: keepDays))));
+  }
   return (where.toString(), params);
 }
 
-int countScheduledData(Database db, String userId, String? customer, String? from, String? to) {
-  final (where, params) = dataEntriesFilter(userId, customer, from, to);
+int countScheduledData(Database db, String userId, String? customer, String? from, String? to,
+    {int keepDays = 0, DateTime? now}) {
+  final (where, params) = dataEntriesFilter(userId, customer, from, to, keepDays: keepDays, now: now);
   return db.select('SELECT COUNT(*) AS n FROM data_entries WHERE $where', params).first['n'] as int;
 }
 
-int deleteScheduledData(Database db, Row schedule) {
-  final (where, params) = dataEntriesFilter(
-    schedule['user_id'] as String,
-    schedule['customer_name'] as String?,
-    schedule['date_from'] as String?,
-    schedule['date_to'] as String?,
-  );
-  final n = db.select('SELECT COUNT(*) AS n FROM data_entries WHERE $where', params).first['n'] as int;
+/// Deletes the user's entries in scope and releases the same quota a single
+/// entry delete does (data_used - n, never below 0). Returns the count.
+int deleteDataScope(Database db, String userId, String? customer, String? from, String? to,
+    {int keepDays = 0, DateTime? now}) {
+  final (where, params) = dataEntriesFilter(userId, customer, from, to, keepDays: keepDays, now: now);
   db.execute('DELETE FROM data_entries WHERE $where', params);
+  final n = db.updatedRows;
+  if (n > 0) {
+    db.execute('UPDATE users SET data_used = MAX(data_used - ?, 0) WHERE id = ?', [n, userId]);
+  }
   return n;
 }
+
+int deleteScheduledData(Database db, Row schedule, {DateTime? now}) => deleteDataScope(
+      db,
+      schedule['user_id'] as String,
+      schedule['customer_name'] as String?,
+      schedule['date_from'] as String?,
+      schedule['date_to'] as String?,
+      keepDays: schedule['keep_days'] as int? ?? 0,
+      now: now,
+    );
 
 const _pairWhere =
     '((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?)) AND created_at < ?';

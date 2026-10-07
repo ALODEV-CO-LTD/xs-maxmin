@@ -34,8 +34,6 @@ Future<Response> onRequest(RequestContext context) async {
   };
 }
 
-final _datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-
 Map<String, dynamic> scheduleJson(Row r, String viewerId, Database db) {
   final friendId = r['friend_id'] as String?;
   String? friendName;
@@ -60,6 +58,12 @@ Map<String, dynamic> scheduleJson(Row r, String viewerId, Database db) {
     'createdAt': r['created_at'],
     'executedAt': r['executed_at'],
     'setByMe': r['user_id'] == viewerId,
+    // Recurring 'data' schedules (null repeat = one-off).
+    'repeat': r['repeat_every'] == null ? null : {'every': r['repeat_every'], 'unit': r['repeat_unit']},
+    'keepDays': r['keep_days'] ?? 0,
+    'runCount': r['run_count'] ?? 0,
+    'nextRunAt': r['status'] == 'pending' ? r['run_at'] : null,
+    'lastRunAt': r['executed_at'],
   };
 }
 
@@ -75,6 +79,13 @@ Response _list(RequestContext context, String userId) {
     [userId, userId],
   );
   return Response.json(body: {'schedules': [for (final r in rows) scheduleJson(r, userId, db)]});
+}
+
+/// "dd/MM/yyyy HH:mm" in Vietnam time.
+String _vnText(DateTime t) {
+  final v = t.toUtc().add(vietnamOffset);
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(v.day)}/${two(v.month)}/${v.year} ${two(v.hour)}:${two(v.minute)}';
 }
 
 String _ttlText(int s) => switch (s) {
@@ -116,7 +127,13 @@ Future<Response> _create(RequestContext context, String userId) async {
   final String scopeText;
   final int willDeleteNow;
   String? customer, from, to, friendId, chatScope;
-  int? ttl;
+  int? ttl, repeatEvery;
+  String? repeatUnit;
+  var keepDays = 0;
+
+  if (kind != 'data' && (body['repeat'] != null || body['keepDays'] != null)) {
+    return Response.json(statusCode: 400, body: {'error': 'Chỉ lịch xoá số liệu mới có lặp lại / giữ lại N ngày'});
+  }
 
   if (kind == 'data') {
     customer = (body['customerName'] as String?)?.trim();
@@ -125,19 +142,44 @@ Future<Response> _create(RequestContext context, String userId) async {
     if (customer != null && customer.isEmpty) customer = null;
     if (from != null && from.isEmpty) from = null;
     if (to != null && to.isEmpty) to = null;
-    for (final d in [from, to]) {
-      if (d != null && !_datePattern.hasMatch(d)) {
-        return Response.json(statusCode: 400, body: {'error': 'Ngày không hợp lệ (định dạng YYYY-MM-DD)'});
+    final rawKeep = body['keepDays'];
+    if (rawKeep != null && (rawKeep is! num || rawKeep != rawKeep.truncate())) {
+      return Response.json(statusCode: 400, body: {'error': 'Số ngày giữ lại không hợp lệ'});
+    }
+    keepDays = (rawKeep as num?)?.toInt() ?? 0;
+    final rawRepeat = body['repeat'];
+    if (rawRepeat != null) {
+      if (rawRepeat is! Map) {
+        return Response.json(statusCode: 400, body: {'error': 'Chu kỳ lặp không hợp lệ'});
       }
+      final every = rawRepeat['every'];
+      final unit = rawRepeat['unit'];
+      if (every is! num || every != every.truncate() || every < 1 || every > 365 ||
+          (unit != 'day' && unit != 'week' && unit != 'month')) {
+        return Response.json(
+          statusCode: 400,
+          body: {'error': 'Chu kỳ lặp không hợp lệ (mỗi 1-365 ngày/tuần/tháng)'},
+        );
+      }
+      if (from != null || to != null) {
+        return Response.json(
+          statusCode: 400,
+          body: {'error': 'Lịch lặp lại không dùng khoảng ngày; hãy dùng "giữ lại N ngày gần nhất"'},
+        );
+      }
+      repeatEvery = every.toInt();
+      repeatUnit = unit as String;
     }
-    if (from != null && to != null && from.compareTo(to) > 0) {
-      return Response.json(statusCode: 400, body: {'error': 'Ngày bắt đầu phải trước ngày kết thúc'});
-    }
-    willDeleteNow = countScheduledData(db, userId, customer, from, to);
+    final scopeError = validateDataScope(from, to, keepDays);
+    if (scopeError != null) return Response.json(statusCode: 400, body: {'error': scopeError});
+    willDeleteNow = countScheduledData(db, userId, customer, from, to, keepDays: keepDays, now: now);
+    final unitText = switch (repeatUnit) { 'week' => 'tuần', 'month' => 'tháng', _ => 'ngày' };
     scopeText = 'Toàn bộ số liệu đã nhập'
         '${customer != null ? ' của khách "$customer"' : ' của mọi khách'}'
         '${from != null || to != null ? ' trong khoảng ${from ?? 'đầu'} đến ${to ?? 'nay'}' : ' ở mọi ngày'}'
-        ' (hiện có $willDeleteNow bản ghi khớp). Không thể hoàn tác.';
+        '${keepDays > 0 ? ', giữ lại $keepDays ngày gần nhất' : ''}'
+        '${repeatEvery != null ? ', lặp lại mỗi ${repeatEvery == 1 ? '' : '$repeatEvery '}$unitText, lần đầu lúc ${_vnText(runAt)} (giờ Việt Nam)' : ''}'
+        ' (nếu xoá ngay bây giờ sẽ xoá $willDeleteNow bản ghi). Không thể hoàn tác.';
   } else if (kind == 'chat') {
     friendId = body['friendId'] as String?;
     ttl = body['ttlSeconds'] is num ? (body['ttlSeconds'] as num).toInt() : null;
@@ -170,6 +212,11 @@ Future<Response> _create(RequestContext context, String userId) async {
     'scopeText': scopeText,
     'willDeleteNow': willDeleteNow,
     'runAt': runAt.toIso8601String(),
+    if (kind == 'data') ...{
+      'repeat': repeatEvery == null ? null : {'every': repeatEvery, 'unit': repeatUnit},
+      'keepDays': keepDays,
+      'firstRunAt': runAt.toIso8601String(),
+    },
   };
   if (!confirm) return Response.json(body: preview);
 
@@ -203,11 +250,24 @@ Future<Response> _create(RequestContext context, String userId) async {
     '''
     INSERT INTO deletion_schedules
       (id, user_id, kind, customer_name, date_from, date_to, friend_id, chat_scope,
-       ttl_seconds, run_at, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+       ttl_seconds, run_at, status, created_at, repeat_every, repeat_unit, keep_days, first_run_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
     ''',
-    [id, userId, kind, customer, from, to, friendId, chatScope, ttl, runAt.toIso8601String(), now.toIso8601String()],
+    [
+      id, userId, kind, customer, from, to, friendId, chatScope, ttl,
+      runAt.toIso8601String(), now.toIso8601String(),
+      repeatEvery, repeatUnit, keepDays, kind == 'data' ? runAt.toIso8601String() : null,
+    ],
   );
+  if (kind == 'data') {
+    logSecurityEvent(
+      db,
+      'deletion_scheduled',
+      userId: userId,
+      ip: clientIp(context),
+      detail: repeatEvery == null ? 'Đặt lịch xoá số liệu một lần' : 'Đặt lịch xoá số liệu lặp mỗi $repeatEvery $repeatUnit',
+    );
+  }
   final saved = db.select('SELECT * FROM deletion_schedules WHERE id = ?', [id]).first;
   return Response.json(statusCode: 201, body: scheduleJson(saved, userId, db));
 }

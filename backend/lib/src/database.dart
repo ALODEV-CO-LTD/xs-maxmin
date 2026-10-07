@@ -403,6 +403,13 @@ void _createSchema(Database db) {
       executed_at TEXT
     );
   ''');
+  // Recurring 'data' schedules: run every `repeat_every` day|week|month from
+  // `first_run_at`, keeping the newest `keep_days` days. NULL repeat = once.
+  _ensureColumn(db, 'deletion_schedules', 'repeat_every', 'INTEGER');
+  _ensureColumn(db, 'deletion_schedules', 'repeat_unit', 'TEXT');
+  _ensureColumn(db, 'deletion_schedules', 'keep_days', 'INTEGER NOT NULL DEFAULT 0');
+  _ensureColumn(db, 'deletion_schedules', 'run_count', 'INTEGER NOT NULL DEFAULT 0');
+  _ensureColumn(db, 'deletion_schedules', 'first_run_at', 'TEXT');
 }
 
 void _seed(Database db) {

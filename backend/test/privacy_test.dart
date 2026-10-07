@@ -67,8 +67,10 @@ void main() {
     db.execute(
       'CREATE TABLE deletion_schedules (id TEXT, user_id TEXT, kind TEXT, customer_name TEXT, date_from TEXT, '
       'date_to TEXT, friend_id TEXT, chat_scope TEXT, ttl_seconds INTEGER, run_at TEXT, status TEXT, '
-      'deleted_count INTEGER DEFAULT 0, created_at TEXT, executed_at TEXT)',
+      'deleted_count INTEGER DEFAULT 0, created_at TEXT, executed_at TEXT, repeat_every INTEGER, '
+      'repeat_unit TEXT, keep_days INTEGER NOT NULL DEFAULT 0, run_count INTEGER NOT NULL DEFAULT 0, first_run_at TEXT)',
     );
+    db.execute('CREATE TABLE users (id TEXT, data_used INTEGER DEFAULT 0)');
     db.execute("INSERT INTO data_entries VALUES ('1','u','An','2026-01-01'), ('2','u','Binh','2026-01-02')");
     db.execute(
       "INSERT INTO direct_messages (id, from_user_id, to_user_id, content, created_at) VALUES "

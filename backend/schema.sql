@@ -207,7 +207,12 @@ CREATE TABLE IF NOT EXISTS deletion_schedules (
   status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'cancelled')),
   deleted_count  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
-  executed_at    TEXT
+  executed_at    TEXT,
+  repeat_every   INTEGER,         -- recurring 'data' schedule: every N ...
+  repeat_unit    TEXT,            -- ... 'day' | 'week' | 'month'; NULL = run once
+  keep_days      INTEGER NOT NULL DEFAULT 0,  -- keep the newest N days of data
+  run_count      INTEGER NOT NULL DEFAULT 0,
+  first_run_at   TEXT             -- anchor of the recurrence (first run_at)
 );
 
 
