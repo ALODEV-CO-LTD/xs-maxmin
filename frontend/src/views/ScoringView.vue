@@ -670,63 +670,11 @@ onMounted(async () => {
   padding: 12px 16px;
   border-radius: 14px;
 }
-.toolbar-mask,
 .toolbar-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-.mask-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  background: var(--surface);
-  border: 1px solid var(--input-border);
-  border-radius: 10px;
-  cursor: pointer;
-}
-.mask-switch.on {
-  color: var(--on-primary);
-  background: var(--primary);
-  border-color: var(--primary);
-}
-/* live countdown + "Hiện trong" choice, next to the switch */
-.mask-countdown {
-  padding: 4px 10px;
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
-  border-radius: 999px;
-}
-.mask-time {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-.mask-time select {
-  min-height: 44px;
-  padding: 0 10px;
-  font-size: 14px;
-  color: var(--text-primary);
-  background: var(--surface);
-  border: 1px solid var(--input-border);
-  border-radius: 10px;
-}
-.mask-state {
-  padding: 1px 8px;
-  font-size: 12px;
-  background: color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 999px;
 }
 .toolbar .btn,
 .more-btn,
