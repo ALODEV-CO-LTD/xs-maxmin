@@ -141,7 +141,10 @@ async function logout() {
 <template>
   <div class="shell">
     <header class="topbar">
-      <div class="brand">XOSO</div>
+      <div class="brand" aria-label="MAMBA">
+        <img class="brand-mark" src="../assets/logo-mark.png" alt="" width="322" height="256" />
+        <img class="brand-word" src="../assets/logo-word.png" alt="MAMBA" width="538" height="64" />
+      </div>
       <div class="topbar-right">
         <SyncStatus />
         <ThemeToggle />
@@ -241,10 +244,17 @@ async function logout() {
 }
 
 .brand {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 20px;
-  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-mark {
+  height: 28px;
+  width: auto;
+}
+.brand-word {
+  height: 13px;
+  width: auto;
 }
 
 .topbar-right {

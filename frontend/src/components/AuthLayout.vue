@@ -19,8 +19,8 @@ defineProps({
     <ThemeToggle class="auth-theme" />
     <main class="auth-card">
       <header class="auth-brand">
-        <div class="auth-logo" aria-hidden="true">XS</div>
-        <h1>XS Maxmin</h1>
+        <img class="auth-logo" src="../assets/logo-full.png" alt="MAMBA" width="655" height="400" />
+        <h1 class="sr-only">MAMBA</h1>
         <p v-if="subtitle" class="auth-subtitle">{{ subtitle }}</p>
       </header>
       <nav v-if="showTabs" class="auth-tabs" aria-label="Tài khoản">
@@ -76,18 +76,18 @@ defineProps({
 }
 
 .auth-logo {
-  width: 48px;
-  height: 48px;
+  display: block;
+  width: min(210px, 70%);
+  height: auto;
   margin: 0 auto 12px;
-  border-radius: 14px;
-  background: var(--primary);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 18px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .auth-brand h1 {
