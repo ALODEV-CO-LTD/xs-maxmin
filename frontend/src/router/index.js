@@ -32,7 +32,7 @@ import ScoringView from '../views/ScoringView.vue'
 import ScoringSettingsView from '../views/ScoringSettingsView.vue'
 import CustomersView from '../views/CustomersView.vue'
 import FriendsView from '../views/FriendsView.vue'
-import FeedbackView from '../views/FeedbackView.vue'
+import { useNotifyStore } from '../stores/notify'
 import PackagesView from '../views/PackagesView.vue'
 import AccountView from '../views/AccountView.vue'
 import AdminUsersView from '../views/admin/UsersView.vue'
@@ -68,7 +68,18 @@ const routes = [
     component: FriendsView,
     meta: { userOnly: true, title: 'Bạn bè & tin nhắn' },
   },
-  { path: '/feedback', name: 'feedback', component: FeedbackView, meta: { userOnly: true, title: 'Phản hồi' } },
+  // Phản hồi is now a popover in the top bar (components/SupportChat.vue); this old address
+  // (message toasts, bookmarks) just opens it on top of the page the person is already on.
+  {
+    path: '/feedback',
+    name: 'feedback',
+    meta: { userOnly: true, title: 'Phản hồi' },
+    component: { render: () => null },
+    beforeEnter: (to, from) => {
+      useNotifyStore().supportOpen = true
+      return from.name ? false : '/'
+    },
+  },
   { path: '/packages', name: 'packages', component: PackagesView, meta: { userOnly: true, title: 'Gói dịch vụ & Thanh toán' } },
   // Payments was merged into /packages (same purchase flow, one page instead of two).
   { path: '/payments', redirect: '/packages' },

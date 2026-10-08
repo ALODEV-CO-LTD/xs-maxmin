@@ -27,6 +27,8 @@ export const useNotifyStore = defineStore('notify', {
     unread: {}, // key -> count
     toasts: [], // { id, title, body, to }
     incomingTick: 0,
+    supportVisible: false, // the popover is on screen right now
+    supportOpen: false, // asks <SupportChat /> to open itself (toast tap, old /feedback link)
     paymentTick: 0, // bumps when Admin decides this user's payment request
     lastIncoming: null, // the last raw event, so views can tell if it is theirs
   }),
@@ -51,7 +53,7 @@ export const useNotifyStore = defineStore('notify', {
       const viewing =
         !document.hidden &&
         ((event.source === 'friend' && r.name === 'friend-thread' && r.params.friendId === event.from) ||
-          (event.source === 'support' && !isAdmin && r.name === 'feedback') ||
+          (event.source === 'support' && !isAdmin && (r.name === 'feedback' || this.supportVisible)) ||
           (event.source === 'support' && isAdmin && r.name === 'admin-messages-thread' && r.params.userId === event.from))
       if (viewing) return
 

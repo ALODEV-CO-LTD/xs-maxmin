@@ -19,6 +19,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import { showConfirm } from '../confirm'
 import AppIcon from './AppIcon.vue'
 import ThemeToggle from './ThemeToggle.vue'
+import SupportChat from './SupportChat.vue'
 import SyncStatus from './SyncStatus.vue'
 import AnnouncementBanner from './AnnouncementBanner.vue'
 import { startSync } from '../offline'
@@ -56,7 +57,6 @@ const userLinks = [
   { name: 'scoring-settings', label: 'Cấu hình tính điểm', icon: 'settings' },
   { name: 'customers', label: 'Khách hàng', icon: 'users' },
   { name: 'friends', label: 'Bạn bè', icon: 'message-circle-more' },
-  { name: 'feedback', label: 'Phản hồi', icon: 'message-square-more' },
   { name: 'packages', label: 'Gói & Thanh toán', icon: 'badge-dollar-sign' },
   { name: 'account', label: 'Tài khoản', icon: 'user' },
 ]
@@ -147,6 +147,7 @@ async function logout() {
       </div>
       <div class="topbar-right">
         <SyncStatus />
+        <SupportChat v-if="!auth.isAdmin" />
         <ThemeToggle />
         <button
           type="button"
@@ -566,7 +567,13 @@ async function logout() {
     padding: 8px 16px;
   }
   .topbar-right {
+    gap: 2px;
+  }
+  .brand {
     gap: 8px;
+  }
+  .brand-word {
+    height: 11px;
   }
   .who {
     padding-right: 8px;
