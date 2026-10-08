@@ -1,5 +1,5 @@
 <!--
-  Auto-lock screen + hide-when-away blur (K09/K40/S02, K32/S10). Mounted once
+  Auto-lock screen (K09/K40/S02). Mounted once
   in App.vue for logged-in users; all logic lives in stores/privacy.js.
   The pages underneath stay mounted (only covered and made inert) so
   half-typed input is not lost. A web page cannot stop screenshots (K33).
@@ -29,14 +29,13 @@ function appRoot() {
 
 function sync() {
   const root = appRoot()
-  document.documentElement.classList.toggle('privacy-away', privacy.away && !privacy.locked)
   if (root) {
     if (privacy.locked) root.setAttribute('inert', '')
     else root.removeAttribute('inert')
   }
 }
 
-watch(() => [privacy.away, privacy.locked], sync, { immediate: true })
+watch(() => privacy.locked, sync, { immediate: true })
 watch(
   () => privacy.locked,
   async (locked) => {
@@ -54,7 +53,6 @@ watch(
 onMounted(() => privacy.start())
 onBeforeUnmount(() => {
   privacy.stop()
-  document.documentElement.classList.remove('privacy-away')
   appRoot()?.removeAttribute('inert')
 })
 
@@ -102,18 +100,8 @@ function logoutNow() {
         <button type="button" class="btn btn-ghost btn-block" @click="logoutNow">Đăng xuất</button>
       </form>
     </div>
-    <div v-else-if="privacy.away" class="pl-veil" aria-hidden="true"></div>
   </Teleport>
 </template>
-
-<style>
-/* Blur the whole app while the page is hidden / unfocused (K32). */
-html.privacy-away #app {
-  filter: blur(18px);
-  pointer-events: none;
-  user-select: none;
-}
-</style>
 
 <style scoped>
 .pl-overlay {
@@ -144,12 +132,5 @@ html.privacy-away #app {
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-secondary);
-}
-/* faint veil on top of the blurred app so nothing sharp shows through */
-.pl-veil {
-  position: fixed;
-  inset: 0;
-  z-index: 290;
-  background: color-mix(in srgb, var(--background) 55%, transparent);
 }
 </style>
