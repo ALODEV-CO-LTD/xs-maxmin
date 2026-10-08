@@ -1,12 +1,11 @@
 // Service worker: keeps the app shell (index.html + hashed JS/CSS assets)
 // available offline. API calls are never cached here - offline data lives in
 // IndexedDB (see src/offline.js).
-const CACHE = 'mamba-shell-v3'
+const CACHE = 'mamba-shell-v4'
 
 // Files at fixed (un-hashed) URLs: pre-cached for offline, but always fetched
 // network-first so a replaced manifest/icon is never stuck behind the cache.
 const FIXED = [
-  '/favicon.svg',
   '/manifest.webmanifest',
   '/favicon.png',
   '/icons/icon-192.png',
