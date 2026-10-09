@@ -1,0 +1,97 @@
+﻿Nhóm,Mã,Yêu cầu / chức năng,Trạng thái trong bảng (cũ),Trạng thái thực tế (cập nhật),Thay đổi,Trên máy chủ thật?,Ghi chú đối chiếu,dev
+Khách hàng,K01,Đăng ký tài khoản,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K02,Dùng thử 30 ngày,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K03,Đăng nhập lớp 1 (tên + mật khẩu),Đã làm,Đã làm,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy",Giới hạn thử sai (khóa 30s tăng dần). Đã sửa lộ tài khoản tồn tại qua thời gian phản hồi (chưa deploy).,
+Khách hàng,K04,Xác thực lớp 2,Một phần,Một phần,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy","Có mật khẩu lớp 2, token tạm dùng một lần (chưa deploy). Chưa có Face ID/sinh trắc.",
+Khách hàng,K05,Mật khẩu dữ liệu riêng,Một phần,Một phần,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy",Chỉ có mật khẩu lớp 2 và mật khẩu xóa. Chưa có mật khẩu riêng cho từng loại dữ liệu nhạy cảm (cần thiết kế).,
+Khách hàng,K06,Đổi mật khẩu,Đã làm,Đã làm,Giữ nguyên,Chỉ có ở bản local (chưa deploy),"Đổi mật khẩu thu hồi phiên khác, chính sách 8 ký tự, giới hạn thử sai (chưa deploy). Hết lỗi đăng xuất oan khi sai mật khẩu.",Sơn
+Khách hàng,K07,Mã khôi phục và đổi mã,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Mã khôi phục hiện một lần, lưu dạng băm, đổi mã ở Tài khoản.",
+Khách hàng,K08,Khôi phục tài khoản,Một phần,Đã làm,Có đổi,"Đã lên máy chủ thật, bản sửa mới chưa deploy","Khôi phục xoay vòng mã, khóa sau 5 lần sai. Bản sửa thu hồi mọi phiên và chống dò tài khoản chưa deploy.",
+Khách hàng,K09,Tự động khóa khi tắt màn hình hoặc hết thời gian,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Tự khóa khi không hoạt động hoặc khi trang bị ẩn; mở khóa bằng mật khẩu.,
+Khách hàng,K10,Quản lý thiết bị và đăng xuất từ xa,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Xem thiết bị đang đăng nhập, đăng xuất từ xa.",
+Khách hàng,K11,Nhập dữ liệu thủ công,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K12,Nhập dữ liệu bằng ảnh OCR,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K13,Nhập dữ liệu bằng tin nhắn,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Nhập từ tin nhắn dán vào, có bảng xem trước và đánh dấu dòng không chắc. Cần mẫu tin nhắn thật để tinh chỉnh bộ phân tích. | Ghi chú cũ: Chưa có mẫu",
+Khách hàng,K14,Tính toán offline,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,"Nhập số và xem lịch sử khi offline, tự đồng bộ khi có mạng. Tính điểm, Khách hàng (thêm/xóa), Nhập kết quả chưa chạy offline.",
+Khách hàng,K15,Lưu dữ liệu kết quả nhập tay,Đã làm,Đã làm,Giữ nguyên,—,,
+Khách hàng,K16,Cú pháp nhập riêng từng khách,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K17,Tìm kiếm dữ liệu,Một phần,Đã làm,Có đổi,Chỉ có ở bản local (chưa deploy),"Tìm theo từ khóa/ngày/hạng mục, không phân biệt dấu. Đã sửa lỗi bỏ sót dữ liệu quá 200 bản ghi (phân trang) - chưa deploy.",
+Khách hàng,K18,Nút copy dữ liệu,Một phần,Đã làm,Có đổi,Chỉ có ở bản local (chưa deploy),Copy đúng dòng đang lọc; giữ số 0 đầu khi dán Excel; có cách dự phòng khi clipboard bị từ chối (chưa deploy).,
+Khách hàng,K19,Quản lý dữ liệu theo khách hàng,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K20,Xóa dữ liệu,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K21,Tạo ID để kết bạn,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K22,Tùy chọn ID theo dãy số,Đã làm,Đã làm,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy","Tự chọn mã 6-12 chữ số, lọc mã dễ đoán (bản lọc chặt hơn chưa deploy).",
+Khách hàng,K23,Nhiều ID ảo trong một tài khoản,Đã làm,Đã làm,Giữ nguyên,Đã lên máy chủ thật,"Nhiều ID ảo, mặc định 5, Admin chỉnh giới hạn, có nhãn.",
+Khách hàng,K24,Xóa ID ảo,Đã làm,Đã làm,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy",Xóa ID. Cách ly mã đã xóa 90 ngày để không bị chiếm lại (chưa deploy).,Sơn
+Khách hàng,K25,Nhắn tin,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K26,Gửi hình ảnh hoặc tệp,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Khách hàng,K27,Gọi thoại,Đã làm,Một phần,Có đổi,Đã lên máy chủ thật,Gọi thoại giữa hai tài khoản chạy; gọi giữa hai mạng khác nhau chưa thông vì chưa cấu hình TURN Cloudflare (thiếu khóa Calls). | Ghi chú cũ: Chưa có gọi ngoài mạng do thiếu cấu hình turn của cf,
+Khách hàng,K28,"Mã hóa tin nhắn, dữ liệu và cuộc gọi",Chưa làm,Chưa làm,Giữ nguyên,—,Nên tách tiêu chí mã hóa đầu cuối khỏi mã hóa dữ liệu lưu trữ.,
+Khách hàng,K29,Xác thực cuộc gọi và chống giả mạo,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,"WebSocket yêu cầu đăng nhập, server chống giả tên người gọi, giới hạn 6 cuộc/phút. Chưa có xác thực đầu cuối.",
+Khách hàng,K30,Đổi giọng nói,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Khách hàng,K31,Không có gọi video,đã làm,đã làm,Giữ nguyên,—,,
+Khách hàng,K32,Ẩn dữ liệu khi ứng dụng chạy nền,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Làm mờ nội dung khi trang bị ẩn hoặc mất focus (trong phạm vi trình duyệt).,
+Khách hàng,K33,Bảo vệ khi chụp màn hình,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,Không thể chặn chụp màn hình tuyệt đối trên web; chỉ có ghi chú giới hạn và làm mờ khi mất focus. Đã loại tính năng định vị.,
+Khách hàng,K34,Cài đặt quyền riêng tư,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Màn hình Cài đặt quyền riêng tư; lưu theo trình duyệt, chưa đồng bộ giữa thiết bị.",
+Khách hàng,K35,Lịch xóa dữ liệu đã lưu,Chưa làm,Đã làm,Có đổi,Chỉ có ở bản local (chưa deploy),"Lịch xóa dữ liệu; bản lặp lại (mỗi N ngày/tuần/tháng, giữ lại N ngày) mới có ở local.",
+Khách hàng,K36,Lịch xóa dữ liệu trao đổi giữa hai người,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Tự xóa tin nhắn/ảnh trong một cuộc trò chuyện sau 1 giờ/1 ngày/7 ngày/30 ngày.,
+Khách hàng,K37,Xóa metadata ảnh trước khi gửi,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Làm sạch EXIF/metadata ảnh ở trình duyệt và máy chủ (JPEG/PNG/WebP); GIF chưa.,
+Khách hàng,K38,Thông báo hoặc tắt đóng dấu ngày giờ và thiết bị,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,Có công tắc giữ/xóa metadata kèm thông báo. Ứng dụng không đóng dấu ngày giờ lên ảnh nên chưa có tùy chọn riêng.,
+Khách hàng,K39,"Quản lý quyền camera, vị trí và thông báo",Chưa làm,Chưa làm,Giữ nguyên,—,,
+Khách hàng,K40,Khóa ứng dụng,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Khóa ứng dụng bằng mật khẩu (xem K09).,
+Khách hàng,K41,Xóa dữ liệu bằng mật khẩu xóa,Một phần,Một phần,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy",Luồng xóa bằng mật khẩu xóa + hộp xác nhận chạy đúng. Đã sửa xóa thiếu tin nhắn Admin (chưa deploy). Chưa có tùy chọn tự xóa sau n lần nhập sai.,
+Khách hàng,K42,Chống người lạ nhập sai ID để xóa dữ liệu,Một phần,Một phần,Giữ nguyên,"Đã lên máy chủ thật, bản sửa mới chưa deploy","Kiểm thử thật: không xóa được dữ liệu người khác, giới hạn thử sai. Đã bịt các chỗ dò mật khẩu còn hở (chưa deploy). Còn: kết bạn không cần chấp nhận.",
+Khách hàng,K43,Góp ý và chăm sóc khách hàng 24/24,Một phần,Một phần,Giữ nguyên,—,,
+Khách hàng,K44,Nút Back rõ ràng,Một phần,Một phần,Giữ nguyên,Chỉ có ở bản local (chưa deploy),"Đã sửa: hộp chi tiết khách có nút đóng và phím Back, nút Quay lại không gây lặp lịch sử. Còn rà: màn khóa, luồng quên mật khẩu.",
+Khách hàng,K45,Trình quản lý nhanh trên PC và điện thoại,Một phần,Một phần,Giữ nguyên,Chỉ có ở bản local (chưa deploy),"Đã có manifest/biểu tượng (cài như ứng dụng), sửa tràn ngang và vùng chạm >=44px. Chưa có ứng dụng native Android/iOS.",
+Admin,A01,"Quản lý tài khoản, trạng thái và thời hạn dùng thử",Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Admin,A02,Quản lý gói sử dụng,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Admin,A03,Khóa và mở khóa tài khoản,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Admin,A04,Quản lý phiên đăng nhập,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Admin xem và thu hồi phiên của từng người dùng.,
+Admin,A05,Quản lý quy tắc ID ảo và giới hạn số lượng,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Admin chỉnh giới hạn số ID ảo (Cài đặt).,
+Admin,A06,Hỗ trợ khôi phục tài khoản,Một phần,Đã làm,Có đổi,Đã lên máy chủ thật,"Admin đặt lại mật khẩu (có chính sách mật khẩu, đăng xuất mọi thiết bị), cấp lại mã khôi phục, gỡ khoá, mật khẩu ngẫu nhiên; ghi nhật ký.",
+Admin,A07,Phân quyền Admin nhiều cấp,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Admin,A08,Chính sách lưu trữ dữ liệu,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Admin,A09,Cấu hình chính sách bảo mật,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Admin,A10,Giám sát hệ thống và thống kê sử dụng,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,Có thống kê và nhật ký bảo mật; chưa có cảnh báo tự động.,
+Admin,A11,Quản lý hỗ trợ khách hàng,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Admin,A12,Cấu hình ứng dụng,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,"Có thông báo và chế độ bảo trì (chỉ hiện banner, không chặn); chưa có cờ bật/tắt tính năng.",
+Admin,A13,Sao lưu và khôi phục hệ thống,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Sao lưu CSDL (VACUUM INTO) và tải về, chỉ Admin.",
+Admin,A14,Thu hồi phiên bị nghi ngờ,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Thu hồi phiên bị nghi ngờ (cùng A04).,
+Admin,A15,Trung tâm hỗ trợ,Đã làm,Đã làm,Giữ nguyên,—,,
+Admin,A16,Gửi thông báo bảo trì và chính sách,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Gửi thông báo bảo trì/chính sách hiện banner cho người dùng.,
+Admin,A17,Quản lý phiên bản ứng dụng,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Admin,A18,Quản lý thanh toán gói dịch vụ,Một phần,Đã làm,Có đổi,Đã lên máy chủ thật,"Mã tham chiếu chuyển khoản, lọc/tìm/phân trang, tổng hợp doanh thu, xuất CSV, lý do từ chối, người dùng huỷ yêu cầu, thông báo kết quả, nhật ký.",
+Hệ thống,S02,Mã hóa dữ liệu khi lưu và truyền,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,"Mật khẩu băm bcrypt, token ký; CSDL SQLite chưa mã hóa khi lưu.",
+Hệ thống,,Khóa sau thời gian chờ,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Khóa sau thời gian chờ (xem K09).,
+Hệ thống,S03,Khóa tạm khi nhập sai,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Khóa tạm tăng dần khi nhập sai (30s đến 15 phút).,
+Hệ thống,S04,Quản lý phiên và thu hồi token,Một phần,Đã làm,Có đổi,"Đã lên máy chủ thật, bản sửa mới chưa deploy","Phiên thiết bị, thu hồi từ xa; thu hồi khi đổi mật khẩu/khôi phục/khóa tài khoản chưa deploy.",
+Hệ thống,S05,Xóa dữ liệu theo lịch,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Tác vụ nền chạy mỗi phút; bản lặp lại chưa deploy.,
+Hệ thống,S06,OCR,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Hệ thống,S07,Đồng bộ dữ liệu,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,"Hàng đợi đồng bộ cho nhập và sửa số liệu, xử lý xung đột. Chưa đồng bộ chat và các trang khác.",
+Hệ thống,S08,Tách dữ liệu giữa các khách hàng,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Hệ thống,S09,Xóa metadata,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Xem K37.,
+Hệ thống,S10,Bảo vệ giao diện trong màn hình đa nhiệm,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Xem K32.,
+Phi chức năng,NFR-01,Màn hình chính phản hồi trong khoảng 2 giây,Chưa đo,"Đã đo, đạt (web)",Có đổi,Đã lên máy chủ thật,"Hiển thị đầu tiên ~184 ms, tải xong ~323 ms, ~658 KB (đo trên máy cục bộ).",
+Phi chức năng,NFR-02,"Nhập, tính toán và tìm kiếm khi không có mạng",Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,"Nhập, tìm kiếm khi offline chạy; Tính điểm chưa.",
+Phi chức năng,NFR-03,Băm mật khẩu an toàn,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
+Phi chức năng,NFR-04,Mã hóa khi truyền và khi lưu,Một phần,Một phần,Giữ nguyên,—,,
+Phi chức năng,NFR-05,Bảo vệ quyền riêng tư,Một phần,Một phần,Giữ nguyên,—,Nội dung yêu cầu này do SRS v2 đề xuất thêm vì bản 1.0 để trống; cần duyệt.,
+Phi chức năng,NFR-06,"Xử lý mất mạng, thử lại và phục hồi lỗi",Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,Hàng đợi thử lại và đồng bộ khi có mạng; chưa phủ hết các trang.,
+Phi chức năng,NFR-07,Nhật ký sự kiện bảo mật,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Bảng nhật ký bảo mật (đăng nhập sai, khóa, thu hồi phiên, xóa dữ liệu...), Admin xem trong Cài đặt.",
+Phi chức năng,NFR-08,Khả năng tách và mở rộng dịch vụ,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Phi chức năng,NFR-09,"Nút Back, vùng chạm và thông báo lỗi dễ hiểu",Một phần,Một phần,Giữ nguyên,Chỉ có ở bản local (chưa deploy),Đã nâng vùng chạm và chữ lên 44px/14px ở hầu hết trang; còn chip/huy hiệu nhỏ có chủ ý.,
+Phi chức năng,NFR-10,"Kiểm thử riêng Android, iOS và Web/PC",Mới có web,Mới có web,Giữ nguyên,—,,
+Điểm cần chốt,DC01,Vai trò nhân viên hỗ trợ,Cần xác nhận,Cần xác nhận,Giữ nguyên,—,SRS 1.0 tách nhân viên hỗ trợ và Admin; SRS v2 chưa tách rõ.,
+Điểm cần chốt,DC02,Tiêu chí nghiệm thu cho từng FR,Thiếu trong bảng v2,Thiếu trong bảng v2,Giữ nguyên,—,SRS 1.0 có tiêu chí nghiệm thu cho FR-01 đến FR-25; cần giữ lại khi giao việc.,
+Điểm cần chốt,DC03,Ma trận kiểm thử,Thiếu trong v2,Thiếu trong v2,Giữ nguyên,—,Cần bổ sung các nhóm kiểm thử từ SRS 1.0 trước khi nghiệm thu.,
+Điểm cần chốt,DC04,Phạm vi loại trừ và pháp lý,Chờ quyết định,Chờ quyết định,Giữ nguyên,—,Cần duyệt các quyết định ở mục 3.2 và mục 9 của SRS v2.,
+Bổ sung,—,"Trang Tính điểm: xem lịch sử theo ngày (tổng, lợi nhuận, chip ngày, khoảng ngày)",—,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),Làm theo yêu cầu 07/10.,
+Bổ sung,—,"Ẩn số liệu trên trang Tính điểm, muốn xem phải nhập mật khẩu",—,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),"Che trên màn hình, chưa phải mã hóa lưu trữ.",
+Bổ sung,—,"Xóa chủ động số liệu bất cứ lúc nào (theo ngày/khoảng ngày), cần mật khẩu",—,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),"Có xem trước số bản ghi, ghi nhật ký bảo mật.",
+Bổ sung,—,"Lịch xóa dữ liệu lặp lại (mỗi N ngày/tuần/tháng) + giữ lại N ngày, cần mật khẩu",—,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),"Đã thử ép chạy: xóa đúng, tự dời sang chu kỳ kế.",
+Bổ sung,—,Một ô Tìm kiếm duy nhất ở Bạn bè (lọc bạn + tìm người mới theo tên/tài khoản/mã ID),—,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),Thay cho ô lọc và mục kết bạn bằng mã ID riêng.,
+Bổ sung,—,"Hộp thoại ""Thêm loại đánh"" (tên, tỉ lệ ăn, so khớp, đối chiếu)",—,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),,
+Bổ sung,—,Huy hiệu tin chưa đọc + thông báo tin mới theo thời gian thực,—,Đã làm,Mới thêm,Đã lên máy chủ thật,Lưu trên máy chủ nên không mất khi tải lại.,
+Bổ sung,—,Lịch sử cuộc gọi và cuộc gọi nhỡ,—,Đã làm,Mới thêm,Đã lên máy chủ thật,,
+Bổ sung,—,"Đổi tên miền sang xs.massagehomeriyadh.com, ngắt tên miền cũ",—,Đã làm,Mới thêm,Đã lên máy chủ thật,Tunnel Cloudflare riêng cho tên miền mới.,
