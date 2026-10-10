@@ -392,7 +392,6 @@ const mcNote = ref('')
 const mcCols = ref([]) // [{ station, source, values, issues, complete, headerText }]
 const mcDate = ref('')
 const mcFileInput = ref(null)
-const mcSavingAll = ref(false)
 const mcStationOptions = computed(() => Object.entries(regionOf(region.value).stations || {}).map(([id, name]) => ({ id, name })))
 
 function onMcImageSelected(e) {
@@ -479,29 +478,6 @@ const mcDuplicate = computed(() => {
   const ids = mcCols.value.map((c) => c.station).filter(Boolean)
   return ids.length !== new Set(ids).size
 })
-const mcSavable = computed(() => mcCols.value.length > 0 && !mcDuplicate.value && mcCols.value.every((c) => c.station && c.complete))
-
-async function mcSaveAll() {
-  if (!mcSavable.value) return
-  mcSavingAll.value = true
-  lotteryError.value = ''
-  lotterySaveMsg.value = ''
-  try {
-    for (const col of mcCols.value) {
-      await api.post('/lottery-results', { drawDate: mcDate.value, station: col.station, ...col.values })
-    }
-    const { results } = await api.get(`/lottery-results?date=${mcDate.value}&all=1`)
-    fillResultsForDate(mcDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
-    lotterySaveMsg.value = `Đã lưu kết quả ${mcCols.value.length} đài ngày ${mcDate.value.split('-').reverse().join('/')}.`
-    mcCols.value = []
-    await loadLottery()
-  } catch (err) {
-    lotteryError.value = err.message || 'Không lưu được kết quả'
-  } finally {
-    mcSavingAll.value = false
-  }
-}
-
 function clearLotteryForm() {
   resetLotteryForm(null)
   if (lrOcrPreviewUrl.value) URL.revokeObjectURL(lrOcrPreviewUrl.value)
@@ -607,9 +583,6 @@ function clearLotteryForm() {
             <button type="button" class="btn btn-ghost btn-sm" :disabled="!col.station" @click="mcFill(col)">Điền vào form để sửa</button>
           </div>
           <p v-if="mcDuplicate" class="mc-warn">Hai cột đang trùng một đài, hãy chọn lại.</p>
-          <button type="button" class="btn btn-primary btn-sm" :disabled="!mcSavable || mcSavingAll" @click="mcSaveAll">
-            {{ mcSavingAll ? 'Đang lưu...' : `Lưu kết quả ${mcCols.length} đài này` }}
-          </button>
         </div>
       </div>
 
