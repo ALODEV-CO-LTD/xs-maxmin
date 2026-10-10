@@ -428,10 +428,10 @@ async function removeFromDetail(c) {
               <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(detail.chenhLech)" /></dd>
             </div>
           </dl>
-          <details v-if="detail.rosterId && rosterRow" class="cd-config">
-            <summary>Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</summary>
+          <section v-if="detail.rosterId && rosterRow" class="cd-config" aria-label="Cấu hình tính điểm của khách này">
+            <h3 class="cd-config-title">Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</h3>
             <CustomerScoringConfig :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
-          </details>
+          </section>
           <div class="cd-copy">
             <label class="cd-copy-date">
               Ngày
@@ -476,19 +476,15 @@ async function removeFromDetail(c) {
   color: var(--muted);
 }
 .cd-config {
-  margin-bottom: 16px;
-  padding: 10px 12px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  margin: 4px 0 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
-.cd-config summary {
-  font-weight: 600;
-  cursor: pointer;
+.cd-config-title {
+  margin: 0 0 8px;
+  font-size: 17px;
 }
-.cd-config[open] summary {
-  margin-bottom: 10px;
-}
+
 .add-customer-card {
   margin-bottom: 16px;
 }
@@ -595,9 +591,9 @@ async function removeFromDetail(c) {
 }
 .cd-box {
   width: 100%;
-  max-width: 420px;
+  max-width: 920px;
   margin: auto;
-  padding: 24px;
+  padding: 28px;
   background: var(--card);
   border: 1px solid var(--input-border);
   border-radius: 16px;
@@ -983,5 +979,11 @@ async function removeFromDetail(c) {
 }
 .mask-row {
   margin-bottom: 12px;
+}
+/* Wide dialog: the four figures on one row. */
+@media (min-width: 720px) {
+  .cd-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 </style>
