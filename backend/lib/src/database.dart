@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
 
@@ -70,6 +71,12 @@ void _migrateSchema(Database db) {
   // fall back to the 'de' default in the frontend.
   _ensureColumn(db, 'data_entries', 'bet_type', 'TEXT');
   _ensureColumn(db, 'customers', 'phone', 'TEXT');
+  // Which lottery this customer plays by default (Nhập số): 'mb', 'mt', 'mn' (all stations of that
+  // region drawing that day) or one station id. NULL = Miền Bắc.
+  _ensureColumn(db, 'customers', 'default_station', 'TEXT');
+  // Station (đài) of an entry: 'mb' / region code / station id; NULL = Miền Bắc (older entries).
+  _ensureColumn(db, 'data_entries', 'station', 'TEXT');
+  _migrateLotteryResults(db);
   // Per-customer scoring override (JSON map typeKey -> {rate, tiers, digits}); NULL = follow the account's settings.
   _ensureColumn(db, 'customers', 'scoring_rates', 'TEXT');
   // Per-user payout-rate config ("tỉ lệ ăn"): JSON object of
@@ -376,20 +383,18 @@ void _createSchema(Database db) {
   // Each prize tier is stored as a JSON array of its numbers (as printed,
   // left-to-right/top-to-bottom) even when it only holds one value, so
   // every tier is read the same way.
+  // Since stations (đài) exist there is one result per (date, station): 'mb' for Miền Bắc, a station id
+  // such as 'mn-tphcm' for Miền Nam / Miền Trung (lib/src/lottery_stations.dart). `data` holds the
+  // prize map {dacBiet, giaiNhat, giaiNhi[], ... giaiTam[]} as JSON (the prize structure differs by region).
   db.execute('''
     CREATE TABLE IF NOT EXISTS lottery_results (
       id TEXT PRIMARY KEY,
-      draw_date TEXT NOT NULL UNIQUE,
-      dac_biet TEXT NOT NULL,
-      giai_nhat TEXT NOT NULL,
-      giai_nhi TEXT NOT NULL,
-      giai_ba TEXT NOT NULL,
-      giai_tu TEXT NOT NULL,
-      giai_nam TEXT NOT NULL,
-      giai_sau TEXT NOT NULL,
-      giai_bay TEXT NOT NULL,
+      draw_date TEXT NOT NULL,
+      station TEXT NOT NULL DEFAULT 'mb',
+      data TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (draw_date, station)
     );
   ''');
 
@@ -524,6 +529,40 @@ void _seed(Database db) {
       VALUES (?, ?, 'purchase', ?, ?, ?)
       ''',
       [_uuid.v4(), id, pkg.wireValue, plan.priceVnd, startedAt.toIso8601String()],
+    );
+  }
+}
+
+/// Moves the old one-result-per-day table (fixed Miền Bắc columns) to the per-station JSON layout.
+void _migrateLotteryResults(Database db) {
+  final cols = db.select('PRAGMA table_info(lottery_results)').map((r) => r['name']).toSet();
+  if (cols.isEmpty || cols.contains('station')) return;
+  db.execute('ALTER TABLE lottery_results RENAME TO lottery_results_legacy');
+  db.execute('''
+    CREATE TABLE lottery_results (
+      id TEXT PRIMARY KEY,
+      draw_date TEXT NOT NULL,
+      station TEXT NOT NULL DEFAULT 'mb',
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (draw_date, station)
+    );
+  ''');
+  for (final r in db.select('SELECT * FROM lottery_results_legacy')) {
+    final data = jsonEncode({
+      'dacBiet': r['dac_biet'],
+      'giaiNhat': r['giai_nhat'],
+      'giaiNhi': jsonDecode(r['giai_nhi'] as String),
+      'giaiBa': jsonDecode(r['giai_ba'] as String),
+      'giaiTu': jsonDecode(r['giai_tu'] as String),
+      'giaiNam': jsonDecode(r['giai_nam'] as String),
+      'giaiSau': jsonDecode(r['giai_sau'] as String),
+      'giaiBay': jsonDecode(r['giai_bay'] as String),
+    });
+    db.execute(
+      "INSERT INTO lottery_results (id, draw_date, station, data, created_at, updated_at) VALUES (?, ?, 'mb', ?, ?, ?)",
+      [r['id'], r['draw_date'], data, r['created_at'], r['updated_at'] ?? r['created_at']],
     );
   }
 }

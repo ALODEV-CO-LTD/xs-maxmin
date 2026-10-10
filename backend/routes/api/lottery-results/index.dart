@@ -3,28 +3,20 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/lottery_stations.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// The official Miền Bắc lottery draw for a given day. This is a shared,
-/// public fact (not scoped to a user) - any logged-in user may read or
-/// upsert it, since it's the same real-world number for everyone and the
-/// point is to let whoever sees the result first record it for the rest.
+/// Official lottery draws, one result per (date, station): Miền Bắc ('mb') or a Miền Nam / Miền
+/// Trung station such as 'mn-tphcm' (lib/src/lottery_stations.dart; Miền Bắc has 8 prize groups,
+/// Miền Nam/Trung 9 with a 6-digit special prize and an eighth prize). A draw is a shared, public
+/// fact (not scoped to a user): whoever enters it first makes it available to everyone, and
+/// anyone can correct it afterward (upsert by date + station).
 ///
-/// GET    ?date=YYYY-MM-DD  -> { result: {...} | null }
-/// POST   { drawDate, dacBiet, giaiNhat, giaiNhi[2], giaiBa[6], giaiTu[4],
-///          giaiNam[6], giaiSau[3], giaiBay[4] } -> upsert by drawDate
-/// DELETE ?date=YYYY-MM-DD  -> removes that day's result (e.g. it was
-///          entered for the wrong date) - { ok: true } either way, deleting
-///          a date with nothing saved is not an error.
-const _tierCounts = {
-  'giaiNhi': 2,
-  'giaiBa': 6,
-  'giaiTu': 4,
-  'giaiNam': 6,
-  'giaiSau': 3,
-  'giaiBay': 4,
-};
-
+/// GET    ?date=YYYY-MM-DD[&station=mb]  -> { result: {...} | null }   (station defaults to 'mb')
+/// GET    ?date=YYYY-MM-DD&all=1         -> { results: [{...}, ...] }  every station saved that day
+/// POST   { drawDate, station?, dacBiet, giaiNhat, giaiNhi[], ... } -> upsert (counts and digit
+///        lengths are checked against the station's region)
+/// DELETE ?date=YYYY-MM-DD[&station=mb] -> removes that result ({ ok: true } even if none)
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
@@ -39,34 +31,34 @@ Future<Response> onRequest(RequestContext context) async {
 
 Map<String, dynamic> _rowToJson(Row r) => {
       'drawDate': r['draw_date'],
-      'dacBiet': r['dac_biet'],
-      'giaiNhat': r['giai_nhat'],
-      'giaiNhi': jsonDecode(r['giai_nhi'] as String),
-      'giaiBa': jsonDecode(r['giai_ba'] as String),
-      'giaiTu': jsonDecode(r['giai_tu'] as String),
-      'giaiNam': jsonDecode(r['giai_nam'] as String),
-      'giaiSau': jsonDecode(r['giai_sau'] as String),
-      'giaiBay': jsonDecode(r['giai_bay'] as String),
+      'station': r['station'],
+      ...(jsonDecode(r['data'] as String) as Map<String, dynamic>),
       'updatedAt': r['updated_at'],
     };
 
 Response _get(RequestContext context) {
-  final date = context.request.uri.queryParameters['date'];
+  final qp = context.request.uri.queryParameters;
+  final date = qp['date'];
   if (date == null || date.isEmpty) {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu ngày (date)'});
   }
   final db = context.read<Database>();
-  final rows = db.select('SELECT * FROM lottery_results WHERE draw_date = ?', [date]);
+  if (qp['all'] == '1') {
+    final rows = db.select('SELECT * FROM lottery_results WHERE draw_date = ? ORDER BY station', [date]);
+    return Response.json(body: {'results': [for (final r in rows) _rowToJson(r)]});
+  }
+  final station = qp['station'] ?? 'mb';
+  final rows = db.select('SELECT * FROM lottery_results WHERE draw_date = ? AND station = ?', [date, station]);
   return Response.json(body: {'result': rows.isEmpty ? null : _rowToJson(rows.first)});
 }
 
 Response _delete(RequestContext context) {
-  final date = context.request.uri.queryParameters['date'];
+  final qp = context.request.uri.queryParameters;
+  final date = qp['date'];
   if (date == null || date.isEmpty) {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu ngày (date)'});
   }
-  final db = context.read<Database>();
-  db.execute('DELETE FROM lottery_results WHERE draw_date = ?', [date]);
+  context.read<Database>().execute('DELETE FROM lottery_results WHERE draw_date = ? AND station = ?', [date, qp['station'] ?? 'mb']);
   return Response.json(body: {'ok': true});
 }
 
@@ -88,67 +80,41 @@ Future<Response> _upsert(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Ngày không hợp lệ'});
   }
 
-  final dacBiet = (body['dacBiet'] as String?)?.trim();
-  final giaiNhat = (body['giaiNhat'] as String?)?.trim();
-  if (dacBiet == null || dacBiet.isEmpty || giaiNhat == null || giaiNhat.isEmpty) {
-    return Response.json(statusCode: 400, body: {'error': 'Thiếu giải đặc biệt hoặc giải nhất'});
+  final station = (body['station'] as String?)?.trim() ?? 'mb';
+  if (!isResultStation(station)) {
+    return Response.json(statusCode: 400, body: {'error': 'Đài không hợp lệ'});
   }
+  final region = regionOf(station)!;
 
-  final tiers = <String, List<String>>{};
-  for (final entry in _tierCounts.entries) {
-    final raw = body[entry.key];
-    if (raw is! List) {
-      return Response.json(statusCode: 400, body: {'error': 'Thiếu dữ liệu ${entry.key}'});
+  // Every prize group of the region must be present with the right count and digit length.
+  final data = <String, dynamic>{};
+  for (final prize in region.structure) {
+    final raw = body[prize.tier];
+    final values = raw is List ? raw.map((v) => (v?.toString() ?? '').trim()).toList() : [raw?.toString().trim() ?? ''];
+    if (values.length != prize.count || values.any((v) => v.isEmpty)) {
+      return Response.json(statusCode: 400, body: {'error': '${prize.label} phải có đủ ${prize.count} số'});
     }
-    final values = raw.map((v) => (v as String?)?.trim() ?? '').toList();
-    if (values.length != entry.value || values.any((v) => v.isEmpty)) {
-      return Response.json(
-        statusCode: 400,
-        body: {'error': '${entry.key} phải có đủ ${entry.value} số'},
-      );
+    final bad = values.where((v) => !RegExp('^\\d{${prize.digits}}\$').hasMatch(v));
+    if (bad.isNotEmpty) {
+      return Response.json(statusCode: 400, body: {'error': '${prize.label}: mỗi số phải có đúng ${prize.digits} chữ số'});
     }
-    tiers[entry.key] = values;
+    // The special and first prize are single strings (as before); every other group is a list.
+    data[prize.tier] = (prize.tier == 'dacBiet' || prize.tier == 'giaiNhat') ? values.first : values;
   }
 
   final db = context.read<Database>();
   final now = DateTime.now().toUtc().toIso8601String();
-  final existing = db.select('SELECT id, created_at FROM lottery_results WHERE draw_date = ?', [drawDate]);
+  final existing = db.select('SELECT id, created_at FROM lottery_results WHERE draw_date = ? AND station = ?', [drawDate, station]);
   final id = existing.isEmpty ? newId() : existing.first['id'] as String;
   final createdAt = existing.isEmpty ? now : existing.first['created_at'] as String;
-
   db.execute(
     '''
-    INSERT INTO lottery_results (
-      id, draw_date, dac_biet, giai_nhat, giai_nhi, giai_ba, giai_tu, giai_nam, giai_sau, giai_bay,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (draw_date) DO UPDATE SET
-      dac_biet = excluded.dac_biet,
-      giai_nhat = excluded.giai_nhat,
-      giai_nhi = excluded.giai_nhi,
-      giai_ba = excluded.giai_ba,
-      giai_tu = excluded.giai_tu,
-      giai_nam = excluded.giai_nam,
-      giai_sau = excluded.giai_sau,
-      giai_bay = excluded.giai_bay,
-      updated_at = excluded.updated_at
+    INSERT INTO lottery_results (id, draw_date, station, data, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT (draw_date, station) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
     ''',
-    [
-      id,
-      drawDate,
-      dacBiet,
-      giaiNhat,
-      jsonEncode(tiers['giaiNhi']),
-      jsonEncode(tiers['giaiBa']),
-      jsonEncode(tiers['giaiTu']),
-      jsonEncode(tiers['giaiNam']),
-      jsonEncode(tiers['giaiSau']),
-      jsonEncode(tiers['giaiBay']),
-      createdAt,
-      now,
-    ],
+    [id, drawDate, station, jsonEncode(data), createdAt, now],
   );
-
-  final saved = db.select('SELECT * FROM lottery_results WHERE draw_date = ?', [drawDate]);
+  final saved = db.select('SELECT * FROM lottery_results WHERE draw_date = ? AND station = ?', [drawDate, station]);
   return Response.json(body: {'result': _rowToJson(saved.first)});
 }

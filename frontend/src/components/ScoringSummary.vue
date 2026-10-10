@@ -4,22 +4,23 @@
     (2) Lô trúng: how many lô hit, which ones, the money;
     (3) Còn lại = (1) - (2), over the days that already have a lottery result.
   Figures hide behind "••••" while "Ẩn số liệu" is on (stores/mask.js).
-  Props: days [{date, entries}], accountRates, customerRates, lotteryByDate {date: result|null|undefined}
+  Props: days [{date, entries}], accountRates, customerRates, getResult(date, station)
 -->
 <script setup>
 import { computed, ref } from 'vue'
 import MaskedValue from './MaskedValue.vue'
 import { betTypeLabel } from '../betTypes'
 import { summarize } from '../scoringSummary'
+import { stationName } from '../lotteryStations'
 
 const props = defineProps({
   days: { type: Array, required: true },
   accountRates: { type: Object, required: true },
   customerRates: { type: Object, default: null },
-  lotteryByDate: { type: Object, required: true },
+  getResult: { type: Function, required: true }, // (date, station) -> result | null | undefined
 })
 
-const s = computed(() => summarize(props.days, props.accountRates, props.customerRates, props.lotteryByDate))
+const s = computed(() => summarize(props.days, props.accountRates, props.customerRates, props.getResult))
 const showWon = ref(false)
 const nf = new Intl.NumberFormat('vi-VN')
 const money = (n) => `${nf.format(Math.round(n))} đ`
@@ -66,7 +67,7 @@ const sign = (n) => (n > 0 ? '+' : '')
       <ul v-if="showWon" class="won-list">
         <li v-for="(w, i) in s.won.items" :key="i">
           <span class="won-num"><MaskedValue :text="w.number" /></span>
-          <span class="won-meta">{{ betTypeLabel(w.type) }} · {{ fmtDate(w.date) }}<template v-if="w.hits > 1"> · trúng {{ w.hits }} lần</template></span>
+          <span class="won-meta">{{ betTypeLabel(w.type) }} · {{ fmtDate(w.date) }}<template v-if="w.station && w.station !== 'mb'"> · {{ stationName(w.station) }}</template><template v-if="w.hits > 1"> · trúng {{ w.hits }} lần</template></span>
           <strong><MaskedValue :text="money(w.money)" /></strong>
         </li>
       </ul>

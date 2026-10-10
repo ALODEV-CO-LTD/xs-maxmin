@@ -12,6 +12,7 @@ const validTiers = [
   'giaiNam',
   'giaiSau',
   'giaiBay',
+  'giaiTam', // Miền Nam / Miền Trung only (eighth prize); ignored for a Miền Bắc result
 ];
 
 const minDigits = 1;

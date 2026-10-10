@@ -39,6 +39,8 @@ import ModalDialog from '../components/ModalDialog.vue'
 import DeleteDataDialog from '../components/DeleteDataDialog.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
 import { effectiveConfig, DEFAULT_RATES } from '../scoringConfig'
+import { entryDetail } from '../scoringSummary'
+import { entryStations, loadStations, stationLabel } from '../lotteryStations'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { loadAllEntries } from '../offline'
@@ -134,7 +136,11 @@ watch([selectedCustomer, dateFrom, dateTo, onlyMissing], () => {
 
 // ---- Grouping by day -------------------------------------------------------
 
-const lotteryCache = reactive({}) // date -> result | null, avoids refetching the same day twice
+// `${date}|${station}` -> result | null: one draw per date and station (đài); avoids refetching the same one twice.
+const lotteryCache = reactive({})
+const lrKey = (date, station) => `${date}|${station}`
+const stationsOfEntry = (e) => entryStations(e)
+const getResult = (date, station) => lotteryCache[lrKey(date, station)]
 // entry.id -> { state: 'computing'|'no-lottery'|'saved'|'error', value, error }
 const resultStatus = reactive({})
 
@@ -148,10 +154,18 @@ const rangeEntries = computed(() => {
   })
 })
 
-// 'yes' | 'no' | undefined (not looked up yet)
-function lotteryState(date) {
-  if (!(date in lotteryCache)) return undefined
-  return lotteryCache[date] ? 'yes' : 'no'
+// For one day: 'yes' = every station its entries are on has a result, 'partial' = only some, 'no' = none,
+// undefined = not looked up yet.
+function lotteryState(date, list) {
+  const keys = new Set()
+  for (const e of list) for (const st of stationsOfEntry(e)) keys.add(lrKey(date, st))
+  if (!keys.size) return undefined
+  let have = 0
+  for (const k of keys) {
+    if (!(k in lotteryCache)) return undefined
+    if (lotteryCache[k]) have++
+  }
+  return have === keys.size ? 'yes' : have > 0 ? 'partial' : 'no'
 }
 
 // Collapsed days are summed from an in-memory calculation (no request, no
@@ -159,8 +173,9 @@ function lotteryState(date) {
 function entryOut(e) {
   const st = resultStatus[e.id]
   if (st?.state === 'saved') return st.value
-  const lr = lotteryCache[e.entryDate]
-  return lr ? scoreEntry(e, lr) : toNumber(e.result)
+  const stations = stationsOfEntry(e)
+  const known = stations.filter((st) => lotteryCache[lrKey(e.entryDate, st)])
+  return known.length ? scoreEntryAll(e, known.map((st) => lotteryCache[lrKey(e.entryDate, st)])) : toNumber(e.result)
 }
 
 // Every day in range, newest first, with its figures. `settled` = a lottery
@@ -175,14 +190,14 @@ const allDays = computed(() => {
     .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
     .map((date) => {
       const list = map.get(date)
-      const lot = lotteryState(date)
+      const lot = lotteryState(date, list)
       let totalIn = 0
       let totalOut = 0
       for (const e of list) {
         totalIn += toNumber(e.score)
         totalOut += entryOut(e)
       }
-      return { date, entries: list, lottery: lot, settled: lot === 'yes', totalIn, totalOut, profit: totalOut - totalIn }
+      return { date, entries: list, lottery: lot, settled: lot === 'yes' || lot === 'partial', totalIn, totalOut, profit: totalOut - totalIn }
     })
 })
 
@@ -254,64 +269,40 @@ function digitsFor(betType) {
   return configFor(betType)?.digits ?? 2
 }
 
-function normDigits(str, count) {
-  const digits = String(str || '').replace(/\D/g, '')
-  if (!digits) return ''
-  return digits.slice(-count).padStart(count, '0')
-}
-
-// Only the numbers from the tiers this bet type is configured to check
-// (e.g. đề -> just "dacBiet"), not always all 27 - see PUT
-// /me/scoring-settings.
-function numbersForTiers(r, tiers) {
-  const byTier = {
-    dacBiet: [r.dacBiet],
-    giaiNhat: [r.giaiNhat],
-    giaiNhi: r.giaiNhi,
-    giaiBa: r.giaiBa,
-    giaiTu: r.giaiTu,
-    giaiNam: r.giaiNam,
-    giaiSau: r.giaiSau,
-    giaiBay: r.giaiBay,
-  }
-  return tiers.flatMap((t) => byTier[t] || [])
-}
-
-async function fetchLotteryFor(date) {
-  if (date in lotteryCache) return lotteryCache[date]
+async function fetchLotteryFor(date, station = 'mb') {
+  const key = lrKey(date, station)
+  if (key in lotteryCache) return lotteryCache[key]
   try {
-    const { result } = await api.get(`/lottery-results?date=${date}`)
-    lotteryCache[date] = result
+    const { result } = await api.get(`/lottery-results?date=${date}&station=${encodeURIComponent(station)}`)
+    lotteryCache[key] = result
     return result
   } catch (_) {
-    lotteryCache[date] = null
+    lotteryCache[key] = null
     return null
   }
 }
 
-// Pure calculation (no network): points out for one entry against a day's result.
-function scoreEntry(entry, lr) {
+// Points out for one entry over every given result (one per station it counts for): the sum.
+function scoreEntryAll(entry, results) {
   const config = configFor(entry.betType)
-  const digits = config.digits || 2
-  const trailing = numbersForTiers(lr, config.tiers).map((n) => n.slice(-digits))
-  const bets = (entry.value || '')
-    .split(/[,;\s]+/)
-    .map((v) => normDigits(v, digits))
-    .filter(Boolean)
-  let matches = 0
-  for (const b of bets) matches += trailing.filter((x) => x === b).length
-  const score = toNumber(entry.score)
-  return matches > 0 ? score * config.rate * matches : 0
+  let out = 0
+  for (const lr of results) out += entryDetail(entry, lr, config).out
+  return out
 }
 
 async function computeOne(entry) {
   resultStatus[entry.id] = { state: 'computing', value: null }
-  const lr = await fetchLotteryFor(entry.entryDate)
-  if (!lr) {
+  const stations = stationsOfEntry(entry)
+  const results = []
+  for (const st of stations) {
+    const lr = await fetchLotteryFor(entry.entryDate, st)
+    if (lr) results.push(lr)
+  }
+  if (!results.length) {
     resultStatus[entry.id] = { state: 'no-lottery', value: null }
     return
   }
-  const value = scoreEntry(entry, lr)
+  const value = scoreEntryAll(entry, results)
   // Already saved with the same figure -> nothing to write.
   if (entry.result !== null && entry.result !== undefined && entry.result !== '' && toNumber(entry.result) === value) {
     resultStatus[entry.id] = { state: 'saved', value }
@@ -361,10 +352,17 @@ watch(
 let prefetchToken = 0
 async function prefetchLottery() {
   const token = ++prefetchToken
-  const dates = allDays.value.map((d) => d.date).filter((d) => !(d in lotteryCache))
-  const queue = [...dates]
+  const queue = []
+  for (const d of allDays.value) {
+    for (const st of new Set(d.entries.flatMap((e) => stationsOfEntry(e)))) {
+      if (!(lrKey(d.date, st) in lotteryCache)) queue.push([d.date, st])
+    }
+  }
   const worker = async () => {
-    while (queue.length && token === prefetchToken) await fetchLotteryFor(queue.shift())
+    while (queue.length && token === prefetchToken) {
+      const [date, st] = queue.shift()
+      await fetchLotteryFor(date, st)
+    }
   }
   await Promise.all([worker(), worker(), worker(), worker()])
 }
@@ -401,7 +399,7 @@ async function onDeleted(n) {
 }
 
 onMounted(async () => {
-  await Promise.all([load(), loadRates(), loadCustomers()])
+  await Promise.all([load(), loadRates(), loadCustomers(), loadStations()])
 })
 </script>
 
@@ -483,7 +481,7 @@ onMounted(async () => {
         :days="days"
         :account-rates="rates"
         :customer-rates="customerRates"
-        :lottery-by-date="lotteryCache"
+        :get-result="getResult"
       />
 
       <div v-if="!selectedCustomer" class="card empty-state">
@@ -566,6 +564,10 @@ onMounted(async () => {
               </button>
               <div class="day-meta">
                 <span v-if="day.lottery === 'yes'" class="chip chip-ok">Đã có kết quả xổ số</span>
+                <template v-else-if="day.lottery === 'partial'">
+                  <span class="chip chip-warn">Thiếu kết quả của một số đài</span>
+                  <RouterLink :to="{ name: 'results', query: { date: day.date } }" class="tap-link meta-link">Nhập kết quả</RouterLink>
+                </template>
                 <template v-else-if="day.lottery === 'no'">
                   <span class="chip chip-warn">Chưa có kết quả xổ số</span>
                   <RouterLink :to="{ name: 'results', query: { date: day.date } }" class="tap-link meta-link">Nhập kết quả</RouterLink>
@@ -580,6 +582,7 @@ onMounted(async () => {
                 <div class="result-row-top">
                   <span class="chip">{{ betTypeLabel(entry.betType || 'de') }} × {{ rateFor(entry.betType) }}</span>
                   <span class="chip">{{ digitsFor(entry.betType) }} số cuối</span>
+                  <span v-if="entry.station && entry.station !== 'mb'" class="chip">{{ stationLabel(entry.station) }}</span>
                   <span
                     v-if="resultStatus[entry.id]?.state === 'saved' && !masked"
                     class="chip"

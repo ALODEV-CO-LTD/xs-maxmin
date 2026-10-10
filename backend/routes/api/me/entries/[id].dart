@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/lottery_stations.dart';
 import 'package:server/src/database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -62,6 +63,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
           'score': row['score'],
           'result': row['result'],
           'betType': row['bet_type'],
+          'station': row['station'],
           'note': row['note'],
           'createdAt': row['created_at'],
           'updatedAt': currentVersion,
@@ -99,6 +101,9 @@ Future<Response> onRequest(RequestContext context, String id) async {
   final betType = body.containsKey('betType')
       ? (body['betType'] as String?)?.trim()
       : row['bet_type'] as String?;
+  final station = body.containsKey('station')
+      ? (isEntryStation((body['station'] as String?)?.trim() ?? '') ? (body['station'] as String).trim() : null)
+      : row['station'] as String?;
   final note = body.containsKey('note')
       ? (body['note'] as String?)?.trim()
       : row['note'] as String?;
@@ -107,10 +112,10 @@ Future<Response> onRequest(RequestContext context, String id) async {
   db.execute(
     '''
     UPDATE data_entries
-    SET customer_name = ?, entry_date = ?, value = ?, score = ?, result = ?, bet_type = ?, note = ?, updated_at = ?
+    SET customer_name = ?, entry_date = ?, value = ?, score = ?, result = ?, bet_type = ?, station = ?, note = ?, updated_at = ?
     WHERE id = ? AND user_id = ?
     ''',
-    [customerName, entryDate, value, score, result, betType, note, updatedAt, id, auth.userId],
+    [customerName, entryDate, value, score, result, betType, station, note, updatedAt, id, auth.userId],
   );
 
   return Response.json(
@@ -122,6 +127,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
       'score': score,
       'result': result,
       'betType': betType,
+      'station': station,
       'note': note,
       'createdAt': row['created_at'],
       'updatedAt': updatedAt,

@@ -29,6 +29,8 @@ import ModalDialog from '../components/ModalDialog.vue'
 import CustomerScoringConfig from '../components/CustomerScoringConfig.vue'
 import ScoringSettingsView from './ScoringSettingsView.vue'
 import { DEFAULT_RATES } from '../scoringConfig'
+import { allStationOptions, loadStations } from '../lotteryStations'
+import AppSelect from '../components/AppSelect.vue'
 import MaskedValue from '../components/MaskedValue.vue'
 import { mask } from '../stores/mask'
 import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
@@ -77,6 +79,25 @@ async function loadAccountRates() {
 }
 const defaultConfigOpen = ref(route.query.config === 'default')
 const rosterRow = computed(() => roster.value.find((r) => r.id === detail.value?.rosterId) || null)
+// The lottery this customer plays by default: what Nhập số starts from for them.
+const stationSaving = ref(false)
+const stationMsg = ref('')
+async function saveDefaultStation(code) {
+  const row = rosterRow.value
+  if (!row) return
+  stationSaving.value = true
+  stationMsg.value = ''
+  try {
+    const res = await api.patch(`/me/customers/${row.id}`, { defaultStation: code })
+    row.defaultStation = res.defaultStation
+    stationMsg.value = 'Đã lưu đài mặc định'
+  } catch (err) {
+    stationMsg.value = err instanceof ApiError ? err.message : 'Không lưu được đài'
+  } finally {
+    stationSaving.value = false
+  }
+}
+onMounted(loadStations)
 function onCustomerConfigSaved(map) {
   const row = rosterRow.value
   if (row) row.scoringRates = map
@@ -428,6 +449,15 @@ async function removeFromDetail(c) {
               <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(detail.chenhLech)" /></dd>
             </div>
           </dl>
+          <section v-if="detail.rosterId && rosterRow" class="cd-station" aria-label="Đài mặc định">
+            <label class="cd-station-label">Đài xổ số mặc định khi nhập số cho khách này</label>
+            <div class="cd-station-row">
+              <AppSelect :model-value="rosterRow.defaultStation || 'mb'" aria-label="Đài mặc định" @update:model-value="saveDefaultStation">
+                <option v-for="o in allStationOptions()" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </AppSelect>
+              <span v-if="stationMsg" class="muted-note" role="status">{{ stationMsg }}</span>
+            </div>
+          </section>
           <section v-if="detail.rosterId && rosterRow" class="cd-config" aria-label="Cấu hình tính điểm của khách này">
             <h3 class="cd-config-title">Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</h3>
             <CustomerScoringConfig :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
@@ -474,6 +504,22 @@ async function removeFromDetail(c) {
 .config-hint {
   font-size: 13px;
   color: var(--muted);
+}
+.cd-station {
+  margin: 0 0 14px;
+}
+.cd-station-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cd-station-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  max-width: 460px;
 }
 .cd-config {
   margin: 4px 0 18px;

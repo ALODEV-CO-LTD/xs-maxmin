@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/lottery_stations.dart';
 import 'package:server/src/entry_list.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -48,6 +49,7 @@ Future<Response> _create(RequestContext context, String userId) async {
   final score = (body['score'] as String?)?.trim();
   final result = (body['result'] as String?)?.trim();
   final betType = (body['betType'] as String?)?.trim();
+  final station = _station(body['station']);
   if (value == null || value.isEmpty) {
     return Response.json(statusCode: 400, body: {'error': 'Vui lòng nhập số liệu'});
   }
@@ -111,10 +113,10 @@ Future<Response> _create(RequestContext context, String userId) async {
   final createdAt = now.toIso8601String();
   db.execute(
     '''
-    INSERT INTO data_entries (id, user_id, customer_name, entry_date, value, score, result, bet_type, note, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO data_entries (id, user_id, customer_name, entry_date, value, score, result, bet_type, station, note, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''',
-    [id, userId, customerName, entryDate, value, score, result, betType, note, createdAt, createdAt],
+    [id, userId, customerName, entryDate, value, score, result, betType, station, note, createdAt, createdAt],
   );
   db.execute('UPDATE users SET data_used = data_used + 1 WHERE id = ?', [userId]);
 
@@ -128,11 +130,18 @@ Future<Response> _create(RequestContext context, String userId) async {
       'score': score,
       'result': result,
       'betType': betType,
+      'station': station,
       'note': note,
       'createdAt': createdAt,
       'updatedAt': createdAt,
     },
   );
+}
+
+/// An entry's station: 'mb', a region code or a station id; anything else (or absent) = null (Miền Bắc).
+String? _station(Object? raw) {
+  final s = raw is String ? raw.trim() : '';
+  return s.isNotEmpty && isEntryStation(s) ? s : null;
 }
 
 Map<String, Object?> _entryJson(Row r) => {
@@ -143,6 +152,7 @@ Map<String, Object?> _entryJson(Row r) => {
       'score': r['score'],
       'result': r['result'],
       'betType': r['bet_type'],
+      'station': r['station'],
       'note': r['note'],
       'createdAt': r['created_at'],
       'updatedAt': r['updated_at'] ?? r['created_at'],

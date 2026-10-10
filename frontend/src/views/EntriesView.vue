@@ -26,6 +26,7 @@ import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
 import { customerBetTypes } from '../scoringConfig'
+import { loadStations, stationLabel, stationOptions } from '../lotteryStations'
 import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
 import { aliasesToText, fold, parseMessage, textToAliases, DEFAULT_STAKE_MARKERS } from '../messageParser'
@@ -78,8 +79,15 @@ const betTypes = computed(() => {
 const form = reactive({
   customerName: '',
   entryDate: today(),
+  // Đài (lottery) these numbers are for: 'mb', a region ('mn' / 'mt' = every station drawing that day) or one station.
+  // Starts from the customer's own default (Khách hàng > Xem chi tiết).
+  station: 'mb',
   note: '',
 })
+const stationChoices = computed(() => stationOptions(form.entryDate))
+const customerDefaultStation = computed(() => customers.value.find((c) => c.name === form.customerName)?.defaultStation || 'mb')
+watch(customerDefaultStation, (v) => (form.station = v), { immediate: true })
+onMounted(loadStations)
 // Manual entry: a flat list of rows, each = (hạng mục, số, điểm vào). Every
 // filled-in row becomes its own data_entries row on submit (value=<số>,
 // score=<điểm>, betType=<hạng mục>), so two numbers with different stakes
@@ -345,6 +353,7 @@ async function submitForm() {
           entryDate: form.entryDate,
           score: task.row.score.trim() || undefined,
           betType: task.type,
+          station: form.station,
           note: form.note.trim() || undefined,
         })
       )
@@ -666,6 +675,7 @@ async function savePreview() {
           entryDate: form.entryDate,
           score: String(r.score).trim(),
           betType: r.type,
+          station: form.station,
           note: form.note.trim() || undefined,
         })
         entries.value.unshift(res.entry)
@@ -761,6 +771,13 @@ async function deleteTemplate() {
         <form v-if="form.customerName" class="card add-form" @submit.prevent="submitForm">
           <h3 style="margin-top: 0">Thêm số liệu mới</h3>
           <div v-if="formError" class="alert alert-error">{{ formError }}</div>
+
+          <div class="field station-field">
+            <label>Đài</label>
+            <AppSelect v-model="form.station" aria-label="Đài xổ số">
+              <option v-for="o in stationChoices" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </AppSelect>
+          </div>
 
           <div class="ocr-box">
             <input
@@ -1027,7 +1044,7 @@ async function deleteTemplate() {
                     <tr>
                       <td v-if="filters.all" data-label="Khách hàng">{{ entry.customerName }}</td>
                       <td data-label="Ngày">{{ entry.entryDate }}<span v-if="entry.pending" class="chip pending-chip">Chờ đồng bộ</span></td>
-                      <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}</td>
+                      <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}<span v-if="entry.station && entry.station !== 'mb'" class="chip station-tag">{{ stationLabel(entry.station) }}</span></td>
                       <td data-label="Số" class="cell-num"><MaskedValue :text="entry.value" /></td>
                       <td data-label="Điểm vào" class="cell-points"><MaskedValue :text="fmtPoints(entry.score)" /></td>
                       <td data-label="Điểm ra" class="cell-points"><MaskedValue :text="fmtPoints(entry.result)" /></td>
@@ -1126,6 +1143,14 @@ async function deleteTemplate() {
 </template>
 
 <style scoped>
+.station-field {
+  margin-bottom: 12px;
+}
+.station-tag {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+}
 /* K17 filters, K18 copy, K13 paste preview, offline markers */
 .notice-row {
   display: flex;

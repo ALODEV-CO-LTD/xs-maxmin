@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/lottery_stations.dart';
 import 'package:server/src/phone.dart';
 import 'package:server/src/scoring_rates.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -11,7 +12,7 @@ import 'package:sqlite3/sqlite3.dart';
 /// store the name as plain text, not a foreign key) are untouched and
 /// still show up everywhere as before.
 ///
-/// PATCH { phone?, scoringRates? } -> sets (or clears, with '' / null) the customer's phone
+/// PATCH { phone?, scoringRates?, defaultStation? } -> sets (or clears, with '' / null) the customer's phone
 /// number and/or their own scoring config.
 Future<Response> onRequest(RequestContext context, String id) async {
   final method = context.request.method;
@@ -46,6 +47,16 @@ Future<Response> onRequest(RequestContext context, String id) async {
       }
       db.execute('UPDATE customers SET phone = ? WHERE id = ? AND user_id = ?', [phone, id, auth.userId]);
       reply['phone'] = phone;
+    }
+    // Default lottery for this customer's new entries: 'mb', 'mt', 'mn' or a station id; null = Miền Bắc.
+    if (body.containsKey('defaultStation')) {
+      final raw = body['defaultStation'];
+      final code = raw is String ? raw.trim() : '';
+      if (code.isNotEmpty && !isEntryStation(code)) {
+        return Response.json(statusCode: 400, body: {'error': 'Đài không hợp lệ'});
+      }
+      db.execute('UPDATE customers SET default_station = ? WHERE id = ? AND user_id = ?', [code.isEmpty || code == 'mb' ? null : code, id, auth.userId]);
+      reply['defaultStation'] = code.isEmpty || code == 'mb' ? null : code;
     }
     if (body.containsKey('scoringRates')) {
       // null / {} = follow the account's settings again; otherwise this customer's own overrides.

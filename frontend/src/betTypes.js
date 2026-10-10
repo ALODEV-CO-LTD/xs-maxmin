@@ -21,6 +21,7 @@ export const PRIZE_TIERS = [
   { key: 'giaiNam', label: 'Giải năm' },
   { key: 'giaiSau', label: 'Giải sáu' },
   { key: 'giaiBay', label: 'Giải bảy' },
+  { key: 'giaiTam', label: 'Giải tám (MN, MT)' },
 ]
 
 export function tierLabel(key) {
