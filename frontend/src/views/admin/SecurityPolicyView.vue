@@ -21,7 +21,7 @@ const form = reactive({
   loginMaxLockSeconds: 900,
   tokenDays: 30,
   autoLockMinutes: 0,
-  watermarkEnabled: true,
+  watermarkEnabled: false,
   screenshotGuardEnabled: true,
 })
 let saved = ''

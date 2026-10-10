@@ -13,7 +13,8 @@ import 'package:sqlite3/sqlite3.dart';
 ///  - screenshotGuardEnabled: cover the screen when a desktop screenshot shortcut
 ///    (Cmd+Shift+3/4/5, Win+Shift+S) is held (frontend/src/screenshotGuard.js).
 ///  - watermarkEnabled: faint viewer name/time overlay on every screen so a
-///    leaked screenshot can be traced (the web cannot block screenshots).
+///    leaked screenshot can be traced (the web cannot block screenshots). OFF by default;
+///    the Admin turns it on in Chính sách bảo mật.
 class SecurityPolicy {
   const SecurityPolicy({
     this.loginFreeAttempts = 5,
@@ -21,7 +22,7 @@ class SecurityPolicy {
     this.loginMaxLockSeconds = 15 * 60,
     this.tokenDays = 30,
     this.autoLockMinutes = 0,
-    this.watermarkEnabled = true,
+    this.watermarkEnabled = false,
     this.screenshotGuardEnabled = true,
   });
 

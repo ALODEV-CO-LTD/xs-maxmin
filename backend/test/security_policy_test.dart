@@ -15,15 +15,15 @@ Database _db() {
 void main() {
   test('defaults equal the old hard-coded values', () {
     final p = loadPolicy(_db());
-    expect([p.loginFreeAttempts, p.loginBaseLockSeconds, p.loginMaxLockSeconds, p.tokenDays, p.autoLockMinutes, p.watermarkEnabled], [5, 30, 900, 30, 0, true]);
+    expect([p.loginFreeAttempts, p.loginBaseLockSeconds, p.loginMaxLockSeconds, p.tokenDays, p.autoLockMinutes, p.watermarkEnabled], [5, 30, 900, 30, 0, false]);
     expect(p.screenshotGuardEnabled, true);
   });
 
   test('saved values are used; out-of-range stored values fall back', () {
     final db = _db();
-    savePolicy(db, {'loginFreeAttempts': 3, 'tokenDays': 7, 'watermarkEnabled': false, 'autoLockMinutes': 15});
+    savePolicy(db, {'loginFreeAttempts': 3, 'tokenDays': 7, 'watermarkEnabled': true, 'autoLockMinutes': 15});
     var p = loadPolicy(db);
-    expect([p.loginFreeAttempts, p.tokenDays, p.watermarkEnabled, p.autoLockMinutes], [3, 7, false, 15]);
+    expect([p.loginFreeAttempts, p.tokenDays, p.watermarkEnabled, p.autoLockMinutes], [3, 7, true, 15]);
     db.execute("INSERT OR REPLACE INTO settings VALUES ('policy.tokenDays', '99999')");
     p = loadPolicy(db);
     expect(p.tokenDays, 30);
