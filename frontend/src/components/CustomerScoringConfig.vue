@@ -157,7 +157,7 @@ async function save() {
         </span>
       </div>
       <div v-if="!r.disabled" class="csc-fields">
-        <label>Tỉ lệ ăn<input v-model="r.rate" type="number" min="1" step="any" /></label>
+        <label>Tỉ lệ<input v-model="r.rate" type="number" min="1" step="any" /></label>
         <label>So khớp
           <AppSelect v-model.number="r.digits">
             <option v-for="d in digitOptions" :key="d" :value="d">{{ d }} số cuối</option>
@@ -190,50 +190,61 @@ async function save() {
 
 <style scoped>
 .csc-hint {
-  margin: 0 0 10px;
-  font-size: 13px;
+  margin: 0 0 8px;
+  font-size: 12.5px;
   color: var(--muted);
-}
-.csc-row {
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
 }
 .csc-bar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
-.csc-head-actions {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: auto;
-}
-.csc-del {
-  color: var(--danger-text);
-}
-.csc-row.off {
-  opacity: 0.65;
+/* Compact rows: name + figures on one line, the prize groups right under in small type. */
+.csc-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 .csc-row.own {
   border-color: var(--primary);
+}
+.csc-row.off {
+  opacity: 0.6;
 }
 .csc-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  margin-bottom: 8px;
+  gap: 2px 6px;
+  font-size: 14px;
+}
+.csc-head-actions {
+  display: inline-flex;
+  gap: 0;
+  margin-left: auto;
+}
+.csc-head-actions .btn {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12.5px;
+}
+.csc-del {
+  color: var(--danger-text);
 }
 .muted {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 .csc-tag {
-  padding: 1px 8px;
-  font-size: 12px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  line-height: 18px;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -244,49 +255,72 @@ async function save() {
 }
 .csc-fields {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 4px 12px;
 }
 .csc-fields label {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 13px;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .csc-fields input {
-  width: 90px;
-  height: 36px;
-  padding: 0 8px;
+  width: 64px;
+  height: 28px;
+  padding: 0 6px;
   font: inherit;
+  font-size: 13.5px;
   text-align: center;
   color: var(--text-primary);
   background: var(--card);
   border: 1px solid var(--input-border);
-  border-radius: 8px;
+  border-radius: 6px;
+}
+.csc-fields :deep(.app-select),
+.csc-fields :deep(select),
+.csc-fields :deep(.select-trigger),
+.csc-fields :deep(button) {
+  min-height: 28px !important;
+  height: 28px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: 13px !important;
 }
 .csc-tiers {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 2px 12px;
 }
 .csc-tier {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-primary);
   white-space: nowrap;
+}
+.csc-tier input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
 }
 .csc-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px 8px;
+  margin-top: 8px;
 }
 .csc-actions .muted {
   flex: 1;
+}
+@media (max-width: 560px) {
+  .csc-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
