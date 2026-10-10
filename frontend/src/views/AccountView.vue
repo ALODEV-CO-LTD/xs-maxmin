@@ -19,19 +19,22 @@ import AppIcon from '../components/AppIcon.vue'
 import PrivacySettings from '../components/PrivacySettings.vue'
 import RecoveryCodePanel from '../components/RecoveryCodePanel.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
+import AccountStats from '../components/AccountStats.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
 // Sections are split into small tabs (the page used to be one very long scroll).
-const TABS = [
+const ALL_TABS = [
+  { key: 'stats', label: 'Thống kê' },
   { key: 'profile', label: 'Hồ sơ' },
   { key: 'security', label: 'Mật khẩu' },
   { key: 'devices', label: 'Thiết bị & riêng tư' },
   { key: 'data', label: 'Dữ liệu' },
 ]
-const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'profile')
+const TABS = ALL_TABS.filter((t) => t.key !== 'stats' || !auth.isAdmin)
+const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : TABS[0].key)
 function selectTab(key) {
   tab.value = key
   router.replace({ query: { ...route.query, tab: key } })
@@ -649,6 +652,10 @@ async function deleteAllData() {
         <RecoveryCodePanel v-if="!auth.isAdmin" />
         <PrivacySettings />
       </div>
+      </div>
+
+      <div v-if="tab === 'stats'" id="acct-panel-stats" role="tabpanel" aria-labelledby="acct-tab-stats">
+        <AccountStats />
       </div>
 
       <div v-show="tab === 'data'" id="acct-panel-data" role="tabpanel" aria-labelledby="acct-tab-data">
