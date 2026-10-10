@@ -23,7 +23,8 @@ import AttachmentPreview from '../components/AttachmentPreview.vue'
 import ChatRetentionPanel from '../components/ChatRetentionPanel.vue'
 import MessageAttachment from '../components/MessageAttachment.vue'
 import { useChatStore } from '../e2ee/chat'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { onScreenshotAttempt } from '../screenshotGuard'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useCallStore } from '../stores/call'
@@ -217,6 +218,7 @@ async function loadMessages(friendId, { quiet = false } = {}) {
       attachment: m.att,
       createdAt: new Date(m.createdAt).toISOString(),
       mine: m.mine,
+      system: m.sys || null,
       status: m.status,
       reason: m.reason,
     }))
@@ -373,6 +375,12 @@ async function retryMessage(m) {
   await loadMessages(selectedFriendId.value, { quiet: true })
 }
 
+// A screenshot shortcut while this conversation is on screen: warn the friend (best effort).
+const stopShotWatch = onScreenshotAttempt(() => {
+  if (selectedFriend.value && !document.hidden && !auth.isAdmin) chat.notifyScreenshot(selectedFriend.value)
+})
+onBeforeUnmount(stopShotWatch)
+
 const peerInfo = computed(() => chat.peerInfo[selectedFriendId.value] || null)
 const showSecurity = ref(false)
 // Top-bar buttons control the auto-delete panel (ChatRetentionPanel) below the header.
@@ -519,8 +527,13 @@ async function acceptKey() {
             <div v-else-if="timeline.length === 0" class="empty-thread">Chưa có tin nhắn nào.</div>
             <div v-else class="messages">
               <template v-for="item in timeline" :key="item.key">
+                <div v-if="item.kind === 'msg' && item.m.system" class="sys-line" :class="{ failed: item.m.mine && item.m.status === 'failed' }">
+                  <template v-if="item.m.system === 'screenshot'">📷 {{ selectedFriend?.name }} vừa chụp màn hình cuộc trò chuyện này</template>
+                  <template v-else-if="item.m.status === 'failed'">📷 Bạn vừa chụp màn hình, nhưng {{ selectedFriend?.name }} đang offline nên chưa được báo</template>
+                  <template v-else>📷 Bạn vừa chụp màn hình, {{ selectedFriend?.name }} đã được báo</template>
+                </div>
                 <div
-                  v-if="item.kind === 'msg'"
+                  v-else-if="item.kind === 'msg'"
                   class="msg"
                   :class="{ mine: item.m.mine }"
                 >
@@ -663,6 +676,20 @@ async function acceptKey() {
 }
 .thread-title {
   flex: 1;
+}
+.sys-line {
+  align-self: center;
+  margin: 6px 0;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  color: var(--danger-text);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.sys-line.failed {
+  color: var(--text-secondary);
 }
 .thread-tools {
   display: flex;

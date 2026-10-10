@@ -44,9 +44,26 @@ function injectStyle() {
   document.head.appendChild(st)
 }
 
+// Listeners told when a screenshot shortcut is detected (e.g. to warn the chat friend).
+const listeners = new Set()
+export function onScreenshotAttempt(fn) {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+function emitAttempt() {
+  for (const fn of listeners) {
+    try {
+      fn()
+    } catch {
+      /* a listener must never break the guard */
+    }
+  }
+}
+
 function cover() {
   if (!enabled) return
   injectStyle()
+  if (!covered) emitAttempt()
   covered = true
   coveredAt = Date.now()
   freshInput = false
@@ -98,6 +115,7 @@ function onKeyUp(e) {
   if (e.key === 'Meta' || e.key === 'OS') held.meta = false
   if (e.key === 'Shift') held.shift = false
   if (e.key === 'PrintScreen') {
+    covered = false // a PrintScreen always counts as a new attempt
     cover()
     clearClipboard()
     clearTimeout(softTimer)

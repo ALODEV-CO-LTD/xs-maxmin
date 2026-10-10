@@ -32,6 +32,7 @@ let userId = null
 const sessionKeys = new Map() // friendId -> { jwkKey, key }
 const ackTimers = new Map() // message id -> timeout
 const incoming = new Map() // message id -> parts received so far
+const lastShotNotice = new Map() // friend id -> when we last warned them about a screenshot
 
 export const useChatStore = defineStore('e2ee-chat', {
   state: () => ({
@@ -145,10 +146,25 @@ export const useChatStore = defineStore('e2ee-chat', {
       const out = {}
       for (const m of await getAll(db, 'messages')) {
         if (!out[m.peerId] || m.createdAt > out[m.peerId].at) {
-          out[m.peerId] = { at: m.createdAt, text: m.text || (m.att ? `[Đính kèm] ${m.att.name}` : '') }
+          out[m.peerId] = { at: m.createdAt, text: m.sys ? '📷 Chụp màn hình cuộc trò chuyện' : m.text || (m.att ? `[Đính kèm] ${m.att.name}` : '') }
         }
       }
       return out
+    },
+
+    // This person just took (or tried to take) a screenshot with the conversation open: tell
+    // the friend, end-to-end encrypted like any message, and leave a visible line on both
+    // sides. Detection is by the screenshot shortcut (screenshotGuard.js), so it is best effort:
+    // phone hardware buttons and other devices cannot be seen. Sent at most once per 20 s.
+    async notifyScreenshot(friend) {
+      if (!this.ready || !friend?.id || !this.friendKeys[friend.id]) return
+      const last = lastShotNotice.get(friend.id) || 0
+      if (Date.now() - last < 20000) return
+      lastShotNotice.set(friend.id, Date.now())
+      const msg = { id: newMessageId(), peerId: friend.id, mine: true, text: '', att: null, sys: 'screenshot-sent', createdAt: Date.now(), status: 'sending' }
+      await put(db, 'messages', msg)
+      this.tick++
+      await this._transmit(friend.id, msg, null, null)
     },
 
     // Sends `text` and/or one `file` to `friend` ({id, name}). Returns the stored message.
@@ -187,7 +203,7 @@ export const useChatStore = defineStore('e2ee-chat', {
       if (!call.socket || !call.socketReady) return fail('no-socket')
       if (msg.att && !fileBytes) fileBytes = new Uint8Array(await msg.att.blob.arrayBuffer())
       if (msg.att && !att) att = { name: msg.att.name, type: msg.att.type, size: msg.att.size }
-      const plain = packMessage({ text: msg.text, ts: msg.createdAt, att }, fileBytes)
+      const plain = packMessage({ text: msg.text, ts: msg.createdAt, att, kind: msg.sys === 'screenshot-sent' ? 'screenshot' : null }, fileBytes)
       const { iv, ct } = await encryptBytes(key, plain, { from: userId, to: friendId, id: msg.id })
       const parts = Math.max(1, Math.ceil(ct.length / PART_CHARS))
       if (parts > MAX_PARTS) return fail('invalid')
@@ -265,7 +281,16 @@ export const useChatStore = defineStore('e2ee-chat', {
           key = await this._session(msg.from)
           plain = await decryptBytes(key, msg, frame)
         }
-        const { text, ts, att, file } = unpackMessage(plain)
+        const { text, ts, att, file, kind } = unpackMessage(plain)
+        if (kind === 'screenshot') {
+          // The friend took a screenshot of this conversation: show a notice line and alert.
+          await put(db, 'messages', { id: msg.id, peerId: msg.from, mine: false, text: '', att: null, sys: 'screenshot', createdAt: Math.min(ts, Date.now()), status: 'delivered' })
+          useCallStore()._send({ type: 'e2ee-ack', to: msg.from, id: msg.id })
+          this.tick++
+          useNotifyStore().receive({ source: 'friend', from: msg.from, fromName: msg.fromName, preview: 'đã chụp màn hình cuộc trò chuyện với bạn', hasAttachment: false })
+          await this.bumpUnread(msg.from)
+          return
+        }
         // Only pictures are accepted from a friend as well (a modified client could send anything).
         const stored = att && file.length && ALLOWED_IMAGE_TYPES.includes(att.type)
           ? {

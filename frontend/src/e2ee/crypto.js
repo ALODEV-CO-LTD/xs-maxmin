@@ -70,8 +70,9 @@ export async function decryptBytes(key, { iv, ct }, { from, to, id }) {
 
 // Plaintext frame: [4-byte header length][header JSON][raw file bytes]. Keeping the
 // file as raw bytes (not base64) leaves room for a 5 MB file under the relay's cap.
-export function packMessage({ text = '', ts = Date.now(), att = null }, fileBytes = null) {
-  const header = enc.encode(JSON.stringify({ v: 1, t: text, ts, a: att }))
+// `kind` marks a system notice instead of a chat message (e.g. 'screenshot').
+export function packMessage({ text = '', ts = Date.now(), att = null, kind = null }, fileBytes = null) {
+  const header = enc.encode(JSON.stringify({ v: 1, t: text, ts, a: att, ...(kind ? { k: kind } : {}) }))
   const out = new Uint8Array(4 + header.length + (fileBytes ? fileBytes.length : 0))
   new DataView(out.buffer).setUint32(0, header.length)
   out.set(header, 4)
@@ -84,7 +85,7 @@ export function unpackMessage(bytes) {
   if (len > bytes.length - 4) throw new Error('bad frame')
   const header = JSON.parse(dec.decode(bytes.subarray(4, 4 + len)))
   if (header.v !== 1) throw new Error('unsupported version')
-  return { text: String(header.t || ''), ts: Number(header.ts) || Date.now(), att: header.a || null, file: bytes.subarray(4 + len) }
+  return { text: String(header.t || ''), ts: Number(header.ts) || Date.now(), att: header.a || null, kind: header.k ? String(header.k) : null, file: bytes.subarray(4 + len) }
 }
 
 export function newMessageId() {
