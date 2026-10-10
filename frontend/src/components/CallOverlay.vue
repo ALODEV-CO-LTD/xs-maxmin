@@ -160,6 +160,16 @@ watch(
           <button class="btn btn-ghost btn-round" :class="{ active: call.muted }" @click="call.toggleMute()">
             <AppIcon :name="call.muted ? 'mic-off' : 'mic'" />
           </button>
+          <button
+            v-if="call.voiceFxSupported"
+            class="btn btn-ghost"
+            :class="{ active: call.voiceFx }"
+            :aria-pressed="call.voiceFx"
+            title="Làm méo giọng nói của bạn để người kia nghe không đúng giọng thật"
+            @click="call.toggleVoiceFx()"
+          >
+            Méo giọng: {{ call.voiceFx ? 'Bật' : 'Tắt' }}
+          </button>
           <button class="btn btn-danger btn-round" @click="call.endCall()"><AppIcon name="x" /> Kết thúc</button>
         </div>
       </template>

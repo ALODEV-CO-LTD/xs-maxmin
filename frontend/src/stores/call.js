@@ -18,6 +18,7 @@ import { useAuthStore } from './auth'
 import { askNotificationPermission } from '../callSounds'
 import { useNotifyStore } from './notify'
 import { useChatStore } from '../e2ee/chat'
+import { createVoiceChanger, loadVoiceFx, saveVoiceFx } from '../voiceFx'
 
 const STUN_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 const ICE_CACHE_MS = 10 * 60 * 1000
@@ -130,6 +131,9 @@ export const useCallStore = defineStore('call', {
     acquiring: false,
     peer: null, // { id, name }
     muted: false,
+    // "Méo giọng": the other side hears a distorted voice (voiceFx.js). Remembered on this device.
+    voiceFx: loadVoiceFx(),
+    voiceFxSupported: true,
     // True once the callee's phone is ringing ("Đang đổ chuông" instead of "Đang gọi").
     ringing: false,
     // True while a connected call lost its network path and is trying to recover.
@@ -480,8 +484,12 @@ export const useCallStore = defineStore('call', {
       const iceServers = await loadIceServers()
       if (!this.localStream) throw new Error('Cuộc gọi đã kết thúc')
       const pc = new RTCPeerConnection({ iceServers })
-      for (const track of this.localStream.getTracks()) {
-        pc.addTrack(track, this.localStream)
+      // The call sends the voice-changer's output (the raw mic when the effect is off
+      // is passed through untouched), so it can be toggled mid-call.
+      this._voice = createVoiceChanger(this.localStream, this.voiceFx)
+      this.voiceFxSupported = this._voice.supported
+      for (const track of this._voice.stream.getTracks()) {
+        pc.addTrack(track, this._voice.stream)
       }
       pc.onicecandidate = (e) => {
         if (e.candidate && this.peer) {
@@ -615,6 +623,12 @@ export const useCallStore = defineStore('call', {
       this._cleanup()
     },
 
+    toggleVoiceFx() {
+      this.voiceFx = !this.voiceFx
+      saveVoiceFx(this.voiceFx)
+      this._voice?.setEnabled(this.voiceFx)
+    },
+
     toggleMute() {
       if (!this.localStream) return
       this.muted = !this.muted
@@ -639,6 +653,8 @@ export const useCallStore = defineStore('call', {
       this._stopMonitor()
       this.pc?.close()
       this.pc = null
+      this._voice?.stop()
+      this._voice = null
       this.localStream?.getTracks().forEach((t) => t.stop())
       this.localStream = null
       this.remoteStream = null

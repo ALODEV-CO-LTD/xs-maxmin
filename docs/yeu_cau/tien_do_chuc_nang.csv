@@ -28,7 +28,7 @@ Khách hàng,K26,Gửi hình ảnh hoặc tệp,Đã làm,Đã làm,Giữ nguyê
 Khách hàng,K27,Gọi thoại,Đã làm,Một phần,Có đổi,Đã lên máy chủ thật,Gọi thoại giữa hai tài khoản chạy; gọi giữa hai mạng khác nhau chưa thông vì chưa cấu hình TURN Cloudflare (thiếu khóa Calls). | Ghi chú cũ: Chưa có gọi ngoài mạng do thiếu cấu hình turn của cf,
 Khách hàng,K28,"Mã hóa tin nhắn, dữ liệu và cuộc gọi",Chưa làm,Một phần,Có đổi,Bản mới đã lên máy chủ thật,"Chat bạn bè mã hóa 2 đầu (ECDH P-256 + AES-GCM), máy chủ chỉ relay khi cả hai online và không lưu; ảnh/tệp mã hóa; lịch sử chỉ trên thiết bị. Cuộc gọi là WebRTC (DTLS-SRTP, mã hóa 2 đầu). Chưa làm: phản hồi Admin, dữ liệu số liệu/khách hàng (chờ app), bí mật chuyển tiếp. Xem docs/MA_HOA_2_DAU.md.",
 Khách hàng,K29,Xác thực cuộc gọi và chống giả mạo,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,"WebSocket yêu cầu đăng nhập, server chống giả tên người gọi, giới hạn 6 cuộc/phút. Chưa có xác thực đầu cuối.",
-Khách hàng,K30,Đổi giọng nói,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Khách hàng,K30,Đổi giọng nói,Chưa làm,Một phần,Có đổi,Chưa deploy,"Chỉ làm méo tiếng: nút Méo giọng trong cuộc gọi (Web Audio: ring modulator + lọc dải + méo), bật/tắt giữa cuộc gọi, nhớ lựa chọn. Chưa có đổi giọng nam/nữ hay giữ nguyên nội dung giọng.",
 Khách hàng,K31,Không có gọi video,đã làm,đã làm,Giữ nguyên,—,,
 Khách hàng,K32,Ẩn dữ liệu khi ứng dụng chạy nền,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Làm mờ nội dung khi trang bị ẩn hoặc mất focus (trong phạm vi trình duyệt).,
 Khách hàng,K33,Bảo vệ khi chụp màn hình,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,Không thể chặn chụp màn hình tuyệt đối trên web; chỉ có ghi chú giới hạn và làm mờ khi mất focus. Đã loại tính năng định vị.,

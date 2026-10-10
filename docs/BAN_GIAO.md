@@ -149,7 +149,7 @@ TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc A
 **Đã xong và đã lên máy chủ thật:** toàn bộ các mục ở mục 5 (nhánh `mask-short` đã deploy đến commit mới nhất ngày 08/10/2026).
 
 **Chưa làm hẳn / làm một phần** (chi tiết từng mã trong `tien_do_chuc_nang.csv`):
-- Chưa làm: mã hoá đầu cuối cho phản hồi Admin và dữ liệu số liệu/khách hàng (K28; chat bạn bè đã mã hoá, xem `docs/MA_HOA_2_DAU.md`), đổi giọng nói (K30), chính sách lưu trữ trên app (A08: web như hiện tại, app lưu trên máy và xoá sạch được), quản lý quyền camera/vị trí/thông báo (K39), cấu hình chính sách bảo mật (A09), quản lý phiên bản app (A17), tách dịch vụ (NFR-08), app Android/iOS, Face ID.
+- Chưa làm: mã hoá đầu cuối cho phản hồi Admin và dữ liệu số liệu/khách hàng (K28; chat bạn bè đã mã hoá, xem `docs/MA_HOA_2_DAU.md`), đổi giọng nói đầy đủ (K30; hiện mới có nút "Méo giọng" trong cuộc gọi), chính sách lưu trữ trên app (A08: web như hiện tại, app lưu trên máy và xoá sạch được), quản lý quyền camera/vị trí/thông báo (K39), cấu hình chính sách bảo mật (A09), quản lý phiên bản app (A17), tách dịch vụ (NFR-08), app Android/iOS, Face ID.
 - Một phần: bảo vệ chụp màn hình (K33 – mới có Ẩn số liệu), xác thực lớp 2/mật khẩu dữ liệu riêng, mã hoá dữ liệu khi lưu (SQLite chưa mã hoá), đồng bộ/offline (đã có hàng đợi nhập số, chưa phủ hết), quản lý thanh toán (A18 đã mở rộng, chưa có đối soát tự động với ngân hàng).
 
 **Đề xuất chống chụp màn hình** (đã trao đổi, chưa làm): web chỉ giảm rủi ro – "giữ để xem" + watermark động + nhật ký; chặn thật cần app: Android `FLAG_SECURE`, iOS phát hiện chụp/quay và che, PC (Electron) `setContentProtection`. Hướng nhanh nhất là bọc web bằng Capacitor.
