@@ -4,6 +4,8 @@ import 'dart:math';
 
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:server/src/database.dart' show appDatabase;
+import 'package:server/src/security_policy.dart';
 
 /// Signing key for all tokens. Set XOSO_JWT_SECRET in the environment of the
 /// server (a long random string). If it is missing, a random key is generated
@@ -25,7 +27,7 @@ String _loadJwtSecret() {
 /// carry their own `type` and are refused by [verifyToken].
 String issueToken({required String userId, required String role, String? sessionId}) {
   final jwt = JWT({'sub': userId, 'role': role, 'type': 'access', if (sessionId != null) 'sid': sessionId});
-  return jwt.sign(SecretKey(_jwtSecret), expiresIn: const Duration(days: 30));
+  return jwt.sign(SecretKey(_jwtSecret), expiresIn: Duration(days: loadPolicy(appDatabase).tokenDays));
 }
 
 class AuthTokenPayload {

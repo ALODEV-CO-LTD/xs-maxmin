@@ -21,7 +21,9 @@ Future<Response> onRequest(RequestContext context) async {
 
 Response _get(RequestContext context) {
   final db = context.read<Database>();
-  final rows = db.select('SELECT key, value FROM settings');
+  // `policy.*` belongs to the security-policy page (its own permission) and internal
+  // markers are not for editing here.
+  final rows = db.select("SELECT key, value FROM settings WHERE key NOT LIKE 'policy.%'");
   return Response.json(
     body: {for (final r in rows) r['key'] as String: r['value']},
   );
@@ -43,6 +45,10 @@ Future<Response> _put(RequestContext context) async {
       return Response.json(statusCode: 400, body: {'error': 'Giới hạn ID ảo phải là số nguyên từ 1 đến 100'});
     }
     body['max_virtual_ids'] = n;
+  }
+
+  if (body.keys.any((k) => k.startsWith('policy.'))) {
+    return Response.json(statusCode: 403, body: {'error': 'Chính sách bảo mật chỉnh ở trang Chính sách bảo mật.'});
   }
 
   final db = context.read<Database>();
@@ -70,6 +76,10 @@ Future<Response> _delete(RequestContext context) async {
   final keys = (body['keys'] as List?)?.cast<String>();
   if (keys == null || keys.isEmpty) {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu danh sách key cần xoá'});
+  }
+
+  if (keys.any((k) => k.startsWith('policy.'))) {
+    return Response.json(statusCode: 403, body: {'error': 'Chính sách bảo mật chỉnh ở trang Chính sách bảo mật.'});
   }
 
   final db = context.read<Database>();

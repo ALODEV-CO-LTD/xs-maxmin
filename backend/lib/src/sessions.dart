@@ -4,6 +4,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'database.dart' show newId;
+import 'security_policy.dart';
 
 // ---------------------------------------------------------------------------
 // Security event log (NFR-07)
@@ -44,9 +45,8 @@ String clientIp(RequestContext context) {
 // Login throttling (K03 / S03)
 // ---------------------------------------------------------------------------
 
-const _freeAttempts = 5; // wrong tries allowed before the first lock
-const _baseLockSeconds = 30; // first lock; doubles with every further failure
-const _maxLockSeconds = 15 * 60;
+// Free tries, first lock and lock ceiling come from the admin-set security policy
+// (security_policy.dart); the lock doubles with every further failure.
 const _failureMemory = Duration(hours: 1); // quiet period that resets the count
 
 String _attemptKey(String identity, String ip) => '${identity.toLowerCase()}|$ip';
@@ -71,7 +71,9 @@ int lockedSecondsLeft(Database db, String identity, String ip) {
 ///
 /// [freeAttempts] lets a caller use a looser threshold for a shared counter
 /// (e.g. one per IP across many account names); default is [_freeAttempts].
-int recordLoginFailure(Database db, String identity, String ip, {String? userId, int freeAttempts = _freeAttempts}) {
+int recordLoginFailure(Database db, String identity, String ip, {String? userId, int? freeAttempts}) {
+  final policy = loadPolicy(db);
+  final free = freeAttempts ?? policy.loginFreeAttempts;
   final key = _attemptKey(identity, ip);
   final now = DateTime.now().toUtc();
   var count = 0;
@@ -83,8 +85,8 @@ int recordLoginFailure(Database db, String identity, String ip, {String? userId,
   count += 1;
   var lockSeconds = 0;
   String? lockedUntil;
-  if (count >= freeAttempts) {
-    lockSeconds = min(_baseLockSeconds * (1 << min(count - freeAttempts, 10)), _maxLockSeconds);
+  if (count >= free) {
+    lockSeconds = min(policy.loginBaseLockSeconds * (1 << min(count - free, 10)), policy.loginMaxLockSeconds);
     lockedUntil = now.add(Duration(seconds: lockSeconds)).toIso8601String();
   }
   db.execute(

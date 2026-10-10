@@ -140,6 +140,12 @@ const routes = [
     meta: { title: 'Sao lưu dữ liệu', requiresAdmin: true, perm: 'backups.manage' },
   },
   {
+    path: '/admin/security-policy',
+    name: 'admin-security-policy',
+    component: () => import('../views/admin/SecurityPolicyView.vue'),
+    meta: { title: 'Chính sách bảo mật', requiresAdmin: true, perm: 'security.policy' },
+  },
+  {
     path: '/admin/staff',
     name: 'admin-staff',
     component: () => import('../views/admin/StaffView.vue'),

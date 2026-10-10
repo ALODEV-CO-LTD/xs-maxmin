@@ -67,6 +67,7 @@ function inCall() {
 }
 
 let timer = null
+let serverDefaultMinutes = 0 // admin policy default, remembered so start() can re-apply it
 let hiddenAt = 0
 let lastWrite = 0
 let lastActive = 0
@@ -88,6 +89,13 @@ export const usePrivacyStore = defineStore('privacy', {
         }),
       )
       this.touch(true)
+    },
+
+    // Admin-set default idle lock (stores/policy.js): used only while this person has not
+    // chosen their own value (nothing saved in this browser yet).
+    applyServerDefault(minutes) {
+      serverDefaultMinutes = minutes
+      if (readStorage(SETTINGS_KEY) === null && minutes > 0) this.autoLockMinutes = minutes
     },
 
     lock() {
@@ -129,6 +137,7 @@ export const usePrivacyStore = defineStore('privacy', {
     start() {
       if (cleanup) return
       Object.assign(this, loadSettings())
+      this.applyServerDefault(serverDefaultMinutes)
       lastActive = Number(readStorage(ACTIVE_KEY)) || Date.now()
       if (readStorage(LOCKED_KEY) === '1') this.locked = true
       this.checkIdle()

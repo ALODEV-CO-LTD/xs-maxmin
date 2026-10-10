@@ -3,6 +3,7 @@ import { watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from './components/AppShell.vue'
 import PrivacyGuard from './components/PrivacyGuard.vue'
+import ScreenWatermark from './components/ScreenWatermark.vue'
 import { useAuthStore } from './stores/auth'
 
 const route = useRoute()
@@ -31,6 +32,8 @@ watch(
 <template>
   <!-- Khoá tự động + làm mờ khi rời trang (stores/privacy.js) -->
   <PrivacyGuard v-if="auth.isAuthenticated" />
+  <!-- Dấu tên người xem lên màn hình (chính sách bảo mật, A09) -->
+  <ScreenWatermark v-if="auth.isAuthenticated" />
   <AppShell v-if="!route.meta.public" />
   <RouterView v-else />
 </template>

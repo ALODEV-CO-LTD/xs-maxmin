@@ -1,0 +1,108 @@
+import 'package:sqlite3/sqlite3.dart';
+
+/// Admin-configurable security policy (A09). Stored in the `settings` table
+/// under `policy.*` keys; anything not set falls back to the defaults below,
+/// which equal the values that used to be hard-coded.
+///
+///  - loginFreeAttempts / loginBaseLockSeconds / loginMaxLockSeconds: the
+///    wrong-password throttle (login, second password, re-auth prompts): free
+///    tries, first lock, and the lock ceiling (the lock doubles each time).
+///  - tokenDays: how long a login lasts before the person must sign in again.
+///  - autoLockMinutes: default idle auto-lock for accounts that never chose
+///    their own (0 = off); each person can still pick a value in Tài khoản.
+///  - watermarkEnabled: faint viewer name/time overlay on every screen so a
+///    leaked screenshot can be traced (the web cannot block screenshots).
+class SecurityPolicy {
+  const SecurityPolicy({
+    this.loginFreeAttempts = 5,
+    this.loginBaseLockSeconds = 30,
+    this.loginMaxLockSeconds = 15 * 60,
+    this.tokenDays = 30,
+    this.autoLockMinutes = 0,
+    this.watermarkEnabled = true,
+  });
+
+  final int loginFreeAttempts;
+  final int loginBaseLockSeconds;
+  final int loginMaxLockSeconds;
+  final int tokenDays;
+  final int autoLockMinutes;
+  final bool watermarkEnabled;
+
+  Map<String, Object> toJson() => {
+        'loginFreeAttempts': loginFreeAttempts,
+        'loginBaseLockSeconds': loginBaseLockSeconds,
+        'loginMaxLockSeconds': loginMaxLockSeconds,
+        'tokenDays': tokenDays,
+        'autoLockMinutes': autoLockMinutes,
+        'watermarkEnabled': watermarkEnabled,
+      };
+}
+
+const _prefix = 'policy.';
+
+/// Allowed range per numeric field (inclusive), with the Vietnamese label used in errors.
+const _ranges = <String, (int, int, String)>{
+  'loginFreeAttempts': (3, 20, 'Số lần nhập sai được phép'),
+  'loginBaseLockSeconds': (5, 3600, 'Thời gian khoá lần đầu (giây)'),
+  'loginMaxLockSeconds': (30, 86400, 'Thời gian khoá tối đa (giây)'),
+  'tokenDays': (1, 365, 'Thời hạn đăng nhập (ngày)'),
+  'autoLockMinutes': (0, 240, 'Tự khoá màn hình mặc định (phút)'),
+};
+
+SecurityPolicy loadPolicy(Database db) {
+  final stored = <String, String>{
+    for (final r in db.select("SELECT key, value FROM settings WHERE key LIKE 'policy.%'")) (r['key'] as String).substring(_prefix.length): r['value'] as String,
+  };
+  int num(String k, int d) {
+    final n = int.tryParse(stored[k] ?? '');
+    final r = _ranges[k]!;
+    return n == null || n < r.$1 || n > r.$2 ? d : n;
+  }
+
+  const d = SecurityPolicy();
+  final base = num('loginBaseLockSeconds', d.loginBaseLockSeconds);
+  final max = num('loginMaxLockSeconds', d.loginMaxLockSeconds);
+  return SecurityPolicy(
+    loginFreeAttempts: num('loginFreeAttempts', d.loginFreeAttempts),
+    loginBaseLockSeconds: base,
+    loginMaxLockSeconds: max < base ? base : max,
+    tokenDays: num('tokenDays', d.tokenDays),
+    autoLockMinutes: num('autoLockMinutes', d.autoLockMinutes),
+    watermarkEnabled: stored['watermarkEnabled'] == null ? d.watermarkEnabled : stored['watermarkEnabled'] == 'true',
+  );
+}
+
+/// Validates a submitted policy (any subset of fields); returns an error message or null.
+String? validatePolicyInput(Map<String, dynamic> body) {
+  for (final e in _ranges.entries) {
+    if (!body.containsKey(e.key)) continue;
+    final v = body[e.key];
+    if (v is! int || v < e.value.$1 || v > e.value.$2) {
+      return '${e.value.$3} phải là số nguyên từ ${e.value.$1} đến ${e.value.$2}';
+    }
+  }
+  if (body.containsKey('watermarkEnabled') && body['watermarkEnabled'] is! bool) {
+    return 'Đóng dấu tên người xem phải là bật hoặc tắt';
+  }
+  final base = body['loginBaseLockSeconds'];
+  final max = body['loginMaxLockSeconds'];
+  if (base is int && max is int && max < base) {
+    return 'Thời gian khoá tối đa không được nhỏ hơn thời gian khoá lần đầu';
+  }
+  return null;
+}
+
+/// Writes the given fields; the rest keep their current/default value.
+void savePolicy(Database db, Map<String, dynamic> body) {
+  for (final k in [..._ranges.keys, 'watermarkEnabled']) {
+    if (!body.containsKey(k)) continue;
+    db.execute(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['$_prefix$k', '${body[k]}'],
+    );
+  }
+}
+
+/// Back to the built-in defaults.
+void resetPolicy(Database db) => db.execute("DELETE FROM settings WHERE key LIKE 'policy.%'");

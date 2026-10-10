@@ -4,6 +4,8 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'security_policy.dart';
+
 import 'package:server/src/sessions.dart';
 
 /// Throttling for endpoints that ask a LOGGED-IN user to re-type their
@@ -14,9 +16,6 @@ import 'package:server/src/sessions.dart';
 /// up to 15 min. Counted per account (not per IP) so a stolen token cannot
 /// be used to guess the password by hopping IPs. A lock only delays; it never
 /// deletes anything.
-const _freeAttempts = 5;
-const _baseLockSeconds = 30;
-const _maxLockSeconds = 15 * 60;
 const _failureMemory = Duration(hours: 1);
 
 String _key(String userId) => 'reauth:$userId|-';
@@ -43,8 +42,9 @@ int reauthRecordFailure(Database db, String userId, String action, {String? ip})
   count += 1;
   var lockSeconds = 0;
   String? lockedUntil;
-  if (count >= _freeAttempts) {
-    lockSeconds = min(_baseLockSeconds * (1 << min(count - _freeAttempts, 10)), _maxLockSeconds);
+  final policy = loadPolicy(db);
+  if (count >= policy.loginFreeAttempts) {
+    lockSeconds = min(policy.loginBaseLockSeconds * (1 << min(count - policy.loginFreeAttempts, 10)), policy.loginMaxLockSeconds);
     lockedUntil = now.add(Duration(seconds: lockSeconds)).toIso8601String();
   }
   db.execute(

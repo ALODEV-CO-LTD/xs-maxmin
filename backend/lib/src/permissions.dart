@@ -25,6 +25,7 @@ const adminPermissions = <String, String>{
   'settings.manage': 'Cài đặt hệ thống (ngân hàng, giá gói)',
   'backups.manage': 'Sao lưu và tải cơ sở dữ liệu',
   'security.view': 'Xem nhật ký bảo mật',
+  'security.policy': 'Cấu hình chính sách bảo mật (số lần nhập sai, thời gian khoá, thời hạn đăng nhập, đóng dấu màn hình)',
 };
 
 /// Permission keys of an account row; `null` = root Admin (everything).

@@ -52,6 +52,7 @@ export const useAuthStore = defineStore('auth', {
         ['announcements.manage', '/admin/notices'],
         [['settings.manage', 'security.view'], '/admin/settings'],
         ['backups.manage', '/admin/backups'],
+        ['security.policy', '/admin/security-policy'],
       ]
       return pages.find(([perm]) => this.can(perm))?.[1] || '/account'
     },

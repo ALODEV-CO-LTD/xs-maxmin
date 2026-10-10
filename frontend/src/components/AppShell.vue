@@ -13,6 +13,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
 import { useChatStore } from '../e2ee/chat'
+import { usePolicyStore } from '../stores/policy'
 import CallOverlay from './CallOverlay.vue'
 import MessageToast from './MessageToast.vue'
 import { useNotifyStore } from '../stores/notify'
@@ -29,6 +30,7 @@ const auth = useAuthStore()
 const call = useCallStore()
 const notify = useNotifyStore()
 const chat = useChatStore()
+const policy = usePolicyStore()
 
 // Unread count shown next to a nav entry (new messages pushed by the server).
 function badgeFor(name) {
@@ -74,6 +76,7 @@ const adminLinks = [
   { perm: ['settings.manage', 'security.view'], name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
   // Admin dùng chung trang /account với khách hàng (đổi mật khẩu...). Admin
   // không có mục "Bạn bè": liên hệ với khách chỉ qua "Phản hồi" ở trên.
+  { perm: 'security.policy', name: 'admin-security-policy', label: 'Chính sách bảo mật', icon: 'settings' },
   { root: true, name: 'admin-staff', label: 'Phân quyền', icon: 'users' },
   { name: 'account', label: 'Tài khoản', icon: 'user' },
 ]
@@ -116,6 +119,7 @@ onMounted(() => {
   call.connect()
   startSync()
   initChat()
+  policy.load()
   // Browsers only show the notification permission prompt after a click.
   window.addEventListener('pointerdown', () => notify.askPermission(), { once: true })
   // Real unread counts from the server now, and again whenever the tab is
