@@ -16,7 +16,7 @@ import 'package:sqlite3/sqlite3.dart';
 ///    leaked screenshot can be traced (the web cannot block screenshots). OFF by default;
 ///    the Admin turns it on in Chính sách bảo mật.
 ///  - blurOnHideEnabled: blur the whole screen while the page is hidden / unfocused
-///    (frontend/src/stores/privacy.js). OFF by default; the Admin turns it on.
+///    (frontend/src/stores/privacy.js). ON by default; the Admin can turn it off.
 class SecurityPolicy {
   const SecurityPolicy({
     this.loginFreeAttempts = 5,
@@ -26,7 +26,7 @@ class SecurityPolicy {
     this.autoLockMinutes = 0,
     this.watermarkEnabled = false,
     this.screenshotGuardEnabled = true,
-    this.blurOnHideEnabled = false,
+    this.blurOnHideEnabled = true,
   });
 
   final int loginFreeAttempts;
@@ -82,7 +82,7 @@ SecurityPolicy loadPolicy(Database db) {
     autoLockMinutes: num('autoLockMinutes', d.autoLockMinutes),
     watermarkEnabled: stored['watermarkEnabled'] == null ? d.watermarkEnabled : stored['watermarkEnabled'] == 'true',
     screenshotGuardEnabled: stored['screenshotGuardEnabled'] == null ? d.screenshotGuardEnabled : stored['screenshotGuardEnabled'] == 'true',
-    blurOnHideEnabled: stored['blurOnHideEnabled'] == 'true',
+    blurOnHideEnabled: stored['blurOnHideEnabled'] == null ? d.blurOnHideEnabled : stored['blurOnHideEnabled'] == 'true',
   );
 }
 

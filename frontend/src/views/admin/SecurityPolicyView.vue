@@ -23,7 +23,7 @@ const form = reactive({
   autoLockMinutes: 0,
   watermarkEnabled: false,
   screenshotGuardEnabled: true,
-  blurOnHideEnabled: false,
+  blurOnHideEnabled: true,
 })
 let saved = ''
 
@@ -123,7 +123,7 @@ async function reset() {
         <label class="check"><input v-model="form.watermarkEnabled" type="checkbox" /> Bật đóng dấu tên người xem</label>
         <p class="hint" style="margin-top: 14px">Trên máy tính, màn hình tự bị phủ đen ngay khi giữ tổ hợp phím chụp (Cmd+Shift+3/4/5 trên Mac, Win+Shift+S trên Windows), nên ảnh chụp ra màu đen. PrintScreen chỉ đến được trang sau khi ảnh đã chụp nên chỉ xoá clipboard. Không chặn được chụp bằng điện thoại, nút cứng trên điện thoại hay quay bằng thiết bị khác; muốn chặn thật cần app.</p>
         <label class="check"><input v-model="form.screenshotGuardEnabled" type="checkbox" /> Phủ đen màn hình khi bấm phím chụp màn hình (máy tính)</label>
-        <p class="hint" style="margin-top: 14px">Làm mờ toàn bộ nội dung khi người dùng chuyển sang tab/cửa sổ khác hoặc trang mất focus (tạm bỏ qua khi đang gọi). Khi bật, người dùng vẫn tự tắt được trong Tài khoản.</p>
+        <p class="hint" style="margin-top: 14px">Làm mờ toàn bộ nội dung khi người dùng chuyển sang tab/cửa sổ khác hoặc trang mất focus (tạm bỏ qua khi đang gọi). Khi bật, mỗi người vẫn tự tắt được trong Tài khoản.</p>
         <label class="check"><input v-model="form.blurOnHideEnabled" type="checkbox" /> Làm mờ màn hình khi ẩn trang hoặc mất focus</label>
       </section>
 

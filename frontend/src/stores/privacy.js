@@ -80,7 +80,7 @@ export const usePrivacyStore = defineStore('privacy', {
     ...loadSettings(),
     locked: false,
     away: false, // page hidden / window unfocused -> blurred
-    blurPolicy: false, // Admin policy (Chính sách bảo mật): blur-on-hide allowed at all; off by default
+    blurPolicy: false, // Admin policy (Chính sách bảo mật): blur-on-hide allowed at all (default on, the server answer decides)
   }),
   actions: {
     saveSettings(patch) {

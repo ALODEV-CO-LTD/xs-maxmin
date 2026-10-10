@@ -17,7 +17,7 @@ void main() {
     final p = loadPolicy(_db());
     expect([p.loginFreeAttempts, p.loginBaseLockSeconds, p.loginMaxLockSeconds, p.tokenDays, p.autoLockMinutes, p.watermarkEnabled], [5, 30, 900, 30, 0, false]);
     expect(p.screenshotGuardEnabled, true);
-    expect(p.blurOnHideEnabled, false);
+    expect(p.blurOnHideEnabled, true);
   });
 
   test('saved values are used; out-of-range stored values fall back', () {
