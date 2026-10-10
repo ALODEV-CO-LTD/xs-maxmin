@@ -136,6 +136,7 @@ export const useChatStore = defineStore('e2ee-chat', {
 
     async messages(friendId) {
       if (!db) return []
+      await this.applyRetention(friendId) // messages that expired while the app stayed open
       const list = await messagesOf(db, friendId)
       return list.sort((a, b) => a.createdAt - b.createdAt)
     },
