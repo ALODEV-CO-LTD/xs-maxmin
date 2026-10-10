@@ -16,8 +16,19 @@ const auth = useAuthStore()
 const policy = usePolicyStore()
 const el = ref(null)
 const now = ref(new Date())
+
+// The mark must stay readable on a white page and on a dark one: dark ink on light
+// themes, light ink on dark ones (follows <html data-theme> and the OS setting).
+const mq = window.matchMedia('(prefers-color-scheme: dark)')
+const readDark = () => {
+  const t = document.documentElement.getAttribute('data-theme')
+  return t ? t === 'dark' : mq.matches
+}
+const dark = ref(readDark())
+const onTheme = () => (dark.value = readDark())
 let tick = null
 let observer = null
+let themeObserver = null
 
 const pad = (n) => String(n).padStart(2, '0')
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c])
@@ -31,9 +42,9 @@ const tile = computed(() => {
   const who = `${u.name || ''} · ${u.username || ''}`.slice(0, 40)
   const tail = String(u.id || '').slice(-4)
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="340" height="190">` +
-    `<g transform="rotate(-24 170 95)" fill="rgba(128,128,128,0.17)" font-family="system-ui,sans-serif" font-size="15" font-weight="600" text-anchor="middle">` +
-    `<text x="170" y="88">${esc(who)}</text><text x="170" y="110" font-size="13" font-weight="500">${esc(when)} · ${esc(tail)}</text></g></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="380" height="210">` +
+    `<g transform="rotate(-24 190 105)" fill="${dark.value ? 'rgba(255,255,255,0.15)' : 'rgba(30,41,59,0.20)'}" font-family="system-ui,sans-serif" font-size="15" font-weight="600" text-anchor="middle">` +
+    `<text x="190" y="98">${esc(who)}</text><text x="190" y="120" font-size="13" font-weight="500">${esc(when)} · ${esc(tail)}</text></g></svg>`
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`
 })
 
@@ -57,10 +68,15 @@ onMounted(() => {
   tick = setInterval(() => (now.value = new Date()), 30000)
   observer = new MutationObserver(guard)
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] })
+  themeObserver = new MutationObserver(onTheme)
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  mq.addEventListener('change', onTheme)
 })
 onBeforeUnmount(() => {
   clearInterval(tick)
   observer?.disconnect()
+  themeObserver?.disconnect()
+  mq.removeEventListener('change', onTheme)
 })
 </script>
 
