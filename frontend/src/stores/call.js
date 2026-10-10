@@ -17,6 +17,7 @@ import { api } from '../api'
 import { useAuthStore } from './auth'
 import { askNotificationPermission } from '../callSounds'
 import { useNotifyStore } from './notify'
+import { useChatStore } from '../e2ee/chat'
 
 const STUN_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 const ICE_CACHE_MS = 10 * 60 * 1000
@@ -223,6 +224,11 @@ export const useCallStore = defineStore('call', {
           this.peer = { id: msg.from, name: msg.fromName || 'Người dùng' }
           this.status = 'incoming'
           this._armRingTimeout()
+          break
+        case 'e2ee-msg':
+        case 'e2ee-ack':
+        case 'e2ee-undelivered':
+          useChatStore().onSocketMessage(msg)
           break
         case 'new-message':
           useNotifyStore().receive(msg, { isAdmin: useAuthStore().isAdmin })

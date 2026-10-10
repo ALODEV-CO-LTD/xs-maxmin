@@ -12,6 +12,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
+import { useChatStore } from '../e2ee/chat'
 import CallOverlay from './CallOverlay.vue'
 import MessageToast from './MessageToast.vue'
 import { useNotifyStore } from '../stores/notify'
@@ -27,6 +28,7 @@ import { startSync } from '../offline'
 const auth = useAuthStore()
 const call = useCallStore()
 const notify = useNotifyStore()
+const chat = useChatStore()
 
 // Unread count shown next to a nav entry (new messages pushed by the server).
 function badgeFor(name) {
@@ -108,6 +110,7 @@ onMounted(() => {
   // ring on any page, not only while the Bạn bè tab happens to be open.
   call.connect()
   startSync()
+  initChat()
   // Browsers only show the notification permission prompt after a click.
   window.addEventListener('pointerdown', () => notify.askPermission(), { once: true })
   // Real unread counts from the server now, and again whenever the tab is
@@ -120,6 +123,12 @@ onMounted(() => {
     if (!document.hidden) notify.refresh()
   }, 10000)
 })
+// End-to-end encrypted chat needs the account loaded (for its id), so start it
+// as soon as the profile is there.
+function initChat() {
+  if (auth.user) chat.init()
+}
+watch(() => auth.user?.id, initChat)
 let pollTimer = null
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisible)
@@ -132,6 +141,7 @@ function onVisible() {
 async function logout() {
   if (!(await showConfirm({ title: 'Đăng xuất', message: 'Bạn có chắc muốn đăng xuất?', confirmText: 'Đăng xuất' }))) return
   call.disconnect()
+  chat.reset()
   notify.clearAll()
   auth.logout()
   router.push('/login')

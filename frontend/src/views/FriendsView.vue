@@ -5,8 +5,10 @@
   the back button/bottom-nav behave sensibly.
 
   API: GET/POST /me/friends, DELETE /me/friends/:friendId,
-       GET/POST /me/friends/:friendId/messages,
        GET /me/friends/search?q= (find people by name/username to add)
+  Messages are end-to-end encrypted: composed, encrypted and kept only on this
+  device (e2ee/chat.js), relayed live over the WebSocket to a friend who is online.
+  Nothing is stored on the server (docs/MA_HOA_2_DAU.md).
 
   Voice-only calling (the 📞 button on the thread header; no video) goes through
   useCallStore, not this component - it just tells the store who to call;
@@ -20,8 +22,8 @@ import ChatAttachButtons from '../components/ChatAttachButtons.vue'
 import AttachmentPreview from '../components/AttachmentPreview.vue'
 import ChatRetentionPanel from '../components/ChatRetentionPanel.vue'
 import MessageAttachment from '../components/MessageAttachment.vue'
-import { fileToPayload } from '../attachments'
-import { computed, onMounted, ref, watch } from 'vue'
+import { useChatStore } from '../e2ee/chat'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useCallStore } from '../stores/call'
@@ -33,6 +35,7 @@ const router = useRouter()
 const call = useCallStore()
 const auth = useAuthStore()
 const notify = useNotifyStore()
+const chat = useChatStore()
 
 const friends = ref([])
 const loading = ref(true)
@@ -137,20 +140,20 @@ function callLine(c) {
 }
 const isMissedCall = (c) => c.direction === 'incoming' && (c.status === 'missed' || c.status === 'busy')
 
-// Messages and call entries in one list, newest on top.
+// Messages and call entries in one list, oldest on top, newest at the bottom.
 const timeline = computed(() => {
   const items = [
     ...messages.value.map((m) => ({ kind: 'msg', key: m.id, at: m.createdAt, m })),
     ...calls.value.map((c) => ({ kind: 'call', key: `call-${c.id}`, at: c.createdAt, c })),
   ]
-  // Newest first: the latest message is always at the top, no scrolling down.
-  return items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+  return items.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
 })
 
 async function loadCalls(friendId) {
   try {
     const res = await api.get(`/me/calls?friendId=${encodeURIComponent(friendId)}&limit=50`)
     calls.value = res.calls
+    scrollToEnd()
     unseenMissed.value = res.unseenMissed || {}
     if (unseenMissed.value[friendId]) {
       await api.post('/me/calls/seen', { friendId })
@@ -184,7 +187,11 @@ async function loadFriends({ quiet = false } = {}) {
   loadError.value = ''
   try {
     const res = await api.get('/me/friends')
+    await chat.rememberFriends(res.friends)
+    const prev = await chat.previews()
     friends.value = res.friends
+      .map((f) => ({ ...f, lastMessage: prev[f.id]?.text || null, lastMessageAt: prev[f.id]?.at || 0 }))
+      .sort((a, b) => b.lastMessageAt - a.lastMessageAt || a.name.localeCompare(b.name, 'vi'))
   } catch (err) {
     loadError.value = err.message || 'Không tải được danh sách bạn bè'
   } finally {
@@ -192,14 +199,30 @@ async function loadFriends({ quiet = false } = {}) {
   }
 }
 
+async function scrollToEnd() {
+  await nextTick()
+  if (threadBody.value) threadBody.value.scrollTop = threadBody.value.scrollHeight
+}
+
 async function loadMessages(friendId, { quiet = false } = {}) {
   if (!quiet) messagesLoading.value = true
   messagesError.value = ''
   try {
-    const res = await api.get(`/me/friends/${friendId}/messages`)
-    messages.value = res.messages
+    const list = await chat.messages(friendId)
+    const grew = list.length !== messages.value.length
+    messages.value = list.map((m) => ({
+      id: m.id,
+      fromUserId: m.mine ? auth.user?.id : friendId,
+      content: m.text,
+      attachment: m.att,
+      createdAt: new Date(m.createdAt).toISOString(),
+      mine: m.mine,
+      status: m.status,
+      reason: m.reason,
+    }))
+    if (!quiet || grew) scrollToEnd()
   } catch (err) {
-    messagesError.value = err.message || 'Không tải được tin nhắn'
+    messagesError.value = err.message || 'Không đọc được tin nhắn trên thiết bị'
   } finally {
     messagesLoading.value = false
   }
@@ -252,6 +275,15 @@ watch(
     } else {
       loadFriends({ quiet: true })
     }
+  },
+)
+
+// Local chat store changed (incoming message, delivery status, auto-delete).
+watch(
+  () => chat.tick,
+  () => {
+    if (selectedFriendId.value) loadMessages(selectedFriendId.value, { quiet: true })
+    loadFriends({ quiet: true })
   },
 )
 
@@ -320,22 +352,31 @@ async function removeFriend(friend) {
 
 async function sendMessage() {
   const content = newMessage.value.trim()
-  if ((!content && !attachment.value) || !selectedFriendId.value) return
+  if ((!content && !attachment.value) || !selectedFriendId.value || !selectedFriend.value) return
   sending.value = true
   messagesError.value = ''
   try {
-    const body = { content }
-    if (attachment.value) body.attachment = await fileToPayload(attachment.value)
-    const msg = await api.post(`/me/friends/${selectedFriendId.value}/messages`, body)
-    messages.value.push(msg)
-    threadBody.value && (threadBody.value.scrollTop = 0)
+    await chat.send(selectedFriend.value, content, attachment.value)
     newMessage.value = ''
     attachment.value = null
+    await loadMessages(selectedFriendId.value, { quiet: true })
+    scrollToEnd()
   } catch (err) {
     messagesError.value = err.message || 'Không gửi được tin nhắn'
   } finally {
     sending.value = false
   }
+}
+
+async function retryMessage(m) {
+  await chat.retry({ id: m.id, mine: true })
+  await loadMessages(selectedFriendId.value, { quiet: true })
+}
+
+const peerInfo = computed(() => chat.peerInfo[selectedFriendId.value] || null)
+const showSecurity = ref(false)
+async function acceptKey() {
+  await chat.acceptKeyChange(selectedFriendId.value)
 }
 </script>
 
@@ -438,6 +479,23 @@ async function sendMessage() {
               </button>
             </div>
           </div>
+          <div v-if="peerInfo?.changed" class="alert alert-warning e2ee-warn" role="alert">
+            Khoá bảo mật của {{ selectedFriend?.name }} đã thay đổi (họ đổi máy hoặc xoá dữ liệu trình duyệt). Hãy xác minh mã bảo mật mới với họ qua kênh khác rồi bấm Đã hiểu.
+            <button type="button" class="btn btn-secondary btn-sm" @click="acceptKey">Đã hiểu</button>
+          </div>
+          <div v-if="selectedFriend && !chat.friendKeys[selectedFriend.id]" class="alert alert-warning e2ee-warn">
+            {{ selectedFriend.name }} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.
+          </div>
+          <div class="e2ee-line">
+            <span aria-hidden="true">🔒</span>
+            <span>Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.</span>
+            <button v-if="peerInfo" type="button" class="btn btn-ghost btn-sm" @click="showSecurity = !showSecurity">Mã bảo mật</button>
+          </div>
+          <div v-if="showSecurity && peerInfo" class="e2ee-codes">
+            <div>Của {{ selectedFriend?.name }}: <code>{{ peerInfo.fingerprint }}</code></div>
+            <div>Của bạn: <code>{{ chat.myFingerprint }}</code></div>
+            <div class="e2ee-hint">Đọc hai mã này cho nhau qua kênh khác (gọi điện, gặp mặt). Nếu khớp thì không ai chen giữa.</div>
+          </div>
           <ChatRetentionPanel
             v-if="!selectedFriend?.isAdmin"
             :friend-id="selectedFriendId"
@@ -453,15 +511,22 @@ async function sendMessage() {
                 <div
                   v-if="item.kind === 'msg'"
                   class="msg"
-                  :class="{ mine: item.m.fromUserId !== selectedFriendId }"
+                  :class="{ mine: item.m.mine }"
                 >
                   <div class="msg-bubble">
                     <span v-if="item.m.content">{{ item.m.content }}</span>
                     <MessageAttachment
                       v-if="item.m.attachment"
                       :att="item.m.attachment"
-                      :path="`/me/friends/${selectedFriendId}/messages/${item.m.id}/attachment`"
+                      :blob="item.m.attachment.blob"
                     />
+                  </div>
+                  <div v-if="item.m.mine && item.m.status === 'failed'" class="msg-state msg-failed">
+                    {{ chat.reasonText(item.m.reason) }}
+                    <button type="button" class="btn btn-ghost btn-sm" @click="retryMessage(item.m)">Gửi lại</button>
+                  </div>
+                  <div v-else-if="item.m.mine && item.m.status !== 'delivered'" class="msg-state">
+                    {{ item.m.status === 'sending' ? 'Đang gửi...' : 'Đã gửi, chờ xác nhận...' }}
                   </div>
                 </div>
                 <div v-else class="call-line" :class="{ missed: isMissedCall(item.c) || item.c.status === 'failed' }">
@@ -607,6 +672,45 @@ async function sendMessage() {
   text-align: center;
   padding: 24px 0;
 }
+.e2ee-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.e2ee-line span:not([aria-hidden]) {
+  flex: 1;
+}
+.e2ee-warn {
+  margin-bottom: 8px;
+}
+.e2ee-codes {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.e2ee-codes code {
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+.e2ee-hint {
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+.msg-state {
+  padding: 2px 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.msg-failed {
+  color: var(--danger-text);
+}
 .unread-badge {
   display: inline-block;
   margin-left: 6px;
@@ -656,9 +760,11 @@ async function sendMessage() {
 }
 .msg {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .msg.mine {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 .msg-bubble {
   max-width: 75%;

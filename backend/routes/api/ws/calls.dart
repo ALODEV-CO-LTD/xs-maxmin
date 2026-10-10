@@ -39,6 +39,18 @@ import 'package:sqlite3/sqlite3.dart';
 const _relayedTypes = {'call-invite', 'call-accept', 'call-reject', 'call-end', 'offer', 'answer', 'ice'};
 const _maxMessageChars = 64 * 1024;
 
+/// End-to-end encrypted chat (docs/MA_HOA_2_DAU.md). The relay forwards the
+/// ciphertext envelope `{id, iv, ct}` to a friend who is online right now and
+/// stores NOTHING: if they are offline the sender is told (`e2ee-undelivered`)
+/// and nothing is kept. The recipient confirms with `e2ee-ack`, which is relayed
+/// back. The plaintext (text and any attachment) is inside `ct`; the server
+/// never sees it. A 5 MB file does not fit one WebSocket frame, so the
+/// ciphertext is split into parts (`part`/`parts`, at most 8) that are relayed
+/// one by one and put back together by the receiver; the relay keeps no state.
+const _e2eeTypes = {'e2ee-msg', 'e2ee-ack'};
+const _maxE2eeChars = 2 * 1024 * 1024; // one frame (part) of ciphertext
+const _maxE2eeParts = 8;
+
 Future<Response> onRequest(RequestContext context) async {
   final token = context.request.uri.queryParameters['token'];
   var auth = token == null ? null : verifyToken(token);
@@ -58,7 +70,7 @@ Future<Response> onRequest(RequestContext context) async {
         (raw) {
           // Signaling messages are tiny (an SDP is a few KB); anything big is
           // abuse, not a call.
-          if (raw is! String || raw.length > _maxMessageChars) return;
+          if (raw is! String || raw.length > _maxE2eeChars) return;
           final Map<String, dynamic> msg;
           try {
             msg = jsonDecode(raw) as Map<String, dynamic>;
@@ -67,6 +79,11 @@ Future<Response> onRequest(RequestContext context) async {
           }
           final to = msg['to'] as String?;
           final type = msg['type'] as String?;
+          if (type != null && _e2eeTypes.contains(type)) {
+            _relayE2ee(db, registry, channel, userId, to, type, msg);
+            return;
+          }
+          if (raw.length > _maxMessageChars) return;
           if (to == null || type == null || !_relayedTypes.contains(type)) return;
 
           // Same trust boundary as text messages: only confirmed friends
@@ -202,4 +219,76 @@ bool _wantsVideo(Map<String, dynamic> msg) {
     return true;
   }
   return false;
+}
+
+final _idPattern = RegExp(r'^[A-Za-z0-9_-]{8,64}$');
+/// Base64 / base64url characters only. A loop, not a RegExp: a regex over a
+/// megabyte of ciphertext overflows the Dart regex engine's stack.
+bool _isBase64(String s) {
+  for (final c in s.codeUnits) {
+    final ok = (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || c == 0x2b || c == 0x2f || c == 0x2d || c == 0x5f || c == 0x3d;
+    if (!ok) return false;
+  }
+  return true;
+}
+
+void _relayE2ee(
+  Database db,
+  CallSignalingRegistry registry,
+  dynamic channel,
+  String userId,
+  String? to,
+  String type,
+  Map<String, dynamic> msg,
+) {
+  final id = msg['id'];
+  if (to == null || id is! String || !_idPattern.hasMatch(id)) return;
+
+  // Only confirmed friends, and never Admin (support has its own thread).
+  final ok = db.select(
+    '''
+    SELECT 1 FROM friendships f JOIN users u ON u.id = f.friend_id
+    WHERE f.user_id = ? AND f.friend_id = ? AND u.role != 'admin'
+    ''',
+    [userId, to],
+  ).isNotEmpty;
+  if (!ok) {
+    channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'reason': 'not-friend'}));
+    return;
+  }
+
+  if (type == 'e2ee-ack') {
+    registry.sendTo(to, {'type': 'e2ee-ack', 'id': id, 'from': userId});
+    return;
+  }
+
+  final part = msg['part'] ?? 0;
+  final parts = msg['parts'] ?? 1;
+  if (part is! int || parts is! int || parts < 1 || parts > _maxE2eeParts || part < 0 || part >= parts) {
+    channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'reason': 'invalid'}));
+    return;
+  }
+  final iv = msg['iv'];
+  final ct = msg['ct'];
+  if (iv is! String || ct is! String || iv.length > 64 || ct.isEmpty || !_isBase64(iv) || !_isBase64(ct)) {
+    channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'reason': 'invalid'}));
+    return;
+  }
+  // `ts` is the sender's clock, shown by the receiver; `fromName` comes from the
+  // account, never from the client.
+  final nameRow = db.select('SELECT name FROM users WHERE id = ?', [userId]);
+  final delivered = registry.sendTo(to, {
+    'type': 'e2ee-msg',
+    'id': id,
+    'from': userId,
+    'fromName': nameRow.isEmpty ? 'Người dùng' : nameRow.first['name'],
+    'iv': iv,
+    'ct': ct,
+    'part': part,
+    'parts': parts,
+    if (msg['ts'] is int) 'ts': msg['ts'],
+  });
+  if (!delivered) {
+    channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'reason': 'offline'}));
+  }
 }

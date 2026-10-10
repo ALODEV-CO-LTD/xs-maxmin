@@ -54,21 +54,18 @@ Future<Response> _addById(RequestContext context, String userId, String friendId
 
 Response _list(RequestContext context, String userId) {
   final db = context.read<Database>();
+  // No message preview/ordering here: friend chat is end-to-end encrypted and
+  // lives only on the devices (docs/MA_HOA_2_DAU.md). Each friend carries their
+  // public key so the client can encrypt to it.
   final rows = db.select(
     '''
-    SELECT u.id, u.name, u.username, u.role,
-      (SELECT CASE WHEN content = '' THEN '[Đính kèm] ' || COALESCE(attachment_name, '') ELSE content END FROM direct_messages
-        WHERE (from_user_id = ? AND to_user_id = u.id) OR (from_user_id = u.id AND to_user_id = ?)
-        ORDER BY created_at DESC LIMIT 1) AS last_message,
-      (SELECT created_at FROM direct_messages
-        WHERE (from_user_id = ? AND to_user_id = u.id) OR (from_user_id = u.id AND to_user_id = ?)
-        ORDER BY created_at DESC LIMIT 1) AS last_message_at
+    SELECT u.id, u.name, u.username, u.role, u.e2ee_public_key
     FROM friendships f
     JOIN users u ON u.id = f.friend_id
     WHERE f.user_id = ? AND u.role != 'admin'
-    ORDER BY last_message_at IS NULL, last_message_at DESC, u.name ASC
+    ORDER BY u.name COLLATE NOCASE ASC
     ''',
-    [userId, userId, userId, userId, userId],
+    [userId],
   );
   return Response.json(
     body: {
@@ -79,13 +76,14 @@ Response _list(RequestContext context, String userId) {
             'name': r['name'],
             'username': r['username'],
             'isAdmin': r['role'] == 'admin',
-            'lastMessage': r['last_message'],
-            'lastMessageAt': r['last_message_at'],
+            'publicKey': _key(r['e2ee_public_key']),
           },
       ],
     },
   );
 }
+
+Object? _key(Object? raw) => raw is String ? jsonDecode(raw) : null;
 
 /// Adds a friend by one of their generated customer codes. Friendship is
 /// symmetric and immediate (no pending/accept step) since sharing the code
@@ -150,8 +148,7 @@ Response _createFriendship(Database db, String userId, Row friendRow) {
       'name': friendRow['name'],
       'username': friendRow['username'],
       'isAdmin': friendRow['role'] == 'admin',
-      'lastMessage': null,
-      'lastMessageAt': null,
+      'publicKey': _key(db.select('SELECT e2ee_public_key FROM users WHERE id = ?', [friendId]).first['e2ee_public_key']),
     },
   );
 }

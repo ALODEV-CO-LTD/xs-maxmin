@@ -1,19 +1,17 @@
 <!--
-  Auto-delete rule for ONE friend conversation (K36/S05): messages (or only
-  images) older than a chosen time are deleted by a server background timer,
-  for both people. Shown under the thread header in FriendsView. Setting a
-  rule first shows the server's warning (scope + when) in a confirm dialog;
-  either friend can change or cancel it.
-  API: GET/POST /me/deletion-schedules, DELETE /me/deletion-schedules/:id
+  Auto-delete for ONE friend conversation (K36/S05). Chat is end-to-end encrypted
+  and stored only on each device (docs/MA_HOA_2_DAU.md), so this rule runs on THIS
+  device: messages (or only images) older than the chosen time are removed from
+  its local history. It does not touch the friend's device.
 -->
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { api } from '../api'
-import { showConfirm } from '../confirm'
+import { useChatStore } from '../e2ee/chat'
 import AppSelect from './AppSelect.vue'
 
 const props = defineProps({ friendId: { type: String, required: true }, friendName: { type: String, default: '' } })
 const emit = defineEmits(['applied'])
+const chat = useChatStore()
 
 const TTL_OPTIONS = [
   { value: 3600, label: '1 giờ' },
@@ -32,29 +30,15 @@ const ttlLabel = computed(() => TTL_OPTIONS.find((o) => o.value === rule.value?.
 
 async function load() {
   error.value = ''
-  try {
-    const res = await api.get('/me/deletion-schedules')
-    rule.value = res.schedules.find((s) => s.kind === 'chat' && s.status === 'pending' && s.friendId === props.friendId) || null
-  } catch (err) {
-    error.value = err.message || 'Không tải được cài đặt tự xoá'
-  }
+  rule.value = await chat.retentionOf(props.friendId)
 }
-watch(() => props.friendId, () => { open.value = false; load() }, { immediate: true })
+watch(() => [props.friendId, chat.ready], () => { open.value = false; load() }, { immediate: true })
 
 async function apply() {
   error.value = ''
   busy.value = true
   try {
-    const body = { kind: 'chat', friendId: props.friendId, ttlSeconds: ttl.value, chatScope: scope.value }
-    const preview = await api.post('/me/deletion-schedules', body)
-    const ok = await showConfirm({
-      title: 'Xác nhận tự xoá tin nhắn',
-      message: `CẢNH BÁO: ${preview.scopeText}\n\nÁp dụng từ: ${new Date(preview.runAt).toLocaleString('vi-VN')}. Bạn có thể tắt bất cứ lúc nào, nhưng nội dung đã xoá không khôi phục được.`,
-      confirmText: 'Bật tự xoá',
-      danger: true,
-    })
-    if (!ok) return
-    await api.post('/me/deletion-schedules', { ...body, confirm: true })
+    await chat.setRetention(props.friendId, { ttlSeconds: ttl.value, scope: scope.value })
     open.value = false
     await load()
     emit('applied')
@@ -66,13 +50,8 @@ async function apply() {
 }
 
 async function cancel() {
-  if (!rule.value) return
-  try {
-    await api.del(`/me/deletion-schedules/${rule.value.id}`)
-    await load()
-  } catch (err) {
-    error.value = err.message || 'Không tắt được tự xoá'
-  }
+  await chat.setRetention(props.friendId, null)
+  await load()
 }
 </script>
 
@@ -80,7 +59,7 @@ async function cancel() {
   <div class="retention">
     <div class="retention-line">
       <span v-if="rule" class="retention-state">
-        Tự xoá {{ rule.chatScope === 'images' ? 'ảnh' : 'tin nhắn' }} cũ hơn {{ ttlLabel }}{{ rule.setByMe ? '' : ' (bạn bè đặt)' }}
+        Tự xoá {{ rule.scope === 'images' ? 'ảnh' : 'tin nhắn' }} cũ hơn {{ ttlLabel }} (trên thiết bị này)
       </span>
       <span v-else class="retention-state muted">Tin nhắn không tự xoá</span>
       <button type="button" class="btn btn-ghost btn-sm" @click="open = !open">{{ open ? 'Đóng' : 'Cài đặt tự xoá' }}</button>
@@ -89,7 +68,7 @@ async function cancel() {
     <div v-if="error" class="alert alert-error" style="margin: 6px 0 0">{{ error }}</div>
     <form v-if="open" class="retention-form" @submit.prevent="apply">
       <p class="retention-hint">
-        Tin nhắn/ảnh cũ hơn thời gian chọn sẽ bị xoá tự động cho cả hai phía của cuộc trò chuyện với {{ friendName }}.
+        Tin nhắn/ảnh cũ hơn thời gian chọn sẽ bị xoá khỏi thiết bị này. Máy chủ không lưu tin nhắn, và thiết bị của {{ friendName }} có cài đặt riêng.
       </p>
       <div class="retention-row">
         <AppSelect v-model="ttl" aria-label="Thời gian tự xoá">

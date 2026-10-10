@@ -11,7 +11,8 @@ import { formatSize } from '../attachments'
 
 const props = defineProps({
   att: { type: Object, required: true }, // { name, type, size, isImage }
-  path: { type: String, required: true }, // API path of the attachment bytes
+  path: { type: String, default: '' }, // API path of the attachment bytes
+  blob: { type: Blob, default: null }, // or the bytes themselves (end-to-end encrypted chat, kept on this device)
 })
 
 const imageUrl = ref('')
@@ -21,7 +22,7 @@ const busy = ref(false)
 onMounted(async () => {
   if (!props.att.isImage) return
   try {
-    imageUrl.value = URL.createObjectURL(await api.blob(props.path))
+    imageUrl.value = URL.createObjectURL(props.blob || (await api.blob(props.path)))
   } catch {
     failed.value = true
   }
@@ -34,7 +35,7 @@ async function download() {
   if (busy.value) return
   busy.value = true
   try {
-    const url = URL.createObjectURL(await api.blob(props.path))
+    const url = URL.createObjectURL(props.blob || (await api.blob(props.path)))
     const a = document.createElement('a')
     a.href = url
     a.download = props.att.name

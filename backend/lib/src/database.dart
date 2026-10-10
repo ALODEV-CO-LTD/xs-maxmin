@@ -91,6 +91,9 @@ void _migrateSchema(Database db) {
   // Epoch seconds: access tokens WITHOUT a session id issued at/before this are
   // rejected (revokes pre-session tokens; set by revokeAllSessions).
   _ensureColumn(db, 'users', 'tokens_valid_after', 'INTEGER');
+  // End-to-end encryption (docs/MA_HOA_2_DAU.md): the client's PUBLIC key (JWK
+  // JSON). The private key never leaves the device.
+  _ensureColumn(db, 'users', 'e2ee_public_key', 'TEXT');
   // Quản lý thanh toán (A18): a short transfer reference ("nội dung chuyển khoản") the user puts
   // in the bank note so the admin can match the money, the reason shown to the user when a request
   // is rejected, and `cancelled` = the user withdrew a still-pending request (stored as status
@@ -158,6 +161,19 @@ void _createSchema(Database db) {
     );
   ''');
   db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)');
+
+  // One-time: friend-to-friend chat is now end-to-end encrypted and relayed over
+  // the WebSocket without being stored (docs/MA_HOA_2_DAU.md). Plaintext history
+  // between two customers cannot be migrated to E2EE, so it is removed. Admin
+  // support threads (Phản hồi) are untouched.
+  if (db.select("SELECT 1 FROM settings WHERE key = 'e2ee_friend_chat_purged'").isEmpty) {
+    db.execute('''
+      DELETE FROM direct_messages
+      WHERE from_user_id NOT IN (SELECT id FROM users WHERE role = 'admin')
+        AND to_user_id NOT IN (SELECT id FROM users WHERE role = 'admin')
+    ''');
+    db.execute("INSERT INTO settings (key, value) VALUES ('e2ee_friend_chat_purged', ?)", [DateTime.now().toUtc().toIso8601String()]);
+  }
 
   // Controlled account recovery (A06): the customer files a request, an admin
   // checks who they are and approves it, which issues a one-time ticket (shown
