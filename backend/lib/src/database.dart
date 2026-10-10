@@ -433,16 +433,17 @@ void _seed(Database db) {
     INSERT INTO users (id, name, username, password_hash, role, package_type, status, created_at)
     VALUES (?, ?, ?, ?, 'admin', 'none', 'active', ?)
     ''',
-    [adminId, 'Admin', '1', hash('1'), now.toIso8601String()],
+    [adminId, 'Admin', '1', hash('1234'), now.toIso8601String()],
   );
 
   final sampleUsers = [
-    ('Nguyễn Văn A', '2', '2', PackageType.oneMonth, 15),
-    ('Trần Thị Hương', 'tranthihuong', 'user123', PackageType.threeMonths, 90),
-    ('Phạm Văn Long', 'phamvanlong', 'user123', PackageType.sixMonths, 180),
-    ('Đỗ Ngọc Mai', 'dongocmai', 'user123', PackageType.oneMonth, 20),
-    ('Hoàng Văn Tùng', 'hoangvantung', 'user123', PackageType.twelveMonths, 330),
+    ('Nguyễn Văn A', '2', '1235', PackageType.oneMonth, 15),
+    ('Trần Thị Hương', '3', '1236', PackageType.threeMonths, 90),
+    ('Phạm Văn Long', '4', '1237', PackageType.sixMonths, 180),
+    ('Đỗ Ngọc Mai', '5', '1238', PackageType.oneMonth, 5),
+    ('Hoàng Văn Tùng', '6', '1239', PackageType.twelveMonths, 330),
   ];
+
 
   for (final (name, username, password, pkg, daysLeft) in sampleUsers) {
     final id = _uuid.v4();

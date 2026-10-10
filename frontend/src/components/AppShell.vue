@@ -183,7 +183,6 @@ async function logout() {
           class="nav-link"
           active-class="nav-link-active"
         >
-          <span class="nav-icon"><AppIcon :name="link.icon" /></span>
           <span>{{ link.label }}</span>
           <span v-if="badgeFor(link.name)" class="nav-badge">{{ badgeFor(link.name) }}</span>
         </RouterLink>
@@ -210,7 +209,6 @@ async function logout() {
           class="sheet-link"
           active-class="sheet-link-active"
         >
-          <span class="nav-icon"><AppIcon :name="link.icon" /></span>
           <span>{{ link.label }}</span>
           <span v-if="badgeFor(link.name)" class="nav-badge">{{ badgeFor(link.name) }}</span>
         </RouterLink>
@@ -379,14 +377,6 @@ async function logout() {
   transition: background 0.15s ease;
 }
 
-.nav-link .nav-icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  font-size: 30px;
-  color: var(--muted);
-}
-
 .nav-link:hover {
   background: var(--surface-2);
 }
@@ -413,10 +403,6 @@ async function logout() {
   width: 4px;
   border-radius: 0 4px 4px 0;
   background: var(--accent);
-}
-
-.nav-link-active .nav-icon {
-  color: var(--accent);
 }
 
 .content {
@@ -534,13 +520,6 @@ async function logout() {
   border-radius: 12px;
 }
 
-.sheet-link .nav-icon {
-  width: 30px;
-  height: 30px;
-  font-size: 30px;
-  color: var(--muted);
-}
-
 .sheet-link:hover {
   background: var(--surface);
 }
@@ -548,18 +527,6 @@ async function logout() {
 .sheet-link-active {
   background: var(--accent-soft);
   font-weight: 700;
-}
-
-.sheet-link-active .nav-icon {
-  color: var(--accent);
-}
-
-.nav-icon {
-  font-size: 20px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 @media (max-width: 480px) {

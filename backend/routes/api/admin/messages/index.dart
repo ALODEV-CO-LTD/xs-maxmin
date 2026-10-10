@@ -23,6 +23,13 @@ Response onRequest(RequestContext context) {
     SELECT
       u.id AS user_id,
       u.name AS name,
+      u.username AS username,
+      u.package_type AS package_type,
+      u.package_expires_at AS package_expires_at,
+      (SELECT dm.from_user_id = u.id FROM direct_messages dm
+        WHERE (dm.from_user_id = u.id AND dm.to_user_id IN (SELECT id FROM users WHERE role = 'admin'))
+           OR (dm.to_user_id = u.id AND dm.from_user_id IN (SELECT id FROM users WHERE role = 'admin'))
+        ORDER BY dm.created_at DESC LIMIT 1) AS last_from_user,
       (SELECT CASE WHEN dm.content = '' THEN '[Đính kèm] ' || COALESCE(dm.attachment_name, '') ELSE dm.content END FROM direct_messages dm
         WHERE (dm.from_user_id = u.id AND dm.to_user_id IN (SELECT id FROM users WHERE role = 'admin'))
            OR (dm.to_user_id = u.id AND dm.from_user_id IN (SELECT id FROM users WHERE role = 'admin'))
@@ -47,6 +54,11 @@ Response onRequest(RequestContext context) {
           {
             'userId': r['user_id'],
             'userName': r['name'],
+            'username': r['username'],
+            'packageType': r['package_type'],
+            'packageExpiresAt': r['package_expires_at'],
+            // true when the customer wrote last, i.e. admin has not answered yet.
+            'awaitingReply': (r['last_from_user'] as int? ?? 0) == 1,
             'avatar': initials(r['name'] as String),
             'lastMessage': r['last_content'],
             'lastMessageAt': r['last_at'],

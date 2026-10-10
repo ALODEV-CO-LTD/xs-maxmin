@@ -43,7 +43,6 @@ import AdminPaymentRequestsView from '../views/admin/PaymentRequestsView.vue'
 import AdminMessagesView from '../views/admin/MessagesView.vue'
 import AdminNoticesView from '../views/admin/NoticesView.vue'
 import AdminBackupsView from '../views/admin/BackupsView.vue'
-import AdminMessageThreadView from '../views/admin/MessageThreadView.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: LoginView, meta: { public: true, title: 'Đăng nhập' } },
@@ -125,8 +124,8 @@ const routes = [
   {
     path: '/admin/messages/:userId',
     name: 'admin-messages-thread',
-    component: AdminMessageThreadView,
-    meta: { title: 'Cuộc trò chuyện', requiresAdmin: true, parent: 'admin-messages' },
+    component: AdminMessagesView,
+    meta: { title: 'Phản hồi khách hàng', requiresAdmin: true },
   },
   {
     path: '/admin/notices',

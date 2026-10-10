@@ -40,7 +40,7 @@ const tKnown = await time('2'), tUnknown = await time('no-such-user-' + x)
 ok(Math.max(tKnown, tUnknown) / Math.max(1, Math.min(tKnown, tUnknown)) < 2, `timing known ${tKnown}ms vs unknown ${tUnknown}ms are close`)
 
 console.log('--- admin lock')
-const adm = await call('POST', '/auth/login', { username: '1', password: '1' }); const A = adm.d.token
+const adm = await call('POST', '/auth/login', { username: '1', password: '1234' }); const A = adm.d.token
 const usr = await call('POST', '/auth/login', { username: U, password: PW }); const pend = usr.d.pendingToken
 const s4 = await call('POST', '/auth/step2', { pendingToken: (await call('POST', '/auth/login', { username: U, password: PW })).d.pendingToken, password: SEC }); const S5 = s4.d.token
 const list = await call('GET', '/admin/users', undefined, A); const uid = (list.d.subscribers).find((u) => u.username === U).id
