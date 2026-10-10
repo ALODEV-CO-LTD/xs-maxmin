@@ -275,7 +275,7 @@ async function submitStep2() {
     <form v-else-if="stage === 'security'" novalidate @submit.prevent="submitForm">
       <div class="step-progress" aria-label="Bước 2 trong 2">Bước 2/2 · Bảo mật</div>
       <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
-      <p class="security-intro">Mật khẩu lớp hai được hỏi thêm mỗi lần đăng nhập. Hãy đặt mật khẩu khác với mật khẩu đăng nhập.</p>
+      <p class="security-intro">Mật khẩu lớp hai được hỏi thêm mỗi lần đăng nhập. Bạn đặt gì tuỳ ý.</p>
 
       <div class="field">
         <label for="reg-second-password">Mật khẩu lớp hai <span class="required-note">Bắt buộc</span></label>
