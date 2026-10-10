@@ -1,6 +1,6 @@
 # MAMBA (XS Maxmin) – Tài liệu bàn giao dự án
 
-> Cập nhật: 09/10/2026 · Nhánh làm việc hiện tại: `mask-short` (chứa toàn bộ công việc mới nhất) · Bản đang chạy: https://xs.massagehomeriyadh.com/
+> Cập nhật: 10/10/2026 · Nhánh làm việc hiện tại: `mask-short` (chứa toàn bộ công việc mới nhất) · Bản đang chạy: https://xs.massagehomeriyadh.com/
 >
 > **Tài liệu này không chứa mật khẩu, token hay khoá bí mật.** Các giá trị đó được bàn giao riêng (xem mục 10).
 
@@ -67,7 +67,7 @@ npm install
 npm run dev -- --host          # --host để máy khác cùng mạng LAN truy cập được
 ```
 
-- Mở http://localhost:5173. Tài khoản mẫu có trong `_seed()` của `backend/lib/src/database.dart`.
+- Mở http://localhost:5173. Tài khoản mẫu có trong `_seed()` của `backend/lib/src/database.dart` (admin `1`/`1234`; khách `2`–`6` mật khẩu `1235`–`1239`).
 - Tắt `dart_frog dev` bằng cổng, **đừng dùng `pkill -f dart_frog`** (đã từng giết nhầm server của người khác).
 - Trên link LAN (HTTP không phải localhost) trình duyệt không cho dùng micro và thông báo đẩy, nên không thử gọi thoại được; dùng bản thật hoặc HTTPS.
 - Chạy test backend: `cd backend && dart test`. Build web: `cd frontend && npm run build` (có bước `prebuild` copy mô hình OCR).
@@ -165,7 +165,7 @@ TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc A
 ## 10. Việc cần làm ngay khi nhận bàn giao
 
 1. **Đặt `XOSO_JWT_SECRET` cố định** trên máy chủ (drop-in như mục 7) để các lần deploy sau không đăng xuất mọi người.
-2. **Đổi mật khẩu mặc định:** admin `1`/`1` và các tài khoản demo có mật khẩu đơn giản (chỉ dùng thử). Trước khi cho khách thật dùng phải đổi hết.
+2. **Đổi mật khẩu mặc định:** admin `1` (mật khẩu seed `1234`) và các tài khoản demo `2`–`6` (mật khẩu seed `1235`–`1239`) – đều là mật khẩu mock trong `_seed()` của `backend/lib/src/database.dart`, chỉ dùng thử. Seed chỉ chạy khi DB trống nên tài khoản đã có trên máy chủ thật giữ mật khẩu cũ (admin vẫn có thể là `1`/`1`). Trước khi cho khách thật dùng phải đổi hết.
 3. **Thu hồi token Cloudflare đã từng gửi qua chat** (ba token) và tạo token riêng cho người mới nếu cần. Khoá TURN hiện dùng nằm trong file cấu hình trên máy chủ, không nằm trong code.
 4. Xác nhận quyền truy cập: SSH vào `root@10.5.100.5`, repo GitHub `trancongthangvn/xs-maxmin`, tài khoản Cloudflare chứa tunnel `xs.massagehomeriyadh.com`.
 5. Dọn các thư mục sao lưu cũ trong `/opt/xs-maxmin` và các file `/root/xoso-*.db` khi đã yên tâm.
