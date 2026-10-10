@@ -22,6 +22,7 @@ const form = reactive({
   tokenDays: 30,
   autoLockMinutes: 0,
   watermarkEnabled: true,
+  screenshotGuardEnabled: true,
 })
 let saved = ''
 
@@ -61,7 +62,7 @@ async function save() {
   notice.value = ''
   try {
     const body = {}
-    for (const k of Object.keys(form)) body[k] = k === 'watermarkEnabled' ? !!form[k] : Number(form[k])
+    for (const k of Object.keys(form)) body[k] = typeof form[k] === 'boolean' ? !!form[k] : Number(form[k])
     fill(await api.put('/admin/security-policy', body))
     notice.value = 'Đã lưu chính sách bảo mật.'
   } catch (err) {
@@ -119,6 +120,8 @@ async function reset() {
         <h2>Đóng dấu màn hình</h2>
         <p class="hint">Web không chặn được chụp màn hình. Dấu tên người xem mờ (tên, tên đăng nhập, giờ, 4 ký tự cuối mã tài khoản) phủ trên mọi màn hình, để ảnh bị lộ truy ra được tài khoản và thời điểm chụp.</p>
         <label class="check"><input v-model="form.watermarkEnabled" type="checkbox" /> Bật đóng dấu tên người xem</label>
+        <p class="hint" style="margin-top: 14px">Trên máy tính, màn hình tự bị phủ đen ngay khi giữ tổ hợp phím chụp (Cmd+Shift+3/4/5 trên Mac, Win+Shift+S trên Windows), nên ảnh chụp ra màu đen. PrintScreen chỉ đến được trang sau khi ảnh đã chụp nên chỉ xoá clipboard. Không chặn được chụp bằng điện thoại, nút cứng trên điện thoại hay quay bằng thiết bị khác; muốn chặn thật cần app.</p>
+        <label class="check"><input v-model="form.screenshotGuardEnabled" type="checkbox" /> Phủ đen màn hình khi bấm phím chụp màn hình (máy tính)</label>
       </section>
 
       <div class="actions">

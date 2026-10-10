@@ -5,6 +5,7 @@ import AppShell from './components/AppShell.vue'
 import PrivacyGuard from './components/PrivacyGuard.vue'
 import ScreenWatermark from './components/ScreenWatermark.vue'
 import { useAuthStore } from './stores/auth'
+import { startScreenshotGuard, stopScreenshotGuard } from './screenshotGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,13 @@ const auth = useAuthStore()
 // The session can die while a page is open (expired/revoked token -> api.js clears it on a 401).
 // Without this the user stays on the page, which then only shows errors; send them to the login
 // screen at once and bring them back to the same page afterwards.
+// Desktop screenshot shortcuts cover the screen while signed in (screenshotGuard.js).
+watch(
+  () => auth.isAuthenticated,
+  (ok) => (ok ? startScreenshotGuard() : stopScreenshotGuard()),
+  { immediate: true },
+)
+
 watch(
   () => auth.isAuthenticated,
   (ok) => {

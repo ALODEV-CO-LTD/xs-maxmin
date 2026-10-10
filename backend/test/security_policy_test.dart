@@ -16,6 +16,7 @@ void main() {
   test('defaults equal the old hard-coded values', () {
     final p = loadPolicy(_db());
     expect([p.loginFreeAttempts, p.loginBaseLockSeconds, p.loginMaxLockSeconds, p.tokenDays, p.autoLockMinutes, p.watermarkEnabled], [5, 30, 900, 30, 0, true]);
+    expect(p.screenshotGuardEnabled, true);
   });
 
   test('saved values are used; out-of-range stored values fall back', () {
@@ -35,6 +36,7 @@ void main() {
     expect(validatePolicyInput({'loginFreeAttempts': 21}), isNotNull);
     expect(validatePolicyInput({'tokenDays': '7'}), isNotNull);
     expect(validatePolicyInput({'watermarkEnabled': 'yes'}), isNotNull);
+    expect(validatePolicyInput({'screenshotGuardEnabled': 1}), isNotNull);
     expect(validatePolicyInput({'loginBaseLockSeconds': 600, 'loginMaxLockSeconds': 300}), isNotNull);
     expect(validatePolicyInput({'loginFreeAttempts': 3, 'tokenDays': 7, 'autoLockMinutes': 0, 'watermarkEnabled': true}), isNull);
   });

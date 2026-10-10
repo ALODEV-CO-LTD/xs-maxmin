@@ -10,6 +10,8 @@ import 'package:sqlite3/sqlite3.dart';
 ///  - tokenDays: how long a login lasts before the person must sign in again.
 ///  - autoLockMinutes: default idle auto-lock for accounts that never chose
 ///    their own (0 = off); each person can still pick a value in Tài khoản.
+///  - screenshotGuardEnabled: cover the screen when a desktop screenshot shortcut
+///    (Cmd+Shift+3/4/5, Win+Shift+S) is held (frontend/src/screenshotGuard.js).
 ///  - watermarkEnabled: faint viewer name/time overlay on every screen so a
 ///    leaked screenshot can be traced (the web cannot block screenshots).
 class SecurityPolicy {
@@ -20,6 +22,7 @@ class SecurityPolicy {
     this.tokenDays = 30,
     this.autoLockMinutes = 0,
     this.watermarkEnabled = true,
+    this.screenshotGuardEnabled = true,
   });
 
   final int loginFreeAttempts;
@@ -28,6 +31,7 @@ class SecurityPolicy {
   final int tokenDays;
   final int autoLockMinutes;
   final bool watermarkEnabled;
+  final bool screenshotGuardEnabled;
 
   Map<String, Object> toJson() => {
         'loginFreeAttempts': loginFreeAttempts,
@@ -36,6 +40,7 @@ class SecurityPolicy {
         'tokenDays': tokenDays,
         'autoLockMinutes': autoLockMinutes,
         'watermarkEnabled': watermarkEnabled,
+        'screenshotGuardEnabled': screenshotGuardEnabled,
       };
 }
 
@@ -70,6 +75,7 @@ SecurityPolicy loadPolicy(Database db) {
     tokenDays: num('tokenDays', d.tokenDays),
     autoLockMinutes: num('autoLockMinutes', d.autoLockMinutes),
     watermarkEnabled: stored['watermarkEnabled'] == null ? d.watermarkEnabled : stored['watermarkEnabled'] == 'true',
+    screenshotGuardEnabled: stored['screenshotGuardEnabled'] == null ? d.screenshotGuardEnabled : stored['screenshotGuardEnabled'] == 'true',
   );
 }
 
@@ -85,6 +91,9 @@ String? validatePolicyInput(Map<String, dynamic> body) {
   if (body.containsKey('watermarkEnabled') && body['watermarkEnabled'] is! bool) {
     return 'Đóng dấu tên người xem phải là bật hoặc tắt';
   }
+  if (body.containsKey('screenshotGuardEnabled') && body['screenshotGuardEnabled'] is! bool) {
+    return 'Che màn hình khi chụp phải là bật hoặc tắt';
+  }
   final base = body['loginBaseLockSeconds'];
   final max = body['loginMaxLockSeconds'];
   if (base is int && max is int && max < base) {
@@ -95,7 +104,7 @@ String? validatePolicyInput(Map<String, dynamic> body) {
 
 /// Writes the given fields; the rest keep their current/default value.
 void savePolicy(Database db, Map<String, dynamic> body) {
-  for (final k in [..._ranges.keys, 'watermarkEnabled']) {
+  for (final k in [..._ranges.keys, 'watermarkEnabled', 'screenshotGuardEnabled']) {
     if (!body.containsKey(k)) continue;
     db.execute(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
