@@ -213,3 +213,41 @@ export async function recognizeLotteryTable(file, { onProgress } = {}) {
     throw classify(err)
   }
 }
+
+/**
+ * Miền Nam / Miền Trung result table (2-4 stations side by side): every recognised word with its position, so the
+ * columns (one per station) and the prize rows can be rebuilt (lotteryColumns.js). English model, as for Miền Bắc;
+ * the station names in the header are read separately by the caller from the same words.
+ */
+export async function recognizeLotteryWords(file, { onProgress } = {}) {
+  try {
+    const image = await prepareImage(file, 'table')
+    return await withWorker('eng', onProgress, async (worker) => {
+      let best = null
+      for (const psm of ['6', '11']) {
+        await worker.setParameters({ tessedit_pageseg_mode: psm })
+        const { data } = await worker.recognize(image, {}, { text: true, blocks: true })
+        const words = collectWords(data)
+        const digits = words.filter((w) => /^\d+$/.test(w.text)).length
+        if (!best || digits > best.digits) best = { words, text: data.text || '', digits, psm }
+      }
+      return best
+    })
+  } catch (err) {
+    throw classify(err)
+  }
+}
+
+// Flattens tesseract's blocks -> paragraphs -> lines -> words into [{ text, x, y, w, h, conf }] (centre-based helpers
+// are computed by the caller).
+function collectWords(data) {
+  if (Array.isArray(data.words) && data.words.length) {
+    return data.words.map((w) => ({ text: w.text, x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1, conf: w.confidence }))
+  }
+  const out = []
+  for (const b of data.blocks || [])
+    for (const p of b.paragraphs || [])
+      for (const l of p.lines || [])
+        for (const w of l.words || []) out.push({ text: w.text, x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1, conf: w.confidence })
+  return out
+}

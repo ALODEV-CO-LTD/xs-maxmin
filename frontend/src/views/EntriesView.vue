@@ -27,6 +27,7 @@ import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
 import { customerBetTypes } from '../scoringConfig'
 import { loadStations, stationLabel, stationOptions } from '../lotteryStations'
+import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
 import { aliasesToText, fold, parseMessage, textToAliases, DEFAULT_STAKE_MARKERS } from '../messageParser'
@@ -185,11 +186,27 @@ function pickImage() {
   ocrFileInput.value?.click()
 }
 
-async function onImageSelected(e) {
+function onImageSelected(e) {
   const file = e.target.files?.[0]
   e.target.value = '' // allow picking the same file again later
-  if (!file) return
+  if (file) processImage(file)
+}
 
+// Paste (Ctrl/Cmd+V) or the "Dán ảnh" button works while the add form (a customer is chosen) is on screen.
+usePasteImage(
+  (file) => processImage(file),
+  () => !!form.customerName && !ocrRunning.value,
+)
+async function pasteImageFromButton() {
+  ocrError.value = ''
+  try {
+    processImage(await readClipboardImage())
+  } catch (e) {
+    ocrError.value = e.message
+  }
+}
+
+async function processImage(file) {
   ocrError.value = ''
   ocrRawText.value = ''
   if (ocrPreviewUrl.value) URL.revokeObjectURL(ocrPreviewUrl.value)
@@ -792,7 +809,8 @@ async function deleteTemplate() {
               <AppIcon v-if="!ocrRunning" name="camera" />
               {{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Nhập từ ảnh (đọc tự động)' }}
             </button>
-            <p class="ocr-hint">Ảnh xử lý ngay trên trình duyệt, không gửi lên đâu cả. Kết quả chỉ là gợi ý. Hãy kiểm tra lại trước khi lưu.</p>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top: 6px" :disabled="ocrRunning" @click="pasteImageFromButton">Dán ảnh từ bộ nhớ tạm</button>
+            <p class="ocr-hint">Chọn ảnh hoặc dán ảnh (Ctrl/Cmd+V). Ảnh xử lý ngay trên trình duyệt, không gửi lên đâu cả. Kết quả chỉ là gợi ý. Hãy kiểm tra lại trước khi lưu.</p>
 
             <div v-if="ocrError" class="alert alert-error" style="margin-top: 8px">{{ ocrError }}</div>
 

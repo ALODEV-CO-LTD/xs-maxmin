@@ -22,11 +22,13 @@
 import { effectiveConfig } from '../scoringConfig'
 import { entryDetail } from '../scoringSummary'
 import { entryStations, loadStations, regionList, regionOf, stationName, stationsOn } from '../lotteryStations'
+import { assignStations, parseColumns } from '../lotteryColumns'
+import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { showConfirm } from '../confirm'
 import AppDatePicker from '../components/AppDatePicker.vue'
 import AppIcon from '../components/AppIcon.vue'
 import AppSelect from '../components/AppSelect.vue'
-import { onMounted, computed, reactive, ref, watch } from 'vue'
+import { nextTick, onMounted, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { loadAllEntries } from '../offline'
 import { today } from '../dates'
@@ -233,13 +235,16 @@ async function loadLottery() {
 }
 
 // Keep the station valid for the region/date, reshape the grid and load what is saved for it.
+let applying = false // true while a recognised column is being written into the form (the watchers must not reload over it)
 watch([region, lotteryDate], () => {
+  if (applying) return
   const choices = stationChoices.value
   if (!choices.includes(station.value)) station.value = choices[0] || region.value
   resetLotteryForm(null)
   loadLottery()
 })
 watch(station, () => {
+  if (applying) return
   resetLotteryForm(null)
   loadLottery()
 })
@@ -315,11 +320,13 @@ function pickLrImage() {
   lrFileInput.value?.click()
 }
 
-async function onLrImageSelected(e) {
+function onLrImageSelected(e) {
   const file = e.target.files?.[0]
   e.target.value = ''
-  if (!file) return
+  if (file) processLrImage(file)
+}
 
+async function processLrImage(file) {
   lrOcrError.value = ''
   if (lrOcrPreviewUrl.value) URL.revokeObjectURL(lrOcrPreviewUrl.value)
   lrOcrPreviewUrl.value = URL.createObjectURL(file)
@@ -373,6 +380,126 @@ function applyLrOcrGuess(text) {
   // 2-digit: bảy(4)
   const two = byLen[2]
   for (let k = 0; k < 4; k++) if (!lotteryForm.giaiBay[k]?.trim() && two[k]) lotteryForm.giaiBay[k] = two[k]
+}
+
+// ---- Đọc ảnh bảng kết quả Miền Nam / Miền Trung (nhiều đài, mỗi đài một cột) ----------------------------
+// The photo is read in the browser, the columns are rebuilt from the word positions (lotteryColumns.js) and every
+// column is only a SUGGESTION: it is shown for review and nothing is saved until the user presses a save button.
+const mcRunning = ref(false)
+const mcProgress = ref(0)
+const mcError = ref('')
+const mcNote = ref('')
+const mcCols = ref([]) // [{ station, source, values, issues, complete, headerText }]
+const mcDate = ref('')
+const mcFileInput = ref(null)
+const mcSavingAll = ref(false)
+const mcStationOptions = computed(() => Object.entries(regionOf(region.value).stations || {}).map(([id, name]) => ({ id, name })))
+
+function onMcImageSelected(e) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (file) processMcImage(file)
+}
+
+async function processMcImage(file) {
+  mcError.value = ''
+  mcNote.value = ''
+  mcCols.value = []
+  mcRunning.value = true
+  mcProgress.value = 0
+  try {
+    await loadStations()
+    const { recognizeLotteryWords } = await import('../ocr')
+    const { words } = await recognizeLotteryWords(file, { onProgress: (p) => (mcProgress.value = p) })
+    const parsed = parseColumns(words)
+    if (!parsed.columns.length) {
+      mcError.value = 'Không nhận ra bảng kết quả (cần thấy giải đặc biệt 6 số của từng đài). Hãy chụp rõ cả bảng hoặc nhập tay.'
+      return
+    }
+    // Which region and day the photo is of: from its title ("XSMT ... 09/10/2026"), else what is selected now.
+    const text = words.map((w) => String(w.text)).join(' ').toLowerCase()
+    const seenRegion = /xsmt/.test(text) ? 'mt' : /xsmn/.test(text) ? 'mn' : region.value
+    const date = parsed.date || lotteryDate.value
+    const candidates = stationsOn(seenRegion, date)
+    assignStations(parsed.columns, candidates)
+    mcDate.value = date
+    mcCols.value = parsed.columns.map((c) => ({ ...c, region: seenRegion }))
+    if (seenRegion !== region.value || date !== lotteryDate.value) {
+      applying = true
+      region.value = seenRegion
+      lotteryDate.value = date
+      await nextTick()
+      applying = false
+      mcNote.value = `Ảnh là kết quả ${regionOf(seenRegion).name} ngày ${date.split('-').reverse().join('/')}; đã chuyển sang miền và ngày này.`
+    }
+  } catch (err) {
+    const { describeOcrError } = await import('../ocr')
+    mcError.value = describeOcrError(err)
+  } finally {
+    mcRunning.value = false
+  }
+}
+
+// Paste (Ctrl/Cmd+V) or the "Dán ảnh" buttons: the picture goes to the reader of the region on screen.
+usePasteImage(
+  (file) => (region.value === 'mb' ? processLrImage(file) : processMcImage(file)),
+  () => !lrOcrRunning.value && !mcRunning.value,
+)
+async function pasteFromButton() {
+  const err = region.value === 'mb' ? lrOcrError : mcError
+  err.value = ''
+  try {
+    const file = await readClipboardImage()
+    if (region.value === 'mb') processLrImage(file)
+    else processMcImage(file)
+  } catch (e) {
+    err.value = e.message
+  }
+}
+
+function pickMcImage() {
+  mcFileInput.value?.click()
+}
+
+async function mcFill(col) {
+  if (!col.station) return
+  applying = true
+  region.value = regionOf(col.station).id
+  lotteryDate.value = mcDate.value
+  station.value = col.station
+  await nextTick()
+  applying = false
+  resetLotteryForm(col.values)
+  hasSavedLottery.value = false
+  gridOpen.value = true
+  lotterySaveMsg.value = `Đã điền ${stationName(col.station)} vào form. Hãy kiểm tra rồi bấm "Lưu kết quả".`
+}
+
+const mcDuplicate = computed(() => {
+  const ids = mcCols.value.map((c) => c.station).filter(Boolean)
+  return ids.length !== new Set(ids).size
+})
+const mcSavable = computed(() => mcCols.value.length > 0 && !mcDuplicate.value && mcCols.value.every((c) => c.station && c.complete))
+
+async function mcSaveAll() {
+  if (!mcSavable.value) return
+  mcSavingAll.value = true
+  lotteryError.value = ''
+  lotterySaveMsg.value = ''
+  try {
+    for (const col of mcCols.value) {
+      await api.post('/lottery-results', { drawDate: mcDate.value, station: col.station, ...col.values })
+    }
+    const { results } = await api.get(`/lottery-results?date=${mcDate.value}&all=1`)
+    fillResultsForDate(mcDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
+    lotterySaveMsg.value = `Đã lưu kết quả ${mcCols.value.length} đài ngày ${mcDate.value.split('-').reverse().join('/')}.`
+    mcCols.value = []
+    await loadLottery()
+  } catch (err) {
+    lotteryError.value = err.message || 'Không lưu được kết quả'
+  } finally {
+    mcSavingAll.value = false
+  }
 }
 
 function clearLotteryForm() {
@@ -438,9 +565,52 @@ function clearLotteryForm() {
           <AppIcon v-if="!lrOcrRunning" name="camera" />
           {{ lrOcrRunning ? `Đang đọc ảnh... ${lrOcrProgress}%` : 'Đọc kết quả từ ảnh' }}
         </button>
-        <p class="ocr-hint">Xử lý ngay trên trình duyệt. Đọc ảnh có thể sai (đặc biệt số có số 0 ở đầu). Luôn kiểm tra lại trước khi lưu.</p>
+        <button type="button" class="btn btn-ghost btn-sm paste-btn" :disabled="lrOcrRunning" @click="pasteFromButton">Dán ảnh từ bộ nhớ tạm</button>
+        <p class="ocr-hint">Xử lý ngay trên trình duyệt. Chọn ảnh hoặc dán ảnh (Ctrl/Cmd+V). Đọc ảnh có thể sai (đặc biệt số có số 0 ở đầu). Luôn kiểm tra lại trước khi lưu.</p>
         <div v-if="lrOcrError" class="alert alert-error" style="margin-top: 8px">{{ lrOcrError }}</div>
         <img v-if="lrOcrPreviewUrl && !lrOcrRunning" :src="lrOcrPreviewUrl" alt="Ảnh đã chọn" class="ocr-thumb-lg" />
+      </div>
+
+      <!-- Miền Nam / Miền Trung: một ảnh bảng kết quả có nhiều đài (mỗi đài một cột) -->
+      <div v-if="region !== 'mb'" class="ocr-box mc-box">
+        <input ref="mcFileInput" type="file" accept="image/*" style="display: none" @change="onMcImageSelected" />
+        <button type="button" class="btn btn-secondary btn-block" :disabled="mcRunning" @click="pickMcImage">
+          <AppIcon v-if="!mcRunning" name="camera" />
+          {{ mcRunning ? `Đang đọc ảnh... ${mcProgress}%` : 'Đọc kết quả từ ảnh (nhiều đài)' }}
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm paste-btn" :disabled="mcRunning" @click="pasteFromButton">Dán ảnh từ bộ nhớ tạm</button>
+        <p class="ocr-hint">
+          Chọn hoặc dán ảnh (Ctrl/Cmd+V) bảng kết quả Miền Nam / Miền Trung (mỗi đài một cột). Xử lý ngay trên trình duyệt; kết quả chỉ là gợi ý để bạn kiểm tra, chưa lưu cho tới khi bạn bấm lưu.
+        </p>
+        <div v-if="mcError" class="alert alert-error" style="margin-top: 8px">{{ mcError }}</div>
+        <div v-if="mcNote" class="alert alert-success" style="margin-top: 8px">{{ mcNote }}</div>
+
+        <div v-if="mcCols.length" class="mc-cols">
+          <div v-for="(col, ci) in mcCols" :key="ci" class="mc-col" :class="{ bad: !col.complete }">
+            <div class="mc-col-head">
+              <AppSelect v-model="col.station" :aria-label="`Đài của cột ${ci + 1}`">
+                <option v-for="o in mcStationOptions" :key="o.id" :value="o.id">{{ o.name }}</option>
+              </AppSelect>
+              <span class="mc-source">{{ col.source ? `nhận theo ${col.source}` : '' }}</span>
+            </div>
+            <p v-if="col.complete" class="mc-ok">Đọc đủ 18 số</p>
+            <p v-else class="mc-warn">Chưa đủ: {{ col.issues.join('; ') }}. Kiểm tra và sửa trong form.</p>
+            <details class="mc-numbers">
+              <summary>Xem các số đã đọc</summary>
+              <dl>
+                <template v-for="p in regionOf(col.region).structure" :key="p.tier">
+                  <dt>{{ p.label }}</dt>
+                  <dd>{{ [].concat(col.values[p.tier] ?? []).map((v) => v || '·').join('  ') }}</dd>
+                </template>
+              </dl>
+            </details>
+            <button type="button" class="btn btn-ghost btn-sm" :disabled="!col.station" @click="mcFill(col)">Điền vào form để sửa</button>
+          </div>
+          <p v-if="mcDuplicate" class="mc-warn">Hai cột đang trùng một đài, hãy chọn lại.</p>
+          <button type="button" class="btn btn-primary btn-sm" :disabled="!mcSavable || mcSavingAll" @click="mcSaveAll">
+            {{ mcSavingAll ? 'Đang lưu...' : `Lưu kết quả ${mcCols.length} đài này` }}
+          </button>
+        </div>
       </div>
 
       <div v-if="lotteryLoading" class="page-subtitle">Đang tải...</div>
@@ -578,6 +748,65 @@ function clearLotteryForm() {
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
+}
+.paste-btn {
+  margin-top: 6px;
+}
+.mc-box {
+  margin-bottom: 12px;
+}
+.mc-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.mc-col {
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.mc-col.bad {
+  border-color: var(--danger-text);
+}
+.mc-col-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.mc-source,
+.mc-ok,
+.mc-warn {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mc-ok {
+  color: var(--success-text);
+}
+.mc-warn {
+  color: var(--danger-text);
+  grid-column: 1 / -1;
+}
+.mc-numbers {
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.mc-numbers dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 6px 0 0;
+}
+.mc-numbers dt {
+  color: var(--muted);
+}
+.mc-numbers dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .region-tabs {
   display: flex;
