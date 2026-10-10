@@ -18,6 +18,9 @@
        PUT  /me/scoring-settings body { rates: {typeKey: {rate, tiers, digits}} }
 -->
 <script setup>
+// `embedded`: shown inside Tính điểm (hides the page title); emits `saved` after every successful save.
+defineProps({ embedded: { type: Boolean, default: false } })
+const emit = defineEmits(['saved'])
 import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
 import AddBetTypeDialog from '../components/AddBetTypeDialog.vue'
@@ -155,6 +158,7 @@ async function save() {
     rows.value = toRows(rates)
     markSaved()
     saved.value = true
+    emit('saved')
     return true
   } catch (err) {
     error.value = err instanceof ApiError ? (err.status === 0 ? 'Mất kết nối tới máy chủ, chưa lưu được. Hãy thử lại.' : err.message) : 'Không thể lưu cài đặt'
@@ -172,10 +176,12 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="page">
-    <h1 class="page-title">Cấu hình tính điểm</h1>
+  <div :class="embedded ? 'settings-embedded' : 'page'">
+    <template v-if="!embedded">
+      <h1 class="page-title">Cấu hình tính điểm</h1>
+    </template>
     <p class="page-subtitle">
-      Cho từng loại đánh của riêng tài khoản bạn: tỉ lệ ăn và đối chiếu với những giải nào trong kết quả xổ số. Điểm
+      {{ embedded ? 'Cấu hình mặc định, dùng cho mọi khách chưa có cấu hình riêng. ' : '' }}Cho từng loại đánh của riêng tài khoản bạn: tỉ lệ ăn và đối chiếu với những giải nào trong kết quả xổ số. Điểm
       ra = điểm vào × tỉ lệ, mỗi lần số khách đánh khớp 2 số cuối với một số ở các giải đã chọn.
     </p>
 

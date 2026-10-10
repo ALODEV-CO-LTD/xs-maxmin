@@ -12,7 +12,8 @@ import 'package:sqlite3/sqlite3.dart';
 /// customer - adding to the roster is a deliberate, separate step done
 /// here (or on CustomersView.vue).
 ///
-/// GET  -> { customers: [{ id, name, phone, createdAt }] }, ordered by name
+/// GET  -> { customers: [{ id, name, phone, scoringRates, createdAt }] }, ordered by name
+///         (`scoringRates` = this customer's own payout config, or null to follow the account's)
 /// POST { name, phone? } -> creates one; 409 if that name already exists
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
@@ -25,6 +26,15 @@ Future<Response> onRequest(RequestContext context) async {
   };
 }
 
+Object? _rates(Object? raw) {
+  if (raw is! String) return null;
+  try {
+    return jsonDecode(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
 Response _list(RequestContext context, String userId) {
   final db = context.read<Database>();
   _backfillFromEntries(db, userId);
@@ -35,7 +45,8 @@ Response _list(RequestContext context, String userId) {
   return Response.json(
     body: {
       'customers': [
-        for (final r in rows) {'id': r['id'], 'name': r['name'], 'phone': r['phone'] ?? '', 'createdAt': r['created_at']},
+        for (final r in rows)
+          {'id': r['id'], 'name': r['name'], 'phone': r['phone'] ?? '', 'scoringRates': _rates(r['scoring_rates']), 'createdAt': r['created_at']},
       ],
     },
   );

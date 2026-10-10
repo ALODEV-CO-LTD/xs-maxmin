@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/scoring_rates.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -25,23 +26,9 @@ import 'package:sqlite3/sqlite3.dart';
 ///          built-in default if the user never saved an override)
 /// PUT  { rates: {typeKey: {rate, tiers, digits}} } -> saves it as this
 ///      user's own
-const _validTiers = [
-  'dacBiet',
-  'giaiNhat',
-  'giaiNhi',
-  'giaiBa',
-  'giaiTu',
-  'giaiNam',
-  'giaiSau',
-  'giaiBay',
-];
-
-const _minDigits = 1;
-const _maxDigits = 5;
-
 final Map<String, dynamic> _defaultRates = {
   'de': {'rate': 70, 'tiers': ['dacBiet'], 'digits': 2},
-  'lo': {'rate': 20, 'tiers': List<String>.from(_validTiers), 'digits': 2},
+  'lo': {'rate': 20, 'tiers': List<String>.from(validTiers), 'digits': 2},
 };
 
 Future<Response> onRequest(RequestContext context) async {
@@ -53,33 +40,6 @@ Future<Response> onRequest(RequestContext context) async {
     HttpMethod.put => _put(context, auth.userId),
     _ => Response(statusCode: 405, body: 'Method not allowed'),
   };
-}
-
-/// Normalizes one stored/submitted rate entry into `{rate, tiers}`.
-/// Accepts a bare number too (the shape this endpoint used before "tiers"
-/// existed) and fills in every tier, matching that version's behavior
-/// (it always compared against all 27 numbers) so old saved settings keep
-/// working exactly as before instead of silently changing what they mean.
-Map<String, dynamic>? _normalizeEntry(dynamic value) {
-  if (value is num) {
-    if (value <= 0) return null;
-    return {'rate': value, 'tiers': List<String>.from(_validTiers), 'digits': 2};
-  }
-  if (value is Map) {
-    final rate = value['rate'];
-    final numericRate = rate is num ? rate : num.tryParse('$rate');
-    final tiersRaw = value['tiers'];
-    if (numericRate == null || numericRate <= 0 || tiersRaw is! List) return null;
-    final tiers = tiersRaw.map((t) => t.toString()).where(_validTiers.contains).toSet().toList();
-    if (tiers.isEmpty) return null;
-    final digitsRaw = value['digits'];
-    final numericDigits = digitsRaw is num ? digitsRaw.toInt() : int.tryParse('$digitsRaw');
-    final digits = (numericDigits == null || numericDigits < _minDigits || numericDigits > _maxDigits)
-        ? 2
-        : numericDigits;
-    return {'rate': numericRate, 'tiers': tiers, 'digits': digits};
-  }
-  return null;
 }
 
 Response _get(RequestContext context, String userId) {
@@ -94,7 +54,7 @@ Response _get(RequestContext context, String userId) {
       if (decoded is Map && decoded.isNotEmpty) {
         final normalized = <String, dynamic>{};
         for (final entry in decoded.entries) {
-          final n = _normalizeEntry(entry.value);
+          final n = normalizeRateEntry(entry.value);
           if (n != null) normalized[entry.key as String] = n;
         }
         if (normalized.isNotEmpty) rates = normalized;
@@ -104,7 +64,7 @@ Response _get(RequestContext context, String userId) {
     }
   }
   return Response.json(
-    body: {'rates': rates, 'availableTiers': _validTiers, 'digitRange': [_minDigits, _maxDigits]},
+    body: {'rates': rates, 'availableTiers': validTiers, 'digitRange': [minDigits, maxDigits]},
   );
 }
 
@@ -127,7 +87,7 @@ Future<Response> _put(RequestContext context, String userId) async {
     if (key is! String || key.trim().isEmpty) {
       return Response.json(statusCode: 400, body: {'error': 'Mã loại đánh không hợp lệ'});
     }
-    final n = _normalizeEntry(entry.value);
+    final n = normalizeRateEntry(entry.value);
     if (n == null) {
       return Response.json(
         statusCode: 400,
@@ -141,6 +101,6 @@ Future<Response> _put(RequestContext context, String userId) async {
   db.execute('UPDATE users SET scoring_rates = ? WHERE id = ?', [jsonEncode(normalized), userId]);
 
   return Response.json(
-    body: {'rates': normalized, 'availableTiers': _validTiers, 'digitRange': [_minDigits, _maxDigits]},
+    body: {'rates': normalized, 'availableTiers': validTiers, 'digitRange': [minDigits, maxDigits]},
   );
 }

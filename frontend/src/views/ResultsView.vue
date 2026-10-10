@@ -19,6 +19,7 @@
        PATCH /me/entries/:id with only `{ result }`.
 -->
 <script setup>
+import { effectiveConfig } from '../scoringConfig'
 import { showConfirm } from '../confirm'
 import AppDatePicker from '../components/AppDatePicker.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -166,7 +167,9 @@ function numbersForTiers(r, tiers) {
   return tiers.flatMap((t) => byTier[t] || [])
 }
 function computeScore(entry, lr) {
-  const config = rates.value[entry.betType || 'de'] ?? rates.value.de
+  // The customer's own config if they have one, else the account-wide one.
+  const own = customers.value.find((c) => c.name === entry.customerName)?.scoringRates
+  const config = effectiveConfig(rates.value, own, entry.betType)
   const digits = config.digits || 2
   const trailing = numbersForTiers(lr, config.tiers).map((n) => String(n).slice(-digits))
   const bets = (entry.value || '').split(/[,;\s]+/).map((v) => normDigits(v, digits)).filter(Boolean)

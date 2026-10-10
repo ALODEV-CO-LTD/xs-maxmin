@@ -70,6 +70,8 @@ void _migrateSchema(Database db) {
   // fall back to the 'de' default in the frontend.
   _ensureColumn(db, 'data_entries', 'bet_type', 'TEXT');
   _ensureColumn(db, 'customers', 'phone', 'TEXT');
+  // Per-customer scoring override (JSON map typeKey -> {rate, tiers, digits}); NULL = follow the account's settings.
+  _ensureColumn(db, 'customers', 'scoring_rates', 'TEXT');
   // Per-user payout-rate config ("tỉ lệ ăn"): JSON object of
   // {betTypeKey: rate}, e.g. '{"de":70,"lo":20}' - each account sets its
   // own (see routes/api/me/scoring-settings), not admin-controlled. Null
