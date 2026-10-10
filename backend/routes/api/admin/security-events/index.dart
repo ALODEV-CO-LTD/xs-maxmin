@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// `GET ?limit=100` - most recent security events (failed logins, lockouts,
@@ -11,7 +12,8 @@ Response onRequest(RequestContext context) {
   }
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
-  if (auth.role != 'admin') return forbidden();
+  final denied = denyUnless(context, auth, 'security.view');
+  if (denied != null) return denied;
 
   final limit = (int.tryParse(context.request.uri.queryParameters['limit'] ?? '') ?? 100).clamp(1, 500);
   final db = context.read<Database>();

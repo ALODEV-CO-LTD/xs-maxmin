@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/permissions.dart';
 import 'package:server/src/package_plans.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -11,7 +12,8 @@ Response onRequest(RequestContext context) {
   }
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
-  if (auth.role != 'admin') return forbidden();
+  final denied = denyUnless(context, auth, 'stats.view');
+  if (denied != null) return denied;
 
   final db = context.read<Database>();
   final totalRow = db.select("SELECT COUNT(*) AS c FROM users WHERE role = 'user'").first;

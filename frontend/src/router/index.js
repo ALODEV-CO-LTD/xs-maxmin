@@ -49,7 +49,7 @@ const routes = [
   { path: '/register', name: 'register', component: RegisterView, meta: { public: true, title: 'Đăng ký' } },
 
   // User area
-  { path: '/', name: 'home', redirect: () => (useAuthStore().isAdmin ? '/admin/users' : '/entries') },
+  { path: '/', name: 'home', redirect: () => (useAuthStore().isAdmin ? useAuthStore().adminHome() : '/entries') },
   { path: '/entries', name: 'entries', component: EntriesView, meta: { userOnly: true, title: 'Nhập số' } },
   { path: '/results', name: 'results', component: ResultsView, meta: { userOnly: true, title: 'Nhập kết quả' } },
   { path: '/scoring', name: 'scoring', component: ScoringView, meta: { userOnly: true, title: 'Tính điểm' } },
@@ -89,55 +89,61 @@ const routes = [
     path: '/admin/users',
     name: 'admin-users',
     component: AdminUsersView,
-    meta: { title: 'Quản lý khách hàng', requiresAdmin: true },
+    meta: { title: 'Quản lý khách hàng', requiresAdmin: true, perm: 'users.view' },
   },
   {
     path: '/admin/stats',
     name: 'admin-stats',
     component: AdminStatsView,
-    meta: { title: 'Thống kê', requiresAdmin: true },
+    meta: { title: 'Thống kê', requiresAdmin: true, perm: 'stats.view' },
   },
   {
     path: '/admin/settings',
     name: 'admin-settings',
     component: AdminSettingsView,
-    meta: { title: 'Cài đặt hệ thống', requiresAdmin: true },
+    meta: { title: 'Cài đặt hệ thống', requiresAdmin: true, perm: ['settings.manage', 'security.view'] },
   },
   {
     path: '/admin/renewals',
     name: 'admin-renewals',
     component: AdminRenewalsView,
-    meta: { title: 'Gia hạn gói', requiresAdmin: true },
+    meta: { title: 'Gia hạn gói', requiresAdmin: true, perm: 'payments.manage' },
   },
   {
     path: '/admin/payment-requests',
     name: 'admin-payment-requests',
     component: AdminPaymentRequestsView,
-    meta: { title: 'Yêu cầu thanh toán', requiresAdmin: true },
+    meta: { title: 'Yêu cầu thanh toán', requiresAdmin: true, perm: 'payments.manage' },
   },
   {
     path: '/admin/messages',
     name: 'admin-messages',
     component: AdminMessagesView,
-    meta: { title: 'Phản hồi khách hàng', requiresAdmin: true },
+    meta: { title: 'Phản hồi khách hàng', requiresAdmin: true, perm: 'support.messages' },
   },
   {
     path: '/admin/messages/:userId',
     name: 'admin-messages-thread',
     component: AdminMessagesView,
-    meta: { title: 'Phản hồi khách hàng', requiresAdmin: true },
+    meta: { title: 'Phản hồi khách hàng', requiresAdmin: true, perm: 'support.messages' },
   },
   {
     path: '/admin/notices',
     name: 'admin-notices',
     component: AdminNoticesView,
-    meta: { title: 'Thông báo & bảo trì', requiresAdmin: true },
+    meta: { title: 'Thông báo & bảo trì', requiresAdmin: true, perm: 'announcements.manage' },
   },
   {
     path: '/admin/backups',
     name: 'admin-backups',
     component: AdminBackupsView,
-    meta: { title: 'Sao lưu dữ liệu', requiresAdmin: true },
+    meta: { title: 'Sao lưu dữ liệu', requiresAdmin: true, perm: 'backups.manage' },
+  },
+  {
+    path: '/admin/staff',
+    name: 'admin-staff',
+    component: () => import('../views/admin/StaffView.vue'),
+    meta: { title: 'Phân quyền Admin', requiresAdmin: true, rootOnly: true },
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
@@ -147,7 +153,7 @@ export const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
   if (to.meta.public) {
@@ -167,8 +173,14 @@ router.beforeEach((to) => {
     return { path: '/' }
   }
 
+  // Admin pages are gated by permission (A07); the profile (with its permissions)
+  // may not be loaded yet on the very first navigation.
+  if (auth.isAdmin && !auth.user) await auth.fetchMe().catch(() => {})
+  if (to.meta.rootOnly && !auth.isRoot) return { path: auth.adminHome() }
+  if (to.meta.perm && !auth.can(to.meta.perm)) return { path: auth.adminHome() }
+
   if (to.meta.userOnly && auth.isAdmin) {
-    return { path: '/admin/users' }
+    return { path: auth.adminHome() }
   }
 
   return true

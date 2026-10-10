@@ -26,7 +26,7 @@ Khách hàng,K24,Xóa ID ảo,Đã làm,Đã làm,Giữ nguyên,"Đã lên máy 
 Khách hàng,K25,Nhắn tin,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
 Khách hàng,K26,Gửi hình ảnh hoặc tệp,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
 Khách hàng,K27,Gọi thoại,Đã làm,Một phần,Có đổi,Đã lên máy chủ thật,Gọi thoại giữa hai tài khoản chạy; gọi giữa hai mạng khác nhau chưa thông vì chưa cấu hình TURN Cloudflare (thiếu khóa Calls). | Ghi chú cũ: Chưa có gọi ngoài mạng do thiếu cấu hình turn của cf,
-Khách hàng,K28,"Mã hóa tin nhắn, dữ liệu và cuộc gọi",Chưa làm,Chưa làm,Giữ nguyên,—,Nên tách tiêu chí mã hóa đầu cuối khỏi mã hóa dữ liệu lưu trữ.,
+Khách hàng,K28,"Mã hóa tin nhắn, dữ liệu và cuộc gọi",Chưa làm,Một phần,Có đổi,Bản mới đã lên máy chủ thật,"Chat bạn bè mã hóa 2 đầu (ECDH P-256 + AES-GCM), máy chủ chỉ relay khi cả hai online và không lưu; ảnh/tệp mã hóa; lịch sử chỉ trên thiết bị. Cuộc gọi là WebRTC (DTLS-SRTP, mã hóa 2 đầu). Chưa làm: phản hồi Admin, dữ liệu số liệu/khách hàng (chờ app), bí mật chuyển tiếp. Xem docs/MA_HOA_2_DAU.md.",
 Khách hàng,K29,Xác thực cuộc gọi và chống giả mạo,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,"WebSocket yêu cầu đăng nhập, server chống giả tên người gọi, giới hạn 6 cuộc/phút. Chưa có xác thực đầu cuối.",
 Khách hàng,K30,Đổi giọng nói,Chưa làm,Chưa làm,Giữ nguyên,—,,
 Khách hàng,K31,Không có gọi video,đã làm,đã làm,Giữ nguyên,—,,
@@ -50,8 +50,8 @@ Admin,A03,Khóa và mở khóa tài khoản,Đã làm,Đã làm,Giữ nguyên,�
 Admin,A04,Quản lý phiên đăng nhập,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Admin xem và thu hồi phiên của từng người dùng.,
 Admin,A05,Quản lý quy tắc ID ảo và giới hạn số lượng,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Admin chỉnh giới hạn số ID ảo (Cài đặt).,
 Admin,A06,Hỗ trợ khôi phục tài khoản,Một phần,Đã làm,Có đổi,Bản mới chưa deploy,"Admin đặt lại mật khẩu (có chính sách mật khẩu, đăng xuất mọi thiết bị), cấp lại mã khôi phục, gỡ khoá, mật khẩu ngẫu nhiên; ghi nhật ký; quy trình khôi phục có kiểm soát: khách gửi yêu cầu, Admin xác minh và duyệt, cấp mã hỗ trợ dùng một lần hạn 24 giờ, khách tự đặt mật khẩu mới (Admin không biết). Chưa deploy.",
-Admin,A07,Phân quyền Admin nhiều cấp,Chưa làm,Chưa làm,Giữ nguyên,—,,
-Admin,A08,Chính sách lưu trữ dữ liệu,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Admin,A07,Phân quyền Admin nhiều cấp,Chưa làm,Đã làm,Có đổi,Chưa deploy,"Admin gốc tạo tài khoản thứ cấp (chăm sóc khách hàng, quản lý hệ thống...) và tích chọn từng quyền (xem/khoá/khôi phục/xoá khách, phản hồi, thanh toán, thống kê, thông báo, cài đặt, sao lưu, nhật ký bảo mật). Quyền đọc từ DB mỗi yêu cầu nên đổi có hiệu lực ngay; chỉ Admin gốc quản lý phân quyền.",
+Admin,A08,Chính sách lưu trữ dữ liệu,Chưa làm,Chưa làm,Giữ nguyên,—,"Quyết định: web giữ như hiện tại (lưu trên máy chủ); app lưu hoàn toàn trên thiết bị và có thể xoá sạch 100%. Làm cùng bản app.",
 Admin,A09,Cấu hình chính sách bảo mật,Chưa làm,Chưa làm,Giữ nguyên,—,,
 Admin,A10,Giám sát hệ thống và thống kê sử dụng,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,Có thống kê và nhật ký bảo mật; chưa có cảnh báo tự động.,
 Admin,A11,Quản lý hỗ trợ khách hàng,Đã làm,Đã làm,Giữ nguyên,—,,Sơn

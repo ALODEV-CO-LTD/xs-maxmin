@@ -94,6 +94,9 @@ void _migrateSchema(Database db) {
   // End-to-end encryption (docs/MA_HOA_2_DAU.md): the client's PUBLIC key (JWK
   // JSON). The private key never leaves the device.
   _ensureColumn(db, 'users', 'e2ee_public_key', 'TEXT');
+  // Multi-level Admin (lib/src/permissions.dart): NULL = root Admin, else a JSON list
+  // of permission keys for a staff account.
+  _ensureColumn(db, 'users', 'staff_permissions', 'TEXT');
   // Quản lý thanh toán (A18): a short transfer reference ("nội dung chuyển khoản") the user puts
   // in the bank note so the admin can match the money, the reason shown to the user when a request
   // is rejected, and `cancelled` = the user withdrew a still-pending request (stored as status

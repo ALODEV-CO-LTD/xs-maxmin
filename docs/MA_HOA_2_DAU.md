@@ -60,3 +60,9 @@ Ghi chú: "không lưu trên máy chủ" kéo theo bỏ các tính năng đang c
 - Không có bí mật chuyển tiếp hoàn hảo (forward secrecy) ở bước đầu vì dùng khoá tĩnh theo thiết bị; thêm khoá tạm cho từng tin hoặc Double Ratchet là bước sau.
 - Lần đầu kết bạn nếu không đối chiếu vân tay thì vẫn tin máy chủ khi phát khoá công khai (rủi ro tráo khoá).
 - Chụp màn hình, người dùng chép tin ra ngoài: ngoài phạm vi E2EE.
+
+## 6. Chính sách lưu trữ (A08) và cuộc gọi
+
+- **Cuộc gọi thoại** đã mã hoá 2 đầu: WebRTC (DTLS-SRTP) giữa hai thiết bị; máy chủ chỉ chuyển tín hiệu và TURN chỉ thấy gói đã mã hoá. Máy chủ vẫn giữ siêu dữ liệu (`call_logs`: ai gọi ai, giờ, thời lượng).
+- **Web:** dữ liệu số liệu/khách hàng giữ như hiện tại (lưu trên máy chủ). Chat bạn bè không lưu trên máy chủ (mục 0).
+- **App (làm cùng bản app):** mọi dữ liệu lưu trên thiết bị, kèm chức năng xoá sạch 100% trên máy. Chưa làm.

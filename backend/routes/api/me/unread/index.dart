@@ -26,14 +26,14 @@ Response onRequest(RequestContext context) {
     LEFT JOIN message_reads r
       ON r.user_id = ?1
      AND r.peer_key = CASE WHEN u.role = 'admin' THEN 'support' ELSE m.from_user_id END
-    WHERE m.to_user_id = ?1
+    WHERE (m.to_user_id = ?1 OR (?2 = 'admin' AND m.to_user_id IN (SELECT id FROM users WHERE role = 'admin')))
       AND m.created_at > COALESCE(
             r.last_read_at,
             (SELECT value FROM settings WHERE key = 'unread_epoch'),
             '')
     GROUP BY m.from_user_id
     ''',
-    [me],
+    [me, auth.role],
   );
 
   final friends = <String, int>{};

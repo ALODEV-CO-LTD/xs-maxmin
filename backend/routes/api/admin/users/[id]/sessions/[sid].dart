@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/permissions.dart';
 import 'package:server/src/sessions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -10,7 +11,8 @@ Response onRequest(RequestContext context, String id, String sid) {
   }
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
-  if (auth.role != 'admin') return forbidden();
+  final denied = denyUnless(context, auth, 'users.lock');
+  if (denied != null) return denied;
 
   final db = context.read<Database>();
   final ok = revokeSession(db, id, sid, by: auth.userId, ip: clientIp(context));

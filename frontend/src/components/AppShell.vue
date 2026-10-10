@@ -64,20 +64,25 @@ const userLinks = [
 ]
 
 const adminLinks = [
-  { name: 'admin-users', label: 'Khách hàng', icon: 'users' },
-  { name: 'admin-stats', label: 'Thống kê', icon: 'chart-column-increasing' },
-  { name: 'admin-payment-requests', label: 'Duyệt thanh toán', icon: 'circle-check' },
-  { name: 'admin-renewals', label: 'Gia hạn', icon: 'refresh-cw' },
-  { name: 'admin-messages', label: 'Phản hồi', icon: 'message-square-more' },
-  { name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
-  { name: 'admin-backups', label: 'Sao lưu', icon: 'refresh-cw' },
-  { name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
+  { perm: 'users.view', name: 'admin-users', label: 'Khách hàng', icon: 'users' },
+  { perm: 'stats.view', name: 'admin-stats', label: 'Thống kê', icon: 'chart-column-increasing' },
+  { perm: 'payments.manage', name: 'admin-payment-requests', label: 'Duyệt thanh toán', icon: 'circle-check' },
+  { perm: 'payments.manage', name: 'admin-renewals', label: 'Gia hạn', icon: 'refresh-cw' },
+  { perm: 'support.messages', name: 'admin-messages', label: 'Phản hồi', icon: 'message-square-more' },
+  { perm: 'announcements.manage', name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
+  { perm: 'backups.manage', name: 'admin-backups', label: 'Sao lưu', icon: 'refresh-cw' },
+  { perm: ['settings.manage', 'security.view'], name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
   // Admin dùng chung trang /account với khách hàng (đổi mật khẩu...). Admin
   // không có mục "Bạn bè": liên hệ với khách chỉ qua "Phản hồi" ở trên.
+  { root: true, name: 'admin-staff', label: 'Phân quyền', icon: 'users' },
   { name: 'account', label: 'Tài khoản', icon: 'user' },
 ]
 
-const links = computed(() => (auth.isAdmin ? adminLinks : userLinks))
+const links = computed(() =>
+  auth.isAdmin
+    ? adminLinks.filter((l) => (l.root ? auth.isRoot : !l.perm || auth.can(l.perm)))
+    : userLinks,
+)
 
 // Back button (K44): child screens declare `meta.parent` (route name) in
 // router/index.js; /customers opened from Nhập số goes back there. The same

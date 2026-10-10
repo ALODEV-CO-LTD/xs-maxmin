@@ -1,6 +1,7 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/attachments.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// `GET /api/admin/messages/:userId/attachment/:messageId` - admin reading an
@@ -11,7 +12,8 @@ Response onRequest(RequestContext context, String userId, String messageId) {
   }
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
-  if (auth.role != 'admin') return forbidden();
+  final denied = denyUnless(context, auth, 'support.messages');
+  if (denied != null) return denied;
 
   final db = context.read<Database>();
   final rows = db.select(

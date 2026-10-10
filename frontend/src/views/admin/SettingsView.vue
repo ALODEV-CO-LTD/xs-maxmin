@@ -22,6 +22,7 @@
 import AppSelect from '../../components/AppSelect.vue'
 import { ref, onMounted, computed } from 'vue'
 import { api, ApiError } from '../../api'
+import { useAuthStore } from '../../stores/auth'
 
 const packages = [
   { wire: '1m', label: '1 tháng', default: 99000 },
@@ -207,8 +208,14 @@ async function loadEvents() {
   }
 }
 
-onMounted(load)
-onMounted(loadEvents)
+// A staff account may hold only one of these rights (A07): the settings forms need
+// settings.manage, the security log needs security.view.
+const auth = useAuthStore()
+const canSettings = auth.can('settings.manage')
+const canSecurity = auth.can('security.view')
+if (canSettings) onMounted(load)
+else loading.value = false
+if (canSecurity) onMounted(loadEvents)
 </script>
 
 <template>
@@ -220,7 +227,7 @@ onMounted(loadEvents)
     <div v-if="saved" class="alert alert-success">Đã lưu cài đặt</div>
     <div v-if="loading">Đang tải...</div>
 
-    <template v-else>
+    <template v-else-if="canSettings">
       <h2 style="margin-top: 0">Tài khoản nhận thanh toán</h2>
       <p class="page-subtitle">
         Khách hàng sẽ thấy thông tin này (và mã QR chuyển khoản nhanh) ở trang Gói dịch vụ khi mua gói.
@@ -288,6 +295,7 @@ onMounted(loadEvents)
     </form>
     </template>
 
+    <template v-if="canSecurity">
     <h2 style="margin-top: 32px">Nhật ký bảo mật gần đây</h2>
     <p class="page-subtitle">Không ghi mật khẩu hay token.</p>
     <div v-if="eventsError" class="alert alert-error">{{ eventsError }}</div>
@@ -315,7 +323,9 @@ onMounted(loadEvents)
       </table>
     </div>
 
-    <template v-if="!loading && otherKeys.length > 0">
+    </template>
+
+    <template v-if="canSettings && !loading && otherKeys.length > 0">
       <h2 style="margin-top: 32px">Các khoá cài đặt khác</h2>
       <div class="card" style="padding: 0">
         <table class="table">

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/permissions.dart';
 import 'package:server/src/password_policy.dart';
 import 'package:server/src/recovery_codes.dart';
 import 'package:server/src/sessions.dart';
@@ -40,6 +41,17 @@ Future<Response> onRequest(RequestContext context, String id) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
   if (auth.role != 'admin') return forbidden();
+  // Per-method permissions (A07): viewing, locking, recovery support and
+  // deleting are separate rights a staff account may or may not hold.
+  final needed = switch (context.request.method) {
+    HttpMethod.get => 'users.view',
+    HttpMethod.delete => 'users.delete',
+    _ => null, // PATCH: decided by the fields below
+  };
+  if (needed != null) {
+    final denied = denyUnless(context, auth, needed);
+    if (denied != null) return denied;
+  }
 
   return switch (context.request.method) {
     HttpMethod.get => _get(context, id),
@@ -98,6 +110,14 @@ Future<Response> _patch(RequestContext context, String id) async {
   }
 
   final hasNewPassword = newPassword is String && newPassword.trim().isNotEmpty;
+  if (locked is bool) {
+    final denied = denyUnless(context, requireAuth(context)!, 'users.lock');
+    if (denied != null) return denied;
+  }
+  if (hasNewPassword || reissueCode || clearLockouts) {
+    final denied = denyUnless(context, requireAuth(context)!, 'users.recovery');
+    if (denied != null) return denied;
+  }
   // Validate before changing anything, so a bad password does not leave a
   // half-applied lock/unlock behind.
   if (newPassword is String && hasNewPassword) {

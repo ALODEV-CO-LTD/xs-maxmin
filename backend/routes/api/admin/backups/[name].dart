@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:path/path.dart' as p;
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/permissions.dart';
 
 import 'index.dart' show backupDir;
 
@@ -11,7 +12,8 @@ import 'index.dart' show backupDir;
 Future<Response> onRequest(RequestContext context, String name) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
-  if (auth.role != 'admin') return forbidden();
+  final denied = denyUnless(context, auth, 'backups.manage');
+  if (denied != null) return denied;
   if (context.request.method != HttpMethod.get) {
     return Response(statusCode: 405, body: 'Method not allowed');
   }

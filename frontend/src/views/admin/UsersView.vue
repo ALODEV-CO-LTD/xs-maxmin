@@ -11,6 +11,9 @@ import { ref, onMounted, watch } from 'vue'
 import { api, ApiError } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
 import AdminRecoveryRequests from '../../components/AdminRecoveryRequests.vue'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
 
 const q = ref('')
 const loading = ref(false)
@@ -98,6 +101,7 @@ const sessionsError = ref('')
 
 async function loadUserSessions(id) {
   sessionsError.value = ''
+  if (!auth.can('users.lock')) return
   try {
     userSessions.value = (await api.get(`/admin/users/${id}/sessions`)).sessions || []
   } catch (err) {
@@ -224,7 +228,7 @@ onMounted(loadList)
     <h1 class="page-title">Quản lý khách hàng</h1>
     <p class="page-subtitle">Tổng cộng {{ total }} khách hàng</p>
 
-    <AdminRecoveryRequests />
+    <AdminRecoveryRequests v-if="auth.can('users.recovery')" />
 
     <div class="field search-field">
       <div class="input-wrap">
@@ -315,7 +319,7 @@ onMounted(loadList)
             </p>
           </div>
 
-          <div class="info-card">
+          <div v-if="auth.can('users.lock')" class="info-card">
             <p class="info-row">
               <strong>Thiết bị đang đăng nhập ({{ userSessions.length }})</strong>
               <button
@@ -378,6 +382,7 @@ onMounted(loadList)
           <div class="modal-actions">
             <div class="actions-main">
             <button
+              v-if="auth.can('users.lock')"
               class="btn btn-secondary"
               :disabled="actionBusy"
               @click="toggleLock"
@@ -386,22 +391,22 @@ onMounted(loadList)
             </button>
 
             <button
-              v-if="!showResetPassword"
+              v-if="!showResetPassword && auth.can('users.recovery')"
               class="btn btn-secondary"
               :disabled="actionBusy"
               @click="showResetPassword = true; lastSetPassword = ''"
             >
               Đặt lại mật khẩu
             </button>
-            <button class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('code')">
+            <button v-if="auth.can('users.recovery')" class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('code')">
               Cấp lại mã khôi phục
             </button>
-            <button class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('unlock')">
+            <button v-if="auth.can('users.recovery')" class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('unlock')">
               Gỡ khoá đăng nhập
             </button>
             </div>
 
-            <div class="actions-danger">
+            <div v-if="auth.can('users.delete')" class="actions-danger">
             <button class="btn btn-danger" :disabled="actionBusy" @click="deleteUser">Xoá tài khoản</button>
             </div>
           </div>

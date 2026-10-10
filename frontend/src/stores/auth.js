@@ -29,8 +29,32 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     isAdmin: (state) => state.role === 'admin',
+    // Multi-level Admin (A07): the permission keys of this admin account (all of them
+    // for the root Admin) and whether it is the root Admin. Loaded with GET /me.
+    permissions: (state) => state.user?.permissions || [],
+    isRoot: (state) => !!state.user?.isRoot,
   },
   actions: {
+    // True when this admin account holds `perm` (the root Admin holds all).
+    // `perm` may also be a list: true when the account holds any of them.
+    can(perm) {
+      if (this.role !== 'admin') return false
+      const list = Array.isArray(perm) ? perm : [perm]
+      return !!this.user?.isRoot || list.some((p) => (this.user?.permissions || []).includes(p))
+    },
+    // First admin page this account may open (admin pages are listed in nav order).
+    adminHome() {
+      const pages = [
+        ['users.view', '/admin/users'],
+        ['support.messages', '/admin/messages'],
+        ['payments.manage', '/admin/payment-requests'],
+        ['stats.view', '/admin/stats'],
+        ['announcements.manage', '/admin/notices'],
+        [['settings.manage', 'security.view'], '/admin/settings'],
+        ['backups.manage', '/admin/backups'],
+      ]
+      return pages.find(([perm]) => this.can(perm))?.[1] || '/account'
+    },
     init() {
       try {
         this.token = localStorage.getItem(TOKEN_KEY)

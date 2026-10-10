@@ -1,4 +1,5 @@
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'database.dart' show newId;
@@ -22,6 +23,10 @@ Map<String, dynamic> meJson(Row row) {
     'name': row['name'],
     'username': row['username'],
     'role': row['role'],
+    // Admin accounts only: the permission keys they hold (all of them for the root
+    // Admin) and whether they are the root Admin.
+    'permissions': effectivePermissions(row),
+    'isRoot': isRootRow(row),
     'hasSecondPassword': row['second_password_hash'] != null,
     'hasWipePassword': row['wipe_password_hash'] != null,
     // Only whether a mã khôi phục exists - the code itself is stored hashed
