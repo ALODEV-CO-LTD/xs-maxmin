@@ -1,23 +1,24 @@
 <!--
-  Two buttons for a chat composer: attach a file (paperclip) or an image.
-  Emits `pick` with the chosen File and `error` with a message when the file is
-  empty or over the 5 MB limit. The chosen file is shown by <AttachmentPreview>.
+  Image button for a chat composer. Only JPG, PNG and WebP pictures can be sent (GIFs and
+  other files can carry author/device/time data that cannot be reliably removed).
+  Emits `pick` with the chosen File and `error` with a message when the file is not an
+  allowed picture, is empty or is over the 5 MB limit. The chosen file is shown by <AttachmentPreview>.
 -->
 <script setup>
 import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
-import { MAX_ATTACHMENT_BYTES } from '../attachments'
+import { ALLOWED_IMAGE_TYPES, IMAGE_ONLY_MESSAGE, MAX_ATTACHMENT_BYTES } from '../attachments'
 
 defineProps({ disabled: { type: Boolean, default: false } })
 const emit = defineEmits(['pick', 'error'])
 
-const fileInput = ref(null)
 const imageInput = ref(null)
 
 function onChange(e) {
   const file = e.target.files?.[0]
   e.target.value = '' // allow picking the same file again
   if (!file) return
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return emit('error', IMAGE_ONLY_MESSAGE)
   if (file.size === 0) return emit('error', 'Tệp trống')
   if (file.size > MAX_ATTACHMENT_BYTES) return emit('error', 'Tệp quá lớn (tối đa 5 MB)')
   emit('pick', file)
@@ -26,12 +27,8 @@ function onChange(e) {
 
 <template>
   <div class="attach-buttons">
-    <input ref="fileInput" type="file" class="attach-input" @change="onChange" />
-    <input ref="imageInput" type="file" accept="image/*" class="attach-input" @change="onChange" />
-    <button type="button" class="attach-btn" :disabled="disabled" aria-label="Đính kèm tập tin" title="Đính kèm tập tin" @click="fileInput.click()">
-      <AppIcon name="paperclip" />
-    </button>
-    <button type="button" class="attach-btn" :disabled="disabled" aria-label="Gửi ảnh" title="Gửi ảnh" @click="imageInput.click()">
+    <input ref="imageInput" type="file" accept="image/jpeg,image/png,image/webp" class="attach-input" @change="onChange" />
+    <button type="button" class="attach-btn" :disabled="disabled" aria-label="Gửi ảnh" title="Gửi ảnh (JPG, PNG, WebP)" @click="imageInput.click()">
       <AppIcon name="image" />
     </button>
   </div>

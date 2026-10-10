@@ -7,44 +7,6 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('JPEG: EXIF (APP1) removed, JFIF (APP0) and scan data kept', () {
-    final jpeg = Uint8List.fromList([
-      0xFF, 0xD8,
-      0xFF, 0xE0, 0x00, 0x04, 0x4A, 0x46, // APP0
-      0xFF, 0xE1, 0x00, 0x06, 0x45, 0x78, 0x69, 0x66, // APP1 "Exif"
-      0xFF, 0xDA, 0x00, 0x02, 0x11, 0x22, 0xFF, 0xD9, // SOS + data + EOI
-    ]);
-    final out = stripImageMetadata(jpeg);
-    expect(out.length, jpeg.length - 8);
-    expect(out.contains(0xE1), isFalse);
-    expect(out.sublist(out.length - 8), [0xFF, 0xDA, 0x00, 0x02, 0x11, 0x22, 0xFF, 0xD9]);
-  });
-
-  test('PNG: tEXt/eXIf dropped, IDAT kept', () {
-    Uint8List chunk(String type, List<int> data) => Uint8List.fromList([
-          0, 0, 0, data.length, ...type.codeUnits, ...data, 0, 0, 0, 0,
-        ]);
-    final sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-    final png = Uint8List.fromList([
-      ...sig,
-      ...chunk('IHDR', List.filled(13, 0)),
-      ...chunk('tEXt', [1, 2, 3]),
-      ...chunk('eXIf', [4, 5]),
-      ...chunk('IDAT', [9, 9]),
-      ...chunk('IEND', []),
-    ]);
-    final out = String.fromCharCodes(stripImageMetadata(png));
-    expect(out.contains('tEXt'), isFalse);
-    expect(out.contains('eXIf'), isFalse);
-    expect(out.contains('IDAT'), isTrue);
-    expect(out.contains('IEND'), isTrue);
-  });
-
-  test('non-images pass through', () {
-    final b = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(stripImageMetadata(b), b);
-  });
-
   test('custom Mã ID validation', () {
     expect(validateCustomCode('482915'), isNull);
     expect(validateCustomCode('12345'), isNotNull); // too short

@@ -6,7 +6,7 @@
 // kept only in this device's IndexedDB. Admin support (Phản hồi) is separate.
 import { defineStore } from 'pinia'
 import { api } from '../api'
-import { anonymousName, isScrubbableImage, scrubImageMetadata, MAX_ATTACHMENT_BYTES } from '../attachments'
+import { ALLOWED_IMAGE_TYPES, IMAGE_ONLY_MESSAGE, anonymousName, scrubImageMetadata, MAX_ATTACHMENT_BYTES } from '../attachments'
 import { useAuthStore } from '../stores/auth'
 import { useCallStore } from '../stores/call'
 import { useNotifyStore } from '../stores/notify'
@@ -159,10 +159,11 @@ export const useChatStore = defineStore('e2ee-chat', {
       let att = null
       let stored = null
       if (file) {
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error(IMAGE_ONLY_MESSAGE)
         if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Tệp quá lớn (tối đa 5 MB)')
-        // Images are redrawn (no EXIF/GPS/device/time) and renamed before they are encrypted.
-        const clean = isScrubbableImage(file) ? await scrubImageMetadata(file) : file
-        const name = isScrubbableImage(file) ? anonymousName(clean.type) : file.name
+        // The picture is redrawn (no EXIF/GPS/device/time) and renamed before it is encrypted.
+        const clean = await scrubImageMetadata(file)
+        const name = anonymousName(clean.type)
         fileBytes = new Uint8Array(await clean.arrayBuffer())
         att = { name, type: clean.type || 'application/octet-stream', size: fileBytes.length }
         stored = { ...att, isImage: att.type.startsWith('image/') && att.type !== 'image/svg+xml', blob: new Blob([fileBytes], { type: att.type }) }
@@ -265,12 +266,13 @@ export const useChatStore = defineStore('e2ee-chat', {
           plain = await decryptBytes(key, msg, frame)
         }
         const { text, ts, att, file } = unpackMessage(plain)
-        const stored = att && file.length
+        // Only pictures are accepted from a friend as well (a modified client could send anything).
+        const stored = att && file.length && ALLOWED_IMAGE_TYPES.includes(att.type)
           ? {
               name: String(att.name || 'tep-dinh-kem').slice(0, 200),
               type: String(att.type || 'application/octet-stream'),
               size: file.length,
-              isImage: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(att.type),
+              isImage: true,
               blob: new Blob([file], { type: String(att.type || 'application/octet-stream') }),
             }
           : null

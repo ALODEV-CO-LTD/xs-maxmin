@@ -35,7 +35,7 @@ Khách hàng,K33,Bảo vệ khi chụp màn hình,Chưa làm,Một phần,Có đ
 Khách hàng,K34,Cài đặt quyền riêng tư,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Màn hình Cài đặt quyền riêng tư; lưu theo trình duyệt, chưa đồng bộ giữa thiết bị.",
 Khách hàng,K35,Lịch xóa dữ liệu đã lưu,Chưa làm,Đã làm,Có đổi,Chỉ có ở bản local (chưa deploy),"Lịch xóa dữ liệu; bản lặp lại (mỗi N ngày/tuần/tháng, giữ lại N ngày) mới có ở local.",
 Khách hàng,K36,Lịch xóa dữ liệu trao đổi giữa hai người,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Tự xóa tin nhắn/ảnh trong một cuộc trò chuyện sau 1 giờ/1 ngày/7 ngày/30 ngày.,
-Khách hàng,K37,Xóa metadata ảnh trước khi gửi,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Làm sạch EXIF/metadata ảnh ở trình duyệt và máy chủ (JPEG/PNG/WebP); GIF chưa.,
+Khách hàng,K37,Xóa metadata ảnh trước khi gửi,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Chỉ gửi được ảnh JPG/PNG/WebP; trình duyệt vẽ lại ảnh và đổi tên ngẫu nhiên; máy chủ dựng lại ảnh chỉ giữ phần cần hiển thị (bỏ EXIF/GPS, text, XMP, ICC, thumbnail, dữ liệu sau EOI), đổi tên ngẫu nhiên và từ chối ảnh hỏng. GIF và tệp khác (PDF, Word, zip) bị từ chối.,
 Khách hàng,K38,Thông báo hoặc tắt đóng dấu ngày giờ và thiết bị,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,Có công tắc giữ/xóa metadata kèm thông báo. Ứng dụng không đóng dấu ngày giờ lên ảnh nên chưa có tùy chọn riêng.,
 Khách hàng,K39,"Quản lý quyền camera, vị trí và thông báo",Chưa làm,Chưa làm,Giữ nguyên,—,,
 Khách hàng,K40,Khóa ứng dụng,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Khóa ứng dụng bằng mật khẩu (xem K09).,

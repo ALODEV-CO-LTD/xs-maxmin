@@ -2,6 +2,12 @@
 // and enforces the same 5 MB limit; checking here just saves a round trip.
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 
+// Only pictures can be sent (K37/K38/S09): GIFs and other files (PDF, Word, zip...) can carry an
+// author, device or creation time that cannot be reliably removed, so they are refused here
+// and again by the server (backend/lib/src/attachments.dart).
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+export const IMAGE_ONLY_MESSAGE = 'Chỉ gửi được ảnh JPG, PNG hoặc WebP (không gửi GIF hay tệp khác)'
+
 export function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -41,9 +47,10 @@ export async function scrubImageMetadata(file) {
   canvas.getContext('2d').drawImage(bitmap, 0, 0)
   bitmap.close?.()
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, file.type, 0.92))
-  // Some browsers can't export WebP and silently fall back to PNG.
-  if (!blob || blob.type !== file.type) throw new Error(SCRUB_FAILED)
-  return new File([blob], file.name, { type: file.type, lastModified: Date.now() })
+  // Some browsers (Safari) cannot export WebP and silently give a PNG instead: that is a clean
+  // picture too, so send it as PNG rather than failing.
+  if (!blob || !ALLOWED_IMAGE_TYPES.includes(blob.type)) throw new Error(SCRUB_FAILED)
+  return new File([blob], file.name, { type: blob.type, lastModified: Date.now() })
 }
 
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
@@ -56,12 +63,9 @@ export function anonymousName(type) {
 // shape POST .../messages expects in its `attachment` field. JPEG/PNG/WebP
 // images are always scrubbed of metadata and renamed first.
 export async function fileToPayload(file) {
-  let toSend = file
-  let name = file.name
-  if (isScrubbableImage(file)) {
-    toSend = await scrubImageMetadata(file)
-    name = anonymousName(toSend.type)
-  }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error(IMAGE_ONLY_MESSAGE)
+  const toSend = await scrubImageMetadata(file)
+  const name = anonymousName(toSend.type)
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Không đọc được tệp'))
