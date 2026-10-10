@@ -91,13 +91,11 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   // Same distinctness rules as POST /api/me/password.
-  final second = row['second_password_hash'] as String?;
   final wipe = row['wipe_password_hash'] as String?;
-  if ((second != null && BCrypt.checkpw(newPassword, second)) ||
-      (wipe != null && BCrypt.checkpw(newPassword, wipe))) {
+  if (wipe != null && BCrypt.checkpw(newPassword, wipe)) {
     return Response.json(
       statusCode: 400,
-      body: {'error': 'Mật khẩu mới phải khác mật khẩu lớp hai và mật khẩu xoá dữ liệu'},
+      body: {'error': 'Mật khẩu mới phải khác mật khẩu xoá dữ liệu'},
     );
   }
 

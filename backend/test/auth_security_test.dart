@@ -7,30 +7,16 @@ import 'package:test/test.dart';
 
 void main() {
   group('password policy', () {
-    test('accepts a normal password', () {
-      expect(validateNewPassword('Xk9mPq2zLw'), isNull);
-      expect(validateNewPassword('mat-khau-moi-9'), isNull);
-    });
-    test('rejects short passwords', () {
-      expect(validateNewPassword('Ab1'), isNotNull);
-      expect(validateNewPassword('1234567'), isNotNull);
-    });
-    test('rejects common passwords case-insensitively', () {
-      for (final p in ['12345678', 'password', 'PASSWORD', 'Qwerty123', 'matkhau123', '11111111', '123456789']) {
-        expect(validateNewPassword(p), isNotNull, reason: p);
+    test('any non-empty password is accepted, however short or common', () {
+      for (final p in ['1234', '0909', '008866', '070501', '1', 'a', 'password', '12345678', 'aaaa', 'Xk9mPq2zLw']) {
+        expect(validateNewPassword(p), isNull, reason: p);
       }
     });
-    test('rejects a single repeated character', () {
-      expect(validateNewPassword('aaaaaaaaa'), isNotNull);
-      expect(validateNewPassword('7777777777'), isNotNull);
-    });
-    test('rejects ascending/descending runs', () {
-      for (final p in ['23456789', '98765432', 'abcdefgh', 'hgfedcba', '0123456789']) {
-        expect(validateNewPassword(p), isNotNull, reason: p);
-      }
-    });
-    test('does not reject a merely patterned but mixed password', () {
-      expect(validateNewPassword('abcd1234x'), isNull);
+    test('rejects empty and over-long (bcrypt 72-byte limit) passwords', () {
+      expect(validateNewPassword(''), isNotNull);
+      expect(validateNewPassword('a' * 72), isNull);
+      expect(validateNewPassword('a' * 73), isNotNull);
+      expect(validateNewPassword('ế' * 25), isNotNull); // 3 bytes each = 75
     });
   });
 

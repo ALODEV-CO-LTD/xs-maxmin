@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/password_policy.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/reauth_limit.dart';
 import 'package:server/src/sessions.dart';
@@ -55,11 +56,9 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Vui lòng nhập mật khẩu xoá dữ liệu'});
   }
 
-  if (wipePassword.length < 4) {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Mật khẩu xoá dữ liệu phải có ít nhất 4 ký tự'},
-    );
+  final wipeError = validateNewPassword(wipePassword);
+  if (wipeError != null) {
+    return Response.json(statusCode: 400, body: {'error': wipeError});
   }
   if (BCrypt.checkpw(wipePassword, self['password_hash'] as String)) {
     return Response.json(

@@ -44,26 +44,16 @@ Future<Response> onRequest(RequestContext context) async {
   if (password == null || passwordError != null) {
     return Response.json(statusCode: 400, body: {'error': passwordError});
   }
-  if (secondPassword == null || secondPassword.length < 4) {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Vui lòng đặt mật khẩu lớp hai (ít nhất 4 ký tự)'},
-    );
-  }
-  if (secondPassword == password) {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Mật khẩu lớp hai phải khác mật khẩu đăng nhập'},
-    );
+  final secondError = secondPassword == null ? 'Vui lòng đặt mật khẩu lớp hai' : validateNewPassword(secondPassword);
+  if (secondPassword == null || secondError != null) {
+    return Response.json(statusCode: 400, body: {'error': secondError});
   }
   // Wipe-password is optional at registration - the user can also set it
   // later from Tài khoản. Only validated when they choose to fill it in.
   if (wipePassword != null && wipePassword.isNotEmpty) {
-    if (wipePassword.length < 4) {
-      return Response.json(
-        statusCode: 400,
-        body: {'error': 'Mật khẩu xoá dữ liệu phải có ít nhất 4 ký tự'},
-      );
+    final wipeError = validateNewPassword(wipePassword);
+    if (wipeError != null) {
+      return Response.json(statusCode: 400, body: {'error': wipeError});
     }
     if (wipePassword == password || wipePassword == secondPassword) {
       return Response.json(

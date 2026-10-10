@@ -555,7 +555,7 @@ async function deleteAllData() {
           <div class="input-wrap"><input v-model="pwForm.currentPassword" type="password" /></div>
         </div>
         <div class="field">
-          <label>Mật khẩu mới (tối thiểu 8 ký tự, không quá dễ đoán)</label>
+          <label>Mật khẩu mới</label>
           <div class="input-wrap"><input v-model="pwForm.newPassword" type="password" /></div>
         </div>
         <div class="field">
@@ -580,7 +580,7 @@ async function deleteAllData() {
           <div class="input-wrap"><input v-model="secondForm.currentPassword" type="password" /></div>
         </div>
         <div class="field">
-          <label>Mật khẩu lớp hai mới (tối thiểu 4 ký tự)</label>
+          <label>Mật khẩu lớp hai mới</label>
           <div class="input-wrap"><input v-model="secondForm.secondPassword" type="password" /></div>
         </div>
         <button type="submit" class="btn btn-secondary sec-submit" :disabled="secondSubmitting">
@@ -601,7 +601,7 @@ async function deleteAllData() {
           <div class="input-wrap"><input v-model="wipeForm.currentPassword" type="password" /></div>
         </div>
         <div class="field">
-          <label>Mật khẩu xoá dữ liệu (tối thiểu 4 ký tự)</label>
+          <label>Mật khẩu xoá dữ liệu</label>
           <div class="input-wrap"><input v-model="wipeForm.wipePassword" type="password" /></div>
         </div>
         <button type="submit" class="btn btn-secondary sec-submit" :disabled="wipeSubmitting">

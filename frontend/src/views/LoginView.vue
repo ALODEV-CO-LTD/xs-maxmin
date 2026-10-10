@@ -140,8 +140,8 @@ async function submitRecover() {
     error.value = 'Vui lòng nhập tên đăng nhập và mã khôi phục'
     return
   }
-  if (recoverNewPassword.value.length < 8) {
-    error.value = 'Mật khẩu mới phải có ít nhất 8 ký tự'
+  if (!recoverNewPassword.value) {
+    error.value = 'Vui lòng nhập mật khẩu mới'
     return
   }
   if (recoverNewPassword.value !== recoverConfirm.value) {
@@ -267,7 +267,7 @@ function backToCredentials() {
       </div>
       <div class="field">
         <label for="rec-new">Mật khẩu mới</label>
-        <PasswordInput id="rec-new" v-model="recoverNewPassword" autocomplete="new-password" placeholder="Ít nhất 8 ký tự" :disabled="loading" />
+        <PasswordInput id="rec-new" v-model="recoverNewPassword" autocomplete="new-password" placeholder="Tuỳ bạn đặt" :disabled="loading" />
       </div>
       <div class="field">
         <label for="rec-confirm">Nhập lại mật khẩu mới</label>

@@ -37,6 +37,9 @@ const step2Password = ref('')
 
 // Inline validation: a field shows its state once it has been blurred or the
 // form has been submitted. Rules mirror the backend (routes/api/auth/register.dart).
+// Any non-empty password is fine (up to bcrypt's 72 bytes) - see backend password_policy.dart.
+const passwordProblem = (v) =>
+  !v ? 'Vui lòng nhập mật khẩu' : new TextEncoder().encode(v).length > 72 ? 'Mật khẩu quá dài (tối đa 72 ký tự)' : ''
 const touched = reactive({})
 const submitted = ref(false)
 const touch = (f) => (touched[f] = true)
@@ -45,22 +48,17 @@ const show = (f) => submitted.value || touched[f]
 const fieldErrors = computed(() => ({
   name: name.value.trim() ? '' : 'Vui lòng nhập tên hiển thị',
   username: username.value.trim().length >= 3 ? '' : 'Tên đăng nhập phải có ít nhất 3 ký tự',
-  password: password.value.length >= 8 ? '' : 'Mật khẩu phải có ít nhất 8 ký tự',
+  password: passwordProblem(password.value),
   confirmPassword: !confirmPassword.value
     ? 'Vui lòng nhập lại mật khẩu'
     : confirmPassword.value !== password.value
       ? 'Mật khẩu xác nhận không khớp'
       : '',
-  secondPassword:
-    secondPassword.value.length < 4
-      ? 'Mật khẩu lớp hai phải có ít nhất 4 ký tự'
-      : secondPassword.value === password.value
-        ? 'Mật khẩu lớp hai phải khác mật khẩu đăng nhập'
-        : '',
+  secondPassword: passwordProblem(secondPassword.value),
   wipePassword: !showWipePassword.value || !wipePassword.value
     ? ''
-    : wipePassword.value.length < 4
-      ? 'Mật khẩu xoá dữ liệu phải có ít nhất 4 ký tự'
+    : passwordProblem(wipePassword.value)
+      ? passwordProblem(wipePassword.value)
       : wipePassword.value === password.value || wipePassword.value === secondPassword.value
         ? 'Mật khẩu xoá dữ liệu phải khác 2 mật khẩu còn lại'
         : '',
@@ -243,7 +241,7 @@ async function submitStep2() {
           id="reg-password"
           v-model="password"
           autocomplete="new-password"
-          placeholder="Ít nhất 8 ký tự"
+          placeholder="Tuỳ bạn đặt"
           :disabled="loading"
           :aria-invalid="state('password') === 'error'"
           aria-describedby="msg-password"
@@ -285,7 +283,7 @@ async function submitStep2() {
           id="reg-second-password"
           v-model="secondPassword"
           autocomplete="off"
-          placeholder="Ít nhất 4 ký tự"
+          placeholder="Tuỳ bạn đặt"
           :disabled="loading"
           :aria-invalid="state('secondPassword') === 'error'"
           aria-describedby="msg-second-password"
@@ -293,7 +291,7 @@ async function submitStep2() {
         />
         <p id="msg-second-password" class="field-msg" :class="state('secondPassword')" aria-live="polite">
           <template v-if="state('secondPassword') === 'error'"><AppIcon name="circle-alert" />{{ fieldErrors.secondPassword }}</template>
-          <template v-else>Ít nhất 4 ký tự và khác mật khẩu đăng nhập.</template>
+          <template v-else>Tuỳ bạn đặt, dùng ở bước đăng nhập thứ hai.</template>
         </p>
       </div>
 
@@ -309,7 +307,7 @@ async function submitStep2() {
             id="reg-wipe-password"
             v-model="wipePassword"
             autocomplete="off"
-            placeholder="Ít nhất 4 ký tự"
+            placeholder="Tuỳ bạn đặt"
             :disabled="loading"
             :aria-invalid="state('wipePassword') === 'error'"
             aria-describedby="msg-wipe-password"

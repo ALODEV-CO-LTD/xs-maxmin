@@ -63,13 +63,6 @@ Future<Response> onRequest(RequestContext context) async {
       body: {'error': 'Mật khẩu mới phải khác mật khẩu hiện tại'},
     );
   }
-  final secondPasswordHash = self['second_password_hash'] as String?;
-  if (secondPasswordHash != null && BCrypt.checkpw(newPassword, secondPasswordHash)) {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Mật khẩu mới phải khác mật khẩu lớp hai'},
-    );
-  }
   final wipePasswordHash = self['wipe_password_hash'] as String?;
   if (wipePasswordHash != null && BCrypt.checkpw(newPassword, wipePasswordHash)) {
     return Response.json(

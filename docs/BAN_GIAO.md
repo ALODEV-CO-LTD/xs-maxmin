@@ -86,7 +86,7 @@ Bảng đầy đủ theo từng mã yêu cầu (K01…, A01…, S01…, NFR…) 
 - Token JWT có `sid` (phiên thiết bị) và `type`; mọi request kiểm tra phiên còn hiệu lực. Đổi mật khẩu/khôi phục/khoá tài khoản thu hồi mọi phiên (`tokens_valid_after`).
 - Các endpoint "nhập lại mật khẩu" (`/me/verify-password`, xoá dữ liệu, tắt ẩn số liệu…) trả **403** khi sai (không phải 401, để client không tự đăng xuất) và **429** khi bị khoá tạm (`reauth_limit.dart`).
 - Đăng nhập sai khoá tạm tăng dần 30 giây → 15 phút (`sessions.dart`), có chống dò tên đăng nhập.
-- Mật khẩu đăng nhập mới phải ≥ 8 ký tự và không phổ biến (`password_policy.dart`). Tài khoản cũ có mật khẩu yếu vẫn đăng nhập được.
+- Mật khẩu (đăng nhập, lớp hai, xoá dữ liệu) đặt tuỳ ý: không giới hạn dưới (chỉ không để trống), tối đa 72 byte vì bcrypt chỉ dùng 72 byte đầu (`password_policy.dart`). Chỉ còn ràng buộc: tên đăng nhập không trùng; mật khẩu xoá dữ liệu phải khác mật khẩu lớp hai và mật khẩu đăng nhập (vì nhập ở bước 2 sẽ kích hoạt xoá).
 - Tin nhắn mới đẩy qua WebSocket; ngoài ra client tự đối chiếu `/me/unread` mỗi 10 giây (dự phòng khi mạng chặn WebSocket).
 - Lỗi 401 ở client → `api.js` xoá phiên → `App.vue` chuyển về `/login?redirect=...`. Đăng xuất chủ động thì không giữ `redirect`.
 

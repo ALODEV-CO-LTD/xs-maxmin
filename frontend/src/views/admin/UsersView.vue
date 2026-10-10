@@ -359,7 +359,7 @@ onMounted(loadList)
           <div v-if="showResetPassword" class="reset-box">
             <label class="reset-label" for="new-password">Mật khẩu mới cho tài khoản này</label>
             <div class="reset-row">
-              <input id="new-password" v-model="newPassword" type="text" placeholder="Tối thiểu 8 ký tự" autocomplete="off" />
+              <input id="new-password" v-model="newPassword" type="text" placeholder="Mật khẩu mới" autocomplete="off" />
               <button class="btn btn-secondary btn-sm" :disabled="actionBusy" type="button" @click="generatePassword">
                 Tạo ngẫu nhiên
               </button>
