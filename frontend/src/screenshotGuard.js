@@ -83,12 +83,12 @@ function clearClipboard() {
 }
 
 function onKeyDown(e) {
-  if (e.key === 'Meta') held.meta = true
+  if (e.key === 'Meta' || e.key === 'OS') held.meta = true // 'OS' = Windows key in older Firefox/Edge
   if (e.key === 'Shift') held.shift = true
   if (e.metaKey) held.meta = true
   if (e.shiftKey) held.shift = true
   if (held.meta && held.shift) cover()
-  else if (covered && e.key !== 'Meta' && e.key !== 'Shift') {
+  else if (covered && e.key !== 'Meta' && e.key !== 'OS' && e.key !== 'Shift') {
     freshInput = true
     maybeUncover()
   }
