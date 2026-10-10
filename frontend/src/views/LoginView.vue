@@ -24,6 +24,7 @@ const route = useRoute()
 const auth = useAuthStore()
 
 // 'credentials' | 'second_password' | 'wipe_confirm' | 'wipe_done' | 'recover' | 'recover_code'
+// | 'help_request' | 'help_sent' | 'ticket'  (admin-assisted recovery, A06)
 const stage = ref('credentials')
 // Cursor starts in the username box.
 onMounted(() => document.getElementById('username')?.focus({ preventScroll: true }))
@@ -167,6 +168,81 @@ async function submitRecover() {
   }
 }
 
+// ---- Admin-assisted recovery (A06): lost the recovery code too ----
+const helpNote = ref('')
+const helpMessage = ref('')
+const ticketCode = ref('')
+
+function startHelp() {
+  error.value = ''
+  recoverUsername.value = recoverUsername.value || username.value.trim()
+  helpNote.value = ''
+  stage.value = 'help_request'
+}
+
+async function submitHelp() {
+  error.value = ''
+  if (!recoverUsername.value.trim()) {
+    error.value = 'Vui lòng nhập tên đăng nhập'
+    return
+  }
+  loading.value = true
+  try {
+    const res = await api.post('/auth/recovery-request', {
+      username: recoverUsername.value.trim(),
+      note: helpNote.value.trim(),
+    })
+    helpMessage.value = res.message
+    stage.value = 'help_sent'
+  } catch (e) {
+    error.value = e instanceof ApiError ? e.message : 'Đã xảy ra lỗi, vui lòng thử lại'
+  } finally {
+    loading.value = false
+  }
+}
+
+function startTicket() {
+  error.value = ''
+  recoverUsername.value = recoverUsername.value || username.value.trim()
+  ticketCode.value = ''
+  recoverNewPassword.value = ''
+  recoverConfirm.value = ''
+  stage.value = 'ticket'
+}
+
+async function submitTicket() {
+  error.value = ''
+  if (!recoverUsername.value.trim() || !ticketCode.value.trim()) {
+    error.value = 'Vui lòng nhập tên đăng nhập và mã hỗ trợ'
+    return
+  }
+  if (!recoverNewPassword.value) {
+    error.value = 'Vui lòng nhập mật khẩu mới'
+    return
+  }
+  if (recoverNewPassword.value !== recoverConfirm.value) {
+    error.value = 'Mật khẩu nhập lại không khớp'
+    return
+  }
+  loading.value = true
+  try {
+    const res = await api.post('/auth/recover-with-ticket', {
+      username: recoverUsername.value.trim(),
+      ticket: ticketCode.value.trim(),
+      newPassword: recoverNewPassword.value,
+    })
+    newRecoveryCode.value = res.recoveryCode
+    ticketCode.value = ''
+    recoverNewPassword.value = ''
+    recoverConfirm.value = ''
+    stage.value = 'recover_code'
+  } catch (e) {
+    error.value = e instanceof ApiError ? e.message : 'Đã xảy ra lỗi, vui lòng thử lại'
+  } finally {
+    loading.value = false
+  }
+}
+
 function recoverDone() {
   newRecoveryCode.value = ''
   backToCredentials()
@@ -184,7 +260,7 @@ function backToCredentials() {
   <AuthLayout
     mode="login"
     :show-tabs="stage === 'credentials'"
-    :title="stage === 'credentials' ? 'Chào mừng trở lại' : stage === 'second_password' ? 'Xác minh tài khoản' : stage === 'recover' ? 'Khôi phục mật khẩu' : stage === 'recover_code' ? 'Lưu mã khôi phục mới' : stage === 'wipe_confirm' ? 'Xác nhận xoá dữ liệu' : 'Hoàn tất'"
+    :title="stage === 'credentials' ? 'Chào mừng trở lại' : stage === 'second_password' ? 'Xác minh tài khoản' : stage === 'recover' ? 'Khôi phục mật khẩu' : stage === 'help_request' || stage === 'help_sent' ? 'Nhờ Admin hỗ trợ' : stage === 'ticket' ? 'Nhập mã hỗ trợ' : stage === 'recover_code' ? 'Lưu mã khôi phục mới' : stage === 'wipe_confirm' ? 'Xác nhận xoá dữ liệu' : 'Hoàn tất'"
     subtitle="Dữ liệu của bạn, trong tầm kiểm soát"
   >
     <form v-if="stage === 'credentials'" @submit.prevent="submitCredentials">
@@ -272,6 +348,67 @@ function backToCredentials() {
       <div class="field">
         <label for="rec-confirm">Nhập lại mật khẩu mới</label>
         <PasswordInput id="rec-confirm" v-model="recoverConfirm" autocomplete="new-password" :disabled="loading" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
+        {{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}
+      </button>
+      <div class="auth-link-row"><button type="button" class="auth-link-button" @click="startHelp">Mất cả mã khôi phục? Nhờ Admin hỗ trợ</button></div>
+      <div class="auth-link-row"><button type="button" class="auth-link-button" @click="startTicket">Tôi đã có mã hỗ trợ từ Admin</button></div>
+      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Quay lại đăng nhập</button>
+    </form>
+
+    <form v-else-if="stage === 'help_request'" @submit.prevent="submitHelp">
+      <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
+      <p class="auth-stage-description">
+        Gửi yêu cầu để quản trị viên hỗ trợ. Admin sẽ xác minh bạn là chủ tài khoản qua kênh hỗ trợ (ví dụ số điện thoại hoặc tin nhắn đã đăng ký);
+        khi được duyệt bạn nhận một <strong>mã hỗ trợ dùng một lần, hạn 24 giờ</strong> để tự đặt mật khẩu mới. Admin không biết mật khẩu của bạn.
+      </p>
+      <div class="field">
+        <label for="help-username">Tên đăng nhập</label>
+        <div class="input-wrap">
+          <input id="help-username" v-model="recoverUsername" type="text" autocomplete="username" :disabled="loading" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="help-note">Thông tin giúp Admin xác minh (không bắt buộc)</label>
+        <div class="input-wrap">
+          <input id="help-note" v-model="helpNote" type="text" maxlength="300" placeholder="Ví dụ: tên, số điện thoại liên hệ" :disabled="loading" />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
+        {{ loading ? 'Đang gửi...' : 'Gửi yêu cầu' }}
+      </button>
+      <button type="button" class="btn btn-ghost btn-block" @click="stage = 'recover'">Quay lại</button>
+    </form>
+
+    <div v-else-if="stage === 'help_sent'">
+      <div class="alert alert-success">{{ helpMessage }}</div>
+      <button type="button" class="btn btn-primary btn-block" @click="startTicket">Tôi đã có mã hỗ trợ</button>
+      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Về trang đăng nhập</button>
+    </div>
+
+    <form v-else-if="stage === 'ticket'" @submit.prevent="submitTicket">
+      <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
+      <p class="auth-stage-description">Nhập mã hỗ trợ Admin đã gửi cho bạn và đặt mật khẩu mới. Mã chỉ dùng được một lần.</p>
+      <div class="field">
+        <label for="tk-username">Tên đăng nhập</label>
+        <div class="input-wrap">
+          <input id="tk-username" v-model="recoverUsername" type="text" autocomplete="username" :disabled="loading" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="tk-code">Mã hỗ trợ</label>
+        <div class="input-wrap">
+          <input id="tk-code" v-model="ticketCode" type="text" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX" :disabled="loading" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="tk-new">Mật khẩu mới</label>
+        <PasswordInput id="tk-new" v-model="recoverNewPassword" autocomplete="new-password" placeholder="Tuỳ bạn đặt" :disabled="loading" />
+      </div>
+      <div class="field">
+        <label for="tk-confirm">Nhập lại mật khẩu mới</label>
+        <PasswordInput id="tk-confirm" v-model="recoverConfirm" autocomplete="new-password" :disabled="loading" />
       </div>
       <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
         {{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}

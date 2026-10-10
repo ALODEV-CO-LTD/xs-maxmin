@@ -159,6 +159,31 @@ void _createSchema(Database db) {
   ''');
   db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)');
 
+  // Controlled account recovery (A06): the customer files a request, an admin
+  // checks who they are and approves it, which issues a one-time ticket (shown
+  // to the admin once, only its hash is stored). The customer then sets their
+  // OWN new password with the ticket, so the admin never learns it.
+  // status: pending | approved | rejected | completed | expired | ignored
+  // ('ignored' = unknown/admin username; kept only so the per-IP limit counts it
+  // and the public endpoint cannot be used to probe which usernames exist).
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS recovery_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      username TEXT NOT NULL,
+      note TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      ip TEXT,
+      created_at TEXT NOT NULL,
+      handled_by TEXT,
+      handled_at TEXT,
+      ticket_hash TEXT,
+      ticket_expires_at TEXT,
+      completed_at TEXT
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_recovery_requests_status ON recovery_requests(status, created_at)');
+
   // Call history (voice calls only). Written by the signaling relay, see
   // call_log.dart. status: ringing | in_progress | completed | missed |
   // rejected | busy | failed. callee_seen = 0 marks a missed call the callee

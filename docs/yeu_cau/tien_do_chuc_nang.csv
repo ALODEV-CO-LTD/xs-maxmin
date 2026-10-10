@@ -49,7 +49,7 @@ Admin,A02,Quản lý gói sử dụng,Đã làm,Đã làm,Giữ nguyên,—,,Sơ
 Admin,A03,Khóa và mở khóa tài khoản,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
 Admin,A04,Quản lý phiên đăng nhập,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Admin xem và thu hồi phiên của từng người dùng.,
 Admin,A05,Quản lý quy tắc ID ảo và giới hạn số lượng,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Admin chỉnh giới hạn số ID ảo (Cài đặt).,
-Admin,A06,Hỗ trợ khôi phục tài khoản,Một phần,Đã làm,Có đổi,Đã lên máy chủ thật,"Admin đặt lại mật khẩu (có chính sách mật khẩu, đăng xuất mọi thiết bị), cấp lại mã khôi phục, gỡ khoá, mật khẩu ngẫu nhiên; ghi nhật ký.",
+Admin,A06,Hỗ trợ khôi phục tài khoản,Một phần,Đã làm,Có đổi,Bản mới chưa deploy,"Admin đặt lại mật khẩu (có chính sách mật khẩu, đăng xuất mọi thiết bị), cấp lại mã khôi phục, gỡ khoá, mật khẩu ngẫu nhiên; ghi nhật ký; quy trình khôi phục có kiểm soát: khách gửi yêu cầu, Admin xác minh và duyệt, cấp mã hỗ trợ dùng một lần hạn 24 giờ, khách tự đặt mật khẩu mới (Admin không biết). Chưa deploy.",
 Admin,A07,Phân quyền Admin nhiều cấp,Chưa làm,Chưa làm,Giữ nguyên,—,,
 Admin,A08,Chính sách lưu trữ dữ liệu,Chưa làm,Chưa làm,Giữ nguyên,—,,
 Admin,A09,Cấu hình chính sách bảo mật,Chưa làm,Chưa làm,Giữ nguyên,—,,

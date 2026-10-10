@@ -10,6 +10,7 @@ import { showConfirm } from '../../confirm'
 import { ref, onMounted, watch } from 'vue'
 import { api, ApiError } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
+import AdminRecoveryRequests from '../../components/AdminRecoveryRequests.vue'
 
 const q = ref('')
 const loading = ref(false)
@@ -222,6 +223,8 @@ onMounted(loadList)
   <div class="page">
     <h1 class="page-title">Quản lý khách hàng</h1>
     <p class="page-subtitle">Tổng cộng {{ total }} khách hàng</p>
+
+    <AdminRecoveryRequests />
 
     <div class="field search-field">
       <div class="input-wrap">
