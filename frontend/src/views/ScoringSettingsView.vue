@@ -94,19 +94,29 @@ async function load() {
   }
 }
 
+const addError = ref('')
 async function onAdd(payload) {
   // Validation (name, rate, at least one prize group, no duplicate) is done by the dialog.
   if (rows.value.some((r) => r.key === payload.key)) return
-  error.value = ''
-  rows.value.push({ key: payload.key, rate: String(payload.rate), tiers: payload.tiers, digits: payload.digits })
+  addError.value = ''
+  const before = rows.value
+  rows.value = [...before, { key: payload.key, rate: String(payload.rate), tiers: payload.tiers, digits: payload.digits }]
+  // A new type is saved to the server RIGHT NOW, while the dialog is still open: if that
+  // fails the dialog stays open with the reason (the error used to appear at the top of the
+  // page, out of sight after scrolling to the new row) and nothing is added locally.
+  const ok = await save()
+  if (!ok) {
+    rows.value = before
+    addError.value = error.value || 'Không lưu được loại đánh này'
+    error.value = ''
+    return
+  }
   addOpen.value = false
   justAdded.value = payload.key
   clearTimeout(justAddedTimer)
-  justAddedTimer = setTimeout(() => (justAdded.value = ''), 4000)
+  justAddedTimer = setTimeout(() => (justAdded.value = ''), 6000)
   await nextTick()
   document.querySelector('tr.row-new')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  // A new type takes effect at once - no separate "Lưu cài đặt" step to forget.
-  await save()
 }
 
 function removeRow(key) {
@@ -124,18 +134,18 @@ async function save() {
   saved.value = false
   if (rows.value.length === 0) {
     error.value = 'Cần ít nhất một loại đánh'
-    return
+    return false
   }
   const map = {}
   for (const r of rows.value) {
     const n = Number(r.rate)
     if (!r.key.trim() || !Number.isFinite(n) || n <= 0) {
       error.value = `Tỉ lệ của "${r.key || '(trống)'}" không hợp lệ`
-      return
+      return false
     }
     if (r.tiers.length === 0) {
       error.value = `"${betTypeLabel(r.key)}" cần chọn ít nhất một giải để đối chiếu`
-      return
+      return false
     }
     map[r.key.trim()] = { rate: n, tiers: r.tiers, digits: Number(r.digits) || 2 }
   }
@@ -145,8 +155,10 @@ async function save() {
     rows.value = toRows(rates)
     markSaved()
     saved.value = true
+    return true
   } catch (err) {
-    error.value = err instanceof ApiError ? err.message : 'Không thể lưu cài đặt'
+    error.value = err instanceof ApiError ? (err.status === 0 ? 'Mất kết nối tới máy chủ, chưa lưu được. Hãy thử lại.' : err.message) : 'Không thể lưu cài đặt'
+    return false
   } finally {
     saving.value = false
   }
@@ -177,7 +189,7 @@ onMounted(load)
     <template v-else>
       <div class="types-bar">
         <h2 class="types-title">Các loại đánh <span class="types-count">{{ rows.length }}</span></h2>
-        <button type="button" class="btn btn-primary" @click="addOpen = true">+ Thêm loại đánh</button>
+        <button type="button" class="btn btn-primary" @click="addError = ''; addOpen = true">+ Thêm loại đánh</button>
       </div>
 
       <div class="card table-wrap" style="padding: 0">
@@ -200,7 +212,7 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="row in rows" :key="row.key" :class="{ 'row-new': row.key === justAdded }">
-              <td class="type-cell" data-label="Loại đánh">{{ betTypeLabel(row.key) }} <span class="page-subtitle">({{ row.key }})</span></td>
+              <td class="type-cell" data-label="Loại đánh">{{ betTypeLabel(row.key) }} <span class="page-subtitle">({{ row.key }})</span><span v-if="row.key === justAdded" class="saved-tag">Đã lưu</span></td>
               <td data-label="Tỉ lệ ăn">
                 <input v-model="row.rate" type="number" min="1" class="rate-input" />
               </td>
@@ -250,7 +262,9 @@ onMounted(load)
       :existing-keys="rows.map((r) => r.key)"
       :digit-options="digitOptions()"
       :tiers="PRIZE_TIERS"
-      @close="addOpen = false"
+      :busy="saving"
+      :save-error="addError"
+      @close="addOpen = false; addError = ''"
       @add="onAdd"
     />
   </div>
@@ -262,6 +276,15 @@ onMounted(load)
 }
 .type-table td {
   vertical-align: middle;
+}
+.saved-tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success-text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
 .type-cell {
   white-space: nowrap;

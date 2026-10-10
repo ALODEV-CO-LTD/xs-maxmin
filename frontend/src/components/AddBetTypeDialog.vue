@@ -17,6 +17,9 @@ const props = defineProps({
   existingKeys: { type: Array, default: () => [] },
   digitOptions: { type: Array, default: () => [1, 2, 3, 4, 5] },
   tiers: { type: Array, required: true },
+  // The parent saves the new type to the server before closing this dialog:
+  busy: { type: Boolean, default: false },
+  saveError: { type: String, default: '' },
 })
 const emit = defineEmits(['close', 'add'])
 
@@ -76,7 +79,7 @@ const pickNone = () => (picked.value = [])
 
 function submit() {
   submitted.value = true
-  if (!valid.value) return
+  if (!valid.value || props.busy) return
   emit('add', { key: key.value, rate: Number(rate.value), digits: Number(digits.value), tiers: [...picked.value] })
 }
 
@@ -107,7 +110,7 @@ function onKey(e) {
       <form ref="box" class="bt-box" role="dialog" aria-modal="true" aria-labelledby="bt-title" novalidate @submit.prevent="submit">
         <header class="bt-head">
           <h2 id="bt-title" class="bt-title">Thêm loại đánh</h2>
-          <p class="bt-sub">Điền thông tin cho loại đánh mới. Loại đánh được lưu và áp dụng ngay khi bạn bấm "Thêm loại đánh".</p>
+          <p class="bt-sub">Điền thông tin cho loại đánh mới. Loại đánh được lưu lên máy chủ khi bạn bấm "Thêm loại đánh"; nếu không lưu được, hộp này vẫn mở và báo lỗi.</p>
         </header>
 
         <section class="bt-section">
@@ -160,9 +163,10 @@ function onKey(e) {
           <p v-if="submitted && tierError" class="bt-error">{{ tierError }}</p>
         </section>
 
+        <p v-if="saveError" class="bt-error" role="alert">{{ saveError }}</p>
         <footer class="bt-actions">
-          <button type="button" class="btn btn-secondary" @click="emit('close')">Huỷ</button>
-          <button type="submit" class="btn btn-primary">Thêm loại đánh</button>
+          <button type="button" class="btn btn-secondary" :disabled="busy" @click="emit('close')">Huỷ</button>
+          <button type="submit" class="btn btn-primary" :disabled="busy">{{ busy ? 'Đang lưu...' : saveError ? 'Thử lại' : 'Thêm loại đánh' }}</button>
         </footer>
       </form>
     </div>
