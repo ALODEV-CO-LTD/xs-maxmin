@@ -61,7 +61,6 @@ const userLinks = [
   { name: 'scoring-settings', label: 'Cấu hình tính điểm', icon: 'settings' },
   { name: 'customers', label: 'Khách hàng', icon: 'users' },
   { name: 'friends', label: 'Bạn bè', icon: 'message-circle-more' },
-  { name: 'packages', label: 'Gói & Thanh toán', icon: 'badge-dollar-sign' },
   { name: 'account', label: 'Tài khoản', icon: 'user' },
 ]
 

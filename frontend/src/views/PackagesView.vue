@@ -16,6 +16,8 @@
        POST /me/packages/purchase
 -->
 <script setup>
+// Shown as a tab of Tài khoản (AccountView) - `embedded` hides the page title there.
+defineProps({ embedded: { type: Boolean, default: false } })
 import { showConfirm } from '../confirm'
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
@@ -169,9 +171,11 @@ async function purchase(plan) {
 </script>
 
 <template>
-  <div class="page">
-    <h1 class="page-title">Gói dịch vụ & Thanh toán</h1>
-    <p class="page-subtitle">Xem gói hiện tại, đăng ký gói mới và theo dõi thanh toán, tất cả ở một nơi.</p>
+  <div :class="embedded ? 'packages-embedded' : 'page'">
+    <template v-if="!embedded">
+      <h1 class="page-title">Gói dịch vụ & Thanh toán</h1>
+      <p class="page-subtitle">Xem gói hiện tại, đăng ký gói mới và theo dõi thanh toán, tất cả ở một nơi.</p>
+    </template>
 
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>

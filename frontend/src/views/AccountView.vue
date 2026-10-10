@@ -10,7 +10,7 @@
 -->
 <script setup>
 import { showConfirm } from '../confirm'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -20,6 +20,7 @@ import PrivacySettings from '../components/PrivacySettings.vue'
 import RecoveryCodePanel from '../components/RecoveryCodePanel.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
 import AccountStats from '../components/AccountStats.vue'
+import PackagesView from './PackagesView.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -31,14 +32,22 @@ const ALL_TABS = [
   { key: 'profile', label: 'Hồ sơ' },
   { key: 'security', label: 'Mật khẩu' },
   { key: 'devices', label: 'Thiết bị & riêng tư' },
+  { key: 'packages', label: 'Gói & Thanh toán' },
   { key: 'data', label: 'Dữ liệu' },
 ]
-const TABS = ALL_TABS.filter((t) => t.key !== 'stats' || !auth.isAdmin)
+// Thống kê and Gói & Thanh toán are for customer accounts only (an admin has no customers, entries or package).
+const TABS = ALL_TABS.filter((t) => !['stats', 'packages'].includes(t.key) || !auth.isAdmin)
 const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : TABS[0].key)
+// The tab bar scrolls sideways on phones: keep the open tab in view (e.g. after a link to ?tab=packages).
+function showActiveTab() {
+  nextTick(() => document.getElementById(`acct-tab-${tab.value}`)?.scrollIntoView({ inline: 'center', block: 'nearest' }))
+}
 function selectTab(key) {
   tab.value = key
   router.replace({ query: { ...route.query, tab: key } })
 }
+watch(tab, showActiveTab)
+onMounted(() => setTimeout(showActiveTab, 600)) // after the profile finished loading and the tabs rendered
 function onTabKey(e) {
   const i = TABS.findIndex((t) => t.key === tab.value)
   const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null
@@ -652,6 +661,10 @@ async function deleteAllData() {
         <RecoveryCodePanel v-if="!auth.isAdmin" />
         <PrivacySettings />
       </div>
+      </div>
+
+      <div v-if="tab === 'packages'" id="acct-panel-packages" role="tabpanel" aria-labelledby="acct-tab-packages">
+        <PackagesView embedded />
       </div>
 
       <div v-if="tab === 'stats'" id="acct-panel-stats" role="tabpanel" aria-labelledby="acct-tab-stats">

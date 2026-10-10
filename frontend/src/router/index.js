@@ -33,7 +33,6 @@ import ScoringSettingsView from '../views/ScoringSettingsView.vue'
 import CustomersView from '../views/CustomersView.vue'
 import FriendsView from '../views/FriendsView.vue'
 import { useNotifyStore } from '../stores/notify'
-import PackagesView from '../views/PackagesView.vue'
 import AccountView from '../views/AccountView.vue'
 import AdminUsersView from '../views/admin/UsersView.vue'
 import AdminStatsView from '../views/admin/StatsView.vue'
@@ -79,9 +78,10 @@ const routes = [
       return from.name ? false : '/'
     },
   },
-  { path: '/packages', name: 'packages', component: PackagesView, meta: { userOnly: true, title: 'Gói dịch vụ & Thanh toán' } },
+  // Gói & Thanh toán now lives in Tài khoản (tab); old links and notifications still land there.
+  { path: '/packages', name: 'packages', redirect: { name: 'account', query: { tab: 'packages' } } },
   // Payments was merged into /packages (same purchase flow, one page instead of two).
-  { path: '/payments', redirect: '/packages' },
+  { path: '/payments', redirect: { name: 'account', query: { tab: 'packages' } } },
   { path: '/account', name: 'account', component: AccountView, meta: { title: 'Tài khoản' } },
 
   // Admin area
