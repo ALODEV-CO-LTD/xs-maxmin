@@ -25,6 +25,10 @@ import { cachedGet, loadAllEntries } from '../offline'
 import { fold } from '../messageParser'
 import AppIcon from '../components/AppIcon.vue'
 import MaskBar from '../components/MaskBar.vue'
+import ModalDialog from '../components/ModalDialog.vue'
+import CustomerScoringConfig from '../components/CustomerScoringConfig.vue'
+import ScoringSettingsView from './ScoringSettingsView.vue'
+import { DEFAULT_RATES } from '../scoringConfig'
 import MaskedValue from '../components/MaskedValue.vue'
 import { mask } from '../stores/mask'
 import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
@@ -59,6 +63,23 @@ async function loadRoster() {
     // Non-fatal - the page still works from entries alone, just without
     // "add new customer" until this loads.
   }
+}
+
+// ---- Cấu hình tính điểm: riêng từng khách (trong Xem chi tiết) + mặc định chung (nút trên đầu) ----
+const accountRates = ref({ ...DEFAULT_RATES })
+async function loadAccountRates() {
+  try {
+    const { rates } = await cachedGet('/me/scoring-settings')
+    if (rates && Object.keys(rates).length) accountRates.value = rates
+  } catch (_) {
+    /* keep the built-in fallback */
+  }
+}
+const defaultConfigOpen = ref(route.query.config === 'default')
+const rosterRow = computed(() => roster.value.find((r) => r.id === detail.value?.rosterId) || null)
+function onCustomerConfigSaved(map) {
+  const row = rosterRow.value
+  if (row) row.scoringRates = map
 }
 
 async function addCustomer() {
@@ -146,6 +167,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('popstate', onPopState)
 })
 onMounted(loadRoster)
+onMounted(loadAccountRates)
 onMounted(() => {
   if (fromEntries) nextTick(() => addInput.value?.focus())
 })
@@ -309,6 +331,10 @@ async function removeFromDetail(c) {
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
       <MaskBar class="mask-row" />
+      <div class="config-row">
+        <button type="button" class="btn btn-secondary btn-sm" @click="defaultConfigOpen = true">Cấu hình tính điểm mặc định</button>
+        <span class="config-hint">Tỉ lệ ăn dùng cho mọi khách; mỗi khách có thể có cấu hình riêng trong Xem chi tiết.</span>
+      </div>
       <div class="field search-field">
         <div class="input-wrap">
           <AppIcon name="search" class="search-icon" />
@@ -363,6 +389,10 @@ async function removeFromDetail(c) {
       </div>
     </template>
 
+    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" wide @close="defaultConfigOpen = false; loadAccountRates()">
+      <ScoringSettingsView embedded @saved="loadAccountRates" />
+    </ModalDialog>
+
     <Teleport to="body">
       <div v-if="detail" class="cd-overlay" @mousedown.self="expanded = null" @keydown.esc="expanded = null">
         <div class="cd-box" role="dialog" aria-modal="true" aria-labelledby="cd-title" tabindex="-1" ref="detailBox">
@@ -398,6 +428,10 @@ async function removeFromDetail(c) {
               <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(detail.chenhLech)" /></dd>
             </div>
           </dl>
+          <details v-if="detail.rosterId && rosterRow" class="cd-config">
+            <summary>Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</summary>
+            <CustomerScoringConfig :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
+          </details>
           <div class="cd-copy">
             <label class="cd-copy-date">
               Ngày
@@ -430,6 +464,31 @@ async function removeFromDetail(c) {
 </template>
 
 <style scoped>
+.config-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.config-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+.cd-config {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.cd-config summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.cd-config[open] summary {
+  margin-bottom: 10px;
+}
 .add-customer-card {
   margin-bottom: 16px;
 }

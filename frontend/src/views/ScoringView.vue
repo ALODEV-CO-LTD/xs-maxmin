@@ -37,10 +37,7 @@ import MaskedValue from '../components/MaskedValue.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import DeleteDataDialog from '../components/DeleteDataDialog.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
-import CustomerScoringConfig from '../components/CustomerScoringConfig.vue'
-import ScoringSettingsView from './ScoringSettingsView.vue'
 import { effectiveConfig, DEFAULT_RATES } from '../scoringConfig'
-import { useRoute } from 'vue-router'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { loadAllEntries } from '../offline'
@@ -231,20 +228,9 @@ const autoCalcError = ref('')
 // still works even if that call fails.
 const rates = ref({ ...DEFAULT_RATES })
 
-// Each customer may have their own payout config (stored on the customer); the account-wide
-// config is the fallback. Edited in the "Cấu hình tính điểm" panel below the toolbar.
+// Each customer may have their own payout config (stored on the customer, edited in Khách hàng);
+// the account-wide config is the fallback.
 const customerRates = computed(() => customers.value.find((c) => c.name === selectedCustomer.value)?.scoringRates || null)
-const selectedCustomerRow = computed(() => customers.value.find((c) => c.name === selectedCustomer.value) || null)
-const configOpen = ref(!!useRoute().query.config)
-const configTab = ref(useRoute().query.config === 'default' ? 'default' : 'customer')
-function onCustomerConfigSaved(map) {
-  const c = customers.value.find((x) => x.name === selectedCustomer.value)
-  if (c) c.scoringRates = map
-  recalc() // results of this customer are scored again with the new config
-}
-function onDefaultConfigSaved() {
-  loadRates().then(recalc)
-}
 
 async function loadRates() {
   try {
@@ -423,13 +409,13 @@ onMounted(async () => {
     <h1 class="page-title">Tính điểm</h1>
     <p class="page-subtitle">
       Điểm ra được máy tự động tính và lưu, theo kết quả xổ số đã nhập ở trang
-      <RouterLink :to="{ name: 'results' }" class="tap-link">Nhập kết quả</RouterLink>. Mỗi khách có thể có tỉ lệ ăn và giải đối chiếu riêng, chỉnh ở mục <strong>Cấu hình tính điểm</strong> bên dưới.
+      <RouterLink :to="{ name: 'results' }" class="tap-link">Nhập kết quả</RouterLink>. Tỉ lệ ăn và giải đối chiếu của từng khách chỉnh ở trang
+      <RouterLink :to="{ name: 'customers' }" class="tap-link">Khách hàng</RouterLink> (Xem chi tiết, mục Cấu hình tính điểm).
     </p>
 
     <div class="toolbar card">
       <MaskBar />
       <div class="toolbar-actions">
-        <button type="button" class="btn btn-secondary btn-sm" :aria-pressed="configOpen" @click="configOpen = !configOpen">Cấu hình tính điểm</button>
         <button type="button" class="btn btn-secondary btn-sm" @click="openDelete('')">Xóa số liệu</button>
         <button type="button" class="btn btn-secondary btn-sm" @click="scheduleOpen = true">Đặt lịch xóa</button>
       </div>
@@ -490,24 +476,6 @@ onMounted(async () => {
           {{ autoCalcRunning > 0 ? 'Đang tính...' : '↻ Tính lại' }}
         </button>
       </div>
-
-      <section v-if="configOpen" class="card config-card" aria-label="Cấu hình tính điểm">
-        <div class="config-tabs" role="tablist">
-          <button type="button" role="tab" class="config-tab" :class="{ on: configTab === 'customer' }" :aria-selected="configTab === 'customer'" @click="configTab = 'customer'">
-            Của khách{{ selectedCustomer ? `: ${selectedCustomer}` : '' }}
-          </button>
-          <button type="button" role="tab" class="config-tab" :class="{ on: configTab === 'default' }" :aria-selected="configTab === 'default'" @click="configTab = 'default'">
-            Mặc định cho mọi khách
-          </button>
-        </div>
-        <template v-if="configTab === 'customer'">
-          <CustomerScoringConfig v-if="selectedCustomerRow" :customer="selectedCustomerRow" :account-rates="rates" @saved="onCustomerConfigSaved" />
-          <p v-else class="config-empty">Chọn một khách hàng ở bộ lọc bên dưới để chỉnh cấu hình riêng cho khách đó.</p>
-        </template>
-        <ScoringSettingsView v-else embedded @saved="onDefaultConfigSaved" />
-      </section>
-      <!-- The results below are hidden while the config panel is open (it is a separate view). -->
-      <template v-if="!configOpen">
 
       <div v-if="!selectedCustomer" class="card empty-state">
         <AppIcon name="users" class="empty-icon" />
@@ -656,7 +624,6 @@ onMounted(async () => {
           Xem thêm ngày cũ ({{ Math.min(PAGE_DAYS, hiddenDayCount) }} / còn {{ hiddenDayCount }} ngày)
         </button>
       </template>
-      </template>
     </template>
 
     <DeleteDataDialog
@@ -678,36 +645,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.config-card {
-  margin-bottom: 12px;
-  padding: 14px;
-}
-.config-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.config-tab {
-  min-height: 36px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.config-tab.on {
-  color: #fff;
-  background: var(--primary);
-  border-color: var(--primary);
-}
-.config-empty {
-  margin: 0;
-  color: var(--muted);
-}
 .page-subtitle a {
   color: var(--text-secondary);
   font-weight: 500;
