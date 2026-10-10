@@ -506,6 +506,8 @@ onMounted(async () => {
         </template>
         <ScoringSettingsView v-else embedded @saved="onDefaultConfigSaved" />
       </section>
+      <!-- The results below are hidden while the config panel is open (it is a separate view). -->
+      <template v-if="!configOpen">
 
       <div v-if="!selectedCustomer" class="card empty-state">
         <AppIcon name="users" class="empty-icon" />
@@ -653,6 +655,7 @@ onMounted(async () => {
         <button v-if="hiddenDayCount > 0" type="button" class="btn btn-secondary more-btn" @click="shownDays += PAGE_DAYS">
           Xem thêm ngày cũ ({{ Math.min(PAGE_DAYS, hiddenDayCount) }} / còn {{ hiddenDayCount }} ngày)
         </button>
+      </template>
       </template>
     </template>
 
