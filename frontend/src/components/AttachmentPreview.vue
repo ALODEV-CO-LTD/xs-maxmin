@@ -2,7 +2,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
-import { formatSize, isScrubbableImage, stripImageMetadata } from '../attachments'
+import { formatSize, isScrubbableImage } from '../attachments'
 
 const props = defineProps({ file: { type: File, required: true } })
 defineEmits(['remove'])
@@ -37,16 +37,10 @@ onBeforeUnmount(() => {
         <AppIcon name="x" />
       </button>
     </div>
-    <!-- Metadata switch + the limit of what it can do (K37/K38/S09). -->
+    <!-- Images are always scrubbed before sending (K37/K38/S09); no switch. -->
     <div v-if="scrubbable" class="att-privacy">
-      <label class="att-privacy-toggle">
-        <input v-model="stripImageMetadata" type="checkbox" />
-        Xoá thông tin ảnh (vị trí GPS, thiết bị, thời gian chụp) trước khi gửi
-      </label>
       <div class="att-privacy-note">
-        {{ stripImageMetadata
-          ? 'Ảnh sẽ được vẽ lại để loại bỏ thông tin ẩn.'
-          : 'Ảnh gốc sẽ được gửi nguyên vẹn, kèm cả thông tin ẩn trong ảnh.' }}
+        Ảnh sẽ tự động được xoá thông tin ẩn (vị trí GPS, thiết bị, thời gian chụp) và đổi tên trước khi gửi.
         Lưu ý: sau khi gửi, bản người nhận đã lưu về máy thì không thể xoá thông tin khỏi đó.
       </div>
     </div>

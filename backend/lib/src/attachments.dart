@@ -63,10 +63,9 @@ AttachmentParse parseAttachment(Object? raw) {
   }
   // Second line of defence for image privacy (K37/K38/S09): the client
   // already redraws images through a canvas, but the client is untrusted, so
-  // JPEG/PNG bytes are scrubbed of EXIF/GPS/text metadata here as well -
-  // unless the sender explicitly opted to keep the original (`keepMetadata`).
-  final keep = raw['keepMetadata'] == true;
-  final data = keep ? bytes : stripImageMetadata(bytes);
+  // JPEG/PNG bytes are scrubbed of EXIF/GPS/text metadata here as well,
+  // always - there is no opt-out.
+  final data = stripImageMetadata(bytes);
   return AttachmentParse.ok(ParsedAttachment(name, type, data));
 }
 
