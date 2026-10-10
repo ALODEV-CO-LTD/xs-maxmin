@@ -26,7 +26,7 @@ import { fold } from '../messageParser'
 import AppIcon from '../components/AppIcon.vue'
 import MaskBar from '../components/MaskBar.vue'
 import ModalDialog from '../components/ModalDialog.vue'
-import CustomerScoringConfig from '../components/CustomerScoringConfig.vue'
+import ScoringConfigEditor from '../components/ScoringConfigEditor.vue'
 import ScoringSettingsView from './ScoringSettingsView.vue'
 import { DEFAULT_RATES } from '../scoringConfig'
 import { allStationOptions, loadStations } from '../lotteryStations'
@@ -410,7 +410,7 @@ async function removeFromDetail(c) {
       </div>
     </template>
 
-    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" wide @close="defaultConfigOpen = false; loadAccountRates()">
+    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" xwide @close="defaultConfigOpen = false; loadAccountRates()">
       <ScoringSettingsView embedded @saved="loadAccountRates" />
     </ModalDialog>
 
@@ -460,7 +460,7 @@ async function removeFromDetail(c) {
           </section>
           <section v-if="detail.rosterId && rosterRow" class="cd-config" aria-label="Cấu hình tính điểm của khách này">
             <h3 class="cd-config-title">Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</h3>
-            <CustomerScoringConfig :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
+            <ScoringConfigEditor scope="customer" :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
           </section>
           <div class="cd-copy">
             <label class="cd-copy-date">

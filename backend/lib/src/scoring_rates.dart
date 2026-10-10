@@ -59,6 +59,8 @@ Map<String, dynamic>? normalizeRateEntry(dynamic value) {
 }
 
 
+final _keyPattern = RegExp(r'^[^@\s]+(@(mb|mt|mn))?$');
+
 /// Validates a whole `{typeKey: entry}` map; returns `(normalized, null)` or `(null, error)`.
 /// With [allowDisabled] (per-customer overrides only) an entry may be `{disabled: true}`: the
 /// customer does not use that bet type (it is hidden from their type list).
@@ -67,7 +69,8 @@ Map<String, dynamic>? normalizeRateEntry(dynamic value) {
   final out = <String, dynamic>{};
   for (final entry in rates.entries) {
     final key = entry.key;
-    if (key is! String || key.trim().isEmpty) return (null, 'Mã loại đánh không hợp lệ');
+    // `type` applies to every region; `type@mb|mt|mn` is the value for that region only (it wins over `type`).
+    if (key is! String || !_keyPattern.hasMatch(key.trim())) return (null, 'Mã loại đánh không hợp lệ');
     final v = entry.value;
     if (allowDisabled && v is Map && v['disabled'] == true) {
       out[key] = {'disabled': true};

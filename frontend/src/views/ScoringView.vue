@@ -39,8 +39,8 @@ import ModalDialog from '../components/ModalDialog.vue'
 import DeleteDataDialog from '../components/DeleteDataDialog.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
 import { effectiveConfig, DEFAULT_RATES } from '../scoringConfig'
-import { entryDetail } from '../scoringSummary'
-import { entryStations, loadStations, stationLabel } from '../lotteryStations'
+import { entryDetail, summarize } from '../scoringSummary'
+import { entryStations, loadStations, regionOf, stationLabel } from '../lotteryStations'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { loadAllEntries } from '../offline'
@@ -128,9 +128,11 @@ function onRangeInput() {
   preset.value = ''
 }
 
+// Which lottery: all, or only entries of one region (Miền Bắc / Miền Trung / Miền Nam).
+const regionFilter = ref('all')
 const PAGE_DAYS = 10
 const shownDays = ref(PAGE_DAYS)
-watch([selectedCustomer, dateFrom, dateTo, onlyMissing], () => {
+watch([selectedCustomer, dateFrom, dateTo, onlyMissing, regionFilter], () => {
   shownDays.value = PAGE_DAYS
 })
 
@@ -148,6 +150,7 @@ const rangeEntries = computed(() => {
   if (!selectedCustomer.value) return []
   return entries.value.filter((e) => {
     if (e.customerName !== selectedCustomer.value) return false
+    if (regionFilter.value !== 'all' && regionOf(e.station).id !== regionFilter.value) return false
     if (dateFrom.value && e.entryDate < dateFrom.value) return false
     if (dateTo.value && e.entryDate > dateTo.value) return false
     return true
@@ -175,7 +178,7 @@ function entryOut(e) {
   if (st?.state === 'saved') return st.value
   const stations = stationsOfEntry(e)
   const known = stations.filter((st) => lotteryCache[lrKey(e.entryDate, st)])
-  return known.length ? scoreEntryAll(e, known.map((st) => lotteryCache[lrKey(e.entryDate, st)])) : toNumber(e.result)
+  return known.length ? scoreEntryAll(e, known.map((st) => [st, lotteryCache[lrKey(e.entryDate, st)]])) : toNumber(e.result)
 }
 
 // Every day in range, newest first, with its figures. `settled` = a lottery
@@ -203,6 +206,10 @@ const allDays = computed(() => {
 
 // `onlyMissing` = only days that have no lottery result yet.
 const days = computed(() => (onlyMissing.value ? allDays.value.filter((d) => d.lottery === 'no') : allDays.value))
+// Money view of each day (see scoringSummary.js): lô, tiền gửi, tiền trúng, còn lại.
+const dayMoney = computed(() => Object.fromEntries(days.value.map((d) => [d.date, summarize([d], rates.value, customerRates.value, getResult)])))
+const moneyFmt = new Intl.NumberFormat('vi-VN')
+const money = (n) => `${moneyFmt.format(Math.round(n))} đ`
 const visibleDays = computed(() => days.value.slice(0, shownDays.value))
 const hiddenDayCount = computed(() => Math.max(0, days.value.length - shownDays.value))
 
@@ -257,16 +264,17 @@ async function loadRates() {
   }
 }
 
-function configFor(betType) {
-  return effectiveConfig(rates.value, customerRates.value, betType)
+// `station` = the entry's station code or a station id: rates are per region.
+function configFor(betType, station) {
+  return effectiveConfig(rates.value, customerRates.value, betType, regionOf(station).id)
 }
 
-function rateFor(betType) {
-  return configFor(betType)?.rate ?? 70
+function rateFor(betType, station) {
+  return configFor(betType, station)?.rate ?? 70
 }
 
-function digitsFor(betType) {
-  return configFor(betType)?.digits ?? 2
+function digitsFor(betType, station) {
+  return configFor(betType, station)?.digits ?? 2
 }
 
 async function fetchLotteryFor(date, station = 'mb') {
@@ -283,10 +291,9 @@ async function fetchLotteryFor(date, station = 'mb') {
 }
 
 // Points out for one entry over every given result (one per station it counts for): the sum.
-function scoreEntryAll(entry, results) {
-  const config = configFor(entry.betType)
+function scoreEntryAll(entry, resultsByStation) {
   let out = 0
-  for (const lr of results) out += entryDetail(entry, lr, config).out
+  for (const [station, lr] of resultsByStation) out += entryDetail(entry, lr, configFor(entry.betType, station)).out
   return out
 }
 
@@ -296,7 +303,7 @@ async function computeOne(entry) {
   const results = []
   for (const st of stations) {
     const lr = await fetchLotteryFor(entry.entryDate, st)
-    if (lr) results.push(lr)
+    if (lr) results.push([st, lr])
   }
   if (!results.length) {
     resultStatus[entry.id] = { state: 'no-lottery', value: null }
@@ -437,6 +444,17 @@ onMounted(async () => {
             </AppSelect>
           </div>
         </div>
+        <div class="field filter-customer">
+          <label>Xổ số</label>
+          <div class="input-wrap">
+            <AppSelect v-model="regionFilter" aria-label="Lọc theo miền">
+              <option value="all">Tất cả các miền</option>
+              <option value="mb">Miền Bắc</option>
+              <option value="mt">Miền Trung</option>
+              <option value="mn">Miền Nam</option>
+            </AppSelect>
+          </div>
+        </div>
         <div class="filter-range">
           <div class="range-chips" role="group" aria-label="Lọc nhanh theo ngày">
             <button
@@ -499,30 +517,6 @@ onMounted(async () => {
       </div>
 
       <template v-else>
-        <div class="card totals" aria-label="Tổng khoảng đang chọn">
-          <div class="totals-head">
-            <strong>Tổng · {{ selectedCustomer }}</strong>
-            <span class="page-subtitle">{{ totals.days }} ngày · {{ totals.rows }} số</span>
-          </div>
-          <div class="totals-grid">
-            <div class="cell">
-              <span class="cell-label">Tổng điểm vào</span>
-              <span class="cell-value"><MaskedValue :text="formatNumber(totals.totalIn)" /></span>
-            </div>
-            <div class="cell">
-              <span class="cell-label">Tổng điểm ra</span>
-              <span class="cell-value"><MaskedValue :text="formatNumber(totals.settledOut)" /></span>
-            </div>
-            <div class="cell">
-              <span class="cell-label">Lợi nhuận</span>
-              <span class="cell-value" :class="!masked && totals.profit > 0 ? 'pos' : !masked && totals.profit < 0 ? 'neg' : ''">
-                <MaskedValue :text="(totals.profit > 0 ? '+' : '') + formatNumber(totals.profit)" />
-              </span>
-            </div>
-          </div>
-          <p class="totals-note">Điểm ra và lợi nhuận chỉ tính các ngày đã có kết quả xổ số.</p>
-        </div>
-
         <div class="day-list">
           <section v-for="day in visibleDays" :key="day.date" class="card day-card" :class="{ open: isOpen(day.date) }">
             <div class="day-head">
@@ -541,21 +535,25 @@ onMounted(async () => {
                 </div>
                 <div class="day-figures">
                   <div class="cell">
-                    <span class="cell-label">Điểm vào</span>
-                    <span class="cell-value"><MaskedValue :text="formatNumber(day.totalIn)" /></span>
+                    <span class="cell-label">Số lô</span>
+                    <span class="cell-value"><MaskedValue :text="formatNumber(dayMoney[day.date].sent.lots)" /></span>
                   </div>
                   <div class="cell">
-                    <span class="cell-label">Điểm ra</span>
+                    <span class="cell-label">Tiền gửi</span>
+                    <span class="cell-value"><MaskedValue :text="money(dayMoney[day.date].sent.money)" /></span>
+                  </div>
+                  <div class="cell">
+                    <span class="cell-label">Tiền trúng</span>
                     <span class="cell-value">
-                      <template v-if="day.settled"><MaskedValue :text="formatNumber(day.totalOut)" /></template>
+                      <template v-if="dayMoney[day.date].settled.lots"><MaskedValue :text="money(dayMoney[day.date].won.money)" /></template>
                       <template v-else>-</template>
                     </span>
                   </div>
                   <div class="cell">
-                    <span class="cell-label">Lợi nhuận</span>
-                    <span class="cell-value" :class="day.settled && !masked ? (day.profit > 0 ? 'pos' : day.profit < 0 ? 'neg' : '') : ''">
-                      <template v-if="day.settled">
-                        <MaskedValue :text="(day.profit > 0 ? '+' : '') + formatNumber(day.profit)" />
+                    <span class="cell-label">Còn lại</span>
+                    <span class="cell-value" :class="dayMoney[day.date].settled.lots && !masked ? (dayMoney[day.date].remaining > 0 ? 'pos' : dayMoney[day.date].remaining < 0 ? 'neg' : '') : ''">
+                      <template v-if="dayMoney[day.date].settled.lots">
+                        <MaskedValue :text="(dayMoney[day.date].remaining > 0 ? '+' : '') + money(dayMoney[day.date].remaining)" />
                       </template>
                       <template v-else>-</template>
                     </span>
@@ -580,8 +578,8 @@ onMounted(async () => {
             <div v-if="isOpen(day.date)" :id="`day-${day.date}`" class="result-list">
               <div v-for="entry in day.entries" :key="entry.id" class="result-row">
                 <div class="result-row-top">
-                  <span class="chip">{{ betTypeLabel(entry.betType || 'de') }} × {{ rateFor(entry.betType) }}</span>
-                  <span class="chip">{{ digitsFor(entry.betType) }} số cuối</span>
+                  <span class="chip">{{ betTypeLabel(entry.betType || 'de') }} × {{ rateFor(entry.betType, entry.station) }}</span>
+                  <span class="chip">{{ digitsFor(entry.betType, entry.station) }} số cuối</span>
                   <span v-if="entry.station && entry.station !== 'mb'" class="chip">{{ stationLabel(entry.station) }}</span>
                   <span
                     v-if="resultStatus[entry.id]?.state === 'saved' && !masked"
@@ -836,7 +834,7 @@ onMounted(async () => {
 .totals-grid,
 .day-figures {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1064,6 +1062,11 @@ onMounted(async () => {
   }
   .cell-value {
     font-size: 14px;
+  }
+}
+@media (max-width: 560px) {
+  .day-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

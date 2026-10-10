@@ -5,7 +5,7 @@
 // (2) and (3) only cover the days that already have a lottery result; the stakes of days
 // without a result are reported separately as "chưa có kết quả" and not counted in (3).
 import { effectiveConfig, pointValueOf, toMoney, unitOf } from './scoringConfig.js'
-import { entryStations } from './lotteryStations.js'
+import { entryStations, regionOf } from './lotteryStations.js'
 
 const toNumber = (v) => {
   const n = parseFloat(String(v ?? '').replace(/[^\d.-]/g, ''))
@@ -53,10 +53,11 @@ export function summarize(days, accountRates, customerRates, getResult) {
   for (const day of days) {
     for (const entry of day.entries) {
       const key = entry.betType || 'de'
-      const cfg = effectiveConfig(accountRates, customerRates, key)
-      const unit = unitOf(key, cfg)
       const stations = entryStations({ ...entry, entryDate: entry.entryDate || day.date })
       for (const station of stations.length ? stations : ['mb']) {
+        // Rates can differ by region (Miền Bắc has 27 numbers a day, Miền Nam / Miền Trung 18).
+        const cfg = effectiveConfig(accountRates, customerRates, key, regionOf(station).id)
+        const unit = unitOf(key, cfg)
         const lr = getResult(day.date, station)
         const d = entryDetail(entry, lr, cfg)
         const stake = d.score * d.lots // each number carries the entry's score

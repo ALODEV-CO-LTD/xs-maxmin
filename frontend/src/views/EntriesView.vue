@@ -25,8 +25,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
-import { customerBetTypes } from '../scoringConfig'
-import { loadStations, stationLabel, stationOptions } from '../lotteryStations'
+import { customerBetTypes, typesOf } from '../scoringConfig'
+import { loadStations, regionOf, stationLabel, stationOptions } from '../lotteryStations'
 import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
@@ -72,8 +72,9 @@ async function loadBetTypes() {
 // the types only that customer has (Khách hàng > Xem chi tiết > Cấu hình tính điểm).
 const betTypes = computed(() => {
   const own = customers.value.find((c) => c.name === form.customerName)?.scoringRates
-  const list = customerBetTypes(accountRates.value, own)
-  return list.length ? list : Object.keys(accountRates.value)
+  // Rates and the list of types depend on the region of the chosen đài (a type can be switched off for one region).
+  const list = customerBetTypes(accountRates.value, own, regionOf(form.station).id)
+  return list.length ? list : typesOf(accountRates.value)
 })
 
 

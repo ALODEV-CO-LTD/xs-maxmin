@@ -9,20 +9,34 @@ export const DEFAULT_RATES = {
   },
 }
 
-export function effectiveConfig(accountRates, customerRates, betType) {
+// A rates map holds `type` (applies to every region) and `type@mb|mt|mn` (that region only, wins over `type`).
+export const regionKey = (type, region) => `${type}@${region}`
+export const isRegionalKey = (key) => key.includes('@')
+export const baseKey = (key) => key.split('@')[0]
+
+// The bet types of a rates map (keys without a region suffix).
+export const typesOf = (rates) => Object.keys(rates || {}).filter((k) => !isRegionalKey(k))
+
+// Config of one bet type for one region, looking at: the customer's own region value, the customer's own value for
+// every region, the account's region value, the account's value, then the account's Đề.
+// `{disabled: true}` on the customer = the customer does not use that type (entries already saved with it are still
+// scored with the account-wide config).
+export function effectiveConfig(accountRates, customerRates, betType, region = 'mb') {
   const key = betType || 'de'
-  const own = customerRates?.[key]
-  // `{disabled: true}` = the customer does not use this type: entries already saved with it are
-  // still scored with the account-wide config.
-  if (own && !own.disabled) return own
-  return accountRates?.[key] ?? accountRates?.de ?? DEFAULT_RATES.de
+  for (const k of [regionKey(key, region), key]) {
+    const own = customerRates?.[k]
+    if (own && !own.disabled) return own
+    if (own?.disabled) break
+  }
+  return accountRates?.[regionKey(key, region)] ?? accountRates?.[key] ?? accountRates?.de ?? DEFAULT_RATES.de
 }
 
-// Bet types this customer can use: the account's types minus the ones switched off for them,
-// plus the types only they have.
-export function customerBetTypes(accountRates, customerRates) {
-  const out = Object.keys(accountRates || {}).filter((k) => !customerRates?.[k]?.disabled)
-  for (const [k, v] of Object.entries(customerRates || {})) if (!v?.disabled && !out.includes(k)) out.push(k)
+// Bet types this customer can use in `region`: the account's types minus the ones switched off for them (in every
+// region or just this one), plus the types only they have.
+export function customerBetTypes(accountRates, customerRates, region = 'mb') {
+  const off = (k) => customerRates?.[k]?.disabled || customerRates?.[regionKey(k, region)]?.disabled
+  const out = typesOf(accountRates).filter((k) => !off(k))
+  for (const k of typesOf(customerRates)) if (!off(k) && !out.includes(k)) out.push(k)
   return out
 }
 

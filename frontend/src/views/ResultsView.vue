@@ -156,10 +156,10 @@ function toNumber(str) {
 function computeScoreFromResults(entry, byStation) {
   // The customer's own config if they have one, else the account-wide one.
   const own = customers.value.find((c) => c.name === entry.customerName)?.scoringRates
-  const config = effectiveConfig(rates.value, own, entry.betType)
-  const lrs = entryStations(entry).map((st) => byStation[st]).filter(Boolean)
-  if (!lrs.length) return null
-  return lrs.reduce((sum, lr) => sum + entryDetail(entry, lr, config).out, 0)
+  const done = entryStations(entry).filter((st) => byStation[st])
+  if (!done.length) return null
+  // Rates are per region: each station is scored with the config of its own region.
+  return done.reduce((sum, st) => sum + entryDetail(entry, byStation[st], effectiveConfig(rates.value, own, entry.betType, regionOf(st).id)).out, 0)
 }
 function fillResultsForDate(date, byStation) {
   for (const e of entries.value) {

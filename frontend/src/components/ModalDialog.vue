@@ -13,6 +13,7 @@ const props = defineProps({
   title: { type: String, default: '' },
   description: { type: String, default: '' },
   wide: { type: Boolean, default: false },
+  xwide: { type: Boolean, default: false }, // very wide (about 960px): big forms such as Cấu hình tính điểm
 })
 const emit = defineEmits(['close'])
 
@@ -48,7 +49,7 @@ function onKey(e) {
 <template>
   <Teleport to="body">
     <div v-if="open" class="md-overlay" @mousedown.self="emit('close')" @keydown="onKey">
-      <div ref="box" class="md-box" :class="{ 'md-wide': wide }" role="dialog" aria-modal="true" aria-labelledby="md-title">
+      <div ref="box" class="md-box" :class="{ 'md-wide': wide, 'md-xwide': xwide }" role="dialog" aria-modal="true" aria-labelledby="md-title">
         <h2 id="md-title" class="md-title">{{ title }}</h2>
         <p v-if="description" class="md-desc">{{ description }}</p>
         <div class="md-body"><slot /></div>
@@ -80,6 +81,11 @@ function onKey(e) {
   border: 1px solid var(--input-border);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
+}
+.md-box.md-xwide {
+  max-width: 960px;
+  max-height: 92vh;
+  overflow-y: auto;
 }
 .md-box.md-wide {
   max-width: 600px;
