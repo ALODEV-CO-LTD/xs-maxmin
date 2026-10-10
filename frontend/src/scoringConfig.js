@@ -17,6 +17,15 @@ export const baseKey = (key) => key.split('@')[0]
 // The bet types of a rates map (keys without a region suffix).
 export const typesOf = (rates) => Object.keys(rates || {}).filter((k) => !isRegionalKey(k))
 
+// Bet types of a rates map as seen in one region: the shared ones plus the ones made only for that region (`type@region`
+// with no shared `type`).
+export function typesIn(rates, region) {
+  const keys = Object.keys(rates || {})
+  const shared = keys.filter((k) => !isRegionalKey(k))
+  const own = keys.filter((k) => k.endsWith(`@${region}`)).map(baseKey).filter((t) => !shared.includes(t))
+  return [...shared, ...own]
+}
+
 // Config of one bet type for one region, looking at: the customer's own region value, the customer's own value for
 // every region, the account's region value, the account's value, then the account's Đề.
 // `{disabled: true}` on the customer = the customer does not use that type (entries already saved with it are still
@@ -35,8 +44,8 @@ export function effectiveConfig(accountRates, customerRates, betType, region = '
 // region or just this one), plus the types only they have.
 export function customerBetTypes(accountRates, customerRates, region = 'mb') {
   const off = (k) => customerRates?.[k]?.disabled || customerRates?.[regionKey(k, region)]?.disabled
-  const out = typesOf(accountRates).filter((k) => !off(k))
-  for (const k of typesOf(customerRates)) if (!off(k) && !out.includes(k)) out.push(k)
+  const out = typesIn(accountRates, region).filter((k) => !off(k))
+  for (const k of typesIn(customerRates, region)) if (!off(k) && !out.includes(k)) out.push(k)
   return out
 }
 

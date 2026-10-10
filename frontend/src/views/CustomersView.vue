@@ -32,8 +32,6 @@ import { DEFAULT_RATES } from '../scoringConfig'
 import { allStationOptions, loadStations } from '../lotteryStations'
 import AppSelect from '../components/AppSelect.vue'
 import MaskedValue from '../components/MaskedValue.vue'
-import { mask } from '../stores/mask'
-import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
 
 const route = useRoute()
 const router = useRouter()
@@ -67,7 +65,7 @@ async function loadRoster() {
   }
 }
 
-// ---- Cấu hình tính điểm: riêng từng khách (trong Xem chi tiết) + mặc định chung (nút trên đầu) ----
+// ---- Cấu hình tính điểm: riêng từng khách (nút Cấu hình tính điểm ở từng dòng) + mặc định chung (nút trên đầu) ----
 const accountRates = ref({ ...DEFAULT_RATES })
 async function loadAccountRates() {
   try {
@@ -266,58 +264,31 @@ function toggle(name) {
   expanded.value = name
   nextTick(() => detailBox.value?.focus())
 }
-// Sao chép (K18): the customer's entries, optionally only one day. Asks first
-// when the user turned on "Hỏi xác nhận trước khi sao chép".
-const copyDate = ref('')
-const confirmCopy = ref(confirmCopyEnabled())
-const copyMessage = ref('')
-watch(confirmCopy, (on) => setConfirmCopy(on))
-watch(expanded, () => {
-  copyDate.value = ''
-  copyMessage.value = ''
-})
-const copyList = computed(() => {
-  const list = detail.value?.entries || []
-  return copyDate.value ? list.filter((e) => e.entryDate === copyDate.value) : list
-})
-async function copyDetail() {
-  if (mask.masked.value) return
-  copyMessage.value = ''
-  const label = [detail.value.name, copyDate.value].filter(Boolean).join(', ')
-  const res = await copyEntries(copyList.value, { label })
-  if (res === 'copied') copyMessage.value = `Đã sao chép ${copyList.value.length} số liệu`
-  else if (res === 'failed') copyMessage.value = 'Không có số liệu để sao chép hoặc không sao chép được'
-}
-
-// Phone number edited inside the detail box.
+// "Sửa": edit a customer's phone number in a small dialog.
+const editing = ref(null) // the table row being edited
 const phoneDraft = ref('')
 const phoneMsg = ref('')
 const savingPhone = ref(false)
-watch(expanded, () => {
-  phoneDraft.value = detail.value?.phone || ''
+function openEdit(c) {
+  editing.value = c
+  phoneDraft.value = c.phone || ''
   phoneMsg.value = ''
-})
+}
 async function savePhone() {
-  const c = detail.value
+  const c = editing.value
   if (!c?.rosterId) return
   savingPhone.value = true
   phoneMsg.value = ''
   try {
     const res = await api.patch(`/me/customers/${c.rosterId}`, { phone: phoneDraft.value.trim() })
-    const row = roster.value.find((r) => r.id === c.rosterId)
+    const row = roster.value.find((x) => x.id === c.rosterId)
     if (row) row.phone = res.phone
-    phoneDraft.value = res.phone
-    phoneMsg.value = 'Đã lưu số điện thoại'
+    editing.value = null
   } catch (err) {
     phoneMsg.value = err instanceof ApiError ? (err.status === 0 ? OFFLINE_WRITE : err.message) : 'Không lưu được số điện thoại'
   } finally {
     savingPhone.value = false
   }
-}
-
-async function removeFromDetail(c) {
-  await removeCustomer(c.rosterId, c.name)
-  if (!roster.value.some((r) => r.id === c.rosterId)) expanded.value = null
 }
 </script>
 
@@ -354,7 +325,6 @@ async function removeFromDetail(c) {
       <MaskBar class="mask-row" />
       <div class="config-row">
         <button type="button" class="btn btn-secondary btn-sm" @click="defaultConfigOpen = true">Cấu hình tính điểm mặc định</button>
-        <span class="config-hint">Tỉ lệ ăn dùng cho mọi khách; mỗi khách có thể có cấu hình riêng trong Xem chi tiết.</span>
       </div>
       <div class="field search-field">
         <div class="input-wrap">
@@ -389,8 +359,9 @@ async function removeFromDetail(c) {
                 <td data-label="Điểm đầu ra"><MaskedValue :text="formatNumber(c.ra)" /></td>
                 <td data-label="Lợi nhuận" :class="c.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(c.chenhLech)" /></td>
                 <td class="actions-cell">
+                  <button v-if="c.rosterId" type="button" class="btn btn-secondary btn-sm" @click.stop="openEdit(c)">Sửa</button>
                   <button type="button" class="btn btn-secondary btn-sm btn-detail" @click.stop="toggle(c.name)">
-                    Xem chi tiết
+                    Cấu hình tính điểm
                   </button>
                   <button
                     v-if="c.rosterId"
@@ -414,6 +385,17 @@ async function removeFromDetail(c) {
       <ScoringSettingsView embedded @saved="loadAccountRates" />
     </ModalDialog>
 
+    <ModalDialog :open="!!editing" :title="editing ? `Sửa ${editing.name}` : ''" @close="editing = null">
+      <form class="cd-phone" @submit.prevent="savePhone">
+        <label>
+          Số điện thoại
+          <input v-model="phoneDraft" type="tel" inputmode="tel" placeholder="Chưa có" :disabled="savingPhone" data-autofocus />
+        </label>
+        <button type="submit" class="btn btn-primary" :disabled="savingPhone || phoneDraft.trim() === (editing?.phone || '')">{{ savingPhone ? 'Đang lưu...' : 'Lưu' }}</button>
+      </form>
+      <p v-if="phoneMsg" class="alert alert-error" role="alert" style="margin-top: 10px">{{ phoneMsg }}</p>
+    </ModalDialog>
+
     <Teleport to="body">
       <div v-if="detail" class="cd-overlay" @mousedown.self="expanded = null" @keydown.esc="expanded = null">
         <div class="cd-box" role="dialog" aria-modal="true" aria-labelledby="cd-title" tabindex="-1" ref="detailBox">
@@ -423,32 +405,7 @@ async function removeFromDetail(c) {
             </button>
             <h2 id="cd-title" class="cd-name">{{ detail.name }}</h2>
           </div>
-          <form v-if="detail.rosterId" class="cd-phone" @submit.prevent="savePhone">
-            <label>
-              Số điện thoại
-              <input v-model="phoneDraft" type="tel" inputmode="tel" placeholder="Chưa có" :disabled="savingPhone" />
-            </label>
-            <button type="submit" class="btn btn-secondary" :disabled="savingPhone || phoneDraft.trim() === (detail.phone || '')">Lưu</button>
-            <span v-if="phoneMsg" class="cd-copy-msg" role="status">{{ phoneMsg }}</span>
-          </form>
-          <dl class="cd-stats">
-            <div class="cd-stat">
-              <dt>Số lượt chơi</dt>
-              <dd><MaskedValue :text="formatNumber(detail.count)" /></dd>
-            </div>
-            <div class="cd-stat">
-              <dt>Điểm đầu vào</dt>
-              <dd><MaskedValue :text="formatNumber(detail.vao)" /></dd>
-            </div>
-            <div class="cd-stat">
-              <dt>Điểm đầu ra</dt>
-              <dd><MaskedValue :text="formatNumber(detail.ra)" /></dd>
-            </div>
-            <div class="cd-stat">
-              <dt>Lợi nhuận</dt>
-              <dd :class="detail.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(detail.chenhLech)" /></dd>
-            </div>
-          </dl>
+          <div class="cd-top">
           <section v-if="detail.rosterId && rosterRow" class="cd-station" aria-label="Đài mặc định">
             <label class="cd-station-label">Đài xổ số mặc định khi nhập số cho khách này</label>
             <div class="cd-station-row">
@@ -458,33 +415,12 @@ async function removeFromDetail(c) {
               <span v-if="stationMsg" class="muted-note" role="status">{{ stationMsg }}</span>
             </div>
           </section>
+          </div>
           <section v-if="detail.rosterId && rosterRow" class="cd-config" aria-label="Cấu hình tính điểm của khách này">
             <h3 class="cd-config-title">Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</h3>
             <ScoringConfigEditor scope="customer" :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
           </section>
-          <div class="cd-copy">
-            <label class="cd-copy-date">
-              Ngày
-              <input v-model="copyDate" type="date" aria-label="Chỉ sao chép số liệu của ngày" />
-            </label>
-            <button type="button" class="btn btn-secondary" :disabled="copyList.length === 0 || mask.masked.value" :title="mask.masked.value ? 'Đang ẩn số liệu: bấm Hiện để sao chép' : undefined" @click="copyDetail">
-              Sao chép {{ mask.masked.value ? '•••' : copyList.length }} số liệu
-            </button>
-            <label class="cd-copy-confirm">
-              <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
-            </label>
-            <span v-if="copyMessage" class="cd-copy-msg" role="status">{{ copyMessage }}</span>
-          </div>
           <div class="cd-actions">
-            <button
-              v-if="detail.rosterId"
-              type="button"
-              class="btn btn-ghost btn-remove"
-              :disabled="deletingId === detail.rosterId"
-              @click="removeFromDetail(detail)"
-            >
-              {{ deletingId === detail.rosterId ? 'Đang xoá...' : 'Xoá khỏi danh sách' }}
-            </button>
             <button type="button" class="btn btn-secondary" @click="expanded = null">Đóng</button>
           </div>
         </div>
@@ -501,12 +437,16 @@ async function removeFromDetail(c) {
   gap: 8px 12px;
   margin-bottom: 12px;
 }
-.config-hint {
-  font-size: 13px;
-  color: var(--muted);
+.cd-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 32px;
+  margin-bottom: 14px;
 }
 .cd-station {
-  margin: 0 0 14px;
+  flex: 1 1 320px;
+  margin: 0;
 }
 .cd-station-label {
   display: block;
@@ -519,10 +459,9 @@ async function removeFromDetail(c) {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  max-width: 460px;
 }
 .cd-config {
-  margin: 4px 0 18px;
+  margin: 4px 0 14px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
@@ -553,7 +492,7 @@ async function removeFromDetail(c) {
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 8px 12px;
-  margin-bottom: 16px;
+  margin: 0;
 }
 .cd-phone label {
   display: flex;
@@ -637,9 +576,9 @@ async function removeFromDetail(c) {
 }
 .cd-box {
   width: 100%;
-  max-width: 920px;
+  max-width: 1080px;
   margin: auto;
-  padding: 28px;
+  padding: 22px 26px;
   background: var(--card);
   border: 1px solid var(--input-border);
   border-radius: 16px;
@@ -681,10 +620,10 @@ async function removeFromDetail(c) {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin: 0 0 20px;
+  margin: 0 0 14px;
 }
 .cd-stat {
-  padding: 12px 14px;
+  padding: 8px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -706,35 +645,6 @@ async function removeFromDetail(c) {
 }
 .cd-stat dd.calc-out {
   color: var(--danger-text);
-}
-.cd-copy {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-bottom: 12px;
-}
-.cd-copy-date {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-.cd-copy-date input {
-  min-height: 40px;
-}
-.cd-copy-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  font-size: 14px;
-  font-weight: 600;
-}
-.cd-copy-msg {
-  font-size: 14px;
-  font-weight: 700;
 }
 .cd-actions {
   display: flex;
@@ -922,7 +832,7 @@ async function removeFromDetail(c) {
   }
 }
 
-/* ---- Actions: "Xem chi tiết" + "Xoá khỏi danh sách" ---- */
+/* ---- Actions: "Cấu hình tính điểm" + "Xoá khỏi danh sách" ---- */
 .actions-cell {
   display: table-cell;
   white-space: nowrap;

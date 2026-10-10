@@ -416,7 +416,7 @@ onMounted(async () => {
     <p class="page-subtitle">
       Điểm ra được máy tự động tính và lưu, theo kết quả xổ số đã nhập ở trang
       <RouterLink :to="{ name: 'results' }" class="tap-link">Nhập kết quả</RouterLink>. Tỉ lệ ăn và giải đối chiếu của từng khách chỉnh ở trang
-      <RouterLink :to="{ name: 'customers' }" class="tap-link">Khách hàng</RouterLink> (Xem chi tiết, mục Cấu hình tính điểm).
+      <RouterLink :to="{ name: 'customers' }" class="tap-link">Khách hàng</RouterLink> (nút Cấu hình tính điểm ở từng khách).
     </p>
 
     <div class="toolbar card">

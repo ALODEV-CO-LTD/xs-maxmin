@@ -17,7 +17,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, ApiError } from '../api'
 import { showConfirm } from '../confirm'
 import { betTypeLabel, PRIZE_TIERS } from '../betTypes'
-import { baseKey, DEFAULT_RATES, isRegionalKey, pointValueOf, regionKey, sameConfig, typesOf, unitOf } from '../scoringConfig'
+import { baseKey, DEFAULT_RATES, isRegionalKey, pointValueOf, regionKey, sameConfig, typesIn, unitOf } from '../scoringConfig'
 import { REGION_IDS } from '../lotteryStations'
 import AppSelect from './AppSelect.vue'
 import AddBetTypeDialog from './AddBetTypeDialog.vue'
@@ -90,9 +90,14 @@ function stored(type) {
   return regional && !regional.disabled ? regional : inherited(type) // a `disabled` marker carries no values
 }
 
+// A type made for this region only (no value that applies to every region).
+const isRegionType = (type) => !work[type] && !(isCustomer.value && base.value[type])
+// Where a row's value is written when it has nothing to inherit from.
+const writeKey = (r) => (r.regionType ? regionKey(r.type, region.value) : r.type)
+
 const typeKeys = computed(() => {
-  const keys = new Set(typesOf(work))
-  if (isCustomer.value) for (const k of typesOf(base.value)) keys.add(k)
+  const keys = new Set(typesIn(work, region.value))
+  if (isCustomer.value) for (const k of typesIn(base.value, region.value)) keys.add(k)
   // generic `type@region` keys of types that no longer exist are ignored
   return [...keys]
 })
@@ -110,7 +115,8 @@ function buildRows() {
       unit: unitOf(type, cfg),
       pointValue: String(pointValueOf(cfg)),
       off: !!offHere,
-      custom: isCustomer.value && !base.value[type],
+      custom: isCustomer.value && !base.value[type] && !base.value[regionKey(type, region.value)],
+      regionType: isRegionType(type),
     })
   }
 }
@@ -132,7 +138,7 @@ function commitRows() {
     const cfg = cfgOf(r)
     const baseCfg = inherited(r.type)
     if (!baseCfg) {
-      work[r.type] = cfg // a type without a general value gets one
+      work[writeKey(r)] = cfg // a type without a general value gets one (region-only types keep theirs in their region)
     } else if (sameConfig(cfg, baseCfg, r.type)) {
       delete work[key]
     } else {
@@ -160,6 +166,7 @@ const differs = (r) => {
 }
 const tag = (r) => {
   if (r.off) return 'Đã bỏ'
+  if (r.regionType) return isCustomer.value ? 'Riêng khách · chỉ miền này' : 'Chỉ miền này'
   if (isRegionOnly(r)) return isCustomer.value ? 'Riêng khách · miền này' : 'Riêng miền này'
   if (isCustomer.value) {
     if (work[r.type] && !work[r.type].disabled) return r.custom ? 'Chỉ khách này' : 'Riêng khách'
@@ -167,7 +174,7 @@ const tag = (r) => {
   }
   return 'Chung các miền'
 }
-const isRegionOnly = (r) => !r.off && (!!work[regionKey(r.type, region.value)] || differs(r))
+const isRegionOnly = (r) => !r.off && !r.regionType && (!!work[regionKey(r.type, region.value)] || differs(r))
 const isInherited = (r) => !r.off && !isRegionOnly(r)
 
 function resetRow(r) {
@@ -179,9 +186,21 @@ function toggleTier(r, key) {
   if (i === -1) r.tiers.push(key)
   else r.tiers.splice(i, 1)
 }
-const tierChoices = computed(() => PRIZE_TIERS.filter((t) => t.key !== 'giaiTam' || region.value !== 'mb'))
 
 async function removeRow(r) {
+  if (r.regionType) {
+    const okRegion = await showConfirm({
+      title: 'Xoá loại đánh',
+      message: `Xoá loại "${betTypeLabel(r.type)}" của ${REGION_NAMES[region.value]}${isCustomer.value ? ` (${props.customer.name})` : ''}? Số liệu đã nhập với loại này vẫn được giữ và tính theo cấu hình mặc định. Bấm Lưu để áp dụng.`,
+      confirmText: 'Xoá',
+      danger: true,
+    })
+    if (!okRegion) return
+    commitRows()
+    delete work[regionKey(r.type, region.value)]
+    buildRows()
+    return
+  }
   const every = !isCustomer.value || r.custom
   const ok = await showConfirm({
     title: 'Xoá loại đánh',
@@ -209,8 +228,8 @@ function restoreRow(r) {
 
 function onAdd(p) {
   commitRows()
-  if (Object.keys(work).some((k) => baseKey(k) === p.key)) return
-  work[p.key] = { rate: p.rate, tiers: [...p.tiers], digits: p.digits, unit: p.unit, pointValue: p.pointValue }
+  if (typeKeys.value.includes(p.key)) return
+  work[regionKey(p.key, region.value)] = { rate: p.rate, tiers: [...p.tiers], digits: p.digits, unit: p.unit, pointValue: p.pointValue }
   addOpen.value = false
   buildRows()
 }
@@ -234,7 +253,7 @@ const dirty = computed(() => {
     const key = regionKey(r.type, region.value)
     const cfg = cfgOf(r)
     const baseCfg = inherited(r.type)
-    if (!baseCfg) copy[r.type] = cfg
+    if (!baseCfg) copy[writeKey(r)] = cfg
     else if (sameConfig(cfg, baseCfg, r.type)) delete copy[key]
     else copy[key] = cfg
   }
@@ -251,7 +270,7 @@ async function save() {
   }
   commitRows()
   const map = JSON.parse(JSON.stringify(work))
-  if (!isCustomer.value && !typesOf(map).length) {
+  if (!isCustomer.value && !Object.keys(map).length) {
     error.value = 'Cần ít nhất một loại đánh'
     return
   }
@@ -294,7 +313,7 @@ const regions = REGION_IDS
       <p class="sce-hint">
         <template v-if="isCustomer">Cấu hình dùng để tính điểm cho <strong>{{ customer.name }}</strong>. Dòng nào không đổi sẽ theo cấu hình mặc định.</template>
         <template v-else>Cấu hình mặc định dùng cho mọi khách chưa có cấu hình riêng.</template>
-        Mỗi miền có thể có tỉ lệ khác nhau: chọn miền rồi sửa. Dòng không đổi sẽ theo giá trị chung của các miền.
+        Mỗi miền có thể có tỉ lệ khác nhau: chọn miền rồi sửa. Loại đánh thêm ở tab nào chỉ dùng cho miền đó.
       </p>
 
       <div v-if="error" class="alert alert-error">{{ error }}</div>
@@ -315,9 +334,10 @@ const regions = REGION_IDS
             {{ REGION_NAMES[id] }}<span v-if="regionHasOverride(id)" class="sce-dot" title="Có cấu hình riêng cho miền này"></span>
           </button>
         </div>
-        <button type="button" class="btn btn-primary btn-sm" @click="addOpen = true">+ Thêm loại đánh</button>
+        <button type="button" class="btn btn-primary btn-sm" :title="`Thêm loại đánh chỉ dùng cho ${REGION_NAMES[region]}`" @click="addOpen = true">+ Thêm loại đánh ({{ REGION_NAMES[region] }})</button>
       </div>
 
+      <div class="sce-list">
       <div v-for="r in rows" :key="r.type" class="sce-row" :class="{ own: isRegionOnly(r), off: r.off }">
         <div class="sce-head">
           <strong>{{ betTypeLabel(r.type) }}</strong> <span class="sce-muted">({{ r.type }})</span>
@@ -341,13 +361,15 @@ const regions = REGION_IDS
               <option value="money">Tiền</option>
             </AppSelect>
           </label>
-          <label v-if="r.unit === 'point'">1 điểm =<input v-model="r.pointValue" type="number" min="0" step="any" class="wide" /> đ</label>
+          <!-- the slot stays (hidden) when the type is paid in money, so the row never changes height -->
+          <label class="sce-pv" :class="{ ghost: r.unit !== 'point' }">1 điểm =<input v-model="r.pointValue" type="number" min="0" step="any" class="wide" :tabindex="r.unit === 'point' ? 0 : -1" /> đ</label>
         </div>
         <div v-if="!r.off" class="sce-tiers">
-          <label v-for="t in tierChoices" :key="t.key" class="sce-tier">
-            <input type="checkbox" :checked="r.tiers.includes(t.key)" @change="toggleTier(r, t.key)" /> {{ t.label }}
+          <label v-for="t in PRIZE_TIERS" :key="t.key" class="sce-tier" :class="{ ghost: t.key === 'giaiTam' && region === 'mb' }">
+            <input type="checkbox" :checked="r.tiers.includes(t.key)" :tabindex="t.key === 'giaiTam' && region === 'mb' ? -1 : 0" @change="toggleTier(r, t.key)" /> <span>{{ t.key === 'giaiTam' ? 'Giải tám' : t.label }}</span>
           </label>
         </div>
+      </div>
       </div>
 
       <div class="sce-foot">
@@ -369,9 +391,14 @@ const regions = REGION_IDS
 </template>
 
 <style scoped>
+/* Sizes are generous and FIXED: every row has the same slots (price per point and the eighth prize are hidden, not
+   removed) and the list has a fixed height that scrolls, so switching region never makes the window jump. */
+.sce {
+  font-size: 14.5px;
+}
 .sce-hint {
-  margin: 0 0 10px;
-  font-size: 13px;
+  margin: 0 0 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 .sce-note {
@@ -383,19 +410,20 @@ const regions = REGION_IDS
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .sce-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .sce-tab {
-  position: relative;
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: 38px;
+  min-width: 110px;
+  padding: 0 16px;
   font: inherit;
-  font-size: 14px;
+  font-size: 14.5px;
+  font-weight: 600;
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -409,24 +437,29 @@ const regions = REGION_IDS
 }
 .sce-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-left: 6px;
+  width: 8px;
+  height: 8px;
+  margin-left: 7px;
   vertical-align: middle;
   background: currentColor;
   border-radius: 50%;
   opacity: 0.8;
 }
+.sce-list {
+  height: clamp(270px, 34vh, 340px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
 .sce-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto;
-  gap: 4px 14px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 8px;
   margin-bottom: 8px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .sce-row.own {
   border-color: var(--primary);
@@ -438,28 +471,30 @@ const regions = REGION_IDS
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px 8px;
-  font-size: 15px;
+  gap: 4px 10px;
+  min-height: 30px;
+  font-size: 16px;
 }
 .sce-actions {
   display: inline-flex;
+  gap: 4px;
   margin-left: auto;
 }
 .sce-actions .btn {
-  min-height: 26px;
-  padding: 0 9px;
-  font-size: 13px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 14.5px;
 }
 .sce-del {
   color: var(--danger-text);
 }
 .sce-muted {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .sce-tag {
-  padding: 0 8px;
-  font-size: 12px;
+  padding: 1px 10px;
+  font-size: 13px;
   line-height: 20px;
   color: var(--muted);
   border: 1px solid var(--border);
@@ -470,62 +505,91 @@ const regions = REGION_IDS
   border-color: var(--primary);
 }
 .sce-fields {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
   align-items: center;
-  gap: 4px 14px;
+  gap: 6px 18px;
+  min-height: 40px;
 }
 .sce-fields label {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 14.5px;
   color: var(--muted);
   white-space: nowrap;
 }
 .sce-fields input {
-  width: 70px;
-  height: 32px;
+  width: 92px;
+  height: 38px;
   padding: 0 8px;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   text-align: center;
   color: var(--text-primary);
   background: var(--card);
   border: 1px solid var(--input-border);
-  border-radius: 8px;
+  border-radius: 10px;
 }
 .sce-fields input.wide {
-  width: 96px;
+  width: 120px;
+}
+.sce-fields :deep(select),
+.sce-fields :deep(.app-select-trigger),
+.sce-fields :deep(button) {
+  min-height: 38px;
+  font-size: 14.5px;
+}
+.ghost {
+  visibility: hidden;
 }
 .sce-tiers {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px 8px;
+  min-height: 28px;
 }
 .sce-tier {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 13.5px;
+  gap: 6px;
+  min-height: 28px;
+  font-size: 14px;
   color: var(--text-primary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sce-tier input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 .sce-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px 10px;
-  margin-top: 10px;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.sce-foot .btn {
+  min-height: 44px;
+  font-size: 15px;
 }
 .sce-foot .sce-muted {
   flex: 1;
 }
-@media (max-width: 600px) {
-  .sce-row {
-    grid-template-columns: 1fr;
+@media (max-width: 760px) {
+  .sce-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sce-tiers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: 90px;
+  }
+  .sce-list {
+    height: clamp(280px, 44vh, 440px);
   }
 }
 </style>

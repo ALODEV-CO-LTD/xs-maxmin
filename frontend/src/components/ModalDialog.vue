@@ -83,7 +83,7 @@ function onKey(e) {
   box-shadow: var(--shadow-lg);
 }
 .md-box.md-xwide {
-  max-width: 960px;
+  max-width: 1080px;
   max-height: 92vh;
   overflow-y: auto;
 }
