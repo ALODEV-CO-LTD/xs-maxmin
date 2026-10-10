@@ -69,6 +69,7 @@ void _migrateSchema(Database db) {
   // own payout rate (see users.scoring_rates below). Nullable so old rows
   // fall back to the 'de' default in the frontend.
   _ensureColumn(db, 'data_entries', 'bet_type', 'TEXT');
+  _ensureColumn(db, 'customers', 'phone', 'TEXT');
   // Per-user payout-rate config ("tỉ lệ ăn"): JSON object of
   // {betTypeKey: rate}, e.g. '{"de":70,"lo":20}' - each account sets its
   // own (see routes/api/me/scoring-settings), not admin-controlled. Null

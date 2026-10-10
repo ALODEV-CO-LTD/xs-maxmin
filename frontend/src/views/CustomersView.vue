@@ -45,6 +45,7 @@ const expanded = ref(null)
 
 const roster = ref([]) // [{id, name, createdAt}] from /me/customers
 const newCustomerName = ref('')
+const newCustomerPhone = ref('')
 const addingCustomer = ref(false)
 const addError = ref('')
 const deletingId = ref(null)
@@ -66,10 +67,11 @@ async function addCustomer() {
   addError.value = ''
   addingCustomer.value = true
   try {
-    const created = await api.post('/me/customers', { name })
+    const created = await api.post('/me/customers', { name, phone: newCustomerPhone.value.trim() })
     roster.value.push(created)
     roster.value.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
     newCustomerName.value = ''
+    newCustomerPhone.value = ''
     if (fromEntries) {
       router.push({ name: 'entries', query: { customer: created.name } })
       return
@@ -157,6 +159,7 @@ const customers = computed(() => {
     byName.set(c.name, {
       name: c.name,
       rosterId: c.id,
+      phone: c.phone || '',
       count: 0,
       vao: 0,
       ra: 0,
@@ -167,7 +170,7 @@ const customers = computed(() => {
   for (const e of entries.value) {
     const name = e.customerName || '(Không tên)'
     if (!byName.has(name)) {
-      byName.set(name, { name, rosterId: null, count: 0, vao: 0, ra: 0, lastDate: null, entries: [] })
+      byName.set(name, { name, rosterId: null, phone: '', count: 0, vao: 0, ra: 0, lastDate: null, entries: [] })
     }
     const c = byName.get(name)
     c.count += 1
@@ -243,6 +246,32 @@ async function copyDetail() {
   else if (res === 'failed') copyMessage.value = 'Không có số liệu để sao chép hoặc không sao chép được'
 }
 
+// Phone number edited inside the detail box.
+const phoneDraft = ref('')
+const phoneMsg = ref('')
+const savingPhone = ref(false)
+watch(expanded, () => {
+  phoneDraft.value = detail.value?.phone || ''
+  phoneMsg.value = ''
+})
+async function savePhone() {
+  const c = detail.value
+  if (!c?.rosterId) return
+  savingPhone.value = true
+  phoneMsg.value = ''
+  try {
+    const res = await api.patch(`/me/customers/${c.rosterId}`, { phone: phoneDraft.value.trim() })
+    const row = roster.value.find((r) => r.id === c.rosterId)
+    if (row) row.phone = res.phone
+    phoneDraft.value = res.phone
+    phoneMsg.value = 'Đã lưu số điện thoại'
+  } catch (err) {
+    phoneMsg.value = err instanceof ApiError ? (err.status === 0 ? OFFLINE_WRITE : err.message) : 'Không lưu được số điện thoại'
+  } finally {
+    savingPhone.value = false
+  }
+}
+
 async function removeFromDetail(c) {
   await removeCustomer(c.rosterId, c.name)
   if (!roster.value.some((r) => r.id === c.rosterId)) expanded.value = null
@@ -259,6 +288,11 @@ async function removeFromDetail(c) {
         <div class="field add-customer-field">
           <div class="input-wrap">
             <input ref="addInput" v-model="newCustomerName" type="text" placeholder="Tên khách hàng mới" :disabled="addingCustomer" />
+          </div>
+        </div>
+        <div class="field add-customer-field">
+          <div class="input-wrap">
+            <input v-model="newCustomerPhone" type="tel" inputmode="tel" placeholder="Số điện thoại (không bắt buộc)" :disabled="addingCustomer" />
           </div>
         </div>
         <button type="submit" class="btn btn-primary" :disabled="addingCustomer || !newCustomerName.trim()">
@@ -291,6 +325,7 @@ async function removeFromDetail(c) {
             <tr>
               <th>STT</th>
               <th>Tên</th>
+              <th>SĐT</th>
               <th>Điểm đầu vào</th>
               <th>Điểm đầu ra</th>
               <th>Lợi nhuận</th>
@@ -302,6 +337,7 @@ async function removeFromDetail(c) {
               <tr class="row-clickable" @click="toggle(c.name)">
                 <td data-label="STT">{{ i + 1 }}</td>
                 <td data-label="Tên">{{ c.name }}</td>
+                <td data-label="SĐT">{{ c.phone || '-' }}</td>
                 <td data-label="Điểm đầu vào"><MaskedValue :text="formatNumber(c.vao)" /></td>
                 <td data-label="Điểm đầu ra"><MaskedValue :text="formatNumber(c.ra)" /></td>
                 <td data-label="Lợi nhuận" :class="c.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(c.chenhLech)" /></td>
@@ -336,6 +372,14 @@ async function removeFromDetail(c) {
             </button>
             <h2 id="cd-title" class="cd-name">{{ detail.name }}</h2>
           </div>
+          <form v-if="detail.rosterId" class="cd-phone" @submit.prevent="savePhone">
+            <label>
+              Số điện thoại
+              <input v-model="phoneDraft" type="tel" inputmode="tel" placeholder="Chưa có" :disabled="savingPhone" />
+            </label>
+            <button type="submit" class="btn btn-secondary" :disabled="savingPhone || phoneDraft.trim() === (detail.phone || '')">Lưu</button>
+            <span v-if="phoneMsg" class="cd-copy-msg" role="status">{{ phoneMsg }}</span>
+          </form>
           <dl class="cd-stats">
             <div class="cd-stat">
               <dt>Số lượt chơi</dt>
@@ -402,6 +446,29 @@ async function removeFromDetail(c) {
 .add-customer-error {
   margin-top: 12px;
   margin-bottom: 0;
+}
+.cd-phone {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+.cd-phone label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cd-phone input {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
 }
 .actions-cell {
   white-space: nowrap;

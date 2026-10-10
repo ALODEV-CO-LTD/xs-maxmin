@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/phone.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// A user's own customer roster. EntriesView is meant to pick a name FROM
@@ -11,8 +12,8 @@ import 'package:sqlite3/sqlite3.dart';
 /// customer - adding to the roster is a deliberate, separate step done
 /// here (or on CustomersView.vue).
 ///
-/// GET  -> { customers: [{ id, name, createdAt }] }, ordered by name
-/// POST { name } -> creates one; 409 if that name already exists
+/// GET  -> { customers: [{ id, name, phone, createdAt }] }, ordered by name
+/// POST { name, phone? } -> creates one; 409 if that name already exists
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
@@ -34,7 +35,7 @@ Response _list(RequestContext context, String userId) {
   return Response.json(
     body: {
       'customers': [
-        for (final r in rows) {'id': r['id'], 'name': r['name'], 'createdAt': r['created_at']},
+        for (final r in rows) {'id': r['id'], 'name': r['name'], 'phone': r['phone'] ?? '', 'createdAt': r['created_at']},
       ],
     },
   );
@@ -79,6 +80,11 @@ Future<Response> _create(RequestContext context, String userId) async {
     return Response.json(statusCode: 400, body: {'error': 'Vui lòng nhập tên khách hàng'});
   }
 
+  final phone = normalizePhone(body['phone']);
+  if (phone == null) {
+    return Response.json(statusCode: 400, body: {'error': 'Số điện thoại không hợp lệ'});
+  }
+
   final db = context.read<Database>();
   final existing = db.select(
     'SELECT id FROM customers WHERE user_id = ? AND name = ? COLLATE NOCASE',
@@ -91,8 +97,8 @@ Future<Response> _create(RequestContext context, String userId) async {
   final id = newId();
   final now = DateTime.now().toUtc().toIso8601String();
   db.execute(
-    'INSERT INTO customers (id, user_id, name, created_at) VALUES (?, ?, ?, ?)',
-    [id, userId, name, now],
+    'INSERT INTO customers (id, user_id, name, phone, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, userId, name, phone, now],
   );
-  return Response.json(statusCode: 201, body: {'id': id, 'name': name, 'createdAt': now});
+  return Response.json(statusCode: 201, body: {'id': id, 'name': name, 'phone': phone, 'createdAt': now});
 }
