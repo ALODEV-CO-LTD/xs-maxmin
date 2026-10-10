@@ -27,9 +27,22 @@ export function customerBetTypes(accountRates, customerRates) {
 }
 
 // Same config? (rate, digits and the SET of prize groups)
-export function sameConfig(a, b) {
+export function sameConfig(a, b, key = '') {
   if (!a || !b) return false
   const ta = [...(a.tiers || [])].sort().join(',')
   const tb = [...(b.tiers || [])].sort().join(',')
-  return Number(a.rate) === Number(b.rate) && Number(a.digits || 2) === Number(b.digits || 2) && ta === tb
+  const ua = unitOf(key, a)
+  const ub = unitOf(key, b)
+  const moneyA = ua === 'point' ? pointValueOf(a) : 0
+  const moneyB = ub === 'point' ? pointValueOf(b) : 0
+  return Number(a.rate) === Number(b.rate) && Number(a.digits || 2) === Number(b.digits || 2) && ta === tb && ua === ub && moneyA === moneyB
 }
+
+// ---- Money view (Tính điểm summary) ------------------------------------------------------
+// A bet type is written either in điểm (default for "lô": the stake is points, 1 điểm = pointValue
+// đồng) or in money (every other type by default: the stake is already đồng).
+export const DEFAULT_POINT_VALUE = 23000
+export const unitOf = (key, cfg) => cfg?.unit || (key === 'lo' ? 'point' : 'money')
+export const pointValueOf = (cfg) => (cfg?.pointValue != null && Number(cfg.pointValue) >= 0 ? Number(cfg.pointValue) : DEFAULT_POINT_VALUE)
+// `amount` is in the type's own unit (điểm or đồng); returns đồng.
+export const toMoney = (key, cfg, amount) => (unitOf(key, cfg) === 'point' ? amount * pointValueOf(cfg) : amount)

@@ -27,6 +27,7 @@ import AddBetTypeDialog from '../components/AddBetTypeDialog.vue'
 import { nextTick, ref, watch, onMounted } from 'vue'
 import { api, ApiError } from '../api'
 import { betTypeLabel, PRIZE_TIERS } from '../betTypes'
+import { pointValueOf, unitOf } from '../scoringConfig'
 
 const defaultRates = {
   de: { rate: 70, tiers: ['dacBiet'], digits: 2 },
@@ -78,6 +79,8 @@ function toRows(map) {
     rate: String(cfg.rate),
     tiers: [...cfg.tiers],
     digits: cfg.digits ?? 2,
+    unit: unitOf(key, cfg),
+    pointValue: String(pointValueOf(cfg)),
   }))
 }
 
@@ -103,7 +106,17 @@ async function onAdd(payload) {
   if (rows.value.some((r) => r.key === payload.key)) return
   addError.value = ''
   const before = rows.value
-  rows.value = [...before, { key: payload.key, rate: String(payload.rate), tiers: payload.tiers, digits: payload.digits }]
+  rows.value = [
+    ...before,
+    {
+      key: payload.key,
+      rate: String(payload.rate),
+      tiers: payload.tiers,
+      digits: payload.digits,
+      unit: payload.unit,
+      pointValue: String(payload.pointValue),
+    },
+  ]
   // A new type is saved to the server RIGHT NOW, while the dialog is still open: if that
   // fails the dialog stays open with the reason (the error used to appear at the top of the
   // page, out of sight after scrolling to the new row) and nothing is added locally.
@@ -150,7 +163,7 @@ async function save() {
       error.value = `"${betTypeLabel(r.key)}" cần chọn ít nhất một giải để đối chiếu`
       return false
     }
-    map[r.key.trim()] = { rate: n, tiers: r.tiers, digits: Number(r.digits) || 2 }
+    map[r.key.trim()] = { rate: n, tiers: r.tiers, digits: Number(r.digits) || 2, unit: r.unit, pointValue: Math.max(0, Number(r.pointValue) || 0) }
   }
   saving.value = true
   try {
@@ -204,6 +217,7 @@ onMounted(load)
             <col class="col-type" />
             <col class="col-rate" />
             <col class="col-digits" />
+            <col class="col-unit" />
             <col />
             <col class="col-action" />
           </colgroup>
@@ -212,6 +226,7 @@ onMounted(load)
               <th>Loại đánh</th>
               <th>Tỉ lệ ăn</th>
               <th>So khớp</th>
+              <th>Cách tính tiền</th>
               <th>Đối chiếu với</th>
               <th></th>
             </tr>
@@ -226,6 +241,17 @@ onMounted(load)
                 <AppSelect v-model.number="row.digits" class="digits-select">
                   <option v-for="d in digitOptions()" :key="d" :value="d">{{ d }} số cuối</option>
                 </AppSelect>
+              </td>
+              <td data-label="Cách tính tiền">
+                <div class="unit-cell">
+                  <AppSelect v-model="row.unit" class="digits-select">
+                    <option value="point">Đánh theo điểm</option>
+                    <option value="money">Đánh theo tiền</option>
+                  </AppSelect>
+                  <label v-if="row.unit === 'point'" class="pv-label">1 điểm =
+                    <input v-model="row.pointValue" type="number" min="0" step="any" class="rate-input pv-input" /> đ
+                  </label>
+                </div>
               </td>
               <td data-label="Đối chiếu với">
                 <div class="tier-grid">
@@ -282,6 +308,25 @@ onMounted(load)
 }
 .type-table td {
   vertical-align: middle;
+}
+.unit-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+.pv-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.pv-input {
+  width: 84px;
+}
+.col-unit {
+  width: 180px;
 }
 .saved-tag {
   margin-left: 8px;

@@ -23,6 +23,9 @@ const maxDigits = 5;
 /// existed) and fills in every tier, matching that version's behavior
 /// (it always compared against all 27 numbers) so old saved settings keep
 /// working exactly as before instead of silently changing what they mean.
+/// Upper bound for "đồng per điểm" (sanity limit).
+const maxPointValue = 100000000;
+
 Map<String, dynamic>? normalizeRateEntry(dynamic value) {
   if (value is num) {
     if (value <= 0) return null;
@@ -40,7 +43,16 @@ Map<String, dynamic>? normalizeRateEntry(dynamic value) {
     final digits = (numericDigits == null || numericDigits < minDigits || numericDigits > maxDigits)
         ? 2
         : numericDigits;
-    return {'rate': numericRate, 'tiers': tiers, 'digits': digits};
+    final out = <String, dynamic>{'rate': numericRate, 'tiers': tiers, 'digits': digits};
+    // Money view (Tính điểm summary): `unit` is how the customer's stake is written - 'point'
+    // (điểm, converted to đồng with `pointValue` = đồng per điểm) or 'money' (already đồng).
+    // Both are optional; the client falls back to lô = point, everything else = money.
+    final unit = value['unit'];
+    if (unit == 'point' || unit == 'money') out['unit'] = unit;
+    final pv = value['pointValue'];
+    final pointValue = pv is num ? pv : num.tryParse('$pv');
+    if (pointValue != null && pointValue >= 0 && pointValue <= maxPointValue) out['pointValue'] = pointValue.round();
+    return out;
   }
   return null;
 }

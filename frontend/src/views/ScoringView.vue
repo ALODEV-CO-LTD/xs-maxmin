@@ -31,6 +31,7 @@
 -->
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
+import ScoringSummary from '../components/ScoringSummary.vue'
 import AppIcon from '../components/AppIcon.vue'
 import AppDatePicker from '../components/AppDatePicker.vue'
 import MaskedValue from '../components/MaskedValue.vue'
@@ -476,6 +477,14 @@ onMounted(async () => {
           {{ autoCalcRunning > 0 ? 'Đang tính...' : '↻ Tính lại' }}
         </button>
       </div>
+
+      <ScoringSummary
+        v-if="selectedCustomer && days.length"
+        :days="days"
+        :account-rates="rates"
+        :customer-rates="customerRates"
+        :lottery-by-date="lotteryCache"
+      />
 
       <div v-if="!selectedCustomer" class="card empty-state">
         <AppIcon name="users" class="empty-icon" />

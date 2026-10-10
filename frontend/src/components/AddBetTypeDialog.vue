@@ -29,6 +29,8 @@ const name = ref('')
 const rate = ref('')
 const digits = ref(2)
 const picked = ref([])
+const unit = ref('money') // how the stake is written: 'point' (điểm) or 'money' (đồng)
+const pointValue = ref('23000') // đồng per điểm, used when unit is 'point'
 const submitted = ref(false)
 let lastFocus = null
 
@@ -58,6 +60,8 @@ watch(
       digits.value = props.digitOptions.includes(2) ? 2 : props.digitOptions[0]
       // Start with every prize group ticked: the inclusive default, easy to narrow down.
       picked.value = props.tiers.map((t) => t.key)
+      unit.value = 'money'
+      pointValue.value = '23000'
       submitted.value = false
       await nextTick()
       nameInput.value?.focus()
@@ -80,7 +84,14 @@ const pickNone = () => (picked.value = [])
 function submit() {
   submitted.value = true
   if (!valid.value || props.busy) return
-  emit('add', { key: key.value, rate: Number(rate.value), digits: Number(digits.value), tiers: [...picked.value] })
+  emit('add', {
+    key: key.value,
+    rate: Number(rate.value),
+    digits: Number(digits.value),
+    tiers: [...picked.value],
+    unit: unit.value,
+    pointValue: Math.max(0, Number(pointValue.value) || 0),
+  })
 }
 
 function onKey(e) {
@@ -146,8 +157,20 @@ function onKey(e) {
         </div>
 
         <section class="bt-section">
+          <label class="bt-label" for="bt-unit">4. Cách tính tiền</label>
+          <select id="bt-unit" v-model="unit" class="bt-input">
+            <option value="money">Đánh theo tiền (số khách gửi đã là đồng)</option>
+            <option value="point">Đánh theo điểm (quy đổi ra đồng)</option>
+          </select>
+          <template v-if="unit === 'point'">
+            <input v-model="pointValue" type="number" min="0" step="any" class="bt-input" style="margin-top: 8px" placeholder="1 điểm = bao nhiêu đồng" aria-label="1 điểm bằng bao nhiêu đồng" />
+            <p class="bt-hint">1 điểm = {{ Number(pointValue || 0).toLocaleString('vi-VN') }} đ</p>
+          </template>
+        </section>
+
+        <section class="bt-section">
           <div class="bt-label-row">
-            <span class="bt-label">4. Đối chiếu với</span>
+            <span class="bt-label">5. Đối chiếu với</span>
             <span class="bt-quick">
               <button type="button" class="bt-link" @click="pickAll">Tất cả</button>
               <button type="button" class="bt-link" @click="pickOnly('dacBiet')">Chỉ Đặc biệt</button>

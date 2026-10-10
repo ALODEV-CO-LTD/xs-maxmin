@@ -13,7 +13,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { api, ApiError } from '../api'
 import { betTypeLabel, PRIZE_TIERS } from '../betTypes'
-import { sameConfig } from '../scoringConfig'
+import { pointValueOf, sameConfig, unitOf } from '../scoringConfig'
 import AppSelect from './AppSelect.vue'
 import AddBetTypeDialog from './AddBetTypeDialog.vue'
 import { showConfirm } from '../confirm'
@@ -31,7 +31,7 @@ const saving = ref(false)
 const error = ref('')
 const notice = ref('')
 
-const clone = (c) => ({ rate: String(c.rate), digits: c.digits || 2, tiers: [...c.tiers] })
+const clone = (c, key = '') => ({ rate: String(c.rate), digits: c.digits || 2, tiers: [...c.tiers], unit: unitOf(key, c), pointValue: String(pointValueOf(c)) })
 
 function build() {
   rows.splice(0)
@@ -42,7 +42,7 @@ function build() {
     const base = props.accountRates[key]
     rows.push({
       key,
-      ...clone(o && !o.disabled ? o : base || { rate: 1, tiers: ['dacBiet'], digits: 2 }),
+      ...clone(o && !o.disabled ? o : base || { rate: 1, tiers: ['dacBiet'], digits: 2 }, key),
       disabled: !!o?.disabled,
       custom: !base,
     })
@@ -51,7 +51,8 @@ function build() {
 }
 watch(() => [props.customer.id, props.customer.scoringRates, props.accountRates], build, { immediate: true, deep: true })
 
-const isDefault = (r) => !r.custom && !r.disabled && sameConfig({ ...r, rate: Number(r.rate) }, props.accountRates[r.key])
+const cfgOf = (r) => ({ rate: Number(r.rate), tiers: [...r.tiers], digits: Number(r.digits) || 2, unit: r.unit, pointValue: Math.max(0, Number(r.pointValue) || 0) })
+const isDefault = (r) => !r.custom && !r.disabled && sameConfig(cfgOf(r), props.accountRates[r.key], r.key)
 const overrideCount = computed(() => rows.filter((r) => !isDefault(r)).length)
 
 // What this form would store: only what differs from the account-wide settings.
@@ -62,15 +63,15 @@ function toMap() {
       if (!r.custom) map[r.key] = { disabled: true } // a type only this customer had is simply gone
       continue
     }
-    const cfg = { rate: Number(r.rate), tiers: [...r.tiers], digits: Number(r.digits) || 2 }
-    if (r.custom || !sameConfig(cfg, props.accountRates[r.key])) map[r.key] = cfg
+    const cfg = cfgOf(r)
+    if (r.custom || !sameConfig(cfg, props.accountRates[r.key], r.key)) map[r.key] = cfg
   }
   return map
 }
 const dirty = computed(() => JSON.stringify(sortKeys(toMap())) !== JSON.stringify(sortKeys(props.customer.scoringRates || {})))
 function sortKeys(o) {
   return Object.fromEntries(
-    Object.entries(o).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, v.disabled ? v : { rate: Number(v.rate), digits: v.digits, tiers: [...v.tiers].sort() }]),
+    Object.entries(o).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, v.disabled ? v : { rate: Number(v.rate), digits: v.digits, tiers: [...v.tiers].sort(), unit: unitOf(k, v), pv: unitOf(k, v) === 'point' ? pointValueOf(v) : 0 }]),
   )
 }
 
@@ -81,7 +82,7 @@ function toggleTier(row, key) {
 }
 function resetRow(row) {
   const d = props.accountRates[row.key]
-  if (d) Object.assign(row, clone(d), { disabled: false })
+  if (d) Object.assign(row, clone(d, row.key), { disabled: false })
 }
 async function removeRow(row) {
   if (!(await showConfirm({
@@ -98,7 +99,7 @@ function restoreRow(row) {
 }
 function onAdd(p) {
   if (rows.some((r) => r.key === p.key)) return
-  rows.push({ key: p.key, rate: String(p.rate), digits: p.digits, tiers: [...p.tiers], disabled: false, custom: true })
+  rows.push({ key: p.key, rate: String(p.rate), digits: p.digits, tiers: [...p.tiers], unit: p.unit, pointValue: String(p.pointValue), disabled: false, custom: true })
   addOpen.value = false
 }
 function resetAll() {
@@ -163,6 +164,13 @@ async function save() {
             <option v-for="d in digitOptions" :key="d" :value="d">{{ d }} số cuối</option>
           </AppSelect>
         </label>
+        <label>Tính theo
+          <AppSelect v-model="r.unit">
+            <option value="point">Điểm</option>
+            <option value="money">Tiền</option>
+          </AppSelect>
+        </label>
+        <label v-if="r.unit === 'point'">1 điểm =<input v-model="r.pointValue" type="number" min="0" step="any" style="width: 84px" /> đ</label>
       </div>
       <div v-if="!r.disabled" class="csc-tiers">
         <label v-for="t in PRIZE_TIERS" :key="t.key" class="csc-tier">
