@@ -194,13 +194,19 @@ function blankLotteryForm() {
 }
 const lotteryForm = reactive(blankLotteryForm())
 const hasSavedLottery = ref(false)
-function resetLotteryForm(values) {
-  for (const k of Object.keys(lotteryForm)) delete lotteryForm[k]
+// A form object for the region's structure, filled from `values` where they fit.
+function shapeForm(values) {
+  const out = {}
   const blank = blankLotteryForm()
   for (const p of structure.value) {
     const v = values?.[p.tier]
-    lotteryForm[p.tier] = singleTiers.includes(p.tier) ? v || '' : Array.isArray(v) && v.length === p.count ? [...v] : blank[p.tier]
+    out[p.tier] = singleTiers.includes(p.tier) ? v || '' : Array.isArray(v) && v.length === p.count ? [...v] : blank[p.tier]
   }
+  return out
+}
+function resetLotteryForm(values) {
+  for (const k of Object.keys(lotteryForm)) delete lotteryForm[k]
+  Object.assign(lotteryForm, shapeForm(values))
 }
 
 // Phones / small tablets: the prize grid is collapsed behind a dropdown
@@ -221,6 +227,7 @@ function applyLotteryResult(r) {
 }
 
 async function loadLottery() {
+  if (region.value !== 'mb') return loadBoard()
   lotteryError.value = ''
   lotterySaveMsg.value = ''
   lotteryLoading.value = true
@@ -248,7 +255,7 @@ watch(station, () => {
   resetLotteryForm(null)
   loadLottery()
 })
-const stationLabelOf = computed(() => `${regionOf(region.value).name}${region.value === 'mb' ? '' : ` · ${stationName(station.value)}`}`)
+const stationLabelOf = computed(() => regionOf(region.value).name)
 
 onMounted(async () => {
   await loadStations()
@@ -256,6 +263,7 @@ onMounted(async () => {
 })
 
 async function saveLottery() {
+  if (region.value !== 'mb') return saveBoard()
   lotteryError.value = ''
   lotterySaveMsg.value = ''
   const allFilled = flatValues().every((v) => (v || '').trim())
@@ -301,6 +309,100 @@ async function deleteLottery() {
     lotteryError.value = err.message || 'Không xoá được'
   } finally {
     lotteryDeleting.value = false
+  }
+}
+
+// ---- Miền Nam / Miền Trung: one table for every station drawing that day (like the printed sheet) ----------------
+// Columns = the day's stations, rows = prizes from G.8 (top) to G.ĐB (bottom). Typing, pasting a photo and saving all work
+// on this one table; a column is saved only when it is completely filled.
+const board = reactive({}) // station id -> form
+const boardSaved = reactive({}) // station id -> true while a saved result exists
+const boardRead = reactive({}) // station id -> true when filled from a photo (empty cells are flagged)
+const boardStations = computed(() => (region.value === 'mb' ? [] : stationChoices.value))
+const boardTiers = computed(() => [...structure.value].reverse())
+const flatOf = (form) => structure.value.flatMap((p) => [].concat(form?.[p.tier] ?? ''))
+const boardFilled = (st) => flatOf(board[st]).filter((v) => (v || '').trim()).length
+const cellBad = (st, p, v) => {
+  const t = (v || '').trim()
+  return t ? t.length !== p.digits : !!boardRead[st]
+}
+const boardDeleting = ref('')
+
+async function loadBoard() {
+  lotteryError.value = ''
+  lotterySaveMsg.value = ''
+  lotteryLoading.value = true
+  try {
+    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
+    const by = Object.fromEntries(results.map((r) => [r.station, r]))
+    for (const o of [board, boardSaved, boardRead]) for (const k of Object.keys(o)) delete o[k]
+    for (const st of boardStations.value) {
+      board[st] = shapeForm(by[st])
+      boardSaved[st] = !!by[st]
+    }
+  } catch (err) {
+    lotteryError.value = err.message || 'Không tải được kết quả xổ số'
+  } finally {
+    lotteryLoading.value = false
+  }
+}
+
+async function saveBoard() {
+  lotteryError.value = ''
+  lotterySaveMsg.value = ''
+  const todo = boardStations.value.filter((st) => boardFilled(st) > 0)
+  if (!todo.length) {
+    lotteryError.value = 'Chưa có số nào để lưu.'
+    return
+  }
+  const total = TOTAL_BOXES.value
+  const partial = todo.filter((st) => boardFilled(st) < total)
+  if (partial.length) {
+    lotteryError.value = `${partial.map(stationName).join(', ')}: chưa nhập đủ ${total} số. Điền đủ hoặc xoá hết cột đó rồi lưu lại.`
+    return
+  }
+  lotterySaving.value = true
+  try {
+    for (const st of todo) {
+      const body = { drawDate: lotteryDate.value, station: st }
+      for (const p of structure.value) {
+        const v = board[st][p.tier]
+        body[p.tier] = Array.isArray(v) ? v.map((x) => x.trim()) : v.trim()
+      }
+      await api.post('/lottery-results', body)
+      boardSaved[st] = true
+      boardRead[st] = false
+    }
+    lotterySaveMsg.value = `Đã lưu kết quả ${todo.map(stationName).join(', ')} ngày ${lotteryDate.value.split('-').reverse().join('/')}.`
+    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
+    fillResultsForDate(lotteryDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
+  } catch (err) {
+    lotteryError.value = err.message || 'Không lưu được kết quả xổ số'
+  } finally {
+    lotterySaving.value = false
+  }
+}
+
+async function deleteBoardColumn(st) {
+  if (!(await showConfirm({
+    title: 'Xoá kết quả',
+    message: `Xoá kết quả xổ số ${stationName(st)} ngày ${lotteryDate.value}? Không thể hoàn tác.`,
+    confirmText: 'Xoá',
+    danger: true,
+  }))) return
+  lotteryError.value = ''
+  lotterySaveMsg.value = ''
+  boardDeleting.value = st
+  try {
+    await api.del(`/lottery-results?date=${lotteryDate.value}&station=${encodeURIComponent(st)}`)
+    board[st] = shapeForm(null)
+    boardSaved[st] = false
+    boardRead[st] = false
+    lotterySaveMsg.value = `Đã xoá kết quả xổ số ${stationName(st)} ngày ${lotteryDate.value}.`
+  } catch (err) {
+    lotteryError.value = err.message || 'Không xoá được'
+  } finally {
+    boardDeleting.value = ''
   }
 }
 
@@ -389,10 +491,8 @@ const mcRunning = ref(false)
 const mcProgress = ref(0)
 const mcError = ref('')
 const mcNote = ref('')
-const mcCols = ref([]) // [{ station, source, values, issues, complete, headerText }]
-const mcDate = ref('')
+const mcWarnings = ref([]) // columns that were not read completely: shown so the red cells are explained
 const mcFileInput = ref(null)
-const mcStationOptions = computed(() => Object.entries(regionOf(region.value).stations || {}).map(([id, name]) => ({ id, name })))
 
 function onMcImageSelected(e) {
   const file = e.target.files?.[0]
@@ -403,7 +503,7 @@ function onMcImageSelected(e) {
 async function processMcImage(file) {
   mcError.value = ''
   mcNote.value = ''
-  mcCols.value = []
+  mcWarnings.value = []
   mcRunning.value = true
   mcProgress.value = 0
   try {
@@ -421,8 +521,6 @@ async function processMcImage(file) {
     const date = parsed.date || lotteryDate.value
     const candidates = stationsOn(seenRegion, date)
     assignStations(parsed.columns, candidates)
-    mcDate.value = date
-    mcCols.value = parsed.columns.map((c) => ({ ...c, region: seenRegion }))
     if (seenRegion !== region.value || date !== lotteryDate.value) {
       applying = true
       region.value = seenRegion
@@ -431,6 +529,18 @@ async function processMcImage(file) {
       applying = false
       mcNote.value = `Ảnh là kết quả ${regionOf(seenRegion).name} ngày ${date.split('-').reverse().join('/')}; đã chuyển sang miền và ngày này.`
     }
+    await loadBoard()
+    // Every recognised column goes straight into the table under its station.
+    for (const c of parsed.columns) {
+      if (!c.station || !board[c.station]) {
+        mcWarnings.value.push('Có một cột chưa xác định được đài, nên chưa điền vào bảng.')
+        continue
+      }
+      board[c.station] = shapeForm(c.values)
+      boardRead[c.station] = true
+      if (!c.complete) mcWarnings.value.push(`${stationName(c.station)}: ${c.issues.join('; ')}`)
+    }
+    lotterySaveMsg.value = 'Đã điền bảng từ ảnh. Kiểm tra các ô (ô đỏ là chưa đủ hoặc sai độ dài) rồi bấm "Lưu kết quả".'
   } catch (err) {
     const { describeOcrError } = await import('../ocr')
     mcError.value = describeOcrError(err)
@@ -460,25 +570,15 @@ function pickMcImage() {
   mcFileInput.value?.click()
 }
 
-async function mcFill(col) {
-  if (!col.station) return
-  applying = true
-  region.value = regionOf(col.station).id
-  lotteryDate.value = mcDate.value
-  station.value = col.station
-  await nextTick()
-  applying = false
-  resetLotteryForm(col.values)
-  hasSavedLottery.value = false
-  gridOpen.value = true
-  lotterySaveMsg.value = `Đã điền ${stationName(col.station)} vào form. Hãy kiểm tra rồi bấm "Lưu kết quả".`
-}
-
-const mcDuplicate = computed(() => {
-  const ids = mcCols.value.map((c) => c.station).filter(Boolean)
-  return ids.length !== new Set(ids).size
-})
 function clearLotteryForm() {
+  if (region.value !== 'mb') {
+    for (const st of boardStations.value) {
+      board[st] = shapeForm(null)
+      boardRead[st] = false
+    }
+    mcWarnings.value = []
+    return
+  }
   resetLotteryForm(null)
   if (lrOcrPreviewUrl.value) URL.revokeObjectURL(lrOcrPreviewUrl.value)
   lrOcrPreviewUrl.value = ''
@@ -487,7 +587,7 @@ function clearLotteryForm() {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page" :class="{ 'board-mode': region !== 'mb' }">
     <h1 class="page-title">Nhập kết quả</h1>
     <p class="page-subtitle">
       Nhập kết quả xổ số (Miền Bắc, Miền Trung, Miền Nam; chọn miền và đài), bấm "Lưu kết quả" để điểm ra tự hiện theo số và điểm vào, rồi bấm "Lưu điểm ra" để lưu cho tất cả khách hàng. Có thể sửa tay từng ô trước khi lưu.
@@ -513,21 +613,6 @@ function clearLotteryForm() {
           {{ r.name }}
         </button>
       </div>
-      <div v-if="region !== 'mb'" class="station-chips" aria-label="Đài">
-        <button
-          v-for="st in stationChoices"
-          :key="st"
-          type="button"
-          class="station-chip"
-          :class="{ on: station === st }"
-          :aria-pressed="station === st"
-          @click="station = st"
-        >
-          {{ stationName(st) }}
-        </button>
-        <span v-if="!stationChoices.length" class="page-subtitle">Hôm nay không có đài nào của miền này.</span>
-      </div>
-
       <div v-if="region === 'mb'" class="ocr-box">
         <input
           ref="lrFileInput"
@@ -561,29 +646,9 @@ function clearLotteryForm() {
         <div v-if="mcError" class="alert alert-error" style="margin-top: 8px">{{ mcError }}</div>
         <div v-if="mcNote" class="alert alert-success" style="margin-top: 8px">{{ mcNote }}</div>
 
-        <div v-if="mcCols.length" class="mc-cols">
-          <div v-for="(col, ci) in mcCols" :key="ci" class="mc-col" :class="{ bad: !col.complete }">
-            <div class="mc-col-head">
-              <AppSelect v-model="col.station" :aria-label="`Đài của cột ${ci + 1}`">
-                <option v-for="o in mcStationOptions" :key="o.id" :value="o.id">{{ o.name }}</option>
-              </AppSelect>
-              <span class="mc-source">{{ col.source ? `nhận theo ${col.source}` : '' }}</span>
-            </div>
-            <p v-if="col.complete" class="mc-ok">Đọc đủ 18 số</p>
-            <p v-else class="mc-warn">Chưa đủ: {{ col.issues.join('; ') }}. Kiểm tra và sửa trong form.</p>
-            <details class="mc-numbers">
-              <summary>Xem các số đã đọc</summary>
-              <dl>
-                <template v-for="p in regionOf(col.region).structure" :key="p.tier">
-                  <dt>{{ p.label }}</dt>
-                  <dd>{{ [].concat(col.values[p.tier] ?? []).map((v) => v || '·').join('  ') }}</dd>
-                </template>
-              </dl>
-            </details>
-            <button type="button" class="btn btn-ghost btn-sm" :disabled="!col.station" @click="mcFill(col)">Điền vào form để sửa</button>
-          </div>
-          <p v-if="mcDuplicate" class="mc-warn">Hai cột đang trùng một đài, hãy chọn lại.</p>
-        </div>
+        <ul v-if="mcWarnings.length" class="mc-warnings">
+          <li v-for="(w, i) in mcWarnings" :key="i">{{ w }}</li>
+        </ul>
       </div>
 
       <div v-if="lotteryLoading" class="page-subtitle">Đang tải...</div>
@@ -591,7 +656,68 @@ function clearLotteryForm() {
         <div v-if="lotteryError" class="alert alert-error">{{ lotteryError }}</div>
         <div v-if="lotterySaveMsg" class="alert alert-success">{{ lotterySaveMsg }}</div>
 
+        <div v-if="region !== 'mb'" class="board-wrap">
+          <p v-if="!boardStations.length" class="page-subtitle">Ngày này không có đài nào của miền này.</p>
+          <table v-else class="board" :style="{ '--cols': boardStations.length }">
+            <thead>
+              <tr>
+                <th class="board-tier">Giải</th>
+                <th v-for="st in boardStations" :key="st" :class="{ saved: boardSaved[st] }">
+                  {{ stationName(st) }}
+                  <span v-if="boardSaved[st]" class="board-saved">đã lưu</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in boardTiers" :key="p.tier" :class="{ 'board-top': p.tier === 'dacBiet' || p.tier === 'giaiTam' }">
+                <th class="board-tier">{{ p.label }}</th>
+                <td v-for="st in boardStations" :key="st">
+                  <div class="board-cell">
+                    <template v-if="board[st]">
+                      <input
+                        v-if="singleTiers.includes(p.tier)"
+                        v-model="board[st][p.tier]"
+                        :maxlength="p.digits"
+                        :class="{ bad: cellBad(st, p, board[st][p.tier]), big: p.tier === 'dacBiet' }"
+                        inputmode="numeric"
+                        :aria-label="`${p.label} ${stationName(st)}`"
+                      />
+                      <input
+                        v-for="(v, k) in board[st][p.tier]"
+                        v-else
+                        :key="k"
+                        v-model="board[st][p.tier][k]"
+                        :maxlength="p.digits"
+                        :class="{ bad: cellBad(st, p, v) }"
+                        inputmode="numeric"
+                        :aria-label="`${p.label} ${stationName(st)} số ${k + 1}`"
+                      />
+                    </template>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th class="board-tier"></th>
+                <td v-for="st in boardStations" :key="st">
+                  <button v-if="boardSaved[st]" type="button" class="btn btn-danger btn-sm" :disabled="boardDeleting === st" @click="deleteBoardColumn(st)">
+                    {{ boardDeleting === st ? 'Đang xoá...' : 'Xoá kết quả' }}
+                  </button>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <div class="lottery-actions">
+            <button type="button" class="btn btn-ghost btn-sm" @click="clearLotteryForm">Xoá form</button>
+            <button type="button" class="btn btn-primary" :disabled="lotterySaving || !boardStations.length" @click="saveLottery">
+              {{ lotterySaving ? 'Đang lưu...' : 'Lưu kết quả' }}
+            </button>
+          </div>
+        </div>
+
         <button
+          v-if="region === 'mb'"
           type="button"
           class="grid-toggle"
           :class="{ open: gridOpen }"
@@ -604,7 +730,7 @@ function clearLotteryForm() {
           <AppIcon name="chevron-down" class="grid-toggle-chevron" />
         </button>
 
-        <div id="lottery-grid" class="lottery-grid" :class="{ collapsed: !gridOpen }">
+        <div v-if="region === 'mb'" id="lottery-grid" class="lottery-grid" :class="{ collapsed: !gridOpen }">
           <div v-for="p in structure" :key="p.tier" class="tier-row">
             <label>{{ p.label }}</label>
             <input v-if="singleTiers.includes(p.tier)" v-model="lotteryForm[p.tier]" :maxlength="p.digits" :class="`num${p.digits}`" inputmode="numeric" />
@@ -621,7 +747,7 @@ function clearLotteryForm() {
           </div>
         </div>
 
-        <div class="lottery-actions">
+        <div v-if="region === 'mb'" class="lottery-actions">
           <button
             v-if="hasSavedLottery"
             type="button"
@@ -725,61 +851,90 @@ function clearLotteryForm() {
 .paste-btn {
   margin-top: 6px;
 }
-.mc-box {
-  margin-bottom: 12px;
+.mc-warnings {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--danger-text);
 }
-.mc-cols {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
+.board-wrap {
+  overflow-x: auto;
 }
-.mc-col {
-  padding: 10px;
-  background: var(--surface);
+.board {
+  width: 100%;
+  max-width: 960px;
+  min-width: calc(88px + var(--cols) * 150px);
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.board th,
+.board td {
+  padding: 8px 6px;
+  text-align: center;
+  vertical-align: middle;
   border: 1px solid var(--border);
-  border-radius: 10px;
 }
-.mc-col.bad {
-  border-color: var(--danger-text);
+.board thead th {
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--surface);
 }
-.mc-col-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 6px;
-}
-.mc-source,
-.mc-ok,
-.mc-warn {
-  margin: 0 0 6px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.mc-ok {
+.board thead th.saved {
   color: var(--success-text);
 }
-.mc-warn {
-  color: var(--danger-text);
-  grid-column: 1 / -1;
+.board-saved {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
 }
-.mc-numbers {
-  margin-bottom: 6px;
+.board th.board-tier {
+  width: 88px;
   font-size: 13px;
-}
-.mc-numbers dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 10px;
-  margin: 6px 0 0;
-}
-.mc-numbers dt {
   color: var(--muted);
+  background: var(--surface);
 }
-.mc-numbers dd {
-  margin: 0;
+.board tbody tr:nth-child(even) td {
+  background: var(--surface-2, var(--surface));
+}
+.board-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.board-cell input {
+  width: 100%;
+  max-width: 120px;
+  height: 34px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+}
+.board-cell input.big {
+  height: 40px;
+  font-size: 18px;
+  color: var(--danger-text);
+}
+.board-top .board-cell input:not(.big) {
+  color: var(--danger-text);
+}
+.board-cell input.bad {
+  border-color: var(--danger-text);
+  background: var(--danger-bg, var(--card));
+}
+.board-cell input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+.mc-box {
+  margin-bottom: 12px;
 }
 .region-tabs {
   display: flex;
@@ -804,12 +959,6 @@ function clearLotteryForm() {
   color: #fff;
   background: var(--primary);
   border-color: var(--primary);
-}
-.station-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
 }
 .num6 {
   width: 76px;
@@ -1233,6 +1382,14 @@ function clearLotteryForm() {
   }
   .page > :not(.page-title):not(.page-subtitle):not(.lottery-card) {
     grid-column: 2;
+  }
+  /* Miền Nam / Miền Trung: the table of stations needs the full width, the customers go below it */
+  .page.board-mode > .lottery-card {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .page.board-mode > :not(.page-title):not(.page-subtitle):not(.lottery-card) {
+    grid-column: 1 / -1;
   }
 
   /* the form column no longer needs its own centred 760px column */

@@ -102,10 +102,15 @@ export function assignStations(columns, candidates) {
 }
 
 export function parseColumns(words) {
+  // The title line of the page ("XSMN Thứ 4 » XSMN 07/10/2026") holds a date whose digits must not count as prizes:
+  // everything on or above the lowest date word is ignored.
+  const dateYs = words.filter((w) => /\/|^20\d\d$/.test(String(w.text || '').trim())).map(centreY)
+  const cut = dateYs.length ? Math.max(...dateYs) + 14 : -Infinity
   const nums = words
     .map((w) => ({ ...w, text: String(w.text || '').trim() }))
     .filter((w) => /^\d+$/.test(w.text) && w.text.length >= 2 && w.text.length <= 6)
     .map((w) => ({ ...w, cx: centreX(w), cy: centreY(w) }))
+    .filter((w) => w.cy > cut)
   const specials = nums.filter((w) => w.text.length === 6).sort((a, b) => a.cx - b.cx)
   if (!specials.length) return { columns: [], date: null }
 
