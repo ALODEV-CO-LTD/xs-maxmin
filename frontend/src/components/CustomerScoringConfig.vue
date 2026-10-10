@@ -1,8 +1,9 @@
 <!--
-  Per-customer scoring config (shown inside Tính điểm). Every bet type of the account is listed
+  Per-customer scoring config (Khách hàng > Xem chi tiết). Every bet type of the account is listed
   with the values THIS customer is scored by: the account-wide setting unless the customer has
-  their own. Only the rows that differ from the account-wide setting are stored, so the others
-  keep following it when the default changes.
+  their own. Each type can be edited, removed for this customer (switched off; it can be restored)
+  and the customer can get types of their own ("Thêm loại đánh"). Only what differs from the
+  account-wide settings is stored, so the rest keeps following it when the default changes.
   Props: customer { id, name, scoringRates }, accountRates { typeKey: {rate, tiers, digits} },
          digitOptions [1..5]
   Emits: saved(ratesOrNull)   (the customer's new override map, null = none)
@@ -14,6 +15,8 @@ import { api, ApiError } from '../api'
 import { betTypeLabel, PRIZE_TIERS } from '../betTypes'
 import { sameConfig } from '../scoringConfig'
 import AppSelect from './AppSelect.vue'
+import AddBetTypeDialog from './AddBetTypeDialog.vue'
+import { showConfirm } from '../confirm'
 
 const props = defineProps({
   customer: { type: Object, required: true },
@@ -22,7 +25,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['saved'])
 
-const rows = reactive([]) // { key, rate, digits, tiers }
+const rows = reactive([]) // { key, rate, digits, tiers, disabled, custom }  custom = only this customer has it
+const addOpen = ref(false)
 const saving = ref(false)
 const error = ref('')
 const notice = ref('')
@@ -33,20 +37,42 @@ function build() {
   rows.splice(0)
   const own = props.customer.scoringRates || {}
   const keys = [...new Set([...Object.keys(props.accountRates), ...Object.keys(own)])]
-  for (const key of keys) rows.push({ key, ...clone(own[key] || props.accountRates[key]) })
+  for (const key of keys) {
+    const o = own[key]
+    const base = props.accountRates[key]
+    rows.push({
+      key,
+      ...clone(o && !o.disabled ? o : base || { rate: 1, tiers: ['dacBiet'], digits: 2 }),
+      disabled: !!o?.disabled,
+      custom: !base,
+    })
+  }
   error.value = ''
 }
 watch(() => [props.customer.id, props.customer.scoringRates, props.accountRates], build, { immediate: true, deep: true })
 
-const isDefault = (r) => !!props.accountRates[r.key] && sameConfig({ ...r, rate: Number(r.rate) }, props.accountRates[r.key])
+const isDefault = (r) => !r.custom && !r.disabled && sameConfig({ ...r, rate: Number(r.rate) }, props.accountRates[r.key])
 const overrideCount = computed(() => rows.filter((r) => !isDefault(r)).length)
-const dirty = computed(() => {
-  const own = props.customer.scoringRates || {}
-  return rows.some((r) => {
-    const stored = own[r.key] || props.accountRates[r.key]
-    return !stored || !sameConfig({ ...r, rate: Number(r.rate) }, stored)
-  })
-})
+
+// What this form would store: only what differs from the account-wide settings.
+function toMap() {
+  const map = {}
+  for (const r of rows) {
+    if (r.disabled) {
+      if (!r.custom) map[r.key] = { disabled: true } // a type only this customer had is simply gone
+      continue
+    }
+    const cfg = { rate: Number(r.rate), tiers: [...r.tiers], digits: Number(r.digits) || 2 }
+    if (r.custom || !sameConfig(cfg, props.accountRates[r.key])) map[r.key] = cfg
+  }
+  return map
+}
+const dirty = computed(() => JSON.stringify(sortKeys(toMap())) !== JSON.stringify(sortKeys(props.customer.scoringRates || {})))
+function sortKeys(o) {
+  return Object.fromEntries(
+    Object.entries(o).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, v.disabled ? v : { rate: Number(v.rate), digits: v.digits, tiers: [...v.tiers].sort() }]),
+  )
+}
 
 function toggleTier(row, key) {
   const i = row.tiers.indexOf(key)
@@ -55,7 +81,25 @@ function toggleTier(row, key) {
 }
 function resetRow(row) {
   const d = props.accountRates[row.key]
-  if (d) Object.assign(row, clone(d))
+  if (d) Object.assign(row, clone(d), { disabled: false })
+}
+async function removeRow(row) {
+  if (!(await showConfirm({
+    title: 'Xoá loại đánh',
+    message: `${row.custom ? 'Xoá' : 'Bỏ'} loại "${betTypeLabel(row.key)}" ${row.custom ? 'của' : 'khỏi danh sách của'} ${props.customer.name}? ${row.custom ? '' : 'Loại này vẫn còn cho các khách khác, và bạn có thể khôi phục lại ở đây. '}Số liệu đã nhập với loại này vẫn được giữ và tính theo cấu hình mặc định. Bấm Lưu để áp dụng.`,
+    confirmText: row.custom ? 'Xoá' : 'Bỏ',
+    danger: true,
+  }))) return
+  if (row.custom) rows.splice(rows.indexOf(row), 1)
+  else row.disabled = true
+}
+function restoreRow(row) {
+  row.disabled = false
+}
+function onAdd(p) {
+  if (rows.some((r) => r.key === p.key)) return
+  rows.push({ key: p.key, rate: String(p.rate), digits: p.digits, tiers: [...p.tiers], disabled: false, custom: true })
+  addOpen.value = false
 }
 function resetAll() {
   for (const r of rows) resetRow(r)
@@ -64,8 +108,8 @@ function resetAll() {
 async function save() {
   error.value = ''
   notice.value = ''
-  const map = {}
   for (const r of rows) {
+    if (r.disabled) continue
     const n = Number(r.rate)
     if (!Number.isFinite(n) || n <= 0) {
       error.value = `Tỉ lệ của "${betTypeLabel(r.key)}" không hợp lệ`
@@ -75,9 +119,8 @@ async function save() {
       error.value = `"${betTypeLabel(r.key)}" cần chọn ít nhất một giải để đối chiếu`
       return
     }
-    const cfg = { rate: n, tiers: [...r.tiers], digits: Number(r.digits) || 2 }
-    if (!sameConfig(cfg, props.accountRates[r.key])) map[r.key] = cfg
   }
+  const map = toMap()
   saving.value = true
   try {
     const res = await api.patch(`/me/customers/${props.customer.id}`, { scoringRates: Object.keys(map).length ? map : null })
@@ -99,13 +142,21 @@ async function save() {
     <div v-if="error" class="alert alert-error">{{ error }}</div>
     <div v-if="notice" class="alert alert-success">{{ notice }}</div>
 
-    <div v-for="r in rows" :key="r.key" class="csc-row" :class="{ own: !isDefault(r) }">
+    <div class="csc-bar">
+      <button type="button" class="btn btn-primary btn-sm" @click="addOpen = true">+ Thêm loại đánh</button>
+    </div>
+
+    <div v-for="r in rows" :key="r.key" class="csc-row" :class="{ own: !isDefault(r) && !r.disabled, off: r.disabled }">
       <div class="csc-head">
         <strong>{{ betTypeLabel(r.key) }}</strong> <span class="muted">({{ r.key }})</span>
-        <span class="csc-tag" :class="{ own: !isDefault(r) }">{{ isDefault(r) ? 'Mặc định' : 'Riêng' }}</span>
-        <button v-if="!isDefault(r) && accountRates[r.key]" type="button" class="btn btn-ghost btn-sm" @click="resetRow(r)">Theo mặc định</button>
+        <span class="csc-tag" :class="{ own: !isDefault(r) && !r.disabled }">{{ r.disabled ? 'Đã bỏ cho khách này' : r.custom ? 'Chỉ khách này' : isDefault(r) ? 'Mặc định' : 'Riêng' }}</span>
+        <span class="csc-head-actions">
+          <button v-if="r.disabled" type="button" class="btn btn-ghost btn-sm" @click="restoreRow(r)">Khôi phục</button>
+          <button v-else-if="!isDefault(r) && !r.custom" type="button" class="btn btn-ghost btn-sm" @click="resetRow(r)">Theo mặc định</button>
+          <button v-if="!r.disabled" type="button" class="btn btn-ghost btn-sm csc-del" @click="removeRow(r)">Xoá</button>
+        </span>
       </div>
-      <div class="csc-fields">
+      <div v-if="!r.disabled" class="csc-fields">
         <label>Tỉ lệ ăn<input v-model="r.rate" type="number" min="1" step="any" /></label>
         <label>So khớp
           <AppSelect v-model.number="r.digits">
@@ -113,12 +164,21 @@ async function save() {
           </AppSelect>
         </label>
       </div>
-      <div class="csc-tiers">
+      <div v-if="!r.disabled" class="csc-tiers">
         <label v-for="t in PRIZE_TIERS" :key="t.key" class="csc-tier">
           <input type="checkbox" :checked="r.tiers.includes(t.key)" @change="toggleTier(r, t.key)" /> {{ t.label }}
         </label>
       </div>
     </div>
+
+    <AddBetTypeDialog
+      :open="addOpen"
+      :existing-keys="rows.map((r) => r.key)"
+      :digit-options="digitOptions"
+      :tiers="PRIZE_TIERS"
+      @close="addOpen = false"
+      @add="onAdd"
+    />
 
     <div class="csc-actions">
       <span class="muted">{{ overrideCount ? `${overrideCount} loại có cấu hình riêng` : 'Đang dùng cấu hình mặc định' }}</span>
@@ -140,6 +200,22 @@ async function save() {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
+}
+.csc-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.csc-head-actions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.csc-del {
+  color: var(--danger-text);
+}
+.csc-row.off {
+  opacity: 0.65;
 }
 .csc-row.own {
   border-color: var(--primary);

@@ -11,7 +11,19 @@ export const DEFAULT_RATES = {
 
 export function effectiveConfig(accountRates, customerRates, betType) {
   const key = betType || 'de'
-  return customerRates?.[key] ?? accountRates?.[key] ?? accountRates?.de ?? DEFAULT_RATES.de
+  const own = customerRates?.[key]
+  // `{disabled: true}` = the customer does not use this type: entries already saved with it are
+  // still scored with the account-wide config.
+  if (own && !own.disabled) return own
+  return accountRates?.[key] ?? accountRates?.de ?? DEFAULT_RATES.de
+}
+
+// Bet types this customer can use: the account's types minus the ones switched off for them,
+// plus the types only they have.
+export function customerBetTypes(accountRates, customerRates) {
+  const out = Object.keys(accountRates || {}).filter((k) => !customerRates?.[k]?.disabled)
+  for (const [k, v] of Object.entries(customerRates || {})) if (!v?.disabled && !out.includes(k)) out.push(k)
+  return out
 }
 
 // Same config? (rate, digits and the SET of prize groups)

@@ -50,7 +50,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
     if (body.containsKey('scoringRates')) {
       // null / {} = follow the account's settings again; otherwise this customer's own overrides.
       final raw = body['scoringRates'];
-      final (rates, error) = raw == null ? (const <String, dynamic>{}, null) : normalizeRatesMap(raw, allowEmpty: true);
+      final (rates, error) = raw == null ? (const <String, dynamic>{}, null) : normalizeRatesMap(raw, allowEmpty: true, allowDisabled: true);
       if (error != null) return Response.json(statusCode: 400, body: {'error': error});
       db.execute(
         'UPDATE customers SET scoring_rates = ? WHERE id = ? AND user_id = ?',

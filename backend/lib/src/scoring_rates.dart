@@ -47,13 +47,20 @@ Map<String, dynamic>? normalizeRateEntry(dynamic value) {
 
 
 /// Validates a whole `{typeKey: entry}` map; returns `(normalized, null)` or `(null, error)`.
-(Map<String, dynamic>?, String?) normalizeRatesMap(Object? rates, {bool allowEmpty = false}) {
+/// With [allowDisabled] (per-customer overrides only) an entry may be `{disabled: true}`: the
+/// customer does not use that bet type (it is hidden from their type list).
+(Map<String, dynamic>?, String?) normalizeRatesMap(Object? rates, {bool allowEmpty = false, bool allowDisabled = false}) {
   if (rates is! Map || (rates.isEmpty && !allowEmpty)) return (null, 'Cần ít nhất một loại đánh');
   final out = <String, dynamic>{};
   for (final entry in rates.entries) {
     final key = entry.key;
     if (key is! String || key.trim().isEmpty) return (null, 'Mã loại đánh không hợp lệ');
-    final n = normalizeRateEntry(entry.value);
+    final v = entry.value;
+    if (allowDisabled && v is Map && v['disabled'] == true) {
+      out[key] = {'disabled': true};
+      continue;
+    }
+    final n = normalizeRateEntry(v);
     if (n == null) return (null, 'Cấu hình của "$key" không hợp lệ (cần tỉ lệ > 0 và ít nhất 1 giải)');
     out[key] = n;
   }

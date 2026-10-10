@@ -25,6 +25,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
+import { customerBetTypes } from '../scoringConfig'
 import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
 import { aliasesToText, fold, parseMessage, textToAliases, DEFAULT_STAKE_MARKERS } from '../messageParser'
@@ -56,16 +57,22 @@ async function loadCustomers() {
 // Bet types (đề/lô/...) come from this account's own rate config - see
 // /scoring-settings (also used by ScoringView to pick a payout rate).
 // Falls back to {de, lo} if that call fails, so the form still works.
-const betTypes = ref(['de', 'lo'])
+const accountRates = ref({ de: {}, lo: {} })
 async function loadBetTypes() {
   try {
     const { rates } = await cachedGet('/me/scoring-settings')
-    const keys = Object.keys(rates || {})
-    if (keys.length) betTypes.value = keys
+    if (rates && Object.keys(rates).length) accountRates.value = rates
   } catch (_) {
     // Keep the fallback list.
   }
 }
+// The types offered are the account's, minus the ones switched off for the selected customer, plus
+// the types only that customer has (Khách hàng > Xem chi tiết > Cấu hình tính điểm).
+const betTypes = computed(() => {
+  const own = customers.value.find((c) => c.name === form.customerName)?.scoringRates
+  const list = customerBetTypes(accountRates.value, own)
+  return list.length ? list : Object.keys(accountRates.value)
+})
 
 
 const form = reactive({
