@@ -328,6 +328,18 @@ const cellBad = (st, p, v) => {
 }
 const boardDeleting = ref('')
 
+// Only digits can be typed or pasted into a prize box, and never more than the prize has.
+function digitsOnly(form) {
+  for (const p of structure.value) {
+    const clean = (v) => String(v ?? '').replace(/\D/g, '').slice(0, p.digits)
+    const v = form[p.tier]
+    if (Array.isArray(v)) v.forEach((x, k) => x !== clean(x) && (v[k] = clean(x)))
+    else if (v !== undefined && v !== clean(v)) form[p.tier] = clean(v)
+  }
+}
+watch(lotteryForm, () => digitsOnly(lotteryForm), { deep: true })
+watch(board, () => Object.values(board).forEach(digitsOnly), { deep: true })
+
 async function loadBoard() {
   lotteryError.value = ''
   lotterySaveMsg.value = ''
@@ -678,6 +690,7 @@ function clearLotteryForm() {
                         v-if="singleTiers.includes(p.tier)"
                         v-model="board[st][p.tier]"
                         :maxlength="p.digits"
+                        :placeholder="'0'.repeat(p.digits)"
                         :class="{ bad: cellBad(st, p, board[st][p.tier]), big: p.tier === 'dacBiet' }"
                         inputmode="numeric"
                         :aria-label="`${p.label} ${stationName(st)}`"
@@ -688,6 +701,7 @@ function clearLotteryForm() {
                         :key="k"
                         v-model="board[st][p.tier][k]"
                         :maxlength="p.digits"
+                        :placeholder="'0'.repeat(p.digits)"
                         :class="{ bad: cellBad(st, p, v) }"
                         inputmode="numeric"
                         :aria-label="`${p.label} ${stationName(st)} số ${k + 1}`"
@@ -732,16 +746,18 @@ function clearLotteryForm() {
 
         <div v-if="region === 'mb'" id="lottery-grid" class="lottery-grid" :class="{ collapsed: !gridOpen }">
           <div v-for="p in structure" :key="p.tier" class="tier-row">
-            <label>{{ p.label }}</label>
-            <input v-if="singleTiers.includes(p.tier)" v-model="lotteryForm[p.tier]" :maxlength="p.digits" :class="`num${p.digits}`" inputmode="numeric" />
+            <label>{{ p.label }}<span class="tier-count">{{ p.count }} ô · {{ p.digits }} số</span></label>
+            <input v-if="singleTiers.includes(p.tier)" v-model="lotteryForm[p.tier]" :maxlength="p.digits" :placeholder="'0'.repeat(p.digits)" :class="`num${p.digits}`" inputmode="numeric" autocomplete="off" />
             <div v-else class="tier-inputs">
               <input
                 v-for="(v, k) in lotteryForm[p.tier]"
                 :key="k"
                 v-model="lotteryForm[p.tier][k]"
                 :maxlength="p.digits"
+                :placeholder="'0'.repeat(p.digits)"
                 :class="`num${p.digits}`"
                 inputmode="numeric"
+                autocomplete="off"
               />
             </div>
           </div>
@@ -1622,13 +1638,29 @@ function clearLotteryForm() {
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   text-align: center;
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--card);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
+.lottery-grid .tier-row input::placeholder,
+.board-cell input::placeholder {
+  font-weight: 500;
+  color: var(--muted);
+  opacity: 0.45;
+}
+.lottery-grid .tier-row > input {
+  max-width: 180px;
+  justify-self: center;
+}
 .lottery-grid .tier-row input:hover {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: var(--primary);
+}
+.tier-count {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
 }
 .lottery-grid .tier-row input:focus {
   outline: none;
