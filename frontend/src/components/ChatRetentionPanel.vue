@@ -3,14 +3,22 @@
   and stored only on each device (docs/MA_HOA_2_DAU.md), so this rule runs on THIS
   device: messages (or only images) older than the chosen time are removed from
   its local history. It does not touch the friend's device.
+  The buttons that open/turn off this setting live in the conversation's top bar
+  (FriendsView); this panel shows the current rule and the settings form.
+  Props: friendId, friendName, open (v-model:open). Emits: applied, rule(rule|null).
+  Exposes cancel().
 -->
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useChatStore } from '../e2ee/chat'
 import AppSelect from './AppSelect.vue'
 
-const props = defineProps({ friendId: { type: String, required: true }, friendName: { type: String, default: '' } })
-const emit = defineEmits(['applied'])
+const props = defineProps({
+  friendId: { type: String, required: true },
+  friendName: { type: String, default: '' },
+  open: { type: Boolean, default: false },
+})
+const emit = defineEmits(['applied', 'update:open', 'rule'])
 const chat = useChatStore()
 
 const TTL_OPTIONS = [
@@ -20,7 +28,6 @@ const TTL_OPTIONS = [
   { value: 2592000, label: '30 ngày' },
 ]
 const rule = ref(null)
-const open = ref(false)
 const ttl = ref(86400)
 const scope = ref('all')
 const error = ref('')
@@ -31,15 +38,16 @@ const ttlLabel = computed(() => TTL_OPTIONS.find((o) => o.value === rule.value?.
 async function load() {
   error.value = ''
   rule.value = await chat.retentionOf(props.friendId)
+  emit('rule', rule.value)
 }
-watch(() => [props.friendId, chat.ready], () => { open.value = false; load() }, { immediate: true })
+watch(() => [props.friendId, chat.ready], () => { emit('update:open', false); load() }, { immediate: true })
 
 async function apply() {
   error.value = ''
   busy.value = true
   try {
     await chat.setRetention(props.friendId, { ttlSeconds: ttl.value, scope: scope.value })
-    open.value = false
+    emit('update:open', false)
     await load()
     emit('applied')
   } catch (err) {
@@ -53,6 +61,7 @@ async function cancel() {
   await chat.setRetention(props.friendId, null)
   await load()
 }
+defineExpose({ cancel })
 </script>
 
 <template>
@@ -62,8 +71,6 @@ async function cancel() {
         Tự xoá {{ rule.scope === 'images' ? 'ảnh' : 'tin nhắn' }} cũ hơn {{ ttlLabel }} (trên thiết bị này)
       </span>
       <span v-else class="retention-state muted">Tin nhắn không tự xoá</span>
-      <button type="button" class="btn btn-ghost btn-sm" @click="open = !open">{{ open ? 'Đóng' : 'Cài đặt tự xoá' }}</button>
-      <button v-if="rule" type="button" class="btn btn-ghost btn-sm" @click="cancel">Tắt</button>
     </div>
     <div v-if="error" class="alert alert-error" style="margin: 6px 0 0">{{ error }}</div>
     <form v-if="open" class="retention-form" @submit.prevent="apply">

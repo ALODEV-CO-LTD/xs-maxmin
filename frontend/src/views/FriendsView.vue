@@ -375,6 +375,10 @@ async function retryMessage(m) {
 
 const peerInfo = computed(() => chat.peerInfo[selectedFriendId.value] || null)
 const showSecurity = ref(false)
+// Top-bar buttons control the auto-delete panel (ChatRetentionPanel) below the header.
+const retentionOpen = ref(false)
+const retentionRule = ref(null)
+const retentionPanel = ref(null)
 async function acceptKey() {
   await chat.acceptKeyChange(selectedFriendId.value)
 }
@@ -468,6 +472,11 @@ async function acceptKey() {
           <div class="thread-header">
             <button class="btn btn-ghost btn-sm back-btn" @click="backToList"><AppIcon name="arrow-left" /> Danh sách</button>
             <strong class="thread-title">{{ selectedFriend?.name || '...' }}</strong>
+            <div class="thread-tools">
+              <button v-if="peerInfo" type="button" class="btn btn-ghost btn-sm" :aria-pressed="showSecurity" @click="showSecurity = !showSecurity">Mã bảo mật</button>
+              <button v-if="!selectedFriend?.isAdmin" type="button" class="btn btn-ghost btn-sm" :aria-pressed="retentionOpen" @click="retentionOpen = !retentionOpen">Cài đặt tự xoá</button>
+              <button v-if="retentionRule" type="button" class="btn btn-ghost btn-sm" title="Tắt tự xoá tin nhắn" @click="retentionPanel?.cancel()">Tắt</button>
+            </div>
             <div v-if="canCall" class="call-buttons">
               <button
                 class="btn btn-ghost btn-sm"
@@ -489,7 +498,6 @@ async function acceptKey() {
           <div class="e2ee-line">
             <span aria-hidden="true">🔒</span>
             <span>Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.</span>
-            <button v-if="peerInfo" type="button" class="btn btn-ghost btn-sm" @click="showSecurity = !showSecurity">Mã bảo mật</button>
           </div>
           <div v-if="showSecurity && peerInfo" class="e2ee-codes">
             <div>Của {{ selectedFriend?.name }}: <code>{{ peerInfo.fingerprint }}</code></div>
@@ -500,6 +508,9 @@ async function acceptKey() {
             v-if="!selectedFriend?.isAdmin"
             :friend-id="selectedFriendId"
             :friend-name="selectedFriend?.name || ''"
+            v-model:open="retentionOpen"
+            ref="retentionPanel"
+            @rule="(r) => (retentionRule = r)"
             @applied="loadMessages(selectedFriendId)"
           />
           <div v-if="messagesError" class="alert alert-error">{{ messagesError }}</div>
@@ -652,6 +663,27 @@ async function acceptKey() {
 }
 .thread-title {
   flex: 1;
+}
+.thread-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px 4px;
+}
+.thread-tools .btn {
+  white-space: nowrap;
+}
+/* Narrow screens: name + call icon on the first row, the tools on their own row below. */
+@media (max-width: 640px) {
+  .thread-header {
+    flex-wrap: wrap;
+  }
+  .thread-tools {
+    order: 5;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+  }
 }
 .call-buttons {
   display: flex;
