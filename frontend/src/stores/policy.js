@@ -8,7 +8,7 @@ import { usePrivacyStore } from './privacy'
 import { setScreenshotGuardEnabled } from '../screenshotGuard'
 
 export const usePolicyStore = defineStore('policy', {
-  state: () => ({ watermarkEnabled: false, screenshotGuardEnabled: true, autoLockMinutes: 0, loaded: false }),
+  state: () => ({ watermarkEnabled: false, screenshotGuardEnabled: true, blurOnHideEnabled: false, autoLockMinutes: 0, loaded: false }),
   actions: {
     async load() {
       try {
@@ -16,6 +16,8 @@ export const usePolicyStore = defineStore('policy', {
         this.watermarkEnabled = res.watermarkEnabled === true
         this.screenshotGuardEnabled = res.screenshotGuardEnabled !== false
         setScreenshotGuardEnabled(this.screenshotGuardEnabled)
+        this.blurOnHideEnabled = res.blurOnHideEnabled === true
+        usePrivacyStore().setBlurPolicy(this.blurOnHideEnabled)
         this.autoLockMinutes = Number(res.autoLockMinutes) || 0
         this.loaded = true
         usePrivacyStore().applyServerDefault(this.autoLockMinutes)

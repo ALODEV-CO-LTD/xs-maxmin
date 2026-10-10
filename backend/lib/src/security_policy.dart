@@ -15,6 +15,8 @@ import 'package:sqlite3/sqlite3.dart';
 ///  - watermarkEnabled: faint viewer name/time overlay on every screen so a
 ///    leaked screenshot can be traced (the web cannot block screenshots). OFF by default;
 ///    the Admin turns it on in Chính sách bảo mật.
+///  - blurOnHideEnabled: blur the whole screen while the page is hidden / unfocused
+///    (frontend/src/stores/privacy.js). OFF by default; the Admin turns it on.
 class SecurityPolicy {
   const SecurityPolicy({
     this.loginFreeAttempts = 5,
@@ -24,6 +26,7 @@ class SecurityPolicy {
     this.autoLockMinutes = 0,
     this.watermarkEnabled = false,
     this.screenshotGuardEnabled = true,
+    this.blurOnHideEnabled = false,
   });
 
   final int loginFreeAttempts;
@@ -33,6 +36,7 @@ class SecurityPolicy {
   final int autoLockMinutes;
   final bool watermarkEnabled;
   final bool screenshotGuardEnabled;
+  final bool blurOnHideEnabled;
 
   Map<String, Object> toJson() => {
         'loginFreeAttempts': loginFreeAttempts,
@@ -42,6 +46,7 @@ class SecurityPolicy {
         'autoLockMinutes': autoLockMinutes,
         'watermarkEnabled': watermarkEnabled,
         'screenshotGuardEnabled': screenshotGuardEnabled,
+        'blurOnHideEnabled': blurOnHideEnabled,
       };
 }
 
@@ -77,6 +82,7 @@ SecurityPolicy loadPolicy(Database db) {
     autoLockMinutes: num('autoLockMinutes', d.autoLockMinutes),
     watermarkEnabled: stored['watermarkEnabled'] == null ? d.watermarkEnabled : stored['watermarkEnabled'] == 'true',
     screenshotGuardEnabled: stored['screenshotGuardEnabled'] == null ? d.screenshotGuardEnabled : stored['screenshotGuardEnabled'] == 'true',
+    blurOnHideEnabled: stored['blurOnHideEnabled'] == 'true',
   );
 }
 
@@ -95,6 +101,9 @@ String? validatePolicyInput(Map<String, dynamic> body) {
   if (body.containsKey('screenshotGuardEnabled') && body['screenshotGuardEnabled'] is! bool) {
     return 'Che màn hình khi chụp phải là bật hoặc tắt';
   }
+  if (body.containsKey('blurOnHideEnabled') && body['blurOnHideEnabled'] is! bool) {
+    return 'Làm mờ màn hình khi ẩn trang phải là bật hoặc tắt';
+  }
   final base = body['loginBaseLockSeconds'];
   final max = body['loginMaxLockSeconds'];
   if (base is int && max is int && max < base) {
@@ -105,7 +114,7 @@ String? validatePolicyInput(Map<String, dynamic> body) {
 
 /// Writes the given fields; the rest keep their current/default value.
 void savePolicy(Database db, Map<String, dynamic> body) {
-  for (final k in [..._ranges.keys, 'watermarkEnabled', 'screenshotGuardEnabled']) {
+  for (final k in [..._ranges.keys, 'watermarkEnabled', 'screenshotGuardEnabled', 'blurOnHideEnabled']) {
     if (!body.containsKey(k)) continue;
     db.execute(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',

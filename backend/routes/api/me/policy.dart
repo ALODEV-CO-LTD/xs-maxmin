@@ -16,5 +16,6 @@ Response onRequest(RequestContext context) {
     'autoLockMinutes': p.autoLockMinutes,
     'watermarkEnabled': p.watermarkEnabled,
     'screenshotGuardEnabled': p.screenshotGuardEnabled,
+    'blurOnHideEnabled': p.blurOnHideEnabled,
   });
 }

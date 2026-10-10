@@ -1,12 +1,13 @@
 // Privacy store - client-side "Cài đặt quyền riêng tư" (K34) and the logic
-// behind auto-lock (K09/K40/S02) and auto-lock after being away.
+// behind auto-lock (K09/K40/S02) and hide-when-away (K32/S10).
 //
 // Conventions:
 //   - Settings live in localStorage under 'xoso_privacy' (per browser, not
-//     synced to the server): { autoLockMinutes, hideLockSeconds }.
+//     synced to the server): { autoLockMinutes, hideLockSeconds, blurOnHide }.
 //       * autoLockMinutes  - lock after this many idle minutes; 0 = off.
 //       * hideLockSeconds  - lock if the tab/window was hidden at least this
 //                            long; 0 = off.
+//       * blurOnHide       - blur the page while it is hidden / unfocused.
 //   - `locked` is also persisted ('xoso_locked') so a reload does not bypass
 //     the lock; the last-activity time ('xoso_last_active') lets a reload or
 //     a sleeping computer still lock once the idle limit has passed.
@@ -16,7 +17,7 @@
 //     password or the layer-2 password. Nothing is sent about the device or
 //     its location.
 //   - Limit (K33): a web page cannot block screenshots or the OS app-switcher
-//     preview. (The old blur-while-away feature was removed on request.)
+//     preview; blur only reduces what is left visible while the page is away.
 import { defineStore } from 'pinia'
 import { api } from '../api'
 import { useCallStore } from './call'
@@ -25,7 +26,7 @@ const SETTINGS_KEY = 'xoso_privacy'
 const LOCKED_KEY = 'xoso_locked'
 const ACTIVE_KEY = 'xoso_last_active'
 
-const DEFAULTS = { autoLockMinutes: 0, hideLockSeconds: 0 }
+const DEFAULTS = { autoLockMinutes: 0, hideLockSeconds: 0, blurOnHide: true }
 
 function readStorage(key) {
   try {
@@ -49,6 +50,7 @@ function loadSettings() {
     return {
       autoLockMinutes: Math.max(0, Number(raw.autoLockMinutes) || 0),
       hideLockSeconds: Math.max(0, Number(raw.hideLockSeconds) || 0),
+      blurOnHide: raw.blurOnHide === undefined ? DEFAULTS.blurOnHide : !!raw.blurOnHide,
     }
   } catch {
     return { ...DEFAULTS }
@@ -77,6 +79,8 @@ export const usePrivacyStore = defineStore('privacy', {
   state: () => ({
     ...loadSettings(),
     locked: false,
+    away: false, // page hidden / window unfocused -> blurred
+    blurPolicy: false, // Admin policy (Chính sách bảo mật): blur-on-hide allowed at all; off by default
   }),
   actions: {
     saveSettings(patch) {
@@ -86,13 +90,20 @@ export const usePrivacyStore = defineStore('privacy', {
         JSON.stringify({
           autoLockMinutes: this.autoLockMinutes,
           hideLockSeconds: this.hideLockSeconds,
+          blurOnHide: this.blurOnHide,
         }),
       )
+      if (!this.blurOnHide) this.away = false
       this.touch(true)
     },
 
     // Admin-set default idle lock (stores/policy.js): used only while this person has not
     // chosen their own value (nothing saved in this browser yet).
+    setBlurPolicy(on) {
+      this.blurPolicy = on === true
+      if (!this.blurPolicy) this.away = false
+    },
+
     applyServerDefault(minutes) {
       serverDefaultMinutes = minutes
       if (readStorage(SETTINGS_KEY) === null && minutes > 0) this.autoLockMinutes = minutes
@@ -107,6 +118,7 @@ export const usePrivacyStore = defineStore('privacy', {
     async unlock(password) {
       await api.post('/me/verify-password', { password })
       this.locked = false
+      this.away = false
       writeStorage(LOCKED_KEY, null)
       this.touch(true)
     },
@@ -148,22 +160,38 @@ export const usePrivacyStore = defineStore('privacy', {
       const events = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove']
       events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
 
+      const goAway = () => {
+        if (this.blurPolicy && this.blurOnHide && !inCall()) this.away = true
+      }
+      const comeBack = () => {
+        this.away = false
+      }
       const onVisibility = () => {
         if (document.hidden) {
           hiddenAt = Date.now()
+          goAway()
         } else {
           if (this.hideLockSeconds && hiddenAt && Date.now() - hiddenAt >= this.hideLockSeconds * 1000) this.lock()
           hiddenAt = 0
           this.checkIdle()
+          if (document.hasFocus()) comeBack()
         }
       }
+      const onBlur = () => goAway()
+      const onFocus = () => {
+        if (!document.hidden) comeBack()
+      }
       document.addEventListener('visibilitychange', onVisibility)
+      window.addEventListener('blur', onBlur)
+      window.addEventListener('focus', onFocus)
 
       timer = setInterval(() => this.checkIdle(), 5000)
 
       cleanup = () => {
         events.forEach((e) => window.removeEventListener(e, onActivity))
         document.removeEventListener('visibilitychange', onVisibility)
+        window.removeEventListener('blur', onBlur)
+        window.removeEventListener('focus', onFocus)
         clearInterval(timer)
         timer = null
       }
@@ -173,6 +201,7 @@ export const usePrivacyStore = defineStore('privacy', {
       if (cleanup) cleanup()
       cleanup = null
       this.locked = false
+      this.away = false
       writeStorage(LOCKED_KEY, null)
       writeStorage(ACTIVE_KEY, null)
     },

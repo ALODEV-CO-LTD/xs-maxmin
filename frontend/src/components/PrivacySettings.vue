@@ -42,10 +42,15 @@ const hideOptions = [
       </select>
     </div>
 
+    <label v-if="privacy.blurPolicy" class="priv-check">
+      <input type="checkbox" :checked="privacy.blurOnHide" @change="privacy.saveSettings({ blurOnHide: $event.target.checked })" />
+      <span>Làm mờ nội dung khi trang bị ẩn hoặc mất focus</span>
+    </label>
+
     <p class="priv-note">
       Khi khoá, bạn nhập lại mật khẩu (hoặc mật khẩu lớp hai) để xem dữ liệu; dữ liệu đang nhập được giữ lại. Lưu ý:
-      trình duyệt không cho phép chặn hoàn toàn việc chụp màn hình hay xem trước ở màn hình đa nhiệm, nên hãy dùng
-      "Ẩn số liệu" ở các trang số liệu để hạn chế lộ nội dung.
+      trình duyệt không cho phép chặn hoàn toàn việc chụp màn hình hay xem trước ở màn hình đa nhiệm, nên làm mờ chỉ
+      giúp giảm nội dung lộ ra.
     </p>
   </div>
 </template>
