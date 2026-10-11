@@ -1,5 +1,5 @@
 <!--
-  /admin/renewals - system-wide renewal/purchase history.
+  Embedded in /admin/payment-requests (tab "Lịch sử gia hạn") - system-wide renewal/purchase history.
   API: GET /admin/renewals -> { renewals: [{ id, userName, avatar, type, packageType, amount, createdAt }] }
   Read-only (最新 200 rows, newest first - set server-side).
 -->
@@ -46,9 +46,8 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="page">
-    <h1 class="page-title">Gia hạn gói</h1>
-    <p class="page-subtitle">Lịch sử mua/gia hạn gói dịch vụ toàn hệ thống (tối đa 200 gần nhất)</p>
+  <div>
+    <p class="page-subtitle">Lịch sử mua/gia hạn gói dịch vụ toàn hệ thống, gồm các yêu cầu đã được duyệt (tối đa 200 gần nhất)</p>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
 

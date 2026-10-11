@@ -36,7 +36,6 @@ import AccountView from '../views/AccountView.vue'
 import AdminUsersView from '../views/admin/UsersView.vue'
 import AdminStatsView from '../views/admin/StatsView.vue'
 import AdminSettingsView from '../views/admin/SettingsView.vue'
-import AdminRenewalsView from '../views/admin/RenewalsView.vue'
 import AdminPaymentRequestsView from '../views/admin/PaymentRequestsView.vue'
 import AdminMessagesView from '../views/admin/MessagesView.vue'
 import AdminNoticesView from '../views/admin/NoticesView.vue'
@@ -98,10 +97,10 @@ const routes = [
     meta: { title: 'Cài đặt hệ thống', requiresAdmin: true, perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'] },
   },
   {
+    // Merged into the payment page ("Lịch sử gia hạn" tab); kept so old links still work.
     path: '/admin/renewals',
     name: 'admin-renewals',
-    component: AdminRenewalsView,
-    meta: { title: 'Gia hạn gói', requiresAdmin: true, perm: 'payments.manage' },
+    redirect: { path: '/admin/payment-requests', query: { view: 'renewals' } },
   },
   {
     path: '/admin/payment-requests',

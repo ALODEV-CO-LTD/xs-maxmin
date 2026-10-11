@@ -13,6 +13,18 @@ import { showConfirm } from '../../confirm'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '../../api'
 import ModalDialog from '../../components/ModalDialog.vue'
+import AppSelect from '../../components/AppSelect.vue'
+import RenewalsView from './RenewalsView.vue'
+import { useRoute, useRouter } from 'vue-router'
+
+// Two views of the same money flow: requests awaiting approval, and the resulting renewal history.
+const route = useRoute()
+const router = useRouter()
+const view = ref(route.query.view === 'renewals' ? 'renewals' : 'requests')
+function selectView(v) {
+  view.value = v
+  router.replace({ query: v === 'renewals' ? { view: v } : {} })
+}
 
 const PAGE = 30
 const loading = ref(true)
@@ -156,8 +168,16 @@ onMounted(load)
         <h1 class="page-title">Quản lý thanh toán</h1>
         <p class="page-subtitle" style="margin-bottom: 0">Duyệt chuyển khoản, theo dõi doanh thu và lịch sử thanh toán gói dịch vụ.</p>
       </div>
-      <button class="btn btn-secondary btn-sm" :disabled="loading" @click="exportCsv">Xuất CSV</button>
+      <button v-if="view === 'requests'" class="btn btn-secondary btn-sm" :disabled="loading" @click="exportCsv">Xuất CSV</button>
     </div>
+
+    <div class="tabs view-tabs" role="tablist" aria-label="Thanh toán">
+      <button type="button" role="tab" class="tab" :class="{ active: view === 'requests' }" :aria-selected="view === 'requests'" @click="selectView('requests')">Duyệt thanh toán</button>
+      <button type="button" role="tab" class="tab" :class="{ active: view === 'renewals' }" :aria-selected="view === 'renewals'" @click="selectView('renewals')">Lịch sử gia hạn</button>
+    </div>
+
+    <RenewalsView v-if="view === 'renewals'" />
+    <template v-else>
 
     <div v-if="summary" class="sum-grid">
       <div class="card sum-card" :class="{ hot: summary.pending > 0 }">
@@ -182,22 +202,12 @@ onMounted(load)
       </div>
     </div>
 
-    <div class="tabs" role="tablist" aria-label="Trạng thái">
-      <button
-        v-for="t in STATUS_TABS"
-        :key="t.key"
-        type="button"
-        role="tab"
-        class="tab"
-        :class="{ active: status === t.key }"
-        :aria-selected="status === t.key"
-        @click="status = t.key"
-      >
-        {{ t.label }}
-      </button>
-    </div>
-
     <div class="filters">
+      <div class="f-status">
+        <AppSelect v-model="status" aria-label="Trạng thái">
+          <option v-for="t in STATUS_TABS" :key="t.key" :value="t.key">{{ t.label }}</option>
+        </AppSelect>
+      </div>
       <input v-model="q" type="search" class="f-input f-q" placeholder="Tìm tên, tài khoản hoặc mã tham chiếu..." aria-label="Tìm kiếm" />
       <label class="f-date">Từ <input v-model="from" type="date" class="f-input" /></label>
       <label class="f-date">Đến <input v-model="to" type="date" class="f-input" /></label>
@@ -275,10 +285,14 @@ onMounted(load)
         <button type="button" class="btn btn-danger" :disabled="actionBusy" @click="confirmReject">Từ chối</button>
       </template>
     </ModalDialog>
+    </template>
   </div>
 </template>
 
 <style scoped>
+.view-tabs {
+  margin-bottom: 16px;
+}
 .head {
   display: flex;
   justify-content: space-between;
@@ -336,6 +350,9 @@ onMounted(load)
   color: var(--on-primary);
   background: var(--primary);
   border-color: var(--primary);
+}
+.f-status {
+  flex: 0 0 170px;
 }
 .filters {
   display: flex;

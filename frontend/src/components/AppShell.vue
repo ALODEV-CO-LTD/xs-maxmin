@@ -66,8 +66,7 @@ const userLinks = [
 const adminLinks = [
   { perm: 'users.view', name: 'admin-users', label: 'Khách hàng', icon: 'users' },
   { perm: 'stats.view', name: 'admin-stats', label: 'Thống kê', icon: 'chart-column-increasing' },
-  { perm: 'payments.manage', name: 'admin-payment-requests', label: 'Duyệt thanh toán', icon: 'circle-check' },
-  { perm: 'payments.manage', name: 'admin-renewals', label: 'Gia hạn', icon: 'refresh-cw' },
+  { perm: 'payments.manage', name: 'admin-payment-requests', label: 'Thanh toán & gia hạn', icon: 'circle-check' },
   { perm: 'support.messages', name: 'admin-messages', label: 'Phản hồi', icon: 'message-square-more' },
   { perm: 'announcements.manage', name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
   { perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
