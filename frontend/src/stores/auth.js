@@ -45,11 +45,11 @@ export const useAuthStore = defineStore('auth', {
     // First admin page this account may open (admin pages are listed in nav order).
     adminHome() {
       const pages = [
+        ['stats.view', '/admin/stats'],
         ['users.view', '/admin/users'],
         ['support.messages', '/admin/messages'],
         ['payments.manage', '/admin/payment-requests'],
-        ['stats.view', '/admin/stats'],
-        ['announcements.manage', '/admin/notices'],
+        [['announcements.manage', 'maintenance.manage'], '/admin/notices'],
         [['settings.manage', 'security.view', 'security.policy', 'backups.manage'], '/admin/settings'],
       ]
       return pages.find(([perm]) => this.can(perm))?.[1] || '/account'

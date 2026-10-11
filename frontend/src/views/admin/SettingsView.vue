@@ -4,9 +4,9 @@
        PUT /admin/settings body { [key]: value }  (upsert one or more keys)
        DELETE /admin/settings body { keys: [...] }  (restore a key to its hard-coded default)
 
-  Two dedicated forms read/write this same generic store:
-    - `package_price_<wireValue>` overriding the hard-coded prices in
-      package_plans.dart (see resolvedPriceVnd).
+  Package catalog (add / edit / hide / delete) lives in its own table:
+    GET/POST /admin/packages, PATCH/DELETE /admin/packages/:code.
+  Dedicated form on this same generic store:
     - `bank_name` / `bank_account_number` / `bank_account_holder` /
       `bank_bin` - the account customers transfer to when buying a package
       (read by GET /me/payment-info, shown on PackagesView.vue's "Thông tin
@@ -24,15 +24,9 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import { showConfirm } from '../../confirm'
 import SecurityPolicyView from './SecurityPolicyView.vue'
 import BackupsView from './BackupsView.vue'
-
-const packages = [
-  { wire: '1m', label: '1 tháng', default: 99000 },
-  { wire: '3m', label: '3 tháng', default: 269000 },
-  { wire: '6m', label: '6 tháng', default: 499000 },
-  { wire: '12m', label: '12 tháng', default: 899000 },
-]
 
 // BIN codes per Napas/VietQR - used both to identify the bank on transfers
 // and to render the VietQR quick-pay code on PackagesView.vue.
@@ -70,7 +64,6 @@ const saved = ref(false)
 const saving = ref(false)
 
 const raw = ref({})
-const prices = ref({})
 const bank = ref({ bank_bin: '', bank_account_number: '', bank_account_holder: '' })
 // Each form only shows its values; "Sửa" unlocks it, "Lưu" / "Huỷ" lock it again.
 const editBank = ref(false)
@@ -80,21 +73,12 @@ const bankSaving = ref(false)
 const bankSaved = ref(false)
 const bankError = ref('')
 
-function keyFor(wire) {
-  return `package_price_${wire}`
-}
-
 async function load() {
   loading.value = true
   error.value = ''
   saved.value = false
   try {
     raw.value = await api.get('/admin/settings')
-    const p = {}
-    for (const pkg of packages) {
-      p[pkg.wire] = raw.value[keyFor(pkg.wire)] ?? ''
-    }
-    prices.value = p
     maxIds.value = raw.value.max_virtual_ids ?? ''
     bank.value = {
       bank_bin: raw.value.bank_bin ?? '',
@@ -132,8 +116,12 @@ async function saveMaxIds() {
   }
 }
 
+// Internal one-time markers set by the server; not settings, so never listed.
+const INTERNAL_KEYS = ['unread_epoch', 'e2ee_friend_chat_purged', 'perm_split_maintenance']
 const otherKeys = computed(() =>
-  Object.keys(raw.value).filter((k) => !packages.some((p) => keyFor(p.wire) === k) && !bankKeys.includes(k)),
+  Object.keys(raw.value).filter(
+    (k) => !k.startsWith('package_price_') && !bankKeys.includes(k) && !INTERNAL_KEYS.includes(k),
+  ),
 )
 
 async function saveBank() {
@@ -164,61 +152,99 @@ async function saveBank() {
   }
 }
 
-async function save() {
-  saving.value = true
-  saved.value = false
-  error.value = ''
+// ---- Package catalog (add / edit / hide / delete) ----
+const packages = ref([])
+const pkgError = ref('')
+const pkgNotice = ref('')
+const pkgBusy = ref('')
+const pkgEditing = ref('') // code being edited, or 'new'
+const pkgForm = ref({ label: '', durationDays: '', priceVnd: '' })
+
+function formatVnd(v) {
+  return Number(v).toLocaleString('vi-VN') + ' đ'
+}
+function formatDuration(d) {
+  if (d % 365 === 0) return `${d} ngày (${d / 365} năm)`
+  if (d % 30 === 0) return `${d} ngày (${d / 30} tháng)`
+  return `${d} ngày`
+}
+
+async function loadPackages() {
+  pkgError.value = ''
   try {
-    const body = {}
-    const keysToDelete = []
-    for (const pkg of packages) {
-      const val = String(prices.value[pkg.wire] ?? '').trim()
-      if (val === '') {
-        if (raw.value[keyFor(pkg.wire)] !== undefined) keysToDelete.push(keyFor(pkg.wire))
-        continue
-      }
-      body[keyFor(pkg.wire)] = val
-    }
-    if (Object.keys(body).length > 0) {
-      raw.value = await api.put('/admin/settings', body)
-    }
-    if (keysToDelete.length > 0) {
-      raw.value = await api.del('/admin/settings', { keys: keysToDelete })
-    }
-    saved.value = true
-    editPrices.value = false
+    packages.value = (await api.get('/admin/packages')).packages
   } catch (err) {
-    error.value = err instanceof ApiError ? err.message : 'Không thể lưu cài đặt'
+    pkgError.value = err instanceof ApiError ? err.message : 'Không tải được danh sách gói'
+  }
+}
+
+function startNewPackage() {
+  pkgForm.value = { label: '', durationDays: '', priceVnd: '' }
+  pkgEditing.value = 'new'
+  pkgNotice.value = ''
+}
+function startEditPackage(p) {
+  pkgForm.value = { label: p.label, durationDays: String(p.durationDays), priceVnd: String(p.priceVnd) }
+  pkgEditing.value = p.type
+  pkgNotice.value = ''
+}
+function cancelPackage() {
+  pkgEditing.value = ''
+}
+
+async function savePackage() {
+  const body = {
+    label: pkgForm.value.label.trim(),
+    durationDays: Number(pkgForm.value.durationDays),
+    priceVnd: Number(pkgForm.value.priceVnd),
+  }
+  pkgBusy.value = pkgEditing.value
+  pkgError.value = ''
+  try {
+    if (pkgEditing.value === 'new') await api.post('/admin/packages', body)
+    else await api.patch(`/admin/packages/${pkgEditing.value}`, body)
+    pkgNotice.value = pkgEditing.value === 'new' ? 'Đã thêm gói' : 'Đã lưu gói (giá mới chỉ áp dụng cho yêu cầu mua sau này)'
+    pkgEditing.value = ''
+    await loadPackages()
+  } catch (err) {
+    pkgError.value = err instanceof ApiError ? err.message : 'Không lưu được gói'
   } finally {
-    saving.value = false
+    pkgBusy.value = ''
   }
 }
 
-function cancelBank() {
-  bank.value = {
-    bank_bin: raw.value.bank_bin ?? '',
-    bank_account_number: raw.value.bank_account_number ?? '',
-    bank_account_holder: raw.value.bank_account_holder ?? '',
+async function togglePackage(p) {
+  pkgBusy.value = p.type
+  pkgError.value = ''
+  try {
+    await api.patch(`/admin/packages/${p.type}`, { active: !p.active })
+    pkgNotice.value = p.active ? `Đã ẩn gói ${p.label} (người dùng không còn thấy để mua)` : `Đã hiện lại gói ${p.label}`
+    await loadPackages()
+  } catch (err) {
+    pkgError.value = err instanceof ApiError ? err.message : 'Không cập nhật được gói'
+  } finally {
+    pkgBusy.value = ''
   }
-  bankError.value = ''
-  editBank.value = false
-}
-function cancelMax() {
-  maxIds.value = raw.value.max_virtual_ids ?? ''
-  maxIdsError.value = ''
-  editMax.value = false
-}
-function cancelPrices() {
-  const p = {}
-  for (const pkg of packages) p[pkg.wire] = raw.value[keyFor(pkg.wire)] ?? ''
-  prices.value = p
-  error.value = ''
-  editPrices.value = false
 }
 
-async function resetPrice(wire) {
-  prices.value[wire] = ''
-  await save()
+async function removePackage(p) {
+  const used = p.usage.users + p.usage.requests + p.usage.transactions > 0
+  if (used) {
+    pkgError.value = `Gói "${p.label}" đã có tài khoản hoặc giao dịch sử dụng nên không xoá được. Hãy ẩn gói để ngừng bán.`
+    return
+  }
+  if (!(await showConfirm({ title: 'Xoá gói', message: `Xoá gói "${p.label}"?`, confirmText: 'Xoá', danger: true }))) return
+  pkgBusy.value = p.type
+  pkgError.value = ''
+  try {
+    await api.del(`/admin/packages/${p.type}`)
+    pkgNotice.value = `Đã xoá gói ${p.label}`
+    await loadPackages()
+  } catch (err) {
+    pkgError.value = err instanceof ApiError ? err.message : 'Không xoá được gói'
+  } finally {
+    pkgBusy.value = ''
+  }
 }
 
 // Recent security events (failed logins, lockouts, session revocations, wipes)
@@ -247,7 +273,7 @@ const canSettings = auth.can('settings.manage')
 const canSecurity = auth.can('security.view')
 const canPolicy = auth.can('security.policy')
 const canBackups = auth.can('backups.manage')
-if (canSettings) onMounted(load)
+if (canSettings) onMounted(() => { load(); loadPackages() })
 else loading.value = false
 if (canSecurity) onMounted(loadEvents)
 
@@ -257,7 +283,7 @@ const TABS = computed(() => [
   ...(canSettings
     ? [
         { key: 'payment', label: 'Thanh toán' },
-        { key: 'prices', label: 'Giá gói' },
+        { key: 'prices', label: 'Gói dịch vụ' },
         { key: 'limits', label: 'Giới hạn ID' },
       ]
     : []),
@@ -367,39 +393,55 @@ function onTabKey(e) {
       </div>
 
       <div v-show="activeTab === 'prices'" role="tabpanel">
-      <h2 style="margin-top: 0">Giá gói dịch vụ</h2>
-      <form class="card" @submit.prevent="save">
-      <fieldset class="ro" :disabled="!editPrices">
-      <div v-for="pkg in packages" :key="pkg.wire" class="field">
-        <label>{{ pkg.label }} (mặc định {{ pkg.default.toLocaleString('vi-VN') }} đ)</label>
-        <div style="display: flex; gap: 8px">
-          <input
-            v-model="prices[pkg.wire]"
-            type="number"
-            min="0"
-            :placeholder="String(pkg.default)"
-          />
-          <button
-            v-if="editPrices && raw[keyFor(pkg.wire)] !== undefined"
-            type="button"
-            class="btn btn-ghost btn-sm"
-            @click="resetPrice(pkg.wire)"
-          >
-            Dùng mặc định
-          </button>
+      <h2 style="margin-top: 0">Gói dịch vụ</h2>
+      <p class="page-subtitle">Thêm, sửa, ẩn hoặc xoá các gói khách hàng có thể mua. Đổi giá chỉ áp dụng cho yêu cầu mua sau này.</p>
+      <div v-if="pkgError" class="alert alert-error">{{ pkgError }}</div>
+      <div v-if="pkgNotice" class="alert alert-success">{{ pkgNotice }}</div>
+
+      <div class="pkg-bar">
+        <button v-if="pkgEditing !== 'new'" type="button" class="btn btn-primary btn-sm" @click="startNewPackage">+ Thêm gói</button>
+      </div>
+
+      <form v-if="pkgEditing === 'new'" class="card pkg-form" @submit.prevent="savePackage">
+        <div class="pkg-fields">
+          <label>Tên gói<input v-model="pkgForm.label" type="text" maxlength="60" placeholder="Vd: 2 tháng" required /></label>
+          <label>Thời hạn (ngày)<input v-model="pkgForm.durationDays" type="number" min="1" max="3650" required /></label>
+          <label>Giá (đ)<input v-model="pkgForm.priceVnd" type="number" min="0" required /></label>
         </div>
-      </div>
+        <div class="pkg-actions">
+          <button type="submit" class="btn btn-primary btn-sm" :disabled="pkgBusy === 'new'">Thêm gói</button>
+          <button type="button" class="btn btn-ghost btn-sm" @click="cancelPackage">Huỷ</button>
+        </div>
+      </form>
 
-      </fieldset>
-
-      <div class="edit-actions">
-        <button v-if="!editPrices" class="btn btn-secondary" type="button" @click="editPrices = true">Sửa</button>
-        <template v-else>
-          <button class="btn btn-ghost" type="button" :disabled="saving" @click="cancelPrices">Huỷ</button>
-          <button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? 'Đang lưu...' : 'Lưu cài đặt' }}</button>
+      <div v-if="packages.length === 0 && pkgEditing !== 'new'" class="card">Chưa có gói nào.</div>
+      <div v-for="p in packages" :key="p.type" class="card pkg-card">
+        <template v-if="pkgEditing !== p.type">
+          <div class="pkg-head">
+            <div>
+              <strong>{{ p.label }}</strong>
+              <span v-if="!p.active" class="chip">Đang ẩn</span>
+              <div class="pkg-meta">{{ formatDuration(p.durationDays) }} · {{ formatVnd(p.priceVnd) }} · {{ p.usage.users }} tài khoản đang dùng</div>
+            </div>
+            <div class="pkg-actions">
+              <button type="button" class="btn btn-primary btn-sm" :disabled="pkgBusy === p.type" @click="startEditPackage(p)">Sửa</button>
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="pkgBusy === p.type" @click="togglePackage(p)">{{ p.active ? 'Ẩn' : 'Hiện lại' }}</button>
+              <button type="button" class="btn btn-ghost btn-sm pkg-danger" :disabled="pkgBusy === p.type" @click="removePackage(p)">Xoá</button>
+            </div>
+          </div>
         </template>
+        <form v-else @submit.prevent="savePackage">
+          <div class="pkg-fields">
+            <label>Tên gói<input v-model="pkgForm.label" type="text" maxlength="60" required /></label>
+            <label>Thời hạn (ngày)<input v-model="pkgForm.durationDays" type="number" min="1" max="3650" required /></label>
+            <label>Giá (đ)<input v-model="pkgForm.priceVnd" type="number" min="0" required /></label>
+          </div>
+          <div class="pkg-actions">
+            <button type="submit" class="btn btn-primary btn-sm" :disabled="pkgBusy === p.type">Lưu</button>
+            <button type="button" class="btn btn-ghost btn-sm" @click="cancelPackage">Huỷ</button>
+          </div>
+        </form>
       </div>
-    </form>
       </div>
     </template>
 
@@ -463,6 +505,47 @@ function onTabKey(e) {
 </template>
 
 <style scoped>
+.pkg-bar {
+  margin-bottom: 12px;
+}
+.pkg-card,
+.pkg-form {
+  margin-bottom: 10px;
+  padding: 14px 16px;
+}
+.pkg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pkg-meta {
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.pkg-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.pkg-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pkg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pkg-danger {
+  color: var(--danger-text);
+}
 .set-tabs {
   display: flex;
   flex-wrap: wrap;

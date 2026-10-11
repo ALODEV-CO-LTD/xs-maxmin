@@ -27,21 +27,14 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final wireType = body['packageType'] as String?;
-  PackageType? pkg;
-  for (final p in PackageType.values) {
-    if (p != PackageType.none && p.wireValue == wireType) {
-      pkg = p;
-      break;
-    }
-  }
-  if (pkg == null) {
-    return Response.json(statusCode: 400, body: {'error': 'Gói không hợp lệ'});
-  }
-
   final self = loadSelfRow(context, auth.userId);
   if (self == null) return unauthorized('Tài khoản không tồn tại');
 
   final db = context.read<Database>();
+  final pkg = wireType == null ? null : findPackage(db, wireType);
+  if (pkg == null || !pkg.active) {
+    return Response.json(statusCode: 400, body: {'error': 'Gói không hợp lệ'});
+  }
   final pending = db.select(
     "SELECT id FROM payment_requests WHERE user_id = ? AND status = 'pending'",
     [auth.userId],
@@ -53,21 +46,21 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final priceVnd = resolvedPriceVnd(db, pkg);
+  final priceVnd = pkg.priceVnd;
   final id = newId();
   final reference = newPaymentReference(db);
   final now = DateTime.now().toUtc().toIso8601String();
   db.execute(
     'INSERT INTO payment_requests (id, user_id, package_type, amount, status, created_at, reference_code) '
     "VALUES (?, ?, ?, ?, 'pending', ?, ?)",
-    [id, auth.userId, pkg.wireValue, priceVnd, now, reference],
+    [id, auth.userId, pkg.code, priceVnd, now, reference],
   );
 
   return Response.json(
     statusCode: 201,
     body: {
       'id': id,
-      'packageType': pkg.wireValue,
+      'packageType': pkg.code,
       'amount': priceVnd,
       'status': 'pending',
       'referenceCode': reference,

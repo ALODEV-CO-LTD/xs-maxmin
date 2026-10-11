@@ -15,22 +15,13 @@ Response onRequest(RequestContext context) {
   if (auth == null) return unauthorized();
 
   final db = context.read<Database>();
+  // `?all=1`: every package incl. hidden ones, labels only (for showing history).
+  final all = context.request.uri.queryParameters['all'] == '1';
   return Response.json(
     body: {
       'packages': [
-        for (final type in [
-          PackageType.oneMonth,
-          PackageType.threeMonths,
-          PackageType.sixMonths,
-          PackageType.twelveMonths,
-        ])
-          {
-            'type': type.wireValue,
-            'label': type.label,
-            'durationDays': packagePlans[type]!.durationDays,
-            'quota': packagePlans[type]!.quota,
-            'priceVnd': resolvedPriceVnd(db, type),
-          },
+        for (final p in listPackages(db, onlyActive: !all))
+          if (p.active) p.toJson() else {'type': p.code, 'label': p.label, 'active': false},
       ],
     },
   );

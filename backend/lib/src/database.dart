@@ -106,6 +106,42 @@ void _migrateSchema(Database db) {
   // Multi-level Admin (lib/src/permissions.dart): NULL = root Admin, else a JSON list
   // of permission keys for a staff account.
   _ensureColumn(db, 'users', 'staff_permissions', 'TEXT');
+  // Editable package catalog (replaces the hard-coded list in package_plans.dart; the
+  // defaults there seed it once, with any old `package_price_<code>` override applied).
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS packages (
+      code TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      duration_days INTEGER NOT NULL,
+      price_vnd INTEGER NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1
+    )
+  ''');
+  if (db.select('SELECT 1 FROM packages LIMIT 1').isEmpty) {
+    var order = 0;
+    for (final plan in packagePlans.values) {
+      final over = db.select('SELECT value FROM settings WHERE key = ?', ['package_price_${plan.type.wireValue}']);
+      final price = over.isEmpty ? null : int.tryParse(over.first['value'] as String);
+      db.execute(
+        'INSERT INTO packages (code, label, duration_days, price_vnd, sort_order, active) VALUES (?, ?, ?, ?, ?, 1)',
+        [plan.type.wireValue, plan.type.label, plan.durationDays, price ?? plan.priceVnd, order++],
+      );
+    }
+  }
+  // `announcements.manage` used to cover maintenance mode too; it is now split into
+  // `maintenance.manage`. Once, give the new right to staff who already had the old one.
+  if (db.select("SELECT 1 FROM settings WHERE key = 'perm_split_maintenance'").isEmpty) {
+    for (final r in db.select("SELECT id, staff_permissions FROM users WHERE staff_permissions IS NOT NULL")) {
+      try {
+        final list = [for (final p in jsonDecode(r['staff_permissions'] as String) as List) p.toString()];
+        if (list.contains('announcements.manage') && !list.contains('maintenance.manage')) {
+          db.execute('UPDATE users SET staff_permissions = ? WHERE id = ?', [jsonEncode([...list, 'maintenance.manage']), r['id']]);
+        }
+      } catch (_) {}
+    }
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('perm_split_maintenance', '1')");
+  }
   // Quản lý thanh toán (A18): a short transfer reference ("nội dung chuyển khoản") the user puts
   // in the bank note so the admin can match the money, the reason shown to the user when a request
   // is rejected, and `cancelled` = the user withdrew a still-pending request (stored as status

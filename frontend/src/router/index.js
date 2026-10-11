@@ -124,7 +124,7 @@ const routes = [
     path: '/admin/notices',
     name: 'admin-notices',
     component: AdminNoticesView,
-    meta: { title: 'Thông báo & bảo trì', requiresAdmin: true, perm: 'announcements.manage' },
+    meta: { title: 'Thông báo & bảo trì', requiresAdmin: true, perm: ['announcements.manage', 'maintenance.manage'] },
   },
   // Sao lưu and Chính sách bảo mật now live in Cài đặt (tabs); the old addresses still work.
   { path: '/admin/backups', redirect: { name: 'admin-settings', query: { tab: 'backups' } } },

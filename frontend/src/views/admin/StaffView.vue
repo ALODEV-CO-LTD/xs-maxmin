@@ -18,7 +18,7 @@ const staff = ref([])
 // Quick starting points: they only tick boxes, the Admin can still change them.
 const PRESETS = [
   { label: 'Chăm sóc khách hàng', keys: ['users.view', 'users.recovery', 'support.messages'] },
-  { label: 'Quản lý hệ thống', keys: ['users.view', 'stats.view', 'announcements.manage', 'settings.manage', 'backups.manage', 'security.view'] },
+  { label: 'Quản lý hệ thống', keys: ['users.view', 'stats.view', 'announcements.manage', 'maintenance.manage', 'settings.manage', 'backups.manage', 'security.view'] },
 ]
 
 const form = reactive({ name: '', username: '', password: '', permissions: [] })
@@ -27,6 +27,7 @@ const showForm = ref(false)
 const formError = ref('')
 
 const edits = reactive({}) // staff id -> { permissions, newPassword }
+const editing = ref('') // id of the account being edited; others are read-only
 const busyId = ref('')
 const notice = ref('')
 
@@ -77,6 +78,7 @@ async function patch(s, body, okText) {
   try {
     await api.patch(`/admin/staff/${s.id}`, body)
     notice.value = okText
+    editing.value = ''
     await load()
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Không lưu được thay đổi'
@@ -104,6 +106,14 @@ async function remove(s) {
   } finally {
     busyId.value = ''
   }
+}
+function startEdit(s) {
+  edits[s.id] = { permissions: [...s.permissions], newPassword: '' }
+  editing.value = s.id
+}
+function cancelEdit(s) {
+  edits[s.id] = { permissions: [...s.permissions], newPassword: '' }
+  editing.value = ''
 }
 const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
 </script>
@@ -155,25 +165,39 @@ const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
             <span v-if="s.locked" class="tag">Đang khoá</span>
           </div>
           <div class="head-actions">
+            <button v-if="editing !== s.id" type="button" class="btn btn-primary btn-sm" :disabled="busyId === s.id" @click="startEdit(s)">Sửa</button>
             <button type="button" class="btn btn-secondary btn-sm" :disabled="busyId === s.id" @click="toggleLock(s)">{{ s.locked ? 'Mở khoá' : 'Khoá' }}</button>
             <button type="button" class="btn btn-ghost btn-sm danger" :disabled="busyId === s.id" @click="remove(s)">Xoá</button>
           </div>
         </div>
-        <div class="presets">
-          <span>Chọn nhanh:</span>
-          <button v-for="p in PRESETS" :key="p.label" type="button" class="btn btn-secondary btn-sm" @click="applyPreset(edits[s.id].permissions, p.keys)">{{ p.label }}</button>
-        </div>
-        <div class="perms">
-          <label v-for="(label, key) in catalog" :key="key" class="perm">
-            <input type="checkbox" :checked="edits[s.id].permissions.includes(key)" @change="toggle(edits[s.id].permissions, key)" />
-            <span>{{ label }}</span>
-          </label>
-        </div>
-        <div class="row">
-          <button type="button" class="btn btn-primary btn-sm" :disabled="busyId === s.id || !edits[s.id].permissions.length || same(edits[s.id].permissions, s.permissions)" @click="savePermissions(s)">Lưu quyền</button>
-          <input v-model="edits[s.id].newPassword" type="text" placeholder="Mật khẩu mới" autocomplete="off" />
-          <button type="button" class="btn btn-secondary btn-sm" :disabled="busyId === s.id || !edits[s.id].newPassword" @click="resetPassword(s)">Đặt lại mật khẩu</button>
-        </div>
+
+        <template v-if="editing !== s.id">
+          <div v-if="s.permissions.length" class="chips">
+            <span v-for="key in s.permissions" :key="key" class="chip">{{ catalog[key] || key }}</span>
+          </div>
+          <p v-else class="muted">Chưa có quyền nào.</p>
+        </template>
+
+        <template v-else>
+          <div class="presets">
+            <span>Chọn nhanh:</span>
+            <button v-for="p in PRESETS" :key="p.label" type="button" class="btn btn-secondary btn-sm" @click="applyPreset(edits[s.id].permissions, p.keys)">{{ p.label }}</button>
+          </div>
+          <div class="perms">
+            <label v-for="(label, key) in catalog" :key="key" class="perm">
+              <input type="checkbox" :checked="edits[s.id].permissions.includes(key)" @change="toggle(edits[s.id].permissions, key)" />
+              <span>{{ label }}</span>
+            </label>
+          </div>
+          <div class="row">
+            <button type="button" class="btn btn-primary btn-sm" :disabled="busyId === s.id || !edits[s.id].permissions.length || same(edits[s.id].permissions, s.permissions)" @click="savePermissions(s)">Lưu quyền</button>
+            <button type="button" class="btn btn-ghost btn-sm" :disabled="busyId === s.id" @click="cancelEdit(s)">Huỷ</button>
+          </div>
+          <div class="row pw-row">
+            <input v-model="edits[s.id].newPassword" type="text" placeholder="Mật khẩu mới" autocomplete="off" />
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="busyId === s.id || !edits[s.id].newPassword" @click="resetPassword(s)">Đặt lại mật khẩu</button>
+          </div>
+        </template>
       </div>
     </template>
   </div>
@@ -274,6 +298,14 @@ input[type='text'] {
 }
 .muted {
   color: var(--muted);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pw-row {
+  margin-top: 10px;
 }
 .tag {
   margin-left: 8px;

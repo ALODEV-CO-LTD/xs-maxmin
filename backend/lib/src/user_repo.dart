@@ -2,7 +2,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import 'database.dart' show newId;
+import 'database.dart' show appDatabase, newId;
 import 'package_plans.dart';
 
 /// Fetches the row for the currently authenticated user, or null if the
@@ -17,7 +17,6 @@ Row? loadSelfRow(RequestContext context, String userId) {
 /// This is the ONLY place data_used/data_quota_total are exposed, and it
 /// is only reachable by the user themselves (see routes/api/me/index.dart).
 Map<String, dynamic> meJson(Row row) {
-  final pkg = PackageType.fromWire(row['package_type'] as String);
   return {
     'id': row['id'],
     'name': row['name'],
@@ -33,8 +32,8 @@ Map<String, dynamic> meJson(Row row) {
     // and is never exposed (not here, not to admins).
     'hasRecoveryCode': row['recovery_code_hash'] != null,
     'package': {
-      'type': pkg.wireValue,
-      'label': pkg.label,
+      'type': row['package_type'],
+      'label': packageLabelOf(appDatabase, row['package_type'] as String),
       'startedAt': row['package_started_at'],
       'expiresAt': row['package_expires_at'],
       'isActive': _isPackageActive(row),
@@ -55,14 +54,13 @@ Map<String, dynamic> meJson(Row row) {
 /// Deliberately excludes data_used/data_quota_total and never touches
 /// data_entries: admins must not be able to see a user's entered numbers.
 Map<String, dynamic> adminSubscriberJson(Row row) {
-  final pkg = PackageType.fromWire(row['package_type'] as String);
   return {
     'id': row['id'],
     'name': row['name'],
     'username': row['username'],
     'package': {
-      'type': pkg.wireValue,
-      'label': pkg.label,
+      'type': row['package_type'],
+      'label': packageLabelOf(appDatabase, row['package_type'] as String),
       'expiresAt': row['package_expires_at'],
     },
     'status': _isPackageActive(row) ? 'active' : 'expired',
@@ -86,7 +84,7 @@ Map<String, dynamic> adminSubscriberJson(Row row) {
 String applyApprovedPackage(
   Database db,
   String userId,
-  PackageType pkg,
+  PackageRow pkg,
   int priceVnd,
 ) {
   final self = loadSelfRowById(db, userId);
@@ -96,8 +94,7 @@ String applyApprovedPackage(
       : null;
   final hadActivePackage = currentExpiry != null && currentExpiry.isAfter(now);
   final startFrom = hadActivePackage ? currentExpiry : now;
-  final plan = packagePlans[pkg]!;
-  final newExpiry = startFrom.add(Duration(days: plan.durationDays));
+  final newExpiry = startFrom.add(Duration(days: pkg.durationDays));
   final txType = hadActivePackage ? 'renew' : 'purchase';
 
   db.execute(
@@ -110,11 +107,11 @@ String applyApprovedPackage(
       status = 'active'
     WHERE id = ?
     ''',
-    [pkg.wireValue, now.toIso8601String(), newExpiry.toIso8601String(), plan.quota, userId],
+    [pkg.code, now.toIso8601String(), newExpiry.toIso8601String(), unlimitedQuota, userId],
   );
   db.execute(
     'INSERT INTO transactions (id, user_id, type, package_type, amount, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [newId(), userId, txType, pkg.wireValue, priceVnd, now.toIso8601String()],
+    [newId(), userId, txType, pkg.code, priceVnd, now.toIso8601String()],
   );
   return txType;
 }

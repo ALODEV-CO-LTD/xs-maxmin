@@ -23,7 +23,12 @@ Response _get(RequestContext context) {
   final db = context.read<Database>();
   // `policy.*` belongs to the security-policy page (its own permission) and internal
   // markers are not for editing here.
-  final rows = db.select("SELECT key, value FROM settings WHERE key NOT LIKE 'policy.%'");
+  // Internal one-time markers (unread_epoch, e2ee_friend_chat_purged, perm_split_maintenance)
+  // are not settings and are hidden too.
+  final rows = db.select(
+    "SELECT key, value FROM settings WHERE key NOT LIKE 'policy.%' "
+    "AND key NOT IN ('unread_epoch', 'e2ee_friend_chat_purged', 'perm_split_maintenance')",
+  );
   return Response.json(
     body: {for (final r in rows) r['key'] as String: r['value']},
   );

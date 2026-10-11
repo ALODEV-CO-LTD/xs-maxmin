@@ -3,27 +3,32 @@
   API: GET /admin/stats -> { totalSubscribers, activeSubscribers, expiredSubscribers, byPackage: { wireValue: count } }
 -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api, ApiError } from '../../api'
+import StatsChart from '../../components/StatsChart.vue'
+import { loadPackageLabels, packageLabel } from '../../packageLabels'
 
 const loading = ref(true)
 const error = ref('')
 const stats = ref(null)
 
-const packageLabels = {
-  none: 'Chưa đăng ký',
-  trial: 'Dùng thử 30 ngày',
-  '1m': '1 tháng',
-  '3m': '3 tháng',
-  '6m': '6 tháng',
-  '12m': '12 tháng',
-}
+// Two charts over the same range: revenue (bars) and new accounts (line).
+const RANGES = [
+  { key: '7', label: '7 ngày' },
+  { key: '30', label: '30 ngày' },
+  { key: '90', label: '90 ngày' },
+  { key: '12m', label: '12 tháng' },
+]
+const range = ref('30')
+const hasRevenue = computed(() => !!stats.value?.canRevenue)
+const revenuePoints = computed(() => (stats.value?.series || []).map((d) => ({ date: d.date, value: d.revenue || 0 })))
+const userPoints = computed(() => (stats.value?.series || []).map((d) => ({ date: d.date, value: d.newUsers })))
 
-async function load() {
-  loading.value = true
+async function load(silent = false) {
+  if (!silent) loading.value = true
   error.value = ''
   try {
-    stats.value = await api.get('/admin/stats')
+    stats.value = await api.get(`/admin/stats?range=${range.value}`)
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Không thể tải thống kê'
   } finally {
@@ -31,7 +36,15 @@ async function load() {
   }
 }
 
-onMounted(load)
+function setRange(r) {
+  range.value = r
+  load(true)
+}
+
+onMounted(() => {
+  loadPackageLabels(true)
+  load()
+})
 </script>
 
 <template>
@@ -58,6 +71,28 @@ onMounted(load)
         </div>
       </div>
 
+      <div class="chart-head">
+        <h2 class="section-title chart-title">Thu nhập và người dùng mới</h2>
+        <div class="range-tabs" role="tablist" aria-label="Khoảng thời gian">
+          <button
+            v-for="r in RANGES"
+            :key="r.key"
+            type="button"
+            role="tab"
+            class="range-btn"
+            :class="{ active: range === r.key }"
+            :aria-selected="range === r.key"
+            @click="setRange(r.key)"
+          >
+            {{ r.label }}
+          </button>
+        </div>
+      </div>
+      <div class="chart-grid">
+        <StatsChart v-if="hasRevenue" :points="revenuePoints" kind="bar" color="var(--primary)" label="Thu nhập" money />
+        <StatsChart :points="userPoints" kind="line" color="var(--success)" label="Người dùng mới" />
+      </div>
+
       <h2 class="section-title">Theo gói dịch vụ</h2>
       <div class="card table-card">
         <table class="table stats-table">
@@ -69,7 +104,7 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="(count, key) in stats.byPackage" :key="key">
-              <td>{{ packageLabels[key] || key }}</td>
+              <td>{{ packageLabel(key) }}</td>
               <td class="col-num">{{ count }}</td>
             </tr>
           </tbody>
@@ -169,6 +204,49 @@ onMounted(load)
 }
 .tile-expired .tile-label::before {
   background: var(--warning);
+}
+
+/* ---- Charts ---- */
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 32px 0 16px;
+}
+.chart-title {
+  margin: 0;
+}
+.range-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.range-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.range-btn:hover {
+  border-color: var(--primary);
+}
+.range-btn.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 16px;
 }
 
 /* ---- Section + table ---- */

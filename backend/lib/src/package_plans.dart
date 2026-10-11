@@ -97,17 +97,66 @@ final Map<PackageType, PackagePlan> packagePlans = {
   ),
 };
 
-/// The price to actually charge/show for [type] - Admin's override from
-/// `settings.package_price_<wireValue>` if one exists, else the hardcoded
-/// default above. This is the single place that decision is made; every
-/// caller (purchase, the public catalog, transaction amount) must go
-/// through this instead of reading `packagePlans[type]!.priceVnd` directly.
-int resolvedPriceVnd(Database db, PackageType type) {
-  final plan = packagePlans[type]!;
-  final rows = db.select(
-    'SELECT value FROM settings WHERE key = ?',
-    ['package_price_${type.wireValue}'],
-  );
-  if (rows.isEmpty) return plan.priceVnd;
-  return int.tryParse(rows.first['value'] as String) ?? plan.priceVnd;
+/// One purchasable package as stored in the `packages` table (Admin can add,
+/// edit, hide and delete these - `routes/api/admin/packages`). The defaults in
+/// [packagePlans] only seed that table on first run.
+class PackageRow {
+  const PackageRow({
+    required this.code,
+    required this.label,
+    required this.durationDays,
+    required this.priceVnd,
+    required this.sortOrder,
+    required this.active,
+  });
+
+  factory PackageRow.fromRow(Row r) => PackageRow(
+        code: r['code'] as String,
+        label: r['label'] as String,
+        durationDays: r['duration_days'] as int,
+        priceVnd: r['price_vnd'] as int,
+        sortOrder: r['sort_order'] as int,
+        active: (r['active'] as int) == 1,
+      );
+
+  final String code;
+  final String label;
+  final int durationDays;
+  final int priceVnd;
+  final int sortOrder;
+  final bool active;
+
+  Map<String, dynamic> toJson() => {
+        'type': code,
+        'label': label,
+        'durationDays': durationDays,
+        'quota': unlimitedQuota,
+        'priceVnd': priceVnd,
+        'active': active,
+        'sortOrder': sortOrder,
+      };
+}
+
+/// Every package, in display order; [onlyActive] = only those users may buy.
+List<PackageRow> listPackages(Database db, {bool onlyActive = false}) => [
+      for (final r in db.select(
+        'SELECT * FROM packages ${onlyActive ? 'WHERE active = 1 ' : ''}ORDER BY sort_order, duration_days, code',
+      ))
+        PackageRow.fromRow(r),
+    ];
+
+PackageRow? findPackage(Database db, String code) {
+  final rows = db.select('SELECT * FROM packages WHERE code = ?', [code]);
+  return rows.isEmpty ? null : PackageRow.fromRow(rows.first);
+}
+
+/// Display name for a stored `package_type` value: the fixed ones (none/trial),
+/// a catalog package's current label, or the raw code if it was since deleted.
+String packageLabelOf(Database db, String code) {
+  final fixed = PackageType.fromWire(code);
+  if (fixed == PackageType.none && code != 'none') {
+    return findPackage(db, code)?.label ?? code;
+  }
+  if (fixed == PackageType.none || fixed == PackageType.trial) return fixed.label;
+  return findPackage(db, code)?.label ?? fixed.label;
 }

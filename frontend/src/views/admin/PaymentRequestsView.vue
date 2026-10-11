@@ -12,6 +12,7 @@
 import { showConfirm } from '../../confirm'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '../../api'
+import { loadPackageLabels, packageLabel } from '../../packageLabels'
 import ModalDialog from '../../components/ModalDialog.vue'
 import AppSelect from '../../components/AppSelect.vue'
 import RenewalsView from './RenewalsView.vue'
@@ -46,21 +47,13 @@ const actionBusy = ref(false)
 const rejectFor = ref(null) // request being rejected
 const rejectReason = ref('')
 
-const packageLabels = {
-  none: 'Chưa đăng ký',
-  trial: 'Dùng thử 30 ngày',
-  '1m': '1 tháng',
-  '3m': '3 tháng',
-  '6m': '6 tháng',
-  '12m': '12 tháng',
-}
 const statusLabels = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Đã từ chối', cancelled: 'Người dùng huỷ' }
 const STATUS_TABS = [
-  { key: 'pending', label: 'Chờ duyệt' },
-  { key: 'approved', label: 'Đã duyệt' },
-  { key: 'rejected', label: 'Đã từ chối' },
-  { key: 'cancelled', label: 'Đã huỷ' },
   { key: 'all', label: 'Tất cả' },
+  { key: 'cancelled', label: 'Đã huỷ' },
+  { key: 'rejected', label: 'Đã từ chối' },
+  { key: 'approved', label: 'Đã duyệt' },
+  { key: 'pending', label: 'Chờ duyệt' },
 ]
 const REASONS = ['Chưa nhận được tiền', 'Số tiền không khớp', 'Sai nội dung chuyển khoản', 'Yêu cầu trùng']
 
@@ -103,7 +96,7 @@ async function approve(r) {
   actionError.value = ''
   const ok = await showConfirm({
     title: 'Duyệt thanh toán',
-    message: `Xác nhận đã nhận ${formatMoney(r.amount)} từ ${r.userName} (${r.referenceCode}) và cấp gói ${packageLabels[r.packageType] || r.packageType}?`,
+    message: `Xác nhận đã nhận ${formatMoney(r.amount)} từ ${r.userName} (${r.referenceCode}) và cấp gói ${packageLabel(r.packageType)}?`,
     confirmText: 'Duyệt',
   })
   if (ok) await act(r.id, 'approve')
@@ -158,7 +151,10 @@ function clearFilters() {
   q.value = from.value = to.value = ''
 }
 
-onMounted(load)
+onMounted(() => {
+  loadPackageLabels(true)
+  load()
+})
 </script>
 
 <template>
@@ -236,7 +232,7 @@ onMounted(load)
           <tr v-for="r in requests" :key="r.id">
             <td data-label="Mã"><code class="ref">{{ r.referenceCode }}</code></td>
             <td data-label="Khách hàng">{{ r.userName }} (@{{ r.username }})</td>
-            <td data-label="Gói">{{ packageLabels[r.packageType] || r.packageType }}</td>
+            <td data-label="Gói">{{ packageLabel(r.packageType) }}</td>
             <td data-label="Số tiền">{{ formatMoney(r.amount) }}</td>
             <td data-label="Trạng thái">
               <span

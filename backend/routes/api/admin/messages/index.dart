@@ -6,7 +6,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 /// `GET /api/admin/messages` - one row per customer who has messaged an
 /// admin account, newest conversation first. Feeds the admin "Phản hồi"
-/// tab. Sourced from `direct_messages` (the same table the "Bạn bè" tab
+/// tab (per-conversation unread counts come from `GET /api/me/unread`). Sourced from `direct_messages` (the same table the "Bạn bè" tab
 /// uses) rather than the old standalone `messages` table, so a customer
 /// only has to reach out once - via the friend chat they already have -
 /// for it to show up here too, instead of admin needing a second, separate
@@ -64,8 +64,6 @@ Response onRequest(RequestContext context) {
             'avatar': initials(r['name'] as String),
             'lastMessage': r['last_content'],
             'lastMessageAt': r['last_at'],
-            // No read/unread tracking column yet - always 0 for now.
-            'unreadCount': 0,
           },
       ],
     },

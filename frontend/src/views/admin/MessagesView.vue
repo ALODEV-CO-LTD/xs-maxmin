@@ -8,10 +8,11 @@
        packageExpiresAt, awaitingReply, lastMessage, lastMessageAt }] }
 -->
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotifyStore } from '../../stores/notify'
 import { api, ApiError } from '../../api'
+import { loadPackageLabels, packageLabel } from '../../packageLabels'
 import AdminChatPane from '../../components/AdminChatPane.vue'
 
 const route = useRoute()
@@ -26,15 +27,6 @@ const onlyAwaiting = ref(false)
 
 const selectedId = computed(() => (route.params.userId ? String(route.params.userId) : ''))
 const selected = computed(() => conversations.value.find((c) => c.userId === selectedId.value) || null)
-
-const packageLabels = {
-  none: 'Chưa đăng ký',
-  trial: 'Dùng thử',
-  '1m': 'Gói 1 tháng',
-  '3m': 'Gói 3 tháng',
-  '6m': 'Gói 6 tháng',
-  '12m': 'Gói 12 tháng',
-}
 
 function noAccents(s) {
   return String(s || '')
@@ -76,7 +68,7 @@ const subtitle = computed(() => {
   if (!c) return ''
   const parts = []
   if (c.username) parts.push(`@${c.username}`)
-  if (c.packageType) parts.push(packageLabels[c.packageType] || c.packageType)
+  if (c.packageType) parts.push(packageLabel(c.packageType))
   if (c.packageExpiresAt) parts.push(`hết hạn ${expiryLabel(c.packageExpiresAt)}`)
   return parts.join(' · ')
 })
@@ -110,13 +102,16 @@ watch(
   },
 )
 
+let timer = null
 onMounted(() => {
+  loadPackageLabels(true)
   load()
   // Safety net when the push channel is blocked.
-  setInterval(() => {
+  timer = setInterval(() => {
     if (!document.hidden) load({ quiet: true })
   }, 15000)
 })
+onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
@@ -158,7 +153,8 @@ onMounted(() => {
               </span>
               <span class="conv-last">
                 <span class="conv-text">{{ c.lastMessage }}</span>
-                <span v-if="c.awaitingReply" class="dot" title="Chưa trả lời" aria-label="Chưa trả lời"></span>
+                <span v-if="notify.unread[`support:${c.userId}`] > 0" class="unread-badge" aria-label="Tin chưa đọc">{{ notify.unread[`support:${c.userId}`] > 9 ? '9+' : notify.unread[`support:${c.userId}`] }}</span>
+                <span v-else-if="c.awaitingReply" class="dot" title="Chưa trả lời" aria-label="Chưa trả lời"></span>
               </span>
             </span>
           </button>
@@ -353,6 +349,18 @@ onMounted(() => {
   white-space: nowrap;
   font-size: 14px;
   color: var(--text-secondary);
+}
+.unread-badge {
+  flex: none;
+  min-width: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  color: #fff;
+  background: var(--danger, #e5484d);
+  border-radius: 999px;
 }
 .dot {
   flex: none;

@@ -1,21 +1,51 @@
 <!--
   /admin/notices - broadcast notices + maintenance mode (A12 / A16).
   API: GET/POST /admin/announcements, PATCH/DELETE /admin/announcements/:id,
-       GET/PUT /admin/settings (keys `maintenance_enabled` = "true"/"false",
-       `maintenance_message`). Users see both as a banner in AppShell
+       GET/PUT /admin/maintenance ({ enabled, message }). Users see both as a banner in AppShell
        (GET /announcements). Maintenance mode only shows a notice, it does not
        block anyone.
 -->
 <script setup>
 import AppSelect from '../../components/AppSelect.vue'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../../api'
 import { showConfirm } from '../../confirm'
 import { useAuthStore } from '../../stores/auth'
 
-// Maintenance mode is stored via /admin/settings, which needs settings.manage;
-// staff holding only announcements.manage get the announcements part alone.
-const canMaintenance = useAuthStore().can('settings.manage')
+// Two separate rights: maintenance.manage (maintenance banner) and
+// announcements.manage (notices); each section is shown only to who holds it.
+const auth = useAuthStore()
+const canMaintenance = auth.can('maintenance.manage')
+const canAnnounce = auth.can('announcements.manage')
+
+const route = useRoute()
+const router = useRouter()
+const TABS = computed(() => [
+  ...(canAnnounce
+    ? [
+        { key: 'sent', label: `Đã gửi (${list.value.length})` },
+        { key: 'compose', label: 'Gửi thông báo' },
+      ]
+    : []),
+  ...(canMaintenance ? [{ key: 'maintenance', label: 'Chế độ bảo trì' }] : []),
+])
+const tab = ref(route.query.tab)
+const activeTab = computed(() => (TABS.value.some((t) => t.key === tab.value) ? tab.value : TABS.value[0]?.key))
+function selectTab(key) {
+  tab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
+function onTabKey(e) {
+  const list = TABS.value
+  const i = list.findIndex((t) => t.key === activeTab.value)
+  const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null
+  if (next === null) return
+  e.preventDefault()
+  const t = list[(next + list.length) % list.length]
+  selectTab(t.key)
+  document.getElementById(`notice-tab-${t.key}`)?.focus()
+}
 
 const KINDS = [
   { value: 'maintenance', label: 'Bảo trì' },
@@ -42,12 +72,12 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, ann] = await Promise.all([
-      canMaintenance ? api.get('/admin/settings') : Promise.resolve({}),
-      api.get('/admin/announcements'),
+    const [mt, ann] = await Promise.all([
+      canMaintenance ? api.get('/admin/maintenance') : Promise.resolve({}),
+      canAnnounce ? api.get('/admin/announcements') : Promise.resolve({ announcements: [] }),
     ])
-    maintenanceOn.value = settings.maintenance_enabled === 'true'
-    maintenanceMessage.value = settings.maintenance_message || ''
+    maintenanceOn.value = mt.enabled === true
+    maintenanceMessage.value = mt.message || ''
     list.value = ann.announcements
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Không tải được dữ liệu'
@@ -61,9 +91,9 @@ async function saveMaintenance() {
   maintenanceSaved.value = false
   error.value = ''
   try {
-    await api.put('/admin/settings', {
-      maintenance_enabled: maintenanceOn.value ? 'true' : 'false',
-      maintenance_message: maintenanceMessage.value.trim(),
+    await api.put('/admin/maintenance', {
+      enabled: maintenanceOn.value,
+      message: maintenanceMessage.value.trim(),
     })
     maintenanceSaved.value = true
   } catch (err) {
@@ -128,7 +158,24 @@ onMounted(load)
     <div v-if="loading" class="card">Đang tải...</div>
 
     <template v-else>
-      <section v-if="canMaintenance" class="card block">
+      <div class="notice-tabs" role="tablist" aria-label="Thông báo và bảo trì" @keydown="onTabKey">
+        <button
+          v-for="t in TABS"
+          :id="`notice-tab-${t.key}`"
+          :key="t.key"
+          type="button"
+          role="tab"
+          class="notice-tab"
+          :class="{ active: activeTab === t.key }"
+          :aria-selected="activeTab === t.key"
+          :tabindex="activeTab === t.key ? 0 : -1"
+          @click="selectTab(t.key)"
+        >
+          {{ t.label }}
+        </button>
+      </div>
+
+      <section v-if="canMaintenance" v-show="activeTab === 'maintenance'" class="card block">
         <h3 class="block-title">Chế độ bảo trì</h3>
         <label class="check-row">
           <input v-model="maintenanceOn" type="checkbox" />
@@ -146,7 +193,7 @@ onMounted(load)
         </button>
       </section>
 
-      <section class="card block">
+      <section v-if="canAnnounce" v-show="activeTab === 'compose'" class="card block">
         <h3 class="block-title">Gửi thông báo mới</h3>
         <form @submit.prevent="post">
           <div class="field">
@@ -169,7 +216,7 @@ onMounted(load)
         </form>
       </section>
 
-      <section class="card block">
+      <section v-if="canAnnounce" v-show="activeTab === 'sent'" class="card block">
         <h3 class="block-title">Thông báo đã gửi</h3>
         <p v-if="list.length === 0" class="empty">Chưa có thông báo nào.</p>
         <ul v-else class="ann-list">
@@ -195,6 +242,39 @@ onMounted(load)
 </template>
 
 <style scoped>
+.notice-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.notice-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.notice-tab:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+.notice-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.notice-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .block {
   margin-bottom: 16px;
 }

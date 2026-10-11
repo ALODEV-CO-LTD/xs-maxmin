@@ -32,7 +32,15 @@ Future<Response> onRequest(RequestContext context, String id) async {
     );
   }
 
-  final pkg = PackageType.fromWire(request['package_type'] as String);
+  // The package may have been hidden since the request was made, still grantable;
+  // only a deleted one cannot be.
+  final pkg = findPackage(db, request['package_type'] as String);
+  if (pkg == null) {
+    return Response.json(
+      statusCode: 409,
+      body: {'error': 'Gói này đã bị xoá khỏi danh mục - hãy từ chối yêu cầu hoặc tạo lại gói.'},
+    );
+  }
   applyApprovedPackage(
     db,
     request['user_id'] as String,

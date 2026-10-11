@@ -64,11 +64,11 @@ const userLinks = [
 ]
 
 const adminLinks = [
-  { perm: 'users.view', name: 'admin-users', label: 'Khách hàng', icon: 'users' },
   { perm: 'stats.view', name: 'admin-stats', label: 'Thống kê', icon: 'chart-column-increasing' },
+  { perm: 'users.view', name: 'admin-users', label: 'Khách hàng', icon: 'users' },
   { perm: 'payments.manage', name: 'admin-payment-requests', label: 'Thanh toán & gia hạn', icon: 'circle-check' },
   { perm: 'support.messages', name: 'admin-messages', label: 'Phản hồi', icon: 'message-square-more' },
-  { perm: 'announcements.manage', name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
+  { perm: ['announcements.manage', 'maintenance.manage'], name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
   { perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
   // Admin dùng chung trang /account với khách hàng (đổi mật khẩu...). Admin
   // không có mục "Bạn bè": liên hệ với khách chỉ qua "Phản hồi" ở trên.

@@ -6,19 +6,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { api, ApiError } from '../../api'
+import { loadPackageLabels, packageLabel } from '../../packageLabels'
 
 const loading = ref(true)
 const error = ref('')
 const renewals = ref([])
-
-const packageLabels = {
-  none: 'Chưa đăng ký',
-  trial: 'Dùng thử 30 ngày',
-  '1m': '1 tháng',
-  '3m': '3 tháng',
-  '6m': '6 tháng',
-  '12m': '12 tháng',
-}
 
 const typeLabels = {
   purchase: 'Mua mới',
@@ -42,7 +34,10 @@ function formatMoney(v) {
   return Number(v).toLocaleString('vi-VN') + ' đ'
 }
 
-onMounted(load)
+onMounted(() => {
+  loadPackageLabels(true)
+  load()
+})
 </script>
 
 <template>
@@ -74,7 +69,7 @@ onMounted(load)
             <td data-label="Loại">
               <span class="chip" :class="r.type === 'renew' ? 'chip-brand' : ''">{{ typeLabels[r.type] || r.type }}</span>
             </td>
-            <td data-label="Gói">{{ packageLabels[r.packageType] || r.packageType }}</td>
+            <td data-label="Gói">{{ packageLabel(r.packageType) }}</td>
             <td data-label="Số tiền">{{ formatMoney(r.amount) }}</td>
             <td data-label="Thời gian">{{ new Date(r.createdAt).toLocaleString('vi-VN') }}</td>
           </tr>
