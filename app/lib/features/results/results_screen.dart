@@ -285,12 +285,13 @@ Future<void> _confirmDelete(BuildContext context, ResultsController c, String st
 
 /// One box of a prize: digits only, never longer than the prize has.
 class DigitCell extends StatefulWidget {
-  const DigitCell({super.key, required this.value, required this.digits, required this.readOnly, required this.onChanged, this.bad = false, this.semantic, this.big = false});
+  const DigitCell({super.key, required this.value, required this.digits, required this.readOnly, required this.onChanged, this.bad = false, this.semantic, this.big = false, this.maxWidth});
   final String value;
   final int digits;
   final bool readOnly;
   final bool bad;
   final bool big;
+  final double? maxWidth; // narrower than the natural width when the columns share a small screen
   final String? semantic;
   final ValueChanged<String> onChanged;
   @override
@@ -319,7 +320,7 @@ class _DigitCellState extends State<DigitCell> {
     final bad = widget.bad;
     final color = bad ? context.badColor : null;
     OutlineInputBorder border(Color? c, double w) => OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: c ?? Theme.of(context).colorScheme.outline, width: w));
-    final width = (widget.digits * 11.0 + 26).clamp(52.0, 96.0);
+    final width = (widget.digits * 11.0 + 26).clamp(52.0, 96.0).clamp(0.0, widget.maxWidth ?? 96.0);
     return SizedBox(
       width: width,
       child: Semantics(
@@ -330,7 +331,7 @@ class _DigitCellState extends State<DigitCell> {
           textAlign: TextAlign.center,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(widget.digits)],
-          style: TextStyle(fontWeight: widget.big ? FontWeight.w800 : FontWeight.w600, fontSize: widget.big ? 16 : 14, color: color, fontFeatures: const [FontFeature.tabularFigures()]),
+          style: TextStyle(fontWeight: widget.big ? FontWeight.w800 : FontWeight.w600, fontSize: (widget.maxWidth != null && widget.maxWidth! < 80) ? 13 : (widget.big ? 16 : 14), color: color, fontFeatures: const [FontFeature.tabularFigures()]),
           onChanged: widget.onChanged,
           decoration: InputDecoration(
             isDense: true,
@@ -359,14 +360,15 @@ class _Board extends StatelessWidget {
     final cols = c.boardStations;
     if (cols.isEmpty) return Text('Ngày này không có đài nào của miền này.', style: TextStyle(color: context.mutedColor));
     final tiers = c.structure.reversed.toList(); // Giải tám at the top, Đặc biệt at the bottom
-    const labelW = 78.0;
+    const labelW = 56.0;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       LayoutBuilder(builder: (context, box) {
-        final colW = ((box.maxWidth - labelW) / cols.length).clamp(104.0, 220.0);
+        // The columns share the screen width (no sideways scrolling for up to 4 stations on a phone).
+        final colW = ((box.maxWidth - labelW) / cols.length).clamp(64.0, 220.0);
         final border = BorderSide(color: Theme.of(context).colorScheme.outlineVariant);
         Widget cell(Widget child, {double? w, Color? bg, bool top = false}) => Container(
               width: w ?? colW,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
               decoration: BoxDecoration(color: bg, border: Border(bottom: border, left: border, top: top ? border : BorderSide.none)),
               child: child,
             );
@@ -400,6 +402,7 @@ class _Board extends StatelessWidget {
                             readOnly: c.boardLocked(s),
                             bad: c.cellBad(s, p, c.board[s]?[p.tier]?[k] ?? ''),
                             big: p.tier == 'dacBiet',
+                            maxWidth: colW - 6,
                             semantic: '${p.label} ${st.stationName(s)} số ${k + 1}',
                             onChanged: (v) => c.setCell(s, p, k, v),
                           ),
