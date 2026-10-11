@@ -99,11 +99,8 @@ defineProps({
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
+  gap: 8px;
   margin-bottom: 24px;
-  border-radius: 12px;
-  background: var(--surface);
 }
 
 .auth-tabs a {
@@ -111,16 +108,18 @@ defineProps({
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  border-radius: 9px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--surface);
   color: var(--muted);
   font-weight: 700;
   text-decoration: none;
 }
 
 .auth-tabs a.active {
-  background: var(--card);
-  color: var(--link);
-  box-shadow: var(--shadow-sm);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 
 .auth-tabs a:focus-visible {

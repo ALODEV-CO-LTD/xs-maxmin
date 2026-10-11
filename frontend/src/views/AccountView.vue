@@ -960,34 +960,34 @@ async function deleteAllData() {
 
 .acct-tabs {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 20px;
-  padding: 4px;
-  overflow-x: auto;
-  background: var(--surface);
-  border: 1px solid var(--input-border);
-  border-radius: 12px;
 }
+/* each tab is its own button (not one stretched bar) */
 .acct-tab {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   min-height: 44px;
-  padding: 0 20px;
+  padding: 0 22px;
   font: inherit;
   font-size: 15px;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
 .acct-tab:hover {
   color: var(--text-primary);
+  border-color: var(--primary);
 }
 .acct-tab.active {
   color: var(--on-primary);
   background: var(--primary);
+  border-color: var(--primary);
 }
 .acct-tab:focus-visible {
   outline: 2px solid var(--primary);

@@ -231,26 +231,31 @@ onMounted(() => {
 }
 .tabs {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 10px;
 }
 .tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 7px 12px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
   cursor: pointer;
 }
+.tab:hover {
+  border-color: var(--primary);
+}
 .tab.on {
-  color: var(--text-primary);
-  border-bottom-color: var(--primary);
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
 }
 .count {
   min-width: 20px;

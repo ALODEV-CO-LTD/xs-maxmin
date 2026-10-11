@@ -224,10 +224,8 @@ const stats = computed(() => {
 }
 .seg {
   display: inline-flex;
-  padding: 2px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .seg-btn {
   min-height: 26px;
@@ -235,14 +233,15 @@ const stats = computed(() => {
   font: inherit;
   font-size: 12.5px;
   color: var(--muted);
-  background: none;
-  border: 0;
-  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   cursor: pointer;
 }
 .seg-btn.on {
   color: #fff;
   background: var(--primary);
+  border-color: var(--primary);
 }
 .chart-sub {
   min-height: 18px;

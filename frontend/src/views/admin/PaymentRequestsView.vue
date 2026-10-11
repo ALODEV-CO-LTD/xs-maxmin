@@ -311,13 +311,9 @@ onMounted(load)
 }
 .tabs {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 12px;
-  padding: 4px;
-  overflow-x: auto;
-  background: var(--surface);
-  border: 1px solid var(--input-border);
-  border-radius: 12px;
 }
 .tab {
   flex: 1 0 auto;
@@ -328,14 +324,18 @@ onMounted(load)
   font-weight: 600;
   white-space: nowrap;
   color: var(--text-secondary);
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
   cursor: pointer;
+}
+.tab:hover {
+  border-color: var(--primary);
 }
 .tab.active {
   color: var(--on-primary);
   background: var(--primary);
+  border-color: var(--primary);
 }
 .filters {
   display: flex;
