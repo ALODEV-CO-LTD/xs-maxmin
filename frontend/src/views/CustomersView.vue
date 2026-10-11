@@ -39,6 +39,9 @@ const router = useRouter()
 const fromEntries = route.query.from === 'entries'
 const addInput = ref(null)
 // Two separate screens: the list of customers, or the form that creates a new one.
+const newConfig = ref(null) // the scoring-config editor of the create form
+const newStation = ref('mb')
+const newKey = ref(0) // bumped to reset the config editor after a customer was created
 const view = ref(route.query.from === 'entries' ? 'new' : 'list')
 watch(view, (v) => v === 'new' && nextTick(() => addInput.value?.focus()))
 
@@ -110,12 +113,30 @@ async function addCustomer() {
   addError.value = ''
   addingCustomer.value = true
   try {
-    const created = await api.post('/me/customers', { name, phone: newCustomerPhone.value.trim() })
+    // Everything is set in one go: the config is checked first so a mistake does not leave a half-made customer.
+    const cfg = newConfig.value?.collect()
+    if (cfg?.error) {
+      addError.value = cfg.error
+      return
+    }
+    let created = await api.post('/me/customers', { name, phone: newCustomerPhone.value.trim() })
+    const extra = {}
+    if (newStation.value && newStation.value !== 'mb') extra.defaultStation = newStation.value
+    if (cfg?.map) extra.scoringRates = cfg.map
+    if (Object.keys(extra).length) {
+      try {
+        created = { ...created, ...(await api.patch(`/me/customers/${created.id}`, extra)) }
+      } catch (err) {
+        addError.value = `Đã tạo khách nhưng chưa lưu được đài/cấu hình: ${err instanceof ApiError ? err.message : 'lỗi mạng'}. Mở Cấu hình tính điểm của khách để đặt lại.`
+      }
+    }
     roster.value.push(created)
     roster.value.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
     view.value = 'list'
     newCustomerName.value = ''
     newCustomerPhone.value = ''
+    newStation.value = 'mb'
+    newKey.value++
     if (fromEntries) {
       router.push({ name: 'entries', query: { customer: created.name } })
       return
@@ -308,19 +329,42 @@ async function savePhone() {
 
     <div v-show="view === 'new'" class="card add-customer-card">
       <form class="add-customer-form" @submit.prevent="addCustomer">
-        <div class="field add-customer-field">
-          <div class="input-wrap">
-            <input ref="addInput" v-model="newCustomerName" type="text" placeholder="Tên khách hàng mới" :disabled="addingCustomer" />
+        <div class="add-customer-row">
+          <div class="field add-customer-field">
+            <label>Tên khách hàng</label>
+            <div class="input-wrap">
+              <input ref="addInput" v-model="newCustomerName" type="text" placeholder="Tên khách hàng mới" :disabled="addingCustomer" />
+            </div>
+          </div>
+          <div class="field add-customer-field">
+            <label>Số điện thoại</label>
+            <div class="input-wrap">
+              <input v-model="newCustomerPhone" type="tel" inputmode="tel" placeholder="Không bắt buộc" :disabled="addingCustomer" />
+            </div>
+          </div>
+          <div class="field add-customer-field">
+            <label>Đài xổ số mặc định khi nhập số</label>
+            <AppSelect v-model="newStation" aria-label="Đài mặc định">
+              <option v-for="o in allStationOptions()" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </AppSelect>
           </div>
         </div>
-        <div class="field add-customer-field">
-          <div class="input-wrap">
-            <input v-model="newCustomerPhone" type="tel" inputmode="tel" placeholder="Số điện thoại (không bắt buộc)" :disabled="addingCustomer" />
-          </div>
+
+        <h3 class="add-customer-config-title">Cấu hình tính điểm của khách này</h3>
+        <ScoringConfigEditor
+          :key="newKey"
+          ref="newConfig"
+          scope="customer"
+          draft
+          :customer="{ id: null, name: newCustomerName.trim(), scoringRates: null }"
+          :account-rates="accountRates"
+        />
+
+        <div class="add-customer-actions">
+          <button type="submit" class="btn btn-primary" :disabled="addingCustomer || !newCustomerName.trim()">
+            {{ addingCustomer ? 'Đang tạo...' : 'Tạo khách hàng' }}
+          </button>
         </div>
-        <button type="submit" class="btn btn-primary" :disabled="addingCustomer || !newCustomerName.trim()">
-          {{ addingCustomer ? 'Đang thêm...' : 'Thêm khách hàng' }}
-        </button>
       </form>
       <div v-if="addError" class="alert alert-error add-customer-error">{{ addError }}</div>
     </div>
@@ -480,6 +524,39 @@ async function savePhone() {
   font-size: 17px;
 }
 
+.add-customer-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+  width: 100%;
+}
+.add-customer-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.add-customer-row .add-customer-field {
+  flex: none;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .add-customer-row {
+    grid-template-columns: 1fr;
+  }
+}
+.add-customer-config-title {
+  width: 100%;
+  margin: 18px 0 8px;
+  font-size: 17px;
+}
+.add-customer-actions {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
 .add-customer-card {
   margin-bottom: 16px;
 }
