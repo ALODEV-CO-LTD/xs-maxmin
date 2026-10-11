@@ -12,7 +12,7 @@ String formatElapsed(Duration d) {
 }
 
 /// Full-screen call UI (CallOverlay.vue): incoming (Nghe máy / Từ chối), outgoing (Đang gọi / Đang đổ chuông),
-/// connecting and connected (timer, mute, speaker, hang up). Shown above every route by [FriendsScreen].
+/// connecting and connected (timer, mute, speaker, hang up). Shown above every route by MessagingHost, so a call rings on any screen.
 class CallPanel extends StatefulWidget {
   const CallPanel({super.key, required this.call});
   final CallService call;
@@ -85,7 +85,7 @@ class _CallPanelState extends State<CallPanel> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    if (connected || c.status == CallStatus.outgoing) _RoundButton(icon: c.muted ? Icons.mic_off : Icons.mic, color: c.muted ? Brand.warning : theme.colorScheme.surfaceContainerHighest, label: c.muted ? 'Bật micro' : 'Tắt micro', onTap: c.toggleMute),
+                    if (connected || c.status == CallStatus.outgoing || c.status == CallStatus.connecting) _RoundButton(icon: c.muted ? Icons.mic_off : Icons.mic, color: c.muted ? Brand.warning : theme.colorScheme.surfaceContainerHighest, label: c.muted ? 'Bật micro' : 'Tắt micro', onTap: c.toggleMute),
                     _RoundButton(icon: Icons.call_end, color: context.badColor, label: 'Kết thúc', onTap: c.hangUp),
                     if (connected) _RoundButton(icon: c.speaker ? Icons.volume_up : Icons.volume_down, color: c.speaker ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest, label: c.speaker ? 'Loa ngoài' : 'Loa trong', onTap: c.toggleSpeaker),
                   ],

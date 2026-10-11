@@ -17,7 +17,12 @@ import 'features/auth/recover_screen.dart';
 import 'features/auth/register_screen.dart';
 import 'features/customers/customers_screen.dart';
 import 'features/entries/entries_screen.dart';
+import 'features/friends/call_ringer.dart';
+import 'features/friends/chat_route.dart';
 import 'features/friends/friends_screen.dart';
+import 'features/friends/keep_alive.dart';
+import 'features/friends/messaging_host.dart';
+import 'features/friends/notifications.dart';
 import 'features/results/results_screen.dart';
 import 'features/scoring/scoring_screen.dart';
 import 'features/admin/admin_shell.dart';
@@ -43,6 +48,7 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
         GoRoute(path: '/recover', builder: (_, _) => const RecoverScreen()),
         GoRoute(path: '/admin', builder: (_, _) => const AdminShell()),
         GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
+        GoRoute(path: '/friends/chat/:id', builder: (_, state) => ChatRoutePage(friendId: state.pathParameters['id'] ?? '')),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
         StatefulShellRoute.indexedStack(
           builder: (_, _, shell) => AppShell(shell: shell),
@@ -72,6 +78,10 @@ class _MambaAppState extends State<MambaApp> {
   final AdminSession _admin = AdminSession();
   final PrivacyStore _privacy = PrivacyStore();
   late final GoRouter _router = buildRouter(_auth);
+  // Messaging pieces that live as long as the app (the hub itself is per signed-in customer, see MessagingHost).
+  final LocalNotifier _notifier = LocalNotifier();
+  final SystemCallRinger _ringer = SystemCallRinger();
+  final ForegroundTaskService _background = ForegroundTaskService();
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +101,16 @@ class _MambaAppState extends State<MambaApp> {
         darkTheme: darkTheme,
         themeMode: ThemeMode.dark,
         routerConfig: _router,
-        builder: (context, child) => PrivacyGate(child: child ?? const SizedBox.shrink()),
+        builder: (context, child) => MessagingHost(
+          auth: _auth,
+          api: _api,
+          router: _router,
+          privacy: _privacy,
+          notifier: _notifier,
+          ringer: _ringer,
+          background: _background,
+          child: PrivacyGate(child: child ?? const SizedBox.shrink()),
+        ),
         locale: const Locale('vi'),
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,

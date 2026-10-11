@@ -73,6 +73,9 @@ class ChatService extends ChangeNotifier {
   /// The friend whose conversation is on screen: its incoming messages are not counted as unread.
   String? openPeer;
 
+  /// False while the app is in the background: then no conversation counts as "being read".
+  bool foreground = true;
+
   E2eeIdentity? _identity;
   bool _disposed = false;
   final Map<String, ({Map<String, dynamic> jwk, Uint8List key})> _sessions = {};
@@ -353,7 +356,7 @@ class ChatService extends ChangeNotifier {
   // ---- unread counters, kept on this device -----------------------------------------------------------------------
 
   Future<void> _bumpUnread(String friendId) async {
-    if (openPeer == friendId) return;
+    if (foreground && openPeer == friendId) return;
     final n = (unread[friendId] ?? 0) + 1;
     unread[friendId] = n;
     await store.setMeta('unread:$friendId', '$n');
@@ -406,6 +409,13 @@ class ChatService extends ChangeNotifier {
       t.cancel();
     }
     _ackTimers.clear();
+    // Wipe what is only needed while signed in: derived session keys and the private key held in memory.
+    _sessions.clear();
+    _identity = null;
+    friendKeys.clear();
+    peerInfo.clear();
+    unread.clear();
+    ready = false;
     store.close();
     super.dispose();
   }

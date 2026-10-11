@@ -11,10 +11,7 @@ import 'chat_models.dart';
 import 'chat_service.dart';
 import 'friends_controller.dart';
 import 'image_scrub.dart';
-
-/// Android 14+ can report screenshots of the app only through native code. If the host app forwards them on this
-/// channel (method `screenshot`), the friend is warned just like the web does on a screenshot shortcut.
-const screenshotChannel = MethodChannel('mamba/screenshot');
+import 'realtime_socket.dart';
 
 sealed class _Item {
   _Item(this.at);
@@ -62,13 +59,12 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _chat.openPeer = _f.id;
-    _chat.markRead(_f.id);
+    _c.markChatSeen(_f.id);
     _chat.addListener(_onChat);
+    _scroll.addListener(_onScroll);
+    _c.socket.addListener(_onSocket);
     _c.call?.addListener(_onCall);
     _lastEnded = _c.call?.endedTick ?? 0;
-    screenshotChannel.setMethodCallHandler((call) async {
-      if (call.method == 'screenshot' && mounted && !_f.isAdmin) _chat.notifyScreenshot(_f.id);
-    });
     _reload(first: true);
     _loadCalls();
     _chat.retentionOf(_f.id).then((r) {
@@ -81,10 +77,26 @@ class _ChatPageState extends State<ChatPage> {
     _chat.openPeer = null;
     _chat.removeListener(_onChat);
     _c.call?.removeListener(_onCall);
-    screenshotChannel.setMethodCallHandler(null);
+    _c.socket.removeListener(_onSocket);
+    _scroll.removeListener(_onScroll);
     _text.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  bool _showDown = false;
+
+  void _onScroll() {
+    final far = _scroll.hasClients && _scroll.offset > 400; // the list is reversed: 0 is the newest message
+    if (far != _showDown && mounted) setState(() => _showDown = far);
+  }
+
+  void _onSocket() {
+    if (mounted) setState(() {});
+  }
+
+  void _toBottom() {
+    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
   }
 
   void _onChat() {
@@ -185,7 +197,10 @@ class _ChatPageState extends State<ChatPage> {
     final canCall = call != null && call.canCall && !_f.isAdmin;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_f.name, overflow: TextOverflow.ellipsis),
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_f.name, overflow: TextOverflow.ellipsis),
+          _ConnChip(state: _c.socket.state),
+        ]),
         actions: [
           if (canCall) IconButton(icon: const Icon(Icons.call), tooltip: 'Gọi thoại', onPressed: call.busy ? null : () => call.startCall(_f.id, _f.name)),
           if (info != null) IconButton(icon: Icon(Icons.verified_user_outlined, color: _showSecurity ? theme.colorScheme.primary : null), tooltip: 'Mã bảo mật', onPressed: () => setState(() => _showSecurity = !_showSecurity)),
@@ -227,7 +242,17 @@ class _ChatPageState extends State<ChatPage> {
               child: Align(alignment: Alignment.centerLeft, child: Text(_rule?.describe ?? 'Tin nhắn không tự xoá', style: theme.textTheme.bodySmall?.copyWith(color: _rule != null ? theme.colorScheme.primary : context.mutedColor))),
             ),
             if (_error.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(16, 6, 16, 0), child: Text(_error, style: TextStyle(color: context.badColor))),
-            Expanded(child: _list(context)),
+            Expanded(
+              child: Stack(children: [
+                Positioned.fill(child: _list(context)),
+                if (_showDown)
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: FloatingActionButton.small(heroTag: null, tooltip: 'Xuống tin mới nhất', onPressed: _toBottom, child: const Icon(Icons.keyboard_arrow_down)),
+                  ),
+              ]),
+            ),
             if (_pending != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
@@ -355,6 +380,28 @@ class _ChatPageState extends State<ChatPage> {
             ? const SizedBox(width: 120, height: 80)
             : Image.file(File(path), width: 220, fit: BoxFit.cover, cacheWidth: 660, errorBuilder: (_, _, _) => const SizedBox(width: 120, height: 60, child: Center(child: Text('Không mở được ảnh')))),
       ),
+    );
+  }
+}
+
+/// Đang kết nối / Đã kết nối / Mất kết nối.
+class _ConnChip extends StatelessWidget {
+  const _ConnChip({required this.state});
+  final ConnState state;
+  @override
+  Widget build(BuildContext context) {
+    final (text, color) = switch (state) {
+      ConnState.connected => ('Đã kết nối', context.okColor),
+      ConnState.connecting => ('Đang kết nối', Brand.warning),
+      ConnState.disconnected => ('Mất kết nối', context.badColor),
+    };
+    return Semantics(
+      label: 'Trạng thái kết nối: $text',
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+      ]),
     );
   }
 }

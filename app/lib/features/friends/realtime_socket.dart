@@ -14,6 +14,9 @@ abstract class FrameSink {
   void send(Map<String, dynamic> frame);
 }
 
+/// What the chat header shows: Đang kết nối / Đã kết nối / Mất kết nối.
+enum ConnState { connecting, connected, disconnected }
+
 typedef ChannelFactory = WebSocketChannel Function(Uri uri);
 
 WebSocketChannel _defaultFactory(Uri uri) => IOWebSocketChannel.connect(uri, pingInterval: const Duration(seconds: 20), connectTimeout: const Duration(seconds: 15));
@@ -25,7 +28,8 @@ Duration reconnectDelay(int attempt, [Random? rnd]) {
 }
 
 /// `wss://host/api/ws/calls?token=...` - signalling for calls, the E2EE chat relay and push events - with automatic
-/// reconnection and backoff. Open it while the chat screen is visible and [stop] it when the screen is left.
+/// reconnection and backoff. The app opens it once for the signed-in customer and keeps it (with backoff) while the
+/// process is alive; [stop] closes it for good.
 class RealtimeSocket extends ChangeNotifier implements FrameSink {
   RealtimeSocket({required this.tokenProvider, ChannelFactory? factory, Duration Function(int)? delay})
       : _factory = factory ?? _defaultFactory,
@@ -43,11 +47,15 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
   bool _wanted = false;
   bool _disposed = false;
   bool _ready = false;
+  bool _dialing = false;
   int _generation = 0;
 
   @override
   bool get ready => _ready;
   Stream<Map<String, dynamic>> get frames => _frames.stream;
+  bool get wanted => _wanted;
+
+  ConnState get state => _ready ? ConnState.connected : (_wanted && _dialing ? ConnState.connecting : ConnState.disconnected);
 
   void start() {
     if (_wanted || _disposed) return;
@@ -59,6 +67,7 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
   /// Closes the socket and stops reconnecting (screen left).
   void stop() {
     _wanted = false;
+    _dialing = false;
     _retry?.cancel();
     _retry = null;
     _teardown();
@@ -94,6 +103,8 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
     if (!_wanted || token == null || token.isEmpty) return;
     _teardown();
     final gen = _generation;
+    _dialing = true;
+    notifyListeners();
     try {
       final uri = Uri.parse(AppConfig.wsCalls).replace(queryParameters: {'token': token});
       final ch = _factory(uri);
@@ -101,6 +112,7 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
       await ch.ready;
       if (gen != _generation) return;
       _ready = true;
+      _dialing = false;
       _attempt = 0;
       notifyListeners();
       _sub = ch.stream.listen(
@@ -123,6 +135,8 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
   void _lost(int gen) {
     if (gen != _generation) return;
     _teardown();
+    _dialing = false;
+    if (!_disposed) notifyListeners();
     if (!_wanted || _disposed) return;
     _retry?.cancel();
     _retry = Timer(_delay(_attempt++), _connect);

@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../core/api_client.dart';
+import 'call_state.dart';
 import 'realtime_socket.dart';
 
-enum CallStatus { idle, outgoing, incoming, connecting, connected }
+export 'call_state.dart';
 
 class CallPeer {
   const CallPeer(this.id, this.name);
@@ -35,7 +35,8 @@ String micErrorMessage(Object err) {
 
 /// Voice-only WebRTC calls between friends. Same signalling as frontend/src/stores/call.js (messages travel over the
 /// shared WebSocket, see backend/routes/api/ws/calls.dart): call-invite / call-ringing / call-accept / call-reject /
-/// call-end / offer / answer / ice. One call at a time. Call UI is [CallOverlay].
+/// call-end / offer / answer / ice. One call at a time. The status changes follow [reduceCall]; the call UI is
+/// `CallPanel`, ringing / vibration / notifications are driven by the app-level controller from [status].
 class CallService extends ChangeNotifier {
   CallService({required this.api, required this.socket, required this.canCall});
   final ApiClient api;
@@ -43,6 +44,9 @@ class CallService extends ChangeNotifier {
 
   /// Admin accounts neither place nor receive calls (the server enforces this too).
   final bool canCall;
+
+  /// An invitation arrived while this device was already busy (it was rejected with `busy`): (friendId, name).
+  void Function(String friendId, String name)? onBusyMissed;
 
   CallStatus status = CallStatus.idle;
   CallPeer? peer;
@@ -56,11 +60,15 @@ class CallService extends ChangeNotifier {
   DateTime? startedAt;
   int endedTick = 0; // bumps when a call ends, so history views reload
 
+  /// How the last call ended (set together with [endedTick]).
+  CallEnd? lastEnd;
+
   RTCPeerConnection? _pc;
   MediaStream? _local;
   bool _isCaller = false;
   int _restarts = 0;
-  Timer? _ringTimer, _failTimer, _monitor, _ringTone;
+  Timer? _ringTimer, _failTimer, _monitor;
+  bool _incomingCall = false;
   final List<RTCIceCandidate> _pending = [];
   List<Map<String, dynamic>> _iceServers = const [
     {'urls': 'stun:stun.l.google.com:19302'},
@@ -69,6 +77,25 @@ class CallService extends ChangeNotifier {
   bool _disposed = false;
 
   bool get busy => status != CallStatus.idle || acquiring;
+
+  /// Forces a status (tests of what the app does around a call: foreground service, privacy lock).
+  @visibleForTesting
+  void debugSetStatus(CallStatus st, {CallPeer? withPeer}) {
+    status = st;
+    if (withPeer != null) peer = withPeer;
+    _changed();
+  }
+
+  /// Puts an outgoing call in the ringing state without touching the microphone (tests).
+  @visibleForTesting
+  void debugStartOutgoing(String friendId, String name) {
+    peer = CallPeer(friendId, name);
+    _isCaller = true;
+    _incomingCall = false;
+    status = reduceCall(status, CallEvent.localInvite).status;
+    _armRing();
+    _changed();
+  }
 
   void _changed() {
     if (!_disposed) notifyListeners();
@@ -93,15 +120,17 @@ class CallService extends ChangeNotifier {
     switch (m['type']) {
       case 'call-invite':
         if (from is! String) return true;
-        if (!canCall || busy) {
+        final name = (m['fromName'] as String?) ?? 'Người dùng';
+        if (!canCall || busy || reduceCall(status, CallEvent.remoteInvite).outcome == CallOutcome.busy) {
           socket.send({'type': 'call-reject', 'to': from, 'reason': 'busy'});
+          if (canCall) onBusyMissed?.call(from, name);
           return true;
         }
-        peer = CallPeer(from, (m['fromName'] as String?) ?? 'Người dùng');
+        peer = CallPeer(from, name);
         error = '';
-        status = CallStatus.incoming;
+        _incomingCall = true;
+        status = reduceCall(status, CallEvent.remoteInvite).status;
         _armRing();
-        _startRingTone();
         _changed();
       case 'call-ringing':
         if (status == CallStatus.outgoing && from == peer?.id) {
@@ -111,17 +140,19 @@ class CallService extends ChangeNotifier {
       case 'call-accept':
         if (status == CallStatus.outgoing && from == peer?.id) {
           _clearRing();
+          status = reduceCall(status, CallEvent.remoteAccept).status;
+          _changed();
           _startAsCaller();
         }
       case 'call-reject':
         if (peer?.id == from) {
           error = m['reason'] == 'busy' ? 'Người này đang bận' : 'Cuộc gọi bị từ chối';
-          _cleanup();
+          _cleanup(m['reason'] == 'busy' ? CallEvent.remoteBusy : CallEvent.remoteReject);
         }
       case 'call-unavailable':
         if (peer?.id == from) {
           error = 'Người này hiện không trực tuyến';
-          _cleanup();
+          _cleanup(CallEvent.unavailable);
         }
       case 'call-end':
         if (peer?.id == from) {
@@ -134,7 +165,7 @@ class CallService extends ChangeNotifier {
             case 'failed':
               error = 'Không thể kết nối trực tiếp giữa hai thiết bị (mạng đang chặn). Thử lại bằng mạng khác.';
           }
-          _cleanup();
+          _cleanup(CallEvent.remoteEnd);
         }
       case 'offer':
         if (peer?.id == from) _onOffer(m['sdp']);
@@ -144,7 +175,7 @@ class CallService extends ChangeNotifier {
         if (peer?.id == from && m['candidate'] is Map) _onRemoteIce(Map<String, dynamic>.from(m['candidate'] as Map));
       case 'call-error':
         error = (m['error'] as String?) ?? 'Lỗi cuộc gọi';
-        if (status != CallStatus.idle) _cleanup();
+        if (status != CallStatus.idle) _cleanup(CallEvent.failure);
         _changed();
       default:
         return false;
@@ -160,7 +191,7 @@ class CallService extends ChangeNotifier {
       if (status == CallStatus.incoming || status == CallStatus.outgoing) {
         error = status == CallStatus.incoming ? 'Bạn nhỡ cuộc gọi từ ${peer?.name ?? 'người dùng'}' : 'Không có phản hồi';
         if (peer != null) _send(peer!.id, {'type': 'call-end'});
-        _cleanup();
+        _cleanup(CallEvent.ringTimeout);
       }
     });
   }
@@ -168,22 +199,6 @@ class CallService extends ChangeNotifier {
   void _clearRing() {
     _ringTimer?.cancel();
     _ringTimer = null;
-  }
-
-  void _startRingTone() {
-    _ringTone?.cancel();
-    void once() {
-      SystemSound.play(SystemSoundType.alert);
-      HapticFeedback.vibrate();
-    }
-
-    once();
-    _ringTone = Timer.periodic(const Duration(seconds: 2), (_) => once());
-  }
-
-  void _stopRingTone() {
-    _ringTone?.cancel();
-    _ringTone = null;
   }
 
   Future<MediaStream> _acquireMic() async {
@@ -231,8 +246,9 @@ class CallService extends ChangeNotifier {
     _local = stream;
     peer = CallPeer(friendId, friendName);
     _isCaller = true;
+    _incomingCall = false;
     ringing = false;
-    status = CallStatus.outgoing;
+    status = reduceCall(status, CallEvent.localInvite).status;
     _send(friendId, {'type': 'call-invite'});
     _armRing();
     _changed();
@@ -255,10 +271,9 @@ class CallService extends ChangeNotifier {
     final p = peer;
     if (status != CallStatus.incoming || p == null) return;
     _clearRing();
-    _stopRingTone();
     _isCaller = false;
     unawaited(_loadIce());
-    status = CallStatus.connecting;
+    status = reduceCall(status, CallEvent.localAccept).status;
     _changed();
     MediaStream stream;
     try {
@@ -278,7 +293,7 @@ class CallService extends ChangeNotifier {
   void reject() {
     if (status != CallStatus.incoming || peer == null) return;
     _send(peer!.id, {'type': 'call-reject'});
-    _cleanup();
+    _cleanup(CallEvent.localReject);
   }
 
   Future<void> _onOffer(Object? sdp) async {
@@ -320,7 +335,7 @@ class CallService extends ChangeNotifier {
   }
 
   void _markConnected() {
-    status = CallStatus.connected;
+    status = reduceCall(status, CallEvent.mediaUp).status;
     startedAt = DateTime.now();
     ringing = false;
     _startMonitor();
@@ -382,7 +397,7 @@ class CallService extends ChangeNotifier {
           _changed();
           _tryIceRestart(pc);
         case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
-          _cleanup();
+          _cleanup(CallEvent.remoteEnd);
         default:
       }
     };
@@ -479,7 +494,7 @@ class CallService extends ChangeNotifier {
   void hangUp() {
     final p = peer;
     if (p != null && status != CallStatus.idle) _send(p.id, {'type': 'call-end'});
-    _cleanup();
+    _cleanup(CallEvent.localHangup);
   }
 
   /// Ends the call because of a local problem and tells the peer (otherwise it would hang on "calling").
@@ -487,7 +502,7 @@ class CallService extends ChangeNotifier {
     error = message;
     final p = peer;
     if (p != null && status != CallStatus.idle) _send(p.id, {'type': 'call-end', 'reason': ?reason});
-    _cleanup();
+    _cleanup(CallEvent.failure);
   }
 
   void clearError() {
@@ -506,10 +521,19 @@ class CallService extends ChangeNotifier {
     } catch (_) {/* disposed */}
   }
 
-  void _cleanup() {
+  void _cleanup([CallEvent event = CallEvent.failure]) {
     final was = status != CallStatus.idle;
+    if (was && peer != null) {
+      final step = reduceCall(status, event);
+      lastEnd = CallEnd(
+        peerId: peer!.id,
+        peerName: peer!.name,
+        outcome: step.outcome ?? CallOutcome.ended,
+        incoming: _incomingCall,
+        duration: startedAt == null ? Duration.zero : DateTime.now().difference(startedAt!),
+      );
+    }
     _clearRing();
-    _stopRingTone();
     _failTimer?.cancel();
     _failTimer = null;
     _monitor?.cancel();
@@ -548,7 +572,7 @@ class CallService extends ChangeNotifier {
   void onSocketLost() {
     if (status != CallStatus.idle) {
       error = error.isEmpty ? 'Mất kết nối, cuộc gọi đã kết thúc' : error;
-      _cleanup();
+      _cleanup(CallEvent.socketLost);
     }
   }
 

@@ -1,96 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
-import '../../core/api_client.dart';
-import '../../core/auth_store.dart';
 import '../../core/theme.dart';
-import 'call_panel.dart';
-import 'call_service.dart';
 import 'chat_page.dart';
 import 'friends_controller.dart';
+import 'messaging_host.dart';
+import 'messaging_settings.dart';
 
 /// Bạn bè: friend list (unread / missed-call badges), search and add by name or Mã ID, and the E2EE chat + voice
-/// calls (FriendsView.vue). The WebSocket opens with this screen and closes when it is left.
+/// calls (FriendsView.vue). The WebSocket, chat and call services are the APP-level ones (see MessagingHost): this
+/// screen only shows them.
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
   @override
   State<FriendsScreen> createState() => _FriendsScreenState();
 }
 
-class _FriendsScreenState extends State<FriendsScreen> with WidgetsBindingObserver {
-  FriendsController? _c;
-  OverlayEntry? _callEntry;
+class _FriendsScreenState extends State<FriendsScreen> {
   final _search = TextEditingController();
   bool _copied = false;
-  String? _shownIncoming;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
+  FriendsController? _c;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_c == null) {
-      final c = FriendsController(api: context.read<ApiClient>(), auth: context.read<AuthStore>());
+    final c = MessagingScope.maybeOf(context);
+    if (c != null && !identical(c, _c)) {
       _c = c;
-      c.addListener(_onChange);
-      c.start();
+      // Fresh data every time the screen opens; the services themselves are already running.
+      c.refreshFriendList(quiet: true);
+      c.pollUnread();
+      c.loadUnseenMissed();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askNotifications(c));
     }
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _c?.setForeground(state == AppLifecycleState.resumed);
-  }
-
-  void _onChange() {
-    final c = _c!;
-    final call = c.call;
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (call != null && overlay != null) {
-      final active = call.status != CallStatus.idle;
-      if (active && _callEntry == null) {
-        _callEntry = OverlayEntry(builder: (_) => ListenableBuilder(listenable: call, builder: (_, _) => CallPanel(call: call)));
-        overlay.insert(_callEntry!);
-      } else if (!active && _callEntry != null) {
-        _callEntry!.remove();
-        _callEntry!.dispose();
-        _callEntry = null;
-      }
-      if (call.error.isNotEmpty && !call.busy) {
-        final msg = call.error;
-        call.clearError();
-        _snack(msg);
-      }
-    }
-    final inc = c.lastIncoming;
-    if (inc != null && _shownIncoming != '${inc.friendId}${inc.preview}${c.chat?.tick}' && c.chat?.openPeer != inc.friendId) {
-      _shownIncoming = '${inc.friendId}${inc.preview}${c.chat?.tick}';
-      _snack('${inc.name}: ${inc.preview}', onTap: () => _openChat(c.friends.where((f) => f.id == inc.friendId).firstOrNull));
+  /// First visit: explain why notifications matter, then ask (Android 13+ shows its own dialog).
+  Future<void> _askNotifications(FriendsController c) async {
+    if (!mounted || c.notificationsAsked || await c.notifier.allowed) return;
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bật thông báo?'),
+        content: const Text('Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ, nên chỉ nhận được khi ứng dụng đang chạy. Bật thông báo để biết khi có tin nhắn hoặc cuộc gọi đến. Thông báo chỉ ghi "Tin nhắn mới từ <tên>", không hiện nội dung.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Để sau')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Bật thông báo')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await c.requestNotificationPermission(force: true);
+    } else {
+      await c.skipNotificationPrompt();
     }
   }
 
-  void _snack(String msg, {VoidCallback? onTap}) {
+  void _snack(String msg) {
     if (!mounted) return;
     final m = ScaffoldMessenger.of(context);
     m.hideCurrentSnackBar();
-    m.showSnackBar(SnackBar(
-      content: Text(msg, maxLines: 2, overflow: TextOverflow.ellipsis),
-      action: onTap == null ? null : SnackBarAction(label: 'Mở', onPressed: onTap),
-    ));
+    m.showSnackBar(SnackBar(content: Text(msg, maxLines: 2, overflow: TextOverflow.ellipsis)));
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _callEntry?.remove();
-    _callEntry?.dispose();
-    _c?.removeListener(_onChange);
-    _c?.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -129,7 +104,10 @@ class _FriendsScreenState extends State<FriendsScreen> with WidgetsBindingObserv
   Widget build(BuildContext context) {
     final c = _c;
     return Scaffold(
-      appBar: AppBar(title: const Text('Bạn bè & tin nhắn')),
+      appBar: AppBar(
+        title: const Text('Bạn bè & tin nhắn'),
+        actions: [if (c != null) IconButton(icon: const Icon(Icons.settings_outlined), tooltip: 'Cài đặt tin nhắn', onPressed: () => showMessagingSettings(context, c))],
+      ),
       body: c == null
           ? const Center(child: CircularProgressIndicator())
           : ListenableBuilder(
