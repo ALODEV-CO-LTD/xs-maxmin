@@ -38,6 +38,9 @@ const router = useRouter()
 // Opened via "+ Thêm khách hàng mới" on Nhập số: after adding a customer, go back there.
 const fromEntries = route.query.from === 'entries'
 const addInput = ref(null)
+// Two separate screens: the list of customers, or the form that creates a new one.
+const view = ref(route.query.from === 'entries' ? 'new' : 'list')
+watch(view, (v) => v === 'new' && nextTick(() => addInput.value?.focus()))
 
 const entries = ref([])
 const loading = ref(true)
@@ -110,6 +113,7 @@ async function addCustomer() {
     const created = await api.post('/me/customers', { name, phone: newCustomerPhone.value.trim() })
     roster.value.push(created)
     roster.value.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+    view.value = 'list'
     newCustomerName.value = ''
     newCustomerPhone.value = ''
     if (fromEntries) {
@@ -295,9 +299,14 @@ async function savePhone() {
 <template>
   <div class="page">
     <h1 class="page-title">Khách hàng</h1>
-    <p class="page-subtitle">Danh sách khách hàng của bạn. Thêm khách mới ở đây, số liệu vào/ra được tổng hợp từ các lượt nhập, tính như ở trang Nhập số liệu.</p>
+    <p class="page-subtitle">Danh sách khách hàng của bạn. Chọn Danh sách để xem và cấu hình khách, hoặc Tạo khách hàng mới để thêm khách; số liệu vào/ra được tổng hợp từ các lượt nhập.</p>
 
-    <div class="card add-customer-card">
+    <div class="view-tabs" role="tablist" aria-label="Khách hàng">
+      <button type="button" role="tab" class="view-tab" :class="{ active: view === 'list' }" :aria-selected="view === 'list'" @click="view = 'list'">Danh sách khách hàng</button>
+      <button type="button" role="tab" class="view-tab" :class="{ active: view === 'new' }" :aria-selected="view === 'new'" @click="view = 'new'">Tạo khách hàng mới</button>
+    </div>
+
+    <div v-show="view === 'new'" class="card add-customer-card">
       <form class="add-customer-form" @submit.prevent="addCustomer">
         <div class="field add-customer-field">
           <div class="input-wrap">
@@ -316,10 +325,11 @@ async function savePhone() {
       <div v-if="addError" class="alert alert-error add-customer-error">{{ addError }}</div>
     </div>
 
-    <div v-if="fromCache" class="alert alert-warning">
+    <div v-if="fromCache && view === 'list'" class="alert alert-warning">
       Đang offline: hiển thị số liệu đã lưu trên máy. Thêm/xoá khách hàng cần có mạng.
     </div>
-    <div v-if="loading" class="card">Đang tải...</div>
+    <div v-if="view !== 'list'"></div>
+    <div v-else-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
       <MaskBar class="mask-row" />
@@ -333,7 +343,7 @@ async function savePhone() {
         </div>
       </div>
 
-      <div v-if="customers.length === 0" class="card">Chưa có khách hàng nào. Thêm khách ở trên để bắt đầu.</div>
+      <div v-if="customers.length === 0" class="card">Chưa có khách hàng nào. Bấm "Tạo khách hàng mới" để bắt đầu.</div>
       <div v-else-if="filteredCustomers.length === 0" class="card">Không tìm thấy khách hàng phù hợp.</div>
 
       <div v-else class="table-wrap">
@@ -736,47 +746,30 @@ async function savePhone() {
 .table-wrap .table {
   width: 100%;
 }
-/* One alignment per column, the same for its header and its cells:
-   STT / Tên / SĐT on the left, the three numbers on the right, Thao tác on the right. */
-.table-wrap th:nth-child(1),
-.table-wrap td:nth-child(1) {
-  width: 64px;
-  text-align: left;
-  color: var(--text-secondary);
+/* Every column is the same size and centred, header and cells alike (STT narrow, Thao tác wider for its buttons). */
+.table-wrap .table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1000px;
 }
-.table-wrap th:nth-child(2),
-.table-wrap td:nth-child(2) {
-  width: auto;
-  min-width: 160px;
-  text-align: left;
+.table-wrap th,
+.table-wrap td {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.table-wrap th:nth-child(3),
-.table-wrap td:nth-child(3) {
-  width: 140px;
-  text-align: left;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+.table-wrap th:nth-child(1),
+.table-wrap td:nth-child(1) {
+  width: 6%;
+  color: var(--text-secondary);
 }
-.table-wrap th:nth-child(n + 4):nth-child(-n + 6),
-.table-wrap td:nth-child(n + 4):nth-child(-n + 6) {
-  width: 120px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.table-wrap th:nth-child(n + 2):nth-child(-n + 6),
+.table-wrap td:nth-child(n + 2):nth-child(-n + 6) {
+  width: 13%;
 }
 .table-wrap th:nth-child(7),
 .table-wrap td:nth-child(7) {
-  width: 1%;
-  text-align: right;
-}
-@media (max-width: 1180px) {
-  .table-wrap td:nth-child(7) {
-    min-width: 200px;
-  }
-  .actions-cell {
-    white-space: normal !important;
-  }
+  width: 29%;
 }
 .table-wrap td:nth-child(2) {
   font-size: 16px;
@@ -786,6 +779,32 @@ async function savePhone() {
 .table-wrap td:nth-child(4),
 .table-wrap td:nth-child(5) {
   font-weight: 600;
+}
+.view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+.view-tab {
+  min-height: 44px;
+  padding: 0 22px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.view-tab:hover {
+  border-color: var(--primary);
+}
+.view-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
 }
 .table-wrap .row-clickable:hover {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
@@ -797,7 +816,7 @@ async function savePhone() {
 
 /* Delete: ghost destructive, quiet until hovered */
 .actions-cell {
-  text-align: right;
+  text-align: center !important;
   white-space: nowrap;
 }
 .actions-cell .btn {
@@ -849,16 +868,13 @@ async function savePhone() {
   .table-wrap td:nth-child(1):not([colspan]) {
     display: none;
   }
-  .table-wrap th:nth-child(3),
-  .table-wrap td:nth-child(3) {
+  .table-wrap .table {
+    table-layout: auto;
+    min-width: 0;
+  }
+  .table-wrap th:nth-child(n + 2),
+  .table-wrap td:nth-child(n + 2) {
     width: auto;
-  }
-  .table-wrap th:nth-child(n + 4):nth-child(-n + 6),
-  .table-wrap td:nth-child(n + 4):nth-child(-n + 6) {
-    width: 90px;
-  }
-  .table-wrap td:nth-child(2) {
-    min-width: 110px;
   }
   .table-wrap th,
   .table-wrap td {

@@ -21,6 +21,7 @@ import RecoveryCodePanel from '../components/RecoveryCodePanel.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
 import AccountStats from '../components/AccountStats.vue'
 import PackagesView from './PackagesView.vue'
+import ModalDialog from '../components/ModalDialog.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -30,14 +31,13 @@ const route = useRoute()
 const ALL_TABS = [
   { key: 'stats', label: 'Thống kê' },
   { key: 'profile', label: 'Hồ sơ' },
-  { key: 'security', label: 'Mật khẩu' },
   { key: 'devices', label: 'Thiết bị & riêng tư' },
   { key: 'packages', label: 'Gói & Thanh toán' },
   { key: 'data', label: 'Dữ liệu' },
 ]
 // Thống kê and Gói & Thanh toán are for customer accounts only (an admin has no customers, entries or package).
 const TABS = ALL_TABS.filter((t) => !['stats', 'packages'].includes(t.key) || !auth.isAdmin)
-const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : TABS[0].key)
+const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : route.query.tab === 'security' ? 'profile' : TABS[0].key)
 // The tab bar scrolls sideways on phones: keep the open tab in view (e.g. after a link to ?tab=packages).
 function showActiveTab() {
   nextTick(() => document.getElementById(`acct-tab-${tab.value}`)?.scrollIntoView({ inline: 'center', block: 'nearest' }))
@@ -58,6 +58,7 @@ function onTabKey(e) {
   document.getElementById(`acct-tab-${t.key}`)?.focus()
 }
 const call = useCallStore()
+const secDialog = ref('') // which password form is open: 'password' | 'second' | 'wipe'
 
 // Logout lives here on phones/tablets (the header button is hidden below 860px).
 async function logoutNow() {
@@ -503,6 +504,11 @@ async function deleteAllData() {
             {{ user?.hasWipePassword ? 'Đã bật' : 'Chưa đặt' }}
           </span>
         </div>
+        <div class="acct-actions" role="group" aria-label="Mật khẩu">
+          <button type="button" class="btn btn-secondary btn-sm" @click="secDialog = 'password'">Đổi mật khẩu</button>
+          <button type="button" class="btn btn-secondary btn-sm" @click="secDialog = 'second'">{{ user?.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai' }}</button>
+          <button type="button" class="btn btn-secondary btn-sm" @click="secDialog = 'wipe'">{{ user?.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu' }}</button>
+        </div>
         <button type="button" class="btn btn-secondary logout-btn" @click="logoutNow">
           <AppIcon name="log-out" /> Đăng xuất
         </button>
@@ -550,75 +556,6 @@ async function deleteAllData() {
       </div>
 
       </div>
-      </div>
-
-      <div v-show="tab === 'security'" id="acct-panel-security" role="tabpanel" aria-labelledby="acct-tab-security">
-      <div class="security-grid">
-      <!-- Change password -->
-      <form class="card sec-card sec-password" @submit.prevent="submitPasswordChange">
-        <h3 style="margin-top: 0">Đổi mật khẩu đăng nhập</h3>
-        <div v-if="pwError" class="alert alert-error">{{ pwError }}</div>
-        <div v-if="pwSuccess" class="alert alert-success">{{ pwSuccess }}</div>
-        <div class="field">
-          <label>Mật khẩu hiện tại</label>
-          <div class="input-wrap"><input v-model="pwForm.currentPassword" type="password" /></div>
-        </div>
-        <div class="field">
-          <label>Mật khẩu mới</label>
-          <div class="input-wrap"><input v-model="pwForm.newPassword" type="password" /></div>
-        </div>
-        <div class="field">
-          <label>Nhập lại mật khẩu mới</label>
-          <div class="input-wrap"><input v-model="pwForm.confirmPassword" type="password" /></div>
-        </div>
-        <button type="submit" class="btn btn-primary sec-submit" :disabled="pwSubmitting">
-          {{ pwSubmitting ? 'Đang lưu...' : 'Đổi mật khẩu' }}
-        </button>
-      </form>
-
-      <!-- Second password -->
-      <form class="card sec-card sec-second" @submit.prevent="submitSecondPassword">
-        <h3 style="margin-top: 0">Mật khẩu lớp hai</h3>
-        <p class="page-subtitle" style="margin-bottom: 12px">
-          Lớp bảo mật thứ hai khi đăng nhập. {{ user?.hasSecondPassword ? 'Chỉ có thể đổi, không thể tắt.' : '' }}
-        </p>
-        <div v-if="secondError" class="alert alert-error">{{ secondError }}</div>
-        <div v-if="secondSuccess" class="alert alert-success">{{ secondSuccess }}</div>
-        <div class="field">
-          <label>Mật khẩu hiện tại</label>
-          <div class="input-wrap"><input v-model="secondForm.currentPassword" type="password" /></div>
-        </div>
-        <div class="field">
-          <label>Mật khẩu lớp hai mới</label>
-          <div class="input-wrap"><input v-model="secondForm.secondPassword" type="password" /></div>
-        </div>
-        <button type="submit" class="btn btn-secondary sec-submit" :disabled="secondSubmitting">
-          {{ secondSubmitting ? 'Đang lưu...' : user?.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai' }}
-        </button>
-      </form>
-
-      <!-- Wipe password -->
-      <form class="card sec-card sec-wipe" @submit.prevent="submitWipePassword">
-        <h3 style="margin-top: 0">Mật khẩu xoá dữ liệu</h3>
-        <p class="page-subtitle" style="margin-bottom: 12px">
-          Nếu bạn đăng nhập bằng mật khẩu này thay vì mật khẩu chính, hệ thống sẽ hỏi xác nhận xoá dữ liệu (số liệu, khách hàng, mẫu cú pháp, lịch xoá, nhật ký cuộc gọi, tin nhắn phản hồi Admin, lịch sử giao dịch; giữ lại tài khoản, bạn bè và tin nhắn bạn bè) thay vì đăng nhập bình thường. Mật khẩu này phải khác mật khẩu lớp hai. {{ user?.hasWipePassword ? 'Chỉ có thể đổi, không thể tắt.' : 'Tuỳ chọn, bỏ trống nếu không cần.' }}
-        </p>
-        <div v-if="wipeError" class="alert alert-error">{{ wipeError }}</div>
-        <div v-if="wipeSuccess" class="alert alert-success">{{ wipeSuccess }}</div>
-        <div class="field">
-          <label>Mật khẩu hiện tại</label>
-          <div class="input-wrap"><input v-model="wipeForm.currentPassword" type="password" /></div>
-        </div>
-        <div class="field">
-          <label>Mật khẩu xoá dữ liệu</label>
-          <div class="input-wrap"><input v-model="wipeForm.wipePassword" type="password" /></div>
-        </div>
-        <button type="submit" class="btn btn-secondary sec-submit" :disabled="wipeSubmitting">
-          {{ wipeSubmitting ? 'Đang lưu...' : user?.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu' }}
-        </button>
-      </form>
-      </div>
-
       </div>
 
       <div v-show="tab === 'devices'" id="acct-panel-devices" role="tabpanel" aria-labelledby="acct-tab-devices">
@@ -689,6 +626,68 @@ async function deleteAllData() {
       </div>
       </div>
     </template>
+
+    <ModalDialog :open="secDialog === 'password'" title="Đổi mật khẩu đăng nhập" @close="secDialog = ''">
+      <form class="sec-form" @submit.prevent="submitPasswordChange">
+        <div v-if="pwError" class="alert alert-error">{{ pwError }}</div>
+        <div v-if="pwSuccess" class="alert alert-success">{{ pwSuccess }}</div>
+        <div class="field">
+          <label>Mật khẩu hiện tại</label>
+          <div class="input-wrap"><input v-model="pwForm.currentPassword" type="password" /></div>
+        </div>
+        <div class="field">
+          <label>Mật khẩu mới</label>
+          <div class="input-wrap"><input v-model="pwForm.newPassword" type="password" /></div>
+        </div>
+        <div class="field">
+          <label>Nhập lại mật khẩu mới</label>
+          <div class="input-wrap"><input v-model="pwForm.confirmPassword" type="password" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary sec-submit" :disabled="pwSubmitting">
+          {{ pwSubmitting ? 'Đang lưu...' : 'Đổi mật khẩu' }}
+        </button>
+      </form>
+    </ModalDialog>
+    <ModalDialog :open="secDialog === 'second'" title="Mật khẩu lớp hai" @close="secDialog = ''">
+      <form class="sec-form" @submit.prevent="submitSecondPassword">
+        <p class="page-subtitle" style="margin-bottom: 12px">
+          Lớp bảo mật thứ hai khi đăng nhập. {{ user?.hasSecondPassword ? 'Chỉ có thể đổi, không thể tắt.' : '' }}
+        </p>
+        <div v-if="secondError" class="alert alert-error">{{ secondError }}</div>
+        <div v-if="secondSuccess" class="alert alert-success">{{ secondSuccess }}</div>
+        <div class="field">
+          <label>Mật khẩu hiện tại</label>
+          <div class="input-wrap"><input v-model="secondForm.currentPassword" type="password" /></div>
+        </div>
+        <div class="field">
+          <label>Mật khẩu lớp hai mới</label>
+          <div class="input-wrap"><input v-model="secondForm.secondPassword" type="password" /></div>
+        </div>
+        <button type="submit" class="btn btn-secondary sec-submit" :disabled="secondSubmitting">
+          {{ secondSubmitting ? 'Đang lưu...' : user?.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai' }}
+        </button>
+      </form>
+    </ModalDialog>
+    <ModalDialog :open="secDialog === 'wipe'" title="Mật khẩu xoá dữ liệu" @close="secDialog = ''">
+      <form class="sec-form" @submit.prevent="submitWipePassword">
+        <p class="page-subtitle" style="margin-bottom: 12px">
+          Nếu bạn đăng nhập bằng mật khẩu này thay vì mật khẩu chính, hệ thống sẽ hỏi xác nhận xoá dữ liệu (số liệu, khách hàng, mẫu cú pháp, lịch xoá, nhật ký cuộc gọi, tin nhắn phản hồi Admin, lịch sử giao dịch; giữ lại tài khoản, bạn bè và tin nhắn bạn bè) thay vì đăng nhập bình thường. Mật khẩu này phải khác mật khẩu lớp hai. {{ user?.hasWipePassword ? 'Chỉ có thể đổi, không thể tắt.' : 'Tuỳ chọn, bỏ trống nếu không cần.' }}
+        </p>
+        <div v-if="wipeError" class="alert alert-error">{{ wipeError }}</div>
+        <div v-if="wipeSuccess" class="alert alert-success">{{ wipeSuccess }}</div>
+        <div class="field">
+          <label>Mật khẩu hiện tại</label>
+          <div class="input-wrap"><input v-model="wipeForm.currentPassword" type="password" /></div>
+        </div>
+        <div class="field">
+          <label>Mật khẩu xoá dữ liệu</label>
+          <div class="input-wrap"><input v-model="wipeForm.wipePassword" type="password" /></div>
+        </div>
+        <button type="submit" class="btn btn-secondary sec-submit" :disabled="wipeSubmitting">
+          {{ wipeSubmitting ? 'Đang lưu...' : user?.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu' }}
+        </button>
+      </form>
+    </ModalDialog>
   </div>
 </template>
 
@@ -722,8 +721,7 @@ async function deleteAllData() {
   margin-bottom: 12px !important;
 }
 
-.account-top,
-.security-grid {
+.account-top {
   display: grid;
   gap: 16px;
   margin-bottom: 16px;
@@ -732,12 +730,7 @@ async function deleteAllData() {
 .account-top {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.security-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: stretch;
-}
-.page .account-top > .card,
-.page .security-grid > .card {
+.page .account-top > .card {
   margin-bottom: 0;
 }
 
@@ -870,44 +863,39 @@ async function deleteAllData() {
 }
 
 /* ---- Security forms ---- */
-.sec-card {
+.sec-form {
   display: flex;
   flex-direction: column;
-  border-top: 3px solid var(--border);
 }
-.sec-password {
-  border-top-color: var(--primary);
-}
-.sec-second {
-  border-top-color: var(--input-border);
-}
-/* security setting, not a destructive action: amber accent, never red */
-.sec-wipe {
-  border-top-color: var(--warning);
+.acct-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
 }
 
-.sec-card .field {
+.sec-form .field {
   margin-bottom: 12px;
 }
-.sec-card .field label {
+.sec-form .field label {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
 }
-.sec-card .field input {
+.sec-form .field input {
   height: 44px;
   padding: 0 14px;
   font-size: 15px;
   border-radius: 10px;
   border: 1px solid var(--input-border);
 }
-.sec-card .field input:focus {
+.sec-form .field input:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
 }
-.sec-card .alert {
+.sec-form .alert {
   font-size: 14px;
   padding: 10px 14px;
   margin-bottom: 12px;
@@ -943,17 +931,11 @@ async function deleteAllData() {
 }
 
 /* ---- Responsive ---- */
-@media (max-width: 1100px) {
-  .security-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 720px) {
   .page {
     padding: 24px 16px 96px;
   }
-  .account-top,
-  .security-grid {
+  .account-top {
     grid-template-columns: 1fr;
   }
 }
