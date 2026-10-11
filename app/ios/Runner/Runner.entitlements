@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	APNs environment. "development" = sandbox push server, used by builds signed with a Development profile
+	(Xcode Run / flutter run on a device). For TestFlight and App Store builds change the value below to
+	"production" (or leave it: Xcode replaces it with "production" automatically when you Archive with a
+	Distribution profile), and set XOSO_APNS_SANDBOX=false on the server. See docs/BAN_GIAO.md, section 9e.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

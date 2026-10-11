@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dart_frog_web_socket/dart_frog_web_socket.dart';
 import 'package:server/src/call_log.dart';
+import 'package:server/src/apns.dart';
 import 'package:server/src/call_signaling.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/push_notify.dart';
 import 'package:server/src/security.dart';
 import 'package:server/src/sessions.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -152,6 +154,7 @@ Future<Response> onRequest(RequestContext context) async {
             if (!delivered) {
               // Offline callee: no ring, but they will see a missed call.
               startCallLog(db, userId, to, status: 'missed');
+              notifyOfflineRecipient(kind: PushKind.call, fromUserId: userId, fromName: payload['fromName'] as String, toUserId: to);
               channel.sink.add(jsonEncode({'type': 'call-unavailable', 'from': to}));
               return;
             }
@@ -289,6 +292,16 @@ void _relayE2ee(
     if (msg['ts'] is int) 'ts': msg['ts'],
   });
   if (!delivered) {
+    // Wake the recipient's iPhone (name + kind only, never content). Only for
+    // the first part so a multi-part file sends one push.
+    if (part == 0) {
+      notifyOfflineRecipient(
+        kind: PushKind.message,
+        fromUserId: userId,
+        fromName: nameRow.isEmpty ? 'Người dùng' : nameRow.first['name'] as String,
+        toUserId: to,
+      );
+    }
     channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'reason': 'offline'}));
   }
 }

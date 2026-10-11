@@ -23,6 +23,7 @@ import 'features/friends/friends_screen.dart';
 import 'features/friends/keep_alive.dart';
 import 'features/friends/messaging_host.dart';
 import 'features/friends/notifications.dart';
+import 'features/friends/push_registrar.dart';
 import 'features/results/results_screen.dart';
 import 'features/scoring/scoring_screen.dart';
 import 'features/admin/admin_shell.dart';
@@ -83,6 +84,42 @@ class _MambaAppState extends State<MambaApp> {
   final LocalNotifier _notifier = LocalNotifier();
   final SystemCallRinger _ringer = SystemCallRinger();
   final ForegroundTaskService _background = ForegroundTaskService();
+  // iOS push notifications (APNs); a no-op on other platforms.
+  late final PushRegistrar _push = PushRegistrar(
+    auth: _auth,
+    api: _api,
+    openRoute: (r) => _router.push(r),
+    explain: _explainPush,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _push.start();
+  }
+
+  @override
+  void dispose() {
+    _push.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _explainPush() async {
+    final ctx = _router.routerDelegate.navigatorKey.currentState?.overlay?.context;
+    if (ctx == null) return false;
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: const Text('Bật thông báo?'),
+        content: const Text('Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ. Thông báo chỉ báo "có người nhắn / gọi bạn" (kèm tên), không hiện nội dung; bạn cần mở MAMBA để nhận tin.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Để sau')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Bật thông báo')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +147,7 @@ class _MambaAppState extends State<MambaApp> {
           notifier: _notifier,
           ringer: _ringer,
           background: _background,
-          child: UpdateGate(api: _api, child: PrivacyGate(child: child ?? const SizedBox.shrink())),
+          child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: PrivacyGate(child: child ?? const SizedBox.shrink()))),
         ),
         locale: const Locale('vi'),
         localizationsDelegates: const [

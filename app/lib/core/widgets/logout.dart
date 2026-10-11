@@ -18,5 +18,5 @@ Future<void> confirmLogout(BuildContext context) async {
       ],
     ),
   );
-  if (ok == true) auth.clear();
+  if (ok == true) await auth.logout();
 }

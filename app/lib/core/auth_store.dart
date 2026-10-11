@@ -13,6 +13,10 @@ class AuthStore extends ChangeNotifier {
   String? role;
   bool ready = false;
 
+  /// Async cleanups to run (each bounded to a few seconds) while the session is still valid, before an explicit
+  /// logout clears it - e.g. unregistering the push token on the server.
+  final List<Future<void> Function()> beforeLogout = [];
+
   bool get signedIn => token != null && token!.isNotEmpty;
   bool get isAdmin => role == 'admin';
 
@@ -36,6 +40,16 @@ class AuthStore extends ChangeNotifier {
       await _storage.write(key: _roleKey, value: role);
     } catch (_) {/* works for this run only */}
     notifyListeners();
+  }
+
+  /// Explicit logout: runs [beforeLogout] hooks first, then clears the session.
+  Future<void> logout() async {
+    for (final hook in List.of(beforeLogout)) {
+      try {
+        await hook().timeout(const Duration(seconds: 4));
+      } catch (_) {/* never block a logout */}
+    }
+    clear();
   }
 
   /// Drops the session (explicit logout, or the server answered 401).

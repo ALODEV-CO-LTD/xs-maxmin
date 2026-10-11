@@ -252,6 +252,18 @@ CREATE TABLE IF NOT EXISTS device_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id);
 
+-- Push notification device tokens (APNs). One token belongs to ONE user.
+CREATE TABLE IF NOT EXISTS push_tokens (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  platform     TEXT NOT NULL CHECK (platform IN ('ios')),
+  token        TEXT NOT NULL UNIQUE,
+  device_label TEXT,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
+
 CREATE TABLE IF NOT EXISTS login_attempts (
   key          TEXT PRIMARY KEY,  -- "<username lowercase>|<ip>"
   fail_count   INTEGER NOT NULL DEFAULT 0,

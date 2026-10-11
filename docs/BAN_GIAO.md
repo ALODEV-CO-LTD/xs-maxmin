@@ -203,6 +203,47 @@ Admin đặt trong **Cài đặt > Phiên bản ứng dụng** (web: `components
 
 App Android (`features/shell/update_gate.dart`, `core/app_version.dart`) hỏi khi mở và khi quay lại sau hơn 1 giờ: thấp hơn bản mới nhất thì hiện thẻ nhắc (bấm "Để sau" thì nhớ theo từng phiên bản), thấp hơn bản tối thiểu thì chặn toàn màn hình tới khi cập nhật, nút "Tải bản mới" mở đường dẫn. Không kết nối được máy chủ thì **không chặn**. Khi phát hành bản mới: sửa `version` trong `app/pubspec.yaml` và `AppConfig.appVersionName/appBuild` trong `app/lib/core/config.dart` cho khớp, rồi đặt phiên bản mới nhất trong Cài đặt.
 
+## 9e. Thông báo đẩy iOS
+
+**Thiết kế.** Tin nhắn bạn bè mã hoá 2 đầu và **không lưu trên máy chủ** (xem `MA_HOA_2_DAU.md`); cuộc gọi báo qua cùng WebSocket. Trước đây iPhone đóng app thì không nhận được gì. Bây giờ khi người nhận **đang offline**, `routes/api/ws/calls.dart` gọi `notifyOfflineRecipient` (`backend/lib/src/push_notify.dart`) để gửi một push APNs tới các iPhone của họ:
+
+- tin nhắn: tiêu đề `<tên người gửi>`, nội dung "Đang nhắn tin cho bạn. Mở MAMBA để nhận."
+- cuộc gọi (lời mời gọi tới người offline): tiêu đề "Cuộc gọi đến", nội dung "<tên người gửi> đang gọi bạn".
+- Tối đa **1 push / (người gửi, người nhận, loại) / 60 giây** (bộ nhớ trong). Không đổi giao thức WebSocket và không đổi phản hồi người gửi nhận được.
+
+Code: `backend/lib/src/apns.dart` (`PushSender`, `ApnsSender`: HTTP/2 tới `api.push.apple.com`, hoặc `api.sandbox.push.apple.com` khi `XOSO_APNS_SANDBOX=true`; JWT ES256 ký bằng khoá .p8, cache ~50 phút; gặp 410 / `BadDeviceToken` / `Unregistered` thì xoá token), `push_tokens.dart`, route `POST/DELETE /api/me/push-token` (chỉ khách hàng, Admin nhận 403; bảng `push_tokens`, một token thuộc đúng một tài khoản, đăng ký lại cho tài khoản khác thì chuyển sang tài khoản đó, xoá tài khoản thì xoá token). Gói thêm: `http2` (backend). Không đặt biến môi trường nào thì bộ gửi **không làm gì** (ghi một dòng log lúc đầu) và mọi thứ khác chạy như cũ.
+
+**Quy tắc riêng tư.** Payload và log chỉ có tên hiển thị của người gửi, loại (`message`/`call`) và id người gửi (để mở đúng cuộc trò chuyện). **Không bao giờ** có nội dung tin, khoá, tên tệp. Payload: `{"aps":{"alert":{title,body},"sound":"default","thread-id":<id người gửi>},"friendId":..,"kind":..}`; cuộc gọi hết hạn sau 30 giây, tin nhắn sau 1 giờ, cả hai `apns-priority: 10`.
+
+**Tin nhắn vẫn có thể mất.** Push chỉ **đánh thức** người nhận. Tin vẫn không được lưu: người gửi thấy "chưa gửi được" và bấm **"Gửi lại"** sau khi người nhận mở app. Cuộc gọi chuông qua push không có (chỉ là thông báo; mở app thì cuộc gọi đã kết thúc và hiện là cuộc gọi nhỡ).
+
+**App.** `app/ios/Runner/Runner.entitlements` (`aps-environment`), `UIBackgroundModes: remote-notification` trong `Info.plist`, `AppDelegate.swift` đăng ký APNs và nói chuyện với Dart qua MethodChannel `vn.mamba/push`; `app/lib/features/friends/push_registrar.dart` xin quyền thông báo (có hộp thoại giải thích), gửi token lên máy chủ sau khi khách hàng đăng nhập (và khi token đổi), xoá token khi đăng xuất (trước khi xoá phiên, qua `AuthStore.logout`), bấm vào thông báo thì mở `/friends/chat/<id>` (cuộc gọi cũng mở cuộc trò chuyện). Đang mở app và đã thấy cùng thông tin trong app thì không hiện banner hệ điều hành. Phiên bị thu hồi từ nơi khác thì token cũ còn trên máy chủ tới khi APNs báo hỏng hoặc có tài khoản khác đăng ký lại thiết bị đó.
+
+**Cách bật (người vận hành).**
+1. Apple Developer > Certificates, Identifiers & Profiles > **Keys** > dấu **+** > đặt tên, tick **Apple Push Notifications service (APNs)** > Continue > Register > **tải file `AuthKey_<KeyID>.p8` (chỉ tải được một lần)**. Ghi lại **Key ID** (10 ký tự) và **Team ID** (`MKG3V4B3M7`). Identifier `vn.mamba.mambaApp` phải bật capability **Push Notifications** (Xcode tự bật khi mở project và đăng nhập đúng team).
+2. Chép file .p8 vào container 501, ngoài thư mục web, quyền chặt: ví dụ `pct push 501 AuthKey_XXXX.p8 /etc/xs-maxmin/apns/AuthKey.p8` rồi `chmod 700 /etc/xs-maxmin/apns; chmod 600 /etc/xs-maxmin/apns/AuthKey.p8; chown` cho user chạy service.
+3. Tạo drop-in như `XOSO_JWT_SECRET` ở mục 7, ví dụ `/etc/systemd/system/xs-maxmin-backend.service.d/apns.conf` (chmod 600):
+```
+[Service]
+Environment=XOSO_APNS_KEY_PATH=/etc/xs-maxmin/apns/AuthKey.p8
+Environment=XOSO_APNS_KEY_ID=<KeyID>
+Environment=XOSO_APNS_TEAM_ID=MKG3V4B3M7
+Environment=XOSO_APNS_TOPIC=vn.mamba.mambaApp
+Environment=XOSO_APNS_SANDBOX=false
+```
+4. `systemctl daemon-reload && systemctl restart xs-maxmin-backend` (**khởi động lại ⇒ mọi người bị đăng xuất một lần** nếu chưa đặt `XOSO_JWT_SECRET`). Kiểm tra log không còn dòng "[apns] not configured".
+5. Môi trường: bản build ký bằng **Development** (chạy từ Xcode / `flutter run` trên máy) dùng **sandbox** ⇒ `XOSO_APNS_SANDBOX=true`, entitlements `development` (mặc định trong repo). Bản **TestFlight / App Store** dùng **production** ⇒ `XOSO_APNS_SANDBOX=false`; khi Archive với Distribution profile Xcode tự đổi `aps-environment` thành `production` (nếu ký thủ công thì đổi tay trong `Runner.entitlements`). Token sandbox và production là hai thế giới khác nhau: một máy chủ chỉ phục vụ được một loại tại một thời điểm.
+
+| Biến | Ý nghĩa |
+|---|---|
+| `XOSO_APNS_KEY_PATH` | đường dẫn file .p8 |
+| `XOSO_APNS_KEY_ID` | Key ID của khoá |
+| `XOSO_APNS_TEAM_ID` | Team ID (`MKG3V4B3M7`) |
+| `XOSO_APNS_TOPIC` | bundle id, mặc định `vn.mamba.mambaApp` |
+| `XOSO_APNS_SANDBOX` | `true` = máy chủ sandbox của Apple |
+
+**Chưa kiểm chứng được** (không có tài khoản Apple khi làm): gửi thật tới APNs, nhận push trên iPhone, quyền thông báo, bấm thông báo khi khởi động nguội, kết nối HTTP/2 thật (`Http2ApnsTransport`). Các phần còn lại có unit test (`backend/test/push_*_test.dart`, `app/test/push_registrar_test.dart`) với bộ gửi/đường truyền giả. Server build cần tải được gói `http2` từ pub.dev (xem lưu ý `.dart_tool` ở mục 7).
+
 ## 10. Việc cần làm ngay khi nhận bàn giao
 
 1. **Đặt `XOSO_JWT_SECRET` cố định** trên máy chủ (drop-in như mục 7) để các lần deploy sau không đăng xuất mọi người.
