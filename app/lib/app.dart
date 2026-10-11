@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'core/api_client.dart';
 import 'core/auth_store.dart';
 import 'core/lottery_stations.dart';
+import 'core/mask_store.dart';
 import 'core/theme.dart';
 import 'features/account/account_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -63,6 +64,7 @@ class _MambaAppState extends State<MambaApp> {
   late final AuthStore _auth = AuthStore()..init();
   late final ApiClient _api = ApiClient(_auth);
   final LotteryStations _stations = LotteryStations();
+  final MaskStore _mask = MaskStore()..load();
   late final GoRouter _router = buildRouter(_auth);
 
   @override
@@ -72,6 +74,7 @@ class _MambaAppState extends State<MambaApp> {
         ChangeNotifierProvider<AuthStore>.value(value: _auth),
         Provider<ApiClient>.value(value: _api),
         ChangeNotifierProvider<LotteryStations>.value(value: _stations),
+        ChangeNotifierProvider<MaskStore>.value(value: _mask),
       ],
       child: MaterialApp.router(
         title: 'MAMBA',
