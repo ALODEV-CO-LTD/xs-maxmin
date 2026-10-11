@@ -27,6 +27,16 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+# Development only: Google ML Kit has no arm64 build for the iOS simulator on Apple Silicon, so a simulator build can
+# leave it out: `MAMBA_NO_MLKIT=1 flutter build ios --simulator` (reading numbers from photos then does not work there).
+# Device and release builds must NOT set it.
+if ENV['MAMBA_NO_MLKIT'] == '1'
+  $mamba_original_plugins_list = method(:flutter_get_plugins_list)
+  def flutter_get_plugins_list(dependencies_hash, platform)
+    $mamba_original_plugins_list.call(dependencies_hash, platform).reject { |p| p['name'].to_s.start_with?('google_mlkit') }
+  end
+end
+
 target 'Runner' do
   use_frameworks!
 
