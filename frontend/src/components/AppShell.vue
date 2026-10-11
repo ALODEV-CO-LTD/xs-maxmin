@@ -70,11 +70,9 @@ const adminLinks = [
   { perm: 'payments.manage', name: 'admin-renewals', label: 'Gia hạn', icon: 'refresh-cw' },
   { perm: 'support.messages', name: 'admin-messages', label: 'Phản hồi', icon: 'message-square-more' },
   { perm: 'announcements.manage', name: 'admin-notices', label: 'Thông báo', icon: 'message-square-more' },
-  { perm: 'backups.manage', name: 'admin-backups', label: 'Sao lưu', icon: 'refresh-cw' },
-  { perm: ['settings.manage', 'security.view'], name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
+  { perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], name: 'admin-settings', label: 'Cài đặt', icon: 'settings' },
   // Admin dùng chung trang /account với khách hàng (đổi mật khẩu...). Admin
   // không có mục "Bạn bè": liên hệ với khách chỉ qua "Phản hồi" ở trên.
-  { perm: 'security.policy', name: 'admin-security-policy', label: 'Chính sách bảo mật', icon: 'settings' },
   { root: true, name: 'admin-staff', label: 'Phân quyền', icon: 'users' },
   { name: 'account', label: 'Tài khoản', icon: 'user' },
 ]

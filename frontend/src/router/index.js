@@ -40,7 +40,6 @@ import AdminRenewalsView from '../views/admin/RenewalsView.vue'
 import AdminPaymentRequestsView from '../views/admin/PaymentRequestsView.vue'
 import AdminMessagesView from '../views/admin/MessagesView.vue'
 import AdminNoticesView from '../views/admin/NoticesView.vue'
-import AdminBackupsView from '../views/admin/BackupsView.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: LoginView, meta: { public: true, title: 'Đăng nhập' } },
@@ -96,7 +95,7 @@ const routes = [
     path: '/admin/settings',
     name: 'admin-settings',
     component: AdminSettingsView,
-    meta: { title: 'Cài đặt hệ thống', requiresAdmin: true, perm: ['settings.manage', 'security.view'] },
+    meta: { title: 'Cài đặt hệ thống', requiresAdmin: true, perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'] },
   },
   {
     path: '/admin/renewals',
@@ -128,18 +127,9 @@ const routes = [
     component: AdminNoticesView,
     meta: { title: 'Thông báo & bảo trì', requiresAdmin: true, perm: 'announcements.manage' },
   },
-  {
-    path: '/admin/backups',
-    name: 'admin-backups',
-    component: AdminBackupsView,
-    meta: { title: 'Sao lưu dữ liệu', requiresAdmin: true, perm: 'backups.manage' },
-  },
-  {
-    path: '/admin/security-policy',
-    name: 'admin-security-policy',
-    component: () => import('../views/admin/SecurityPolicyView.vue'),
-    meta: { title: 'Chính sách bảo mật', requiresAdmin: true, perm: 'security.policy' },
-  },
+  // Sao lưu and Chính sách bảo mật now live in Cài đặt (tabs); the old addresses still work.
+  { path: '/admin/backups', redirect: { name: 'admin-settings', query: { tab: 'backups' } } },
+  { path: '/admin/security-policy', redirect: { name: 'admin-settings', query: { tab: 'policy' } } },
   {
     path: '/admin/staff',
     name: 'admin-staff',

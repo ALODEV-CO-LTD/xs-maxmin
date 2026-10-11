@@ -6,6 +6,7 @@
   Backup files never go into git (backend/data/ is ignored).
 -->
 <script setup>
+defineProps({ embedded: { type: Boolean, default: false } }) // true inside Cài đặt (no page title)
 import { onMounted, ref } from 'vue'
 import { api, ApiError } from '../../api'
 
@@ -72,8 +73,8 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="page">
-    <h1 class="page-title">Sao lưu dữ liệu</h1>
+  <div :class="embedded ? 'embedded' : 'page'">
+    <h1 v-if="!embedded" class="page-title">Sao lưu dữ liệu</h1>
     <p class="page-subtitle">Tạo bản sao lưu cơ sở dữ liệu (lưu trên máy chủ) và tải về máy của bạn. Bản sao lưu chứa dữ liệu của mọi người dùng, hãy cất giữ cẩn thận.</p>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>

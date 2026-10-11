@@ -24,6 +24,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import SecurityPolicyView from './SecurityPolicyView.vue'
+import BackupsView from './BackupsView.vue'
 
 const packages = [
   { wire: '1m', label: '1 tháng', default: 99000 },
@@ -214,6 +216,8 @@ async function loadEvents() {
 const auth = useAuthStore()
 const canSettings = auth.can('settings.manage')
 const canSecurity = auth.can('security.view')
+const canPolicy = auth.can('security.policy')
+const canBackups = auth.can('backups.manage')
 if (canSettings) onMounted(load)
 else loading.value = false
 if (canSecurity) onMounted(loadEvents)
@@ -229,6 +233,8 @@ const TABS = computed(() => [
       ]
     : []),
   ...(canSecurity ? [{ key: 'security', label: 'Nhật ký bảo mật' }] : []),
+  ...(canPolicy ? [{ key: 'policy', label: 'Chính sách bảo mật' }] : []),
+  ...(canBackups ? [{ key: 'backups', label: 'Sao lưu' }] : []),
   ...(canSettings && otherKeys.value.length > 0 ? [{ key: 'other', label: 'Khoá khác' }] : []),
 ])
 const tab = ref(route.query.tab)
@@ -252,7 +258,7 @@ function onTabKey(e) {
 <template>
   <div class="page">
     <h1 class="page-title">Cài đặt hệ thống</h1>
-    <p class="page-subtitle">Thanh toán, giá gói, giới hạn tài khoản và nhật ký bảo mật</p>
+    <p class="page-subtitle">Thanh toán, giá gói, giới hạn tài khoản, nhật ký và chính sách bảo mật, sao lưu</p>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
     <div v-if="saved" class="alert alert-success">Đã lưu cài đặt</div>
@@ -349,6 +355,13 @@ function onTabKey(e) {
       </div>
     </template>
 
+    <div v-if="canPolicy && activeTab === 'policy'" role="tabpanel">
+      <SecurityPolicyView embedded />
+    </div>
+    <div v-if="canBackups && activeTab === 'backups'" role="tabpanel">
+      <BackupsView embedded />
+    </div>
+
     <template v-if="canSecurity && activeTab === 'security'">
     <h2 style="margin-top: 0">Nhật ký bảo mật gần đây</h2>
     <p class="page-subtitle">Không ghi mật khẩu hay token.</p>
@@ -405,15 +418,15 @@ function onTabKey(e) {
 .set-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 20px;
 }
 .set-tab {
-  flex: 1 0 auto;
-  min-height: 44px;
-  padding: 0 20px;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;

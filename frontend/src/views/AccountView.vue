@@ -961,16 +961,16 @@ async function deleteAllData() {
 .acct-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
   margin-bottom: 20px;
 }
 /* each tab is its own button (not one stretched bar) */
 .acct-tab {
   flex: 0 0 auto;
-  min-height: 44px;
-  padding: 0 22px;
+  min-height: 36px;
+  padding: 0 14px;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;

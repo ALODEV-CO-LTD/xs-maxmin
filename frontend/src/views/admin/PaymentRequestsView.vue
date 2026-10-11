@@ -312,13 +312,13 @@ onMounted(load)
 .tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 12px;
 }
 .tab {
-  flex: 1 0 auto;
-  min-height: 40px;
-  padding: 0 16px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
   font: inherit;
   font-size: 14px;
   font-weight: 600;

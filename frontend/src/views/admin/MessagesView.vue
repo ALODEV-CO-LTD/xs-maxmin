@@ -239,7 +239,7 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  padding: 5px 10px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;

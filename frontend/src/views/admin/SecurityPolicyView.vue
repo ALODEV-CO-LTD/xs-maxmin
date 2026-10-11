@@ -6,6 +6,7 @@
   API: GET/PUT/DELETE /admin/security-policy
 -->
 <script setup>
+defineProps({ embedded: { type: Boolean, default: false } }) // true inside Cài đặt (no page title)
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api, ApiError } from '../../api'
 import { showConfirm } from '../../confirm'
@@ -89,8 +90,8 @@ async function reset() {
 </script>
 
 <template>
-  <div class="page">
-    <h1 class="page-title">Chính sách bảo mật</h1>
+  <div :class="embedded ? 'embedded' : 'page'">
+    <h1 v-if="!embedded" class="page-title">Chính sách bảo mật</h1>
     <p class="page-subtitle">Áp dụng cho toàn hệ thống. Mọi thay đổi được ghi vào nhật ký bảo mật.</p>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>

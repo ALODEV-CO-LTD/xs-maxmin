@@ -107,7 +107,7 @@ defineProps({
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 38px;
   border: 1px solid var(--input-border);
   border-radius: 10px;
   background: var(--surface);
