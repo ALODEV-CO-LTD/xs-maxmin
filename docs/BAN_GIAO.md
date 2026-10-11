@@ -192,7 +192,8 @@ Bản app khách hàng cho Android, dùng chung API với bản web. Chạy: `cd
 
 - Cấu trúc: `lib/core` (API client, phiên đăng nhập, theme, đài/miền, cấu hình tính điểm, Ẩn số liệu), `lib/features/{entries,customers,results,scoring,friends,account,auth,shell}`, `lib/app.dart` (router + providers).
 - Đã có: đăng nhập 2 lớp, đăng ký, khôi phục (kể cả nhờ Admin), Nhập số (tay, dán tin nhắn, ảnh bằng ML Kit, hàng đợi offline), Khách hàng và cấu hình tính điểm theo miền, Nhập kết quả (Miền Bắc, bảng Miền Nam/Trung, đọc ảnh), Tính điểm (tổng kết tiền), Bạn bè (chat mã hoá 2 đầu tương thích bản web, ảnh, gọi thoại WebRTC), Tài khoản (hồ sơ, mật khẩu, thiết bị, gói và thanh toán, thống kê), chống chụp màn hình (FLAG_SECURE), tự khoá, làm mờ theo chính sách.
-- Chưa có: dấu tên người xem, lịch xoá dữ liệu, "méo giọng", cuộc gọi đến khi không mở màn Bạn bè (cần dịch vụ nền), tài khoản Admin (dùng bản web), iOS.
+- **Khu Admin trong cùng app** (`lib/features/admin/`, ngăn kéo theo quyền như bản web): Thống kê (biểu đồ), Khách hàng (khoá, thiết bị, đặt lại mật khẩu, khôi phục), Thanh toán & gia hạn, Phản hồi (hộp thư hỗ trợ), Thông báo & bảo trì, Cài đặt (thanh toán, gói, giới hạn ID, nhật ký, chính sách bảo mật, sao lưu; chỉ hiển thị, bấm Sửa mới chỉnh), Phân quyền (Admin gốc). App tự chọn giao diện khách hàng hoặc Admin theo vai trò tài khoản đăng nhập.
+- Chưa có: dấu tên người xem, lịch xoá dữ liệu, "méo giọng", cuộc gọi đến khi không mở màn Bạn bè (cần dịch vụ nền), thông báo đẩy tức thời cho Admin (đang hỏi lại định kỳ), iOS.
 - Cần kiểm tra trên máy thật: camera/ML Kit, gọi thoại, FLAG_SECURE, phát hiện chụp màn hình (Android 14+), minSdk của ML Kit.
 
 ## 10. Việc cần làm ngay khi nhận bàn giao
