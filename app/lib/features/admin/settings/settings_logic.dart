@@ -253,6 +253,7 @@ List<SettingsSection> settingsSections({required bool settings, required bool se
   if (settings) const SettingsSection('payment', 'Thanh toán'),
   if (settings) const SettingsSection('prices', 'Giá gói'),
   if (settings) const SettingsSection('limits', 'Giới hạn ID'),
+  if (settings) const SettingsSection('appversion', 'Phiên bản ứng dụng'),
   if (security) const SettingsSection('security', 'Nhật ký bảo mật'),
   if (policy) const SettingsSection('policy', 'Chính sách bảo mật'),
   if (backups) const SettingsSection('backups', 'Sao lưu'),
@@ -265,5 +266,5 @@ const _internalKeys = {'unread_epoch', 'e2ee_friend_chat_purged', 'perm_split_ma
 /// Keys of the generic store not covered by a dedicated form.
 List<String> otherSettingKeys(Map<String, dynamic> raw) => [
   for (final k in raw.keys)
-    if (!k.startsWith('package_price_') && !_bankKeys.contains(k) && !_internalKeys.contains(k)) k,
+    if (!k.startsWith('package_price_') && !k.startsWith('app_') && !_bankKeys.contains(k) && !_internalKeys.contains(k)) k,
 ];

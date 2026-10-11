@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/admin_session.dart';
 import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
+import 'settings_appversion.dart';
 import 'settings_backups.dart';
 import 'settings_forms.dart';
 import 'settings_logic.dart';
@@ -95,6 +96,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         return MaxIdsSection(raw: _raw, onRaw: (r) => _raw = r);
       case 'prices':
         return const PackagesSection();
+      case 'appversion':
+        return const AppVersionSection();
       case 'security':
         return const SecurityEventsSection();
       case 'policy':

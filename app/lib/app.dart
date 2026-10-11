@@ -27,6 +27,7 @@ import 'features/results/results_screen.dart';
 import 'features/scoring/scoring_screen.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/shell/app_shell.dart';
+import 'features/shell/update_gate.dart';
 import 'features/shell/more_screen.dart';
 
 const _authRoutes = {'/login', '/register', '/recover'};
@@ -109,7 +110,7 @@ class _MambaAppState extends State<MambaApp> {
           notifier: _notifier,
           ringer: _ringer,
           background: _background,
-          child: PrivacyGate(child: child ?? const SizedBox.shrink()),
+          child: UpdateGate(api: _api, child: PrivacyGate(child: child ?? const SizedBox.shrink())),
         ),
         locale: const Locale('vi'),
         localizationsDelegates: const [

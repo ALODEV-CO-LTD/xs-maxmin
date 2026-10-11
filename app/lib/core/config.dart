@@ -2,7 +2,9 @@
 /// `flutter run --dart-define=API_BASE=http://10.0.2.2:8080` (10.0.2.2 = the host machine from the Android emulator).
 class AppConfig {
   /// Shown on the login screen so it is easy to tell which build is installed (keep in step with pubspec.yaml `version`).
-  static const appVersion = '1.2.1 (4)';
+  static const appVersionName = '1.3.0';
+  static const appBuild = 5;
+  static const appVersion = '$appVersionName ($appBuild)';
 
   static const apiBase = String.fromEnvironment('API_BASE', defaultValue: 'https://xs.massagehomeriyadh.com');
 

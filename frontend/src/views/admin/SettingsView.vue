@@ -26,6 +26,7 @@ import { api, ApiError } from '../../api'
 import { useAuthStore } from '../../stores/auth'
 import { showConfirm } from '../../confirm'
 import SecurityPolicyView from './SecurityPolicyView.vue'
+import AppVersionPanel from '../../components/AppVersionPanel.vue'
 import BackupsView from './BackupsView.vue'
 
 // BIN codes per Napas/VietQR - used both to identify the bank on transfers
@@ -120,7 +121,7 @@ async function saveMaxIds() {
 const INTERNAL_KEYS = ['unread_epoch', 'e2ee_friend_chat_purged', 'perm_split_maintenance']
 const otherKeys = computed(() =>
   Object.keys(raw.value).filter(
-    (k) => !k.startsWith('package_price_') && !bankKeys.includes(k) && !INTERNAL_KEYS.includes(k),
+    (k) => !k.startsWith('package_price_') && !k.startsWith('app_') && !bankKeys.includes(k) && !INTERNAL_KEYS.includes(k),
   ),
 )
 
@@ -255,6 +256,7 @@ const EVENT_LABELS = {
   login_locked: 'Khoá tạm đăng nhập',
   session_revoked: 'Thu hồi phiên',
   data_wiped: 'Xoá dữ liệu',
+  app_version_changed: 'Đổi phiên bản ứng dụng',
 }
 
 async function loadEvents() {
@@ -285,6 +287,7 @@ const TABS = computed(() => [
         { key: 'payment', label: 'Thanh toán' },
         { key: 'prices', label: 'Gói dịch vụ' },
         { key: 'limits', label: 'Giới hạn ID' },
+        { key: 'appversion', label: 'Phiên bản ứng dụng' },
       ]
     : []),
   ...(canSecurity ? [{ key: 'security', label: 'Nhật ký bảo mật' }] : []),
@@ -444,6 +447,10 @@ function onTabKey(e) {
       </div>
       </div>
     </template>
+
+    <div v-if="canSettings && activeTab === 'appversion'" role="tabpanel">
+      <AppVersionPanel />
+    </div>
 
     <div v-if="canPolicy && activeTab === 'policy'" role="tabpanel">
       <SecurityPolicyView embedded />

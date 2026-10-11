@@ -197,6 +197,12 @@ Bản app khách hàng cho Android, dùng chung API với bản web. Chạy: `cd
 - Chưa có: dấu tên người xem, lịch xoá dữ liệu, "méo giọng" (thư viện WebRTC không cho xử lý micro), thông báo đẩy qua Firebase (khi app bị hệ thống tắt hẳn thì không nhận được), iOS. Chưa thử trên điện thoại thật: chuông cuộc gọi, thông báo, dịch vụ nền, âm thanh WebRTC giữa hai máy.
 - Cần kiểm tra trên máy thật: camera/ML Kit, gọi thoại, FLAG_SECURE, phát hiện chụp màn hình (Android 14+), minSdk của ML Kit.
 
+## 9d. Quản lý phiên bản ứng dụng (A17)
+
+Admin đặt trong **Cài đặt > Phiên bản ứng dụng** (web: `components/AppVersionPanel.vue`; app Admin: `features/admin/settings/settings_appversion.dart`; chỉ hiển thị, bấm Sửa mới chỉnh): phiên bản mới nhất, phiên bản tối thiểu còn được dùng (dạng `x.y.z`, tối thiểu ≤ mới nhất), đường dẫn tải (bắt buộc `https://`), ghi chú (≤ 500 ký tự). Lưu trong bảng `settings` (khoá `app_latest_version`, `app_min_version`, `app_download_url`, `app_release_notes`; các khoá này không hiện ở "Khoá khác"). API: `GET/PUT /api/admin/app-version` (quyền `settings.manage`, ghi nhật ký bảo mật `app_version_changed`) và `GET /api/app-version` **công khai** (app hỏi trước khi đăng nhập). Code: `backend/lib/src/app_version.dart`.
+
+App Android (`features/shell/update_gate.dart`, `core/app_version.dart`) hỏi khi mở và khi quay lại sau hơn 1 giờ: thấp hơn bản mới nhất thì hiện thẻ nhắc (bấm "Để sau" thì nhớ theo từng phiên bản), thấp hơn bản tối thiểu thì chặn toàn màn hình tới khi cập nhật, nút "Tải bản mới" mở đường dẫn. Không kết nối được máy chủ thì **không chặn**. Khi phát hành bản mới: sửa `version` trong `app/pubspec.yaml` và `AppConfig.appVersionName/appBuild` trong `app/lib/core/config.dart` cho khớp, rồi đặt phiên bản mới nhất trong Cài đặt.
+
 ## 10. Việc cần làm ngay khi nhận bàn giao
 
 1. **Đặt `XOSO_JWT_SECRET` cố định** trên máy chủ (drop-in như mục 7) để các lần deploy sau không đăng xuất mọi người.

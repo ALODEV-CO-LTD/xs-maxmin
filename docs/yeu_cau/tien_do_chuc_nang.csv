@@ -60,7 +60,7 @@ Admin,A13,Sao lưu và khôi phục hệ thống,Chưa làm,Đã làm,Có đổi
 Admin,A14,Thu hồi phiên bị nghi ngờ,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Thu hồi phiên bị nghi ngờ (cùng A04).,
 Admin,A15,Trung tâm hỗ trợ,Đã làm,Đã làm,Giữ nguyên,—,,
 Admin,A16,Gửi thông báo bảo trì và chính sách,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Gửi thông báo bảo trì/chính sách hiện banner cho người dùng.,
-Admin,A17,Quản lý phiên bản ứng dụng,Chưa làm,Chưa làm,Giữ nguyên,—,,
+Admin,A17,Quản lý phiên bản ứng dụng,Chưa làm,Đã làm,Mới thêm,Chỉ có ở bản local (chưa deploy),"Cài đặt > Phiên bản ứng dụng (web và app Admin): phiên bản mới nhất, phiên bản tối thiểu, đường dẫn tải https, ghi chú. App Android hỏi GET /api/app-version khi mở: thấp hơn mới nhất thì nhắc cập nhật, thấp hơn tối thiểu thì chặn tới khi cập nhật. Lỗi mạng thì không chặn.",
 Admin,A18,Quản lý thanh toán gói dịch vụ,Một phần,Đã làm,Có đổi,Đã lên máy chủ thật,"Mã tham chiếu chuyển khoản, lọc/tìm/phân trang, tổng hợp doanh thu, xuất CSV, lý do từ chối, người dùng huỷ yêu cầu, thông báo kết quả, nhật ký.",
 Hệ thống,S02,Mã hóa dữ liệu khi lưu và truyền,Một phần,Một phần,Giữ nguyên,Đã lên máy chủ thật,"Mật khẩu băm bcrypt, token ký; CSDL SQLite chưa mã hóa khi lưu.",
 Hệ thống,,Khóa sau thời gian chờ,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,Khóa sau thời gian chờ (xem K09).,

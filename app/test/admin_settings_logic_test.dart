@@ -106,13 +106,13 @@ void main() {
       List<String> keys({bool st = false, bool sec = false, bool pol = false, bool bk = false, bool other = false}) =>
           settingsSections(settings: st, security: sec, policy: pol, backups: bk, hasOtherKeys: other).map((e) => e.key).toList();
       expect(keys(), isEmpty);
-      expect(keys(st: true), ['payment', 'prices', 'limits']);
+      expect(keys(st: true), ['payment', 'prices', 'limits', 'appversion']);
       expect(keys(sec: true, bk: true), ['security', 'backups']);
-      expect(keys(st: true, sec: true, pol: true, bk: true, other: true), ['payment', 'prices', 'limits', 'security', 'policy', 'backups', 'other']);
+      expect(keys(st: true, sec: true, pol: true, bk: true, other: true), ['payment', 'prices', 'limits', 'appversion', 'security', 'policy', 'backups', 'other']);
       expect(keys(other: true), isEmpty);
     });
     test('other keys hide dedicated and internal ones', () {
-      expect(otherSettingKeys({'bank_bin': '1', 'package_price_x': '1', 'unread_epoch': '1', 'max_virtual_ids': '5', 'lottery_payout_rate': '0.8'}), ['lottery_payout_rate']);
+      expect(otherSettingKeys({'bank_bin': '1', 'package_price_x': '1', 'unread_epoch': '1', 'max_virtual_ids': '5', 'lottery_payout_rate': '0.8', 'app_latest_version': '1.0.0'}), ['lottery_payout_rate']);
     });
     test('backup size', () {
       expect(formatBackupSize(100), '1 KB');
