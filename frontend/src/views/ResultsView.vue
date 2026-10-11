@@ -39,12 +39,11 @@ const loading = ref(true)
 const loadError = ref('')
 const customers = ref([])
 const selectedCustomer = ref('')
-const onlyMissing = ref(true)
 
-const draft = reactive({}) // id -> string being typed, seeded from entry.result
-const savingAll = ref(false)
-const saveAllMsg = ref('')
-const saveAllError = ref('')
+// "Điểm ra" is never typed: it is worked out from the saved result of the day and each customer's own config,
+// and only for the entries written for the day being entered (see syncScores).
+const syncMsg = ref('')
+const syncError = ref('')
 
 function formatNumber(n) {
   return new Intl.NumberFormat('vi-VN').format(n)
@@ -56,7 +55,6 @@ async function load() {
   try {
     const list = await loadAllEntries({ overlay: false })
     entries.value = list.entries
-    for (const e of list.entries) draft[e.id] = e.result || ''
   } catch (err) {
     loadError.value = err.message || 'Không tải được số liệu'
   } finally {
@@ -94,11 +92,13 @@ async function loadRates() {
 onMounted(async () => {
   await Promise.all([load(), loadCustomers(), loadRates()])
   if (!selectedCustomer.value && customers.value.length) selectedCustomer.value = customers.value[0].name
+  await loadDayResults()
 })
 
+// Only the entries of the day whose result is being entered.
 const filtered = computed(() => {
   return entries.value.filter((e) => {
-    if (onlyMissing.value && e.result) return false
+    if (e.entryDate !== lotteryDate.value) return false
     if (selectedCustomer.value && (e.customerName || '(Không tên)') !== selectedCustomer.value) return false
     return true
   })
@@ -118,35 +118,7 @@ const groupedByCustomer = computed(() => {
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
 })
 
-// Entries whose typed/auto-filled "Điểm ra" differs from what is stored.
-const dirtyEntries = computed(() => entries.value.filter((e) => (draft[e.id] ?? '').trim() !== (e.result || '')))
-
-// One button saves every changed "Điểm ra", across all customers.
-async function saveAllResults() {
-  saveAllMsg.value = ''
-  saveAllError.value = ''
-  const list = [...dirtyEntries.value]
-  if (!list.length) return
-  savingAll.value = true
-  let ok = 0
-  let failed = 0
-  for (const entry of list) {
-    try {
-      const updated = await api.patch(`/me/entries/${entry.id}`, { result: (draft[entry.id] || '').trim() })
-      const idx = entries.value.findIndex((e) => e.id === entry.id)
-      if (idx !== -1) entries.value[idx] = updated
-      draft[entry.id] = updated.result || ''
-      ok++
-    } catch (_) {
-      failed++
-    }
-  }
-  savingAll.value = false
-  if (ok) saveAllMsg.value = `Đã lưu điểm ra cho ${ok} số liệu.`
-  if (failed) saveAllError.value = `${failed} số liệu không lưu được, thử lại.`
-}
-
-// ---- Auto-fill "Điểm ra" from a lottery result (display only, saved by the button above) ----
+// ---- Điểm ra, calculated ----------------------------------------------------------------------------------
 function toNumber(str) {
   if (!str) return 0
   const n = parseFloat(String(str).replace(/[^\d.-]/g, ''))
@@ -161,12 +133,40 @@ function computeScoreFromResults(entry, byStation) {
   // Rates are per region: each station is scored with the config of its own region.
   return done.reduce((sum, st) => sum + entryDetail(entry, byStation[st], effectiveConfig(rates.value, own, entry.betType, regionOf(st).id)).out, 0)
 }
-function fillResultsForDate(date, byStation) {
-  for (const e of entries.value) {
-    if (e.entryDate !== date) continue
-    const v = computeScoreFromResults(e, byStation)
-    if (v !== null) draft[e.id] = String(v)
+
+const dayResults = ref({}) // station id -> saved result of the selected day
+async function loadDayResults() {
+  try {
+    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
+    dayResults.value = Object.fromEntries(results.map((r) => [r.station, r]))
+  } catch (_) {
+    dayResults.value = {}
   }
+}
+// Calculated "Điểm ra" of an entry (null = the day has no result for its station yet).
+const scoreOf = (e) => computeScoreFromResults(e, dayResults.value)
+
+// Stores the calculated value on every entry of the day (called after a result is saved).
+async function syncScores() {
+  syncMsg.value = ''
+  syncError.value = ''
+  let ok = 0
+  let failed = 0
+  for (const e of entries.value) {
+    if (e.entryDate !== lotteryDate.value) continue
+    const v = scoreOf(e)
+    if (v === null || String(v) === (e.result || '')) continue
+    try {
+      const updated = await api.patch(`/me/entries/${e.id}`, { result: String(v) })
+      const idx = entries.value.findIndex((x) => x.id === e.id)
+      if (idx !== -1) entries.value[idx] = updated
+      ok++
+    } catch (_) {
+      failed++
+    }
+  }
+  if (ok) syncMsg.value = `Đã tính và lưu điểm ra cho ${ok} số liệu.`
+  if (failed) syncError.value = `${failed} số liệu chưa lưu được điểm ra, lưu lại kết quả để thử lại.`
 }
 
 // ---- Kết quả xổ số (Miền Bắc / Miền Trung / Miền Nam, theo đài) ------------------------------------------
@@ -174,6 +174,8 @@ function fillResultsForDate(date, byStation) {
 // ?date=YYYY-MM-DD (link from the Tính điểm day cards) opens that day.
 const queryDate = String(useRoute().query.date || '')
 const lotteryDate = ref(/^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : today())
+watch(lotteryDate, loadDayResults)
+
 // ‹ › step the day by one, so yesterday's saved result is one tap away.
 function shiftDay(delta) {
   const [y, m, d] = lotteryDate.value.split('-').map(Number)
@@ -294,8 +296,8 @@ async function saveLottery() {
     hasSavedLottery.value = true
     lotteryLocked.value = true
     // Entries of this day can span several stations: score them with every result saved that day.
-    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
-    fillResultsForDate(lotteryDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
+    await loadDayResults()
+    await syncScores()
   } catch (err) {
     lotteryError.value = err.message || 'Không lưu được kết quả xổ số'
   } finally {
@@ -316,6 +318,7 @@ async function deleteLottery() {
   try {
     await api.del(`/lottery-results?date=${lotteryDate.value}&station=${encodeURIComponent(station.value)}`)
     applyLotteryResult(null)
+    await loadDayResults()
     lotterySaveMsg.value = `Đã xoá kết quả xổ số ${stationLabelOf.value} ngày ${lotteryDate.value}.`
   } catch (err) {
     lotteryError.value = err.message || 'Không xoá được'
@@ -401,8 +404,8 @@ async function saveBoard() {
       boardEdit[st] = false
     }
     lotterySaveMsg.value = `Đã lưu kết quả ${todo.map(stationName).join(', ')} ngày ${lotteryDate.value.split('-').reverse().join('/')}.`
-    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
-    fillResultsForDate(lotteryDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
+    await loadDayResults()
+    await syncScores()
   } catch (err) {
     lotteryError.value = err.message || 'Không lưu được kết quả xổ số'
   } finally {
@@ -425,6 +428,7 @@ async function deleteBoardColumn(st) {
     board[st] = shapeForm(null)
     boardSaved[st] = false
     boardRead[st] = false
+    await loadDayResults()
     lotterySaveMsg.value = `Đã xoá kết quả xổ số ${stationName(st)} ngày ${lotteryDate.value}.`
   } catch (err) {
     lotteryError.value = err.message || 'Không xoá được'
@@ -814,32 +818,20 @@ function clearLotteryForm() {
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
       <div class="filters card">
-        <label class="check-field">
-          <input type="checkbox" v-model="onlyMissing" />
-          Chỉ hiện số liệu chưa có điểm ra
-        </label>
+        <strong class="filters-title">Điểm ra ngày {{ lotteryDate.split('-').reverse().join('/') }}</strong>
         <div class="field filter-customer" style="margin: 0">
           <AppSelect v-model="selectedCustomer" aria-label="Khách hàng">
             <option value="">Tất cả khách hàng</option>
             <option v-for="c in customers" :key="c.id" :value="c.name">{{ c.name }}</option>
           </AppSelect>
         </div>
-        <button
-          type="button"
-          class="btn btn-primary filters-save"
-          :disabled="savingAll || dirtyEntries.length === 0"
-          @click="saveAllResults"
-        >
-          {{ savingAll ? 'Đang lưu...' : `Lưu điểm ra${dirtyEntries.length ? ` (${dirtyEntries.length})` : ''}` }}
-        </button>
+        <span class="page-subtitle filters-note">Tự tính theo kết quả đã lưu và công thức của từng khách.</span>
       </div>
 
-      <div v-if="saveAllMsg" class="alert alert-success">{{ saveAllMsg }}</div>
-      <div v-if="saveAllError" class="alert alert-error">{{ saveAllError }}</div>
+      <div v-if="syncMsg" class="alert alert-success">{{ syncMsg }}</div>
+      <div v-if="syncError" class="alert alert-error">{{ syncError }}</div>
 
-      <div v-if="groupedByCustomer.length === 0" class="card">
-        {{ onlyMissing ? 'Không còn số liệu nào cần nhập kết quả.' : 'Không có số liệu phù hợp.' }}
-      </div>
+      <div v-if="groupedByCustomer.length === 0" class="card">Không có số liệu nào của ngày này.</div>
 
       <div v-else class="customer-groups">
         <div v-for="group in groupedByCustomer" :key="group.name" class="card customer-group">
@@ -850,20 +842,15 @@ function clearLotteryForm() {
 
           <div class="result-list">
             <div v-for="entry in group.entries" :key="entry.id" class="result-row">
-              <div class="result-row-top">
-                <span class="chip">{{ entry.entryDate }}</span>
-              </div>
               <div class="result-value">{{ entry.value }}</div>
               <div class="result-meta">
                 <span v-if="entry.score">Điểm vào: {{ formatNumber(Number(entry.score) || entry.score) }}</span>
               </div>
-              <div class="result-input-row">
-                <input
-                  v-model="draft[entry.id]"
-                  type="text"
-                  inputmode="decimal"
-                  placeholder="Điểm ra"
-                />
+              <div class="result-out">
+                <template v-if="scoreOf(entry) !== null">
+                  Điểm ra: <strong>{{ formatNumber(scoreOf(entry)) }}</strong>
+                </template>
+                <span v-else class="muted-out">Chưa có kết quả xổ số</span>
               </div>
             </div>
           </div>
@@ -876,6 +863,20 @@ function clearLotteryForm() {
 <style scoped>
 .lottery-card {
   margin-bottom: 16px;
+}
+.filters-title {
+  margin-right: 8px;
+}
+.filters-note {
+  margin: 0;
+}
+.result-out {
+  order: 4;
+  flex: 1 1 160px;
+  font-size: 15px;
+}
+.muted-out {
+  color: var(--muted);
 }
 .date-nav {
   display: inline-flex;
