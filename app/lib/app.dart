@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -89,6 +90,11 @@ class _MambaAppState extends State<MambaApp> {
         routerConfig: _router,
         builder: (context, child) => PrivacyGate(child: child ?? const SizedBox.shrink()),
         locale: const Locale('vi'),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         supportedLocales: const [Locale('vi')],
       ),
     );

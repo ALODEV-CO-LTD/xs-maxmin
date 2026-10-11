@@ -6,13 +6,11 @@ class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
 
-  static const _titles = ['Nhập số', 'Nhập kết quả', 'Tính điểm', 'Khách hàng', 'Thêm'];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[shell.currentIndex], style: const TextStyle(fontWeight: FontWeight.w700))),
-      body: shell,
+      // Each tab draws its own heading, so there is no AppBar (it only repeated the title).
+      body: SafeArea(bottom: false, child: shell),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
