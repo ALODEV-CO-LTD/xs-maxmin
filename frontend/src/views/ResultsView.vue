@@ -63,8 +63,9 @@ function blankLotteryForm() {
 const lotteryForm = reactive(blankLotteryForm())
 const hasSavedLottery = ref(false)
 // A saved result is only displayed; "Sửa" unlocks the boxes.
-const lotteryEditing = ref(false)
-const lotteryReadOnly = computed(() => hasSavedLottery.value && !lotteryEditing.value)
+// The form is also locked after a photo has been read (it only shows what was read); "Sửa" unlocks it.
+const lotteryLocked = ref(false)
+const lotteryReadOnly = computed(() => lotteryLocked.value)
 // A form object for the region's structure, filled from `values` where they fit.
 function shapeForm(values) {
   const out = {}
@@ -94,7 +95,7 @@ const lotteryDeleting = ref(false)
 
 function applyLotteryResult(r) {
   hasSavedLottery.value = !!r
-  lotteryEditing.value = false
+  lotteryLocked.value = !!r
   resetLotteryForm(r)
 }
 
@@ -153,7 +154,7 @@ async function saveLottery() {
     await api.post('/lottery-results', body)
     lotterySaveMsg.value = `Đã lưu kết quả xổ số ${stationLabelOf.value} ngày ${lotteryDate.value}.`
     hasSavedLottery.value = true
-    lotteryEditing.value = false
+    lotteryLocked.value = true
   } catch (err) {
     lotteryError.value = err.message || 'Không lưu được kết quả xổ số'
   } finally {
@@ -198,7 +199,7 @@ const cellBad = (st, p, v) => {
 }
 const boardDeleting = ref('')
 const boardEdit = reactive({}) // station id -> true while a saved column is unlocked
-const boardLocked = (st) => !!boardSaved[st] && !boardEdit[st]
+const boardLocked = (st) => !!(boardSaved[st] || boardRead[st]) && !boardEdit[st]
 
 // Only digits can be typed or pasted into a prize box, and never more than the prize has.
 function digitsOnly(form) {
@@ -331,7 +332,7 @@ async function processLrImage(file) {
 }
 
 function applyLrOcrGuess(text) {
-  lotteryEditing.value = true
+  lotteryLocked.value = true
   // Chỉ nhận những "từ" (tách bởi khoảng trắng) mà TOÀN BỘ là chữ số -
   // bỏ hẳn nhãn cột kiểu "13GH", "2GH" (thường gặp khi chụp từ trang web
   // khác) thay vì cố tách phần số ra khỏi chúng: \d+ với lookaround từng
@@ -422,7 +423,7 @@ async function processMcImage(file) {
       }
       board[c.station] = shapeForm(c.values)
       boardRead[c.station] = true
-      boardEdit[c.station] = true
+      boardEdit[c.station] = false
       if (!c.complete) mcWarnings.value.push(`${stationName(c.station)}: ${c.issues.join('; ')}`)
     }
     lotterySaveMsg.value = 'Đã điền bảng từ ảnh. Kiểm tra các ô (ô đỏ là chưa đủ hoặc sai độ dài) rồi bấm "Lưu kết quả".'
@@ -466,7 +467,7 @@ function clearLotteryForm() {
     return
   }
   resetLotteryForm(null)
-  lotteryEditing.value = true
+  lotteryLocked.value = false
   if (lrOcrPreviewUrl.value) URL.revokeObjectURL(lrOcrPreviewUrl.value)
   lrOcrPreviewUrl.value = ''
   lrOcrError.value = ''
@@ -596,7 +597,7 @@ function clearLotteryForm() {
               <tr>
                 <th class="board-tier"></th>
                 <td v-for="st in boardStations" :key="st">
-                  <button v-if="boardLocked(st)" type="button" class="btn btn-secondary btn-sm" @click="boardEdit[st] = true">Sửa</button>
+                  <button type="button" class="btn btn-secondary btn-sm" :disabled="!boardLocked(st)" @click="boardEdit[st] = true">Sửa</button>
                   <button v-if="boardSaved[st]" type="button" class="btn btn-danger btn-sm" :disabled="boardDeleting === st" @click="deleteBoardColumn(st)">
                     {{ boardDeleting === st ? 'Đang xoá...' : 'Xoá kết quả' }}
                   </button>
@@ -605,6 +606,7 @@ function clearLotteryForm() {
             </tfoot>
           </table>
           <div class="lottery-actions">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="!boardStations.some(boardLocked)" @click="boardStations.forEach((st) => (boardEdit[st] = true))">Sửa</button>
             <button type="button" class="btn btn-ghost btn-sm" @click="clearLotteryForm">Xoá form</button>
             <button type="button" class="btn btn-primary" :disabled="lotterySaving || !boardStations.length" @click="saveLottery">
               {{ lotterySaving ? 'Đang lưu...' : 'Lưu kết quả' }}
@@ -656,9 +658,9 @@ function clearLotteryForm() {
           >
             {{ lotteryDeleting ? 'Đang xoá...' : 'Xoá kết quả này' }}
           </button>
-          <button v-if="lotteryReadOnly" type="button" class="btn btn-secondary btn-sm" @click="lotteryEditing = true">Sửa</button>
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="!lotteryReadOnly" @click="lotteryLocked = false">Sửa</button>
           <button type="button" class="btn btn-ghost btn-sm" @click="clearLotteryForm">Xoá form</button>
-          <button type="button" class="btn btn-primary" :disabled="lotterySaving || lotteryReadOnly" @click="saveLottery">
+          <button type="button" class="btn btn-primary" :disabled="lotterySaving" @click="saveLottery">
             {{ lotterySaving ? 'Đang lưu...' : 'Lưu kết quả' }}
           </button>
         </div>

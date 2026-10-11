@@ -11,6 +11,11 @@ import AppSelect from '../../components/AppSelect.vue'
 import { onMounted, ref } from 'vue'
 import { api, ApiError } from '../../api'
 import { showConfirm } from '../../confirm'
+import { useAuthStore } from '../../stores/auth'
+
+// Maintenance mode is stored via /admin/settings, which needs settings.manage;
+// staff holding only announcements.manage get the announcements part alone.
+const canMaintenance = useAuthStore().can('settings.manage')
 
 const KINDS = [
   { value: 'maintenance', label: 'Bảo trì' },
@@ -37,7 +42,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, ann] = await Promise.all([api.get('/admin/settings'), api.get('/admin/announcements')])
+    const [settings, ann] = await Promise.all([
+      canMaintenance ? api.get('/admin/settings') : Promise.resolve({}),
+      api.get('/admin/announcements'),
+    ])
     maintenanceOn.value = settings.maintenance_enabled === 'true'
     maintenanceMessage.value = settings.maintenance_message || ''
     list.value = ann.announcements
@@ -120,7 +128,7 @@ onMounted(load)
     <div v-if="loading" class="card">Đang tải...</div>
 
     <template v-else>
-      <section class="card block">
+      <section v-if="canMaintenance" class="card block">
         <h3 class="block-title">Chế độ bảo trì</h3>
         <label class="check-row">
           <input v-model="maintenanceOn" type="checkbox" />
