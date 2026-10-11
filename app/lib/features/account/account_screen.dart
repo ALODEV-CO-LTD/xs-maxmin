@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/logout.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -70,6 +71,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tài khoản'),
+        actions: [IconButton(icon: const Icon(Icons.logout), tooltip: 'Đăng xuất', onPressed: () => confirmLogout(context))],
         leading: context.canPop() ? null : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/more')),
       ),
       body: ListenableBuilder(

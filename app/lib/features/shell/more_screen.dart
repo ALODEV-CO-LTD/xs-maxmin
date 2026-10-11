@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/logout.dart';
 import 'package:go_router/go_router.dart';
 
 import '../friends/friends_controller.dart';
@@ -15,6 +16,13 @@ class MoreScreen extends StatelessWidget {
       children: [
         _tile(context, Icons.chat_bubble_outline, 'Bạn bè', 'Nhắn tin, gọi thoại, mã ID kết bạn', '/friends', badgeOf: hub),
         _tile(context, Icons.person_outline, 'Tài khoản', 'Hồ sơ, mật khẩu, thiết bị, gói & thanh toán', '/account'),
+        Card(
+          child: ListTile(
+            leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+            title: Text('Đăng xuất', style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.error)),
+            onTap: () => confirmLogout(context),
+          ),
+        ),
       ],
     );
   }

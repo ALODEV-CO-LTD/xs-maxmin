@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/admin_session.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/widgets/logout.dart';
 import 'messages/admin_messages_screen.dart';
 import 'notices/admin_notices_screen.dart';
 import 'payments/admin_payments_screen.dart';
@@ -110,6 +111,14 @@ class _AdminShellState extends State<AdminShell> {
               Navigator.pop(context);
               context.push('/account');
             }),
+            ListTile(
+              leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+              title: Text('Đăng xuất', style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                confirmLogout(context);
+              },
+            ),
           ]),
         ),
       ),
