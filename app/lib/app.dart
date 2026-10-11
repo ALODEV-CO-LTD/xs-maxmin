@@ -8,6 +8,8 @@ import 'core/lottery_stations.dart';
 import 'core/mask_store.dart';
 import 'core/theme.dart';
 import 'features/account/account_screen.dart';
+import 'features/account/privacy/privacy_gate.dart';
+import 'features/account/privacy/privacy_store.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/recover_screen.dart';
 import 'features/auth/register_screen.dart';
@@ -65,6 +67,7 @@ class _MambaAppState extends State<MambaApp> {
   late final ApiClient _api = ApiClient(_auth);
   final LotteryStations _stations = LotteryStations();
   final MaskStore _mask = MaskStore()..load();
+  final PrivacyStore _privacy = PrivacyStore();
   late final GoRouter _router = buildRouter(_auth);
 
   @override
@@ -75,6 +78,7 @@ class _MambaAppState extends State<MambaApp> {
         Provider<ApiClient>.value(value: _api),
         ChangeNotifierProvider<LotteryStations>.value(value: _stations),
         ChangeNotifierProvider<MaskStore>.value(value: _mask),
+        ChangeNotifierProvider<PrivacyStore>.value(value: _privacy),
       ],
       child: MaterialApp.router(
         title: 'MAMBA',
@@ -83,6 +87,7 @@ class _MambaAppState extends State<MambaApp> {
         darkTheme: darkTheme,
         themeMode: ThemeMode.dark,
         routerConfig: _router,
+        builder: (context, child) => PrivacyGate(child: child ?? const SizedBox.shrink()),
         locale: const Locale('vi'),
         supportedLocales: const [Locale('vi')],
       ),
