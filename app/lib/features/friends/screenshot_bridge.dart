@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/services.dart';
+import 'package:screen_protector/screen_protector.dart';
 
 /// Android 14+ can report screenshots of the app only through native code: MainActivity forwards them on this channel
 /// (method `screenshot`). The web warns the friend when it detects a screenshot shortcut; the app does the same
@@ -25,12 +28,15 @@ class ScreenshotBridge {
     if (_attached) return;
     _attached = true;
     _channel.setMethodCallHandler(handle);
+    // iOS reports a screenshot (taken, even if it comes out blank) through the screen_protector plugin.
+    if (Platform.isIOS) ScreenProtector.addListener(() => handle(const MethodCall('screenshot')), (_) {});
   }
 
   void detach() {
     if (!_attached) return;
     _attached = false;
     _channel.setMethodCallHandler(null);
+    if (Platform.isIOS) ScreenProtector.removeListener();
   }
 
   Future<void> handle(MethodCall call) async {
