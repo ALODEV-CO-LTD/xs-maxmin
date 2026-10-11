@@ -19,9 +19,7 @@
        PATCH /me/entries/:id with only `{ result }`.
 -->
 <script setup>
-import { effectiveConfig } from '../scoringConfig'
-import { entryDetail } from '../scoringSummary'
-import { entryStations, loadStations, regionList, regionOf, stationName, stationsOn } from '../lotteryStations'
+import { loadStations, regionList, regionOf, stationName, stationsOn } from '../lotteryStations'
 import { assignStations, parseColumns } from '../lotteryColumns'
 import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { showConfirm } from '../confirm'
@@ -30,150 +28,20 @@ import AppIcon from '../components/AppIcon.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { nextTick, onMounted, computed, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import { loadAllEntries } from '../offline'
 import { today } from '../dates'
 import { useRoute } from 'vue-router'
-
-const entries = ref([])
-const loading = ref(true)
-const loadError = ref('')
-const customers = ref([])
-const selectedCustomer = ref('')
-const onlyMissing = ref(true)
-
-const draft = reactive({}) // id -> string being typed, seeded from entry.result
-const savingAll = ref(false)
-const saveAllMsg = ref('')
-const saveAllError = ref('')
-
-function formatNumber(n) {
-  return new Intl.NumberFormat('vi-VN').format(n)
-}
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  try {
-    const list = await loadAllEntries({ overlay: false })
-    entries.value = list.entries
-    for (const e of list.entries) draft[e.id] = e.result || ''
-  } catch (err) {
-    loadError.value = err.message || 'Không tải được số liệu'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadCustomers() {
-  try {
-    const { customers: list } = await api.get('/me/customers')
-    customers.value = list
-  } catch (_) {
-    // Leave empty - the dropdown just shows no customers.
-  }
-}
-
-// Same payout config the "Tính điểm" page uses (fallback = backend default).
-const rates = ref({
-  de: { rate: 70, tiers: ['dacBiet'], digits: 2 },
-  lo: {
-    rate: 20,
-    tiers: ['dacBiet', 'giaiNhat', 'giaiNhi', 'giaiBa', 'giaiTu', 'giaiNam', 'giaiSau', 'giaiBay'],
-    digits: 2,
-  },
-})
-async function loadRates() {
-  try {
-    const { rates: r } = await api.get('/me/scoring-settings')
-    if (r && Object.keys(r).length) rates.value = r
-  } catch (_) {
-    // keep fallback
-  }
-}
-
-onMounted(async () => {
-  await Promise.all([load(), loadCustomers(), loadRates()])
-  if (!selectedCustomer.value && customers.value.length) selectedCustomer.value = customers.value[0].name
-})
-
-const filtered = computed(() => {
-  return entries.value.filter((e) => {
-    if (onlyMissing.value && e.result) return false
-    if (selectedCustomer.value && (e.customerName || '(Không tên)') !== selectedCustomer.value) return false
-    return true
-  })
-})
-
-// Group so a customer's name is shown once, not repeated on every one of
-// their rows - same treatment as ScoringView's "Tính điểm" list.
-const groupedByCustomer = computed(() => {
-  const byName = new Map()
-  for (const e of filtered.value) {
-    const name = e.customerName || '(Không tên)'
-    if (!byName.has(name)) byName.set(name, [])
-    byName.get(name).push(e)
-  }
-  return [...byName.entries()]
-    .map(([name, list]) => ({ name, entries: list }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-})
-
-// Entries whose typed/auto-filled "Điểm ra" differs from what is stored.
-const dirtyEntries = computed(() => entries.value.filter((e) => (draft[e.id] ?? '').trim() !== (e.result || '')))
-
-// One button saves every changed "Điểm ra", across all customers.
-async function saveAllResults() {
-  saveAllMsg.value = ''
-  saveAllError.value = ''
-  const list = [...dirtyEntries.value]
-  if (!list.length) return
-  savingAll.value = true
-  let ok = 0
-  let failed = 0
-  for (const entry of list) {
-    try {
-      const updated = await api.patch(`/me/entries/${entry.id}`, { result: (draft[entry.id] || '').trim() })
-      const idx = entries.value.findIndex((e) => e.id === entry.id)
-      if (idx !== -1) entries.value[idx] = updated
-      draft[entry.id] = updated.result || ''
-      ok++
-    } catch (_) {
-      failed++
-    }
-  }
-  savingAll.value = false
-  if (ok) saveAllMsg.value = `Đã lưu điểm ra cho ${ok} số liệu.`
-  if (failed) saveAllError.value = `${failed} số liệu không lưu được, thử lại.`
-}
-
-// ---- Auto-fill "Điểm ra" from a lottery result (display only, saved by the button above) ----
-function toNumber(str) {
-  if (!str) return 0
-  const n = parseFloat(String(str).replace(/[^\d.-]/g, ''))
-  return Number.isFinite(n) ? n : 0
-}
-// Points out of one entry over the results of the stations it counts for (sum); null when none of them has a result yet.
-function computeScoreFromResults(entry, byStation) {
-  // The customer's own config if they have one, else the account-wide one.
-  const own = customers.value.find((c) => c.name === entry.customerName)?.scoringRates
-  const done = entryStations(entry).filter((st) => byStation[st])
-  if (!done.length) return null
-  // Rates are per region: each station is scored with the config of its own region.
-  return done.reduce((sum, st) => sum + entryDetail(entry, byStation[st], effectiveConfig(rates.value, own, entry.betType, regionOf(st).id)).out, 0)
-}
-function fillResultsForDate(date, byStation) {
-  for (const e of entries.value) {
-    if (e.entryDate !== date) continue
-    const v = computeScoreFromResults(e, byStation)
-    if (v !== null) draft[e.id] = String(v)
-  }
-}
 
 // ---- Kết quả xổ số (Miền Bắc / Miền Trung / Miền Nam, theo đài) ------------------------------------------
 
 // ?date=YYYY-MM-DD (link from the Tính điểm day cards) opens that day.
 const queryDate = String(useRoute().query.date || '')
 const lotteryDate = ref(/^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : today())
+// ‹ › step the day by one, so yesterday's saved result is one tap away.
+function shiftDay(delta) {
+  const [y, m, d] = lotteryDate.value.split('-').map(Number)
+  const next = new Date(Date.UTC(y, m - 1, d + delta))
+  lotteryDate.value = next.toISOString().slice(0, 10)
+}
 const lotteryLoading = ref(false)
 const lotteryError = ref('')
 const lotterySaving = ref(false)
@@ -194,6 +62,9 @@ function blankLotteryForm() {
 }
 const lotteryForm = reactive(blankLotteryForm())
 const hasSavedLottery = ref(false)
+// A saved result is only displayed; "Sửa" unlocks the boxes.
+const lotteryEditing = ref(false)
+const lotteryReadOnly = computed(() => hasSavedLottery.value && !lotteryEditing.value)
 // A form object for the region's structure, filled from `values` where they fit.
 function shapeForm(values) {
   const out = {}
@@ -223,6 +94,7 @@ const lotteryDeleting = ref(false)
 
 function applyLotteryResult(r) {
   hasSavedLottery.value = !!r
+  lotteryEditing.value = false
   resetLotteryForm(r)
 }
 
@@ -281,9 +153,7 @@ async function saveLottery() {
     await api.post('/lottery-results', body)
     lotterySaveMsg.value = `Đã lưu kết quả xổ số ${stationLabelOf.value} ngày ${lotteryDate.value}.`
     hasSavedLottery.value = true
-    // Entries of this day can span several stations: score them with every result saved that day.
-    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
-    fillResultsForDate(lotteryDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
+    lotteryEditing.value = false
   } catch (err) {
     lotteryError.value = err.message || 'Không lưu được kết quả xổ số'
   } finally {
@@ -327,6 +197,8 @@ const cellBad = (st, p, v) => {
   return t ? t.length !== p.digits : !!boardRead[st]
 }
 const boardDeleting = ref('')
+const boardEdit = reactive({}) // station id -> true while a saved column is unlocked
+const boardLocked = (st) => !!boardSaved[st] && !boardEdit[st]
 
 // Only digits can be typed or pasted into a prize box, and never more than the prize has.
 function digitsOnly(form) {
@@ -347,7 +219,7 @@ async function loadBoard() {
   try {
     const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
     const by = Object.fromEntries(results.map((r) => [r.station, r]))
-    for (const o of [board, boardSaved, boardRead]) for (const k of Object.keys(o)) delete o[k]
+    for (const o of [board, boardSaved, boardRead, boardEdit]) for (const k of Object.keys(o)) delete o[k]
     for (const st of boardStations.value) {
       board[st] = shapeForm(by[st])
       boardSaved[st] = !!by[st]
@@ -384,10 +256,9 @@ async function saveBoard() {
       await api.post('/lottery-results', body)
       boardSaved[st] = true
       boardRead[st] = false
+      boardEdit[st] = false
     }
     lotterySaveMsg.value = `Đã lưu kết quả ${todo.map(stationName).join(', ')} ngày ${lotteryDate.value.split('-').reverse().join('/')}.`
-    const { results } = await api.get(`/lottery-results?date=${lotteryDate.value}&all=1`)
-    fillResultsForDate(lotteryDate.value, Object.fromEntries(results.map((r) => [r.station, r])))
   } catch (err) {
     lotteryError.value = err.message || 'Không lưu được kết quả xổ số'
   } finally {
@@ -460,6 +331,7 @@ async function processLrImage(file) {
 }
 
 function applyLrOcrGuess(text) {
+  lotteryEditing.value = true
   // Chỉ nhận những "từ" (tách bởi khoảng trắng) mà TOÀN BỘ là chữ số -
   // bỏ hẳn nhãn cột kiểu "13GH", "2GH" (thường gặp khi chụp từ trang web
   // khác) thay vì cố tách phần số ra khỏi chúng: \d+ với lookaround từng
@@ -550,6 +422,7 @@ async function processMcImage(file) {
       }
       board[c.station] = shapeForm(c.values)
       boardRead[c.station] = true
+      boardEdit[c.station] = true
       if (!c.complete) mcWarnings.value.push(`${stationName(c.station)}: ${c.issues.join('; ')}`)
     }
     lotterySaveMsg.value = 'Đã điền bảng từ ảnh. Kiểm tra các ô (ô đỏ là chưa đủ hoặc sai độ dài) rồi bấm "Lưu kết quả".'
@@ -587,11 +460,13 @@ function clearLotteryForm() {
     for (const st of boardStations.value) {
       board[st] = shapeForm(null)
       boardRead[st] = false
+      boardEdit[st] = true
     }
     mcWarnings.value = []
     return
   }
   resetLotteryForm(null)
+  lotteryEditing.value = true
   if (lrOcrPreviewUrl.value) URL.revokeObjectURL(lrOcrPreviewUrl.value)
   lrOcrPreviewUrl.value = ''
   lrOcrError.value = ''
@@ -602,13 +477,17 @@ function clearLotteryForm() {
   <div class="page" :class="{ 'board-mode': region !== 'mb' }">
     <h1 class="page-title">Nhập kết quả</h1>
     <p class="page-subtitle">
-      Nhập kết quả xổ số (Miền Bắc, Miền Trung, Miền Nam; chọn miền và đài), bấm "Lưu kết quả" để điểm ra tự hiện theo số và điểm vào, rồi bấm "Lưu điểm ra" để lưu cho tất cả khách hàng. Có thể sửa tay từng ô trước khi lưu.
+      Nhập kết quả xổ số (Miền Bắc, Miền Trung, Miền Nam) rồi bấm "Lưu kết quả". Kết quả đã lưu chỉ hiển thị; bấm "Sửa" để chỉnh. Điểm ra của khách được tính tự động ở tab Tính điểm.
     </p>
 
     <div class="card lottery-card">
       <div class="lottery-head">
         <h3 style="margin: 0">Kết quả xổ số {{ stationLabelOf }}</h3>
-        <AppDatePicker v-model="lotteryDate" class="lottery-date" />
+        <div class="date-nav">
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="Ngày trước" title="Ngày trước" @click="shiftDay(-1)">‹</button>
+          <AppDatePicker v-model="lotteryDate" class="lottery-date" />
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="Ngày sau" title="Ngày sau" @click="shiftDay(1)">›</button>
+        </div>
       </div>
 
       <div class="region-tabs" role="tablist" aria-label="Miền">
@@ -689,6 +568,7 @@ function clearLotteryForm() {
                       <input
                         v-if="singleTiers.includes(p.tier)"
                         v-model="board[st][p.tier]"
+                        :readonly="boardLocked(st)"
                         :maxlength="p.digits"
                         :placeholder="'0'.repeat(p.digits)"
                         :class="{ bad: cellBad(st, p, board[st][p.tier]), big: p.tier === 'dacBiet' }"
@@ -700,6 +580,7 @@ function clearLotteryForm() {
                         v-else
                         :key="k"
                         v-model="board[st][p.tier][k]"
+                        :readonly="boardLocked(st)"
                         :maxlength="p.digits"
                         :placeholder="'0'.repeat(p.digits)"
                         :class="{ bad: cellBad(st, p, v) }"
@@ -715,6 +596,7 @@ function clearLotteryForm() {
               <tr>
                 <th class="board-tier"></th>
                 <td v-for="st in boardStations" :key="st">
+                  <button v-if="boardLocked(st)" type="button" class="btn btn-secondary btn-sm" @click="boardEdit[st] = true">Sửa</button>
                   <button v-if="boardSaved[st]" type="button" class="btn btn-danger btn-sm" :disabled="boardDeleting === st" @click="deleteBoardColumn(st)">
                     {{ boardDeleting === st ? 'Đang xoá...' : 'Xoá kết quả' }}
                   </button>
@@ -744,15 +626,16 @@ function clearLotteryForm() {
           <AppIcon name="chevron-down" class="grid-toggle-chevron" />
         </button>
 
-        <div v-if="region === 'mb'" id="lottery-grid" class="lottery-grid" :class="{ collapsed: !gridOpen }">
+        <div v-if="region === 'mb'" id="lottery-grid" class="lottery-grid" :class="{ collapsed: !gridOpen, readonly: lotteryReadOnly }">
           <div v-for="p in structure" :key="p.tier" class="tier-row">
             <label>{{ p.label }}<span class="tier-count">{{ p.count }} ô · {{ p.digits }} số</span></label>
-            <input v-if="singleTiers.includes(p.tier)" v-model="lotteryForm[p.tier]" :maxlength="p.digits" :placeholder="'0'.repeat(p.digits)" :class="`num${p.digits}`" inputmode="numeric" autocomplete="off" />
+            <input v-if="singleTiers.includes(p.tier)" v-model="lotteryForm[p.tier]" :readonly="lotteryReadOnly" :maxlength="p.digits" :placeholder="'0'.repeat(p.digits)" :class="`num${p.digits}`" inputmode="numeric" autocomplete="off" />
             <div v-else class="tier-inputs">
               <input
                 v-for="(v, k) in lotteryForm[p.tier]"
                 :key="k"
                 v-model="lotteryForm[p.tier][k]"
+                :readonly="lotteryReadOnly"
                 :maxlength="p.digits"
                 :placeholder="'0'.repeat(p.digits)"
                 :class="`num${p.digits}`"
@@ -773,80 +656,31 @@ function clearLotteryForm() {
           >
             {{ lotteryDeleting ? 'Đang xoá...' : 'Xoá kết quả này' }}
           </button>
+          <button v-if="lotteryReadOnly" type="button" class="btn btn-secondary btn-sm" @click="lotteryEditing = true">Sửa</button>
           <button type="button" class="btn btn-ghost btn-sm" @click="clearLotteryForm">Xoá form</button>
-          <button type="button" class="btn btn-primary" :disabled="lotterySaving" @click="saveLottery">
+          <button type="button" class="btn btn-primary" :disabled="lotterySaving || lotteryReadOnly" @click="saveLottery">
             {{ lotterySaving ? 'Đang lưu...' : 'Lưu kết quả' }}
           </button>
         </div>
       </template>
     </div>
 
-    <div v-if="loading" class="card">Đang tải...</div>
-    <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
-    <template v-else>
-      <div class="filters card">
-        <label class="check-field">
-          <input type="checkbox" v-model="onlyMissing" />
-          Chỉ hiện số liệu chưa có điểm ra
-        </label>
-        <div class="field filter-customer" style="margin: 0">
-          <AppSelect v-model="selectedCustomer" aria-label="Khách hàng">
-            <option value="">Tất cả khách hàng</option>
-            <option v-for="c in customers" :key="c.id" :value="c.name">{{ c.name }}</option>
-          </AppSelect>
-        </div>
-        <button
-          type="button"
-          class="btn btn-primary filters-save"
-          :disabled="savingAll || dirtyEntries.length === 0"
-          @click="saveAllResults"
-        >
-          {{ savingAll ? 'Đang lưu...' : `Lưu điểm ra${dirtyEntries.length ? ` (${dirtyEntries.length})` : ''}` }}
-        </button>
-      </div>
-
-      <div v-if="saveAllMsg" class="alert alert-success">{{ saveAllMsg }}</div>
-      <div v-if="saveAllError" class="alert alert-error">{{ saveAllError }}</div>
-
-      <div v-if="groupedByCustomer.length === 0" class="card">
-        {{ onlyMissing ? 'Không còn số liệu nào cần nhập kết quả.' : 'Không có số liệu phù hợp.' }}
-      </div>
-
-      <div v-else class="customer-groups">
-        <div v-for="group in groupedByCustomer" :key="group.name" class="card customer-group">
-          <div class="customer-group-head">
-            <strong>{{ group.name }}</strong>
-            <span class="page-subtitle">{{ group.entries.length }} số</span>
-          </div>
-
-          <div class="result-list">
-            <div v-for="entry in group.entries" :key="entry.id" class="result-row">
-              <div class="result-row-top">
-                <span class="chip">{{ entry.entryDate }}</span>
-              </div>
-              <div class="result-value">{{ entry.value }}</div>
-              <div class="result-meta">
-                <span v-if="entry.score">Điểm vào: {{ formatNumber(Number(entry.score) || entry.score) }}</span>
-              </div>
-              <div class="result-input-row">
-                <input
-                  v-model="draft[entry.id]"
-                  type="text"
-                  inputmode="decimal"
-                  placeholder="Điểm ra"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .lottery-card {
   margin-bottom: 16px;
+}
+.date-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.date-nav .btn {
+  min-width: 36px;
+  font-size: 20px;
+  line-height: 1;
 }
 .lottery-head {
   display: flex;
@@ -1392,8 +1226,9 @@ function clearLotteryForm() {
     font-size: 14px;
   }
   .page > .lottery-card {
-    grid-column: 1;
-    grid-row: 3 / -1;
+    grid-column: 1 / -1;
+    grid-row: auto;
+    max-width: 1100px;
     margin: 0;
   }
   .page > :not(.page-title):not(.page-subtitle):not(.lottery-card) {
@@ -1655,6 +1490,17 @@ function clearLotteryForm() {
 }
 .lottery-grid .tier-row input:hover {
   border-color: var(--primary);
+}
+.lottery-grid.readonly .tier-row input,
+.board-cell input[readonly] {
+  cursor: default;
+  background: transparent;
+  border-color: transparent;
+}
+.lottery-grid.readonly .tier-row input:hover,
+.lottery-grid.readonly .tier-row input:focus {
+  border-color: transparent;
+  box-shadow: none;
 }
 .tier-count {
   display: block;
