@@ -26,7 +26,7 @@ import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
 import { customerBetTypes, typesOf } from '../scoringConfig'
-import { loadStations, regionOf, stationLabel, stationOptions } from '../lotteryStations'
+import { isRegionCode, loadStations, regionOf, stationLabel, stationName, stationOptions } from '../lotteryStations'
 import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
@@ -739,6 +739,9 @@ async function deleteTemplate() {
     templateMsg.value = err.message || 'Không xoá được mẫu'
   }
 }
+
+// Short name for the table: Miền Trung / Miền Nam, or the station name (the long label is in the tooltip).
+const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stationName(code))
 </script>
 
 <template>
@@ -1063,7 +1066,7 @@ async function deleteTemplate() {
                     <tr>
                       <td v-if="filters.all" data-label="Khách hàng">{{ entry.customerName }}</td>
                       <td data-label="Ngày">{{ entry.entryDate }}<span v-if="entry.pending" class="chip pending-chip">Chờ đồng bộ</span></td>
-                      <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}<span v-if="entry.station && entry.station !== 'mb'" class="chip station-tag">{{ stationLabel(entry.station) }}</span></td>
+                      <td data-label="Hạng mục">{{ betTypeLabel(entry.betType || 'de') }}<span v-if="entry.station && entry.station !== 'mb'" class="chip station-tag" :title="stationLabel(entry.station)">{{ stationShort(entry.station) }}</span></td>
                       <td data-label="Số" class="cell-num"><MaskedValue :text="entry.value" /></td>
                       <td data-label="Điểm vào" class="cell-points"><MaskedValue :text="fmtPoints(entry.score)" /></td>
                       <td data-label="Điểm ra" class="cell-points"><MaskedValue :text="fmtPoints(entry.result)" /></td>
@@ -2943,4 +2946,37 @@ async function deleteTemplate() {
 .mask-row {
   margin-bottom: 12px;
 }
+
+/* ---- Entries table: the columns share the width evenly and everything is centred ---- */
+.entries-table-wrap .entries-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 760px;
+}
+.entries-table-wrap .entries-table th,
+.entries-table-wrap .entries-table td {
+  text-align: center;
+}
+.entries-table .col-cust { width: 12%; }
+.entries-table .col-date { width: 12%; }
+.entries-table .col-type { width: 14%; }
+.entries-table .col-val { width: 10%; }
+.entries-table .col-pts { width: 12%; }
+.entries-table .col-note { width: auto; min-width: 0; }
+.entries-table th.col-btn,
+.entries-table td.col-btn { width: 8%; }
+.entries-table .cell-points {
+  text-align: center;
+}
+.entries-table .cell-note {
+  text-align: center;
+}
+.entries-table .station-tag {
+  width: fit-content;
+  margin: 4px auto 0;
+  padding: 1px 10px;
+  white-space: nowrap;
+  border-radius: 999px;
+}
 </style>
+

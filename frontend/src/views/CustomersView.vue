@@ -327,7 +327,7 @@ async function savePhone() {
       <button type="button" role="tab" class="view-tab" :class="{ active: view === 'new' }" :aria-selected="view === 'new'" @click="view = 'new'">Tạo khách hàng mới</button>
     </div>
 
-    <div v-show="view === 'new'" class="card add-customer-card">
+    <div v-show="view === 'new'" class="card add-customer-card is-new">
       <form class="add-customer-form" @submit.prevent="addCustomer">
         <div class="add-customer-row">
           <div class="field add-customer-field">
@@ -524,6 +524,9 @@ async function savePhone() {
   font-size: 17px;
 }
 
+.add-customer-card.is-new {
+  max-width: 820px;
+}
 .add-customer-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

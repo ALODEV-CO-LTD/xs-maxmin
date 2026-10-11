@@ -318,7 +318,7 @@ defineExpose({ collect })
 </script>
 
 <template>
-  <div class="sce">
+  <div class="sce" :class="{ 'is-draft': draft }">
     <div v-if="loading" class="sce-note">Đang tải...</div>
     <template v-else>
       <p class="sce-hint">
@@ -461,6 +461,11 @@ defineExpose({ collect })
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-gutter: stable;
+}
+.sce.is-draft .sce-list {
+  height: auto;
+  overflow: visible;
+  padding-right: 0;
 }
 .sce-row {
   display: grid;
