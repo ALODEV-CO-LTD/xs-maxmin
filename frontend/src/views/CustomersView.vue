@@ -720,7 +720,6 @@ async function savePhone() {
   box-shadow: var(--shadow-sm);
 }
 .table-wrap .table {
-  min-width: 640px;
   font-size: 15px;
 }
 .table-wrap th {
@@ -734,30 +733,58 @@ async function savePhone() {
   padding: 14px 16px;
   vertical-align: middle;
 }
+.table-wrap .table {
+  width: 100%;
+}
+/* One alignment per column, the same for its header and its cells:
+   STT / Tên / SĐT on the left, the three numbers on the right, Thao tác on the right. */
 .table-wrap th:nth-child(1),
 .table-wrap td:nth-child(1) {
   width: 64px;
+  text-align: left;
   color: var(--text-secondary);
 }
-.table-wrap th:nth-child(6) {
-  text-align: right;
+.table-wrap th:nth-child(2),
+.table-wrap td:nth-child(2) {
+  width: auto;
+  min-width: 160px;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
-/* numeric columns right-aligned for comparison */
-.table-wrap th:nth-child(n + 3):nth-child(-n + 5),
-.table-wrap td:nth-child(n + 3):nth-child(-n + 5) {
-  width: 150px;
+.table-wrap th:nth-child(3),
+.table-wrap td:nth-child(3) {
+  width: 140px;
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.table-wrap th:nth-child(n + 4):nth-child(-n + 6),
+.table-wrap td:nth-child(n + 4):nth-child(-n + 6) {
+  width: 120px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.table-wrap th:nth-child(7),
+.table-wrap td:nth-child(7) {
+  width: 1%;
+  text-align: right;
+}
+@media (max-width: 1180px) {
+  .table-wrap td:nth-child(7) {
+    min-width: 200px;
+  }
+  .actions-cell {
+    white-space: normal !important;
+  }
+}
 .table-wrap td:nth-child(2) {
-  min-width: 160px;
   font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
 }
-.table-wrap td:nth-child(3),
-.table-wrap td:nth-child(4) {
+.table-wrap td:nth-child(4),
+.table-wrap td:nth-child(5) {
   font-weight: 600;
 }
 .table-wrap .row-clickable:hover {
@@ -771,7 +798,11 @@ async function savePhone() {
 /* Delete: ghost destructive, quiet until hovered */
 .actions-cell {
   text-align: right;
-  width: 170px;
+  white-space: nowrap;
+}
+.actions-cell .btn {
+  min-height: 36px;
+  margin-left: 6px;
 }
 .btn-remove {
   min-height: 36px;
@@ -812,23 +843,30 @@ async function savePhone() {
   }
 }
 
-/* tablets: slimmer number columns so the table fits without sideways scroll */
+/* tablets: drop the STT column and let the columns share the width so the table fits without sideways scroll */
 @media (max-width: 900px) {
   .table-wrap th:nth-child(1),
   .table-wrap td:nth-child(1):not([colspan]) {
     display: none;
   }
-  .table-wrap th:nth-child(n + 3):nth-child(-n + 5),
-  .table-wrap td:nth-child(n + 3):nth-child(-n + 5) {
-    width: 100px;
+  .table-wrap th:nth-child(3),
+  .table-wrap td:nth-child(3) {
+    width: auto;
+  }
+  .table-wrap th:nth-child(n + 4):nth-child(-n + 6),
+  .table-wrap td:nth-child(n + 4):nth-child(-n + 6) {
+    width: 90px;
   }
   .table-wrap td:nth-child(2) {
-    min-width: 120px;
+    min-width: 110px;
   }
   .table-wrap th,
   .table-wrap td {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .actions-cell {
+    white-space: normal;
   }
 }
 
