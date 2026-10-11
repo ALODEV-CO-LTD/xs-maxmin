@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/config.dart';
 import '../../core/theme.dart';
 
 enum _Stage { credentials, secondPassword, wipeConfirm, wipeDone }
@@ -130,6 +131,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(_error!, style: TextStyle(color: cs.error)),
                     ),
                   ..._body(),
+                  const SizedBox(height: 28),
+                  Text('Phiên bản ${AppConfig.appVersion}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5))),
                 ],
               ),
             ),

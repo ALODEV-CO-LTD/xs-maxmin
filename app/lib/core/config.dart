@@ -1,6 +1,9 @@
 /// Build-time settings. Point the app at another server with
 /// `flutter run --dart-define=API_BASE=http://10.0.2.2:8080` (10.0.2.2 = the host machine from the Android emulator).
 class AppConfig {
+  /// Shown on the login screen so it is easy to tell which build is installed (keep in step with pubspec.yaml `version`).
+  static const appVersion = '1.1.0 (2)';
+
   static const apiBase = String.fromEnvironment('API_BASE', defaultValue: 'https://xs.massagehomeriyadh.com');
 
   /// REST base, e.g. https://host/api
