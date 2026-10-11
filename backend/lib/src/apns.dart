@@ -5,8 +5,12 @@ import 'dart:io';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:http2/http2.dart';
 import 'package:server/src/database.dart' show appDatabase;
+import 'package:server/src/fcm.dart';
+import 'package:server/src/push_message.dart';
 import 'package:server/src/push_tokens.dart';
 import 'package:sqlite3/sqlite3.dart';
+
+export 'package:server/src/push_message.dart';
 
 /// Apple Push Notification service (APNs) for the iOS app.
 ///
@@ -15,39 +19,6 @@ import 'package:sqlite3/sqlite3.dart';
 /// material or file names - chat is end-to-end encrypted and the server does
 /// not know any of that. Everything is configured from the environment; with
 /// no configuration the sender is a silent no-op.
-
-enum PushKind { message, call }
-
-class PushMessage {
-  const PushMessage({required this.kind, required this.title, required this.body, required this.friendId});
-  final PushKind kind;
-  final String title;
-  final String body;
-
-  /// The id of the SENDER (the app opens /friends/chat/<friendId> on tap).
-  final String friendId;
-
-  /// The APNs JSON payload.
-  Map<String, dynamic> toPayload() => {
-        'aps': {
-          'alert': {'title': title, 'body': body},
-          'sound': 'default',
-          'thread-id': friendId,
-        },
-        'friendId': friendId,
-        'kind': kind.name,
-      };
-}
-
-/// Sends a push to every iOS device registered for [userId].
-abstract class PushSender {
-  Future<void> send(String userId, PushMessage message);
-}
-
-class NoopPushSender implements PushSender {
-  @override
-  Future<void> send(String userId, PushMessage message) async {}
-}
 
 /// One HTTP/2 request to APNs, already fully built.
 class ApnsRequest {
@@ -148,7 +119,7 @@ class ApnsSender implements PushSender {
   @override
   Future<void> send(String userId, PushMessage message) async {
     final database = db();
-    final tokens = pushTokensOf(database, userId);
+    final tokens = pushTokensOf(database, userId, platform: 'ios');
     if (tokens.isEmpty) return;
     final body = utf8.encode(jsonEncode(message.toPayload()));
     for (final token in tokens) {
@@ -229,23 +200,29 @@ bool _loggedDisabled = false;
 
 /// The sender used by the websocket hooks. Tests replace it with a fake via
 /// the setter; by default it is built once from the environment (no-op when
-/// APNs is not configured).
+/// neither APNs nor FCM is configured).
 PushSender get pushSender => _sender ??= _fromEnvironment(Platform.environment, () => appDatabase);
 
 set pushSender(PushSender? s) => _sender = s;
 
-/// Builds the real/no-op sender from [env]; logs once when disabled.
-PushSender buildPushSender(Map<String, String> env, Database Function() db, {ApnsTransport? transport}) =>
-    _fromEnvironment(env, db, transport: transport);
+/// Builds the real/no-op sender from [env]; logs once when disabled. With both
+/// APNs and FCM configured the result is a [CompositePushSender] (every token
+/// of the user, each through the sender of its platform).
+PushSender buildPushSender(Map<String, String> env, Database Function() db, {ApnsTransport? transport, FcmTransport? fcmTransport}) =>
+    _fromEnvironment(env, db, transport: transport, fcmTransport: fcmTransport);
 
-PushSender _fromEnvironment(Map<String, String> env, Database Function() db, {ApnsTransport? transport}) {
-  final cfg = ApnsConfig.fromEnv(env);
-  if (cfg == null) {
+PushSender _fromEnvironment(Map<String, String> env, Database Function() db, {ApnsTransport? transport, FcmTransport? fcmTransport}) {
+  final senders = <PushSender>[];
+  final apns = ApnsConfig.fromEnv(env);
+  if (apns != null) senders.add(ApnsSender(config: apns, db: db, transport: transport));
+  final fcm = FcmConfig.fromEnv(env);
+  if (fcm != null) senders.add(FcmSender(config: fcm, db: db, transport: fcmTransport));
+  if (senders.isEmpty) {
     if (!_loggedDisabled) {
       _loggedDisabled = true;
-      stderr.writeln('[apns] not configured (XOSO_APNS_*): push notifications disabled');
+      stderr.writeln('[push] not configured (XOSO_APNS_* / XOSO_FCM_*): push notifications disabled');
     }
     return NoopPushSender();
   }
-  return ApnsSender(config: cfg, db: db, transport: transport);
+  return senders.length == 1 ? senders.single : CompositePushSender(senders);
 }

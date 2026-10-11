@@ -10,3 +10,6 @@
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
 -keep class com.pravera.flutter_foreground_task.** { *; }
 -dontwarn com.pravera.flutter_foreground_task.**
+# Firebase Messaging / Core (consumer rules ship with the libraries; these only silence optional references)
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**

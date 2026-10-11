@@ -28,6 +28,7 @@ Database _db() {
 
 final _tok = 'ab' * 32; // 64 hex chars
 final _tok2 = 'cd' * 32;
+final _fcm = 'Ab1_-:' * 25; // 150 chars, case-sensitive
 
 Future<Response> _call(Database db, String userId, HttpMethod method, Object? body, {String role = 'user'}) {
   final ctx = _Ctx();
@@ -64,12 +65,26 @@ void main() {
       {'platform': 'ios', 'token': 'a' * 201},
       {'platform': 'ios'},
       {'platform': 'android', 'token': _tok},
+      {'platform': 'ios', 'token': _fcm},
+      {'platform': 'android', 'token': '${'a' * 99}'},
+      {'platform': 'web', 'token': _fcm},
       {'platform': 'ios', 'token': _tok, 'deviceLabel': 5},
     ]) {
       expect((await _call(db, 'u1', HttpMethod.post, bad)).statusCode, 400, reason: '$bad');
     }
     expect((await _call(db, 'u1', HttpMethod.post, '{nope')).statusCode, 400);
     expect((await _call(db, 'u1', HttpMethod.get, {})).statusCode, 405);
+    expect(_rows(db), isEmpty);
+  });
+
+  test('android: POST keeps token case, DELETE works', () async {
+    final db = _db();
+    var r = await _call(db, 'u1', HttpMethod.post, {'platform': 'android', 'token': _fcm, 'deviceLabel': 'Pixel'});
+    expect(r.statusCode, 200);
+    expect(_rows(db).single['token'], _fcm);
+    expect(_rows(db).single['platform'], 'android');
+    r = await _call(db, 'u1', HttpMethod.delete, {'token': _fcm});
+    expect(jsonDecode(await r.body())['removed'], true);
     expect(_rows(db), isEmpty);
   });
 

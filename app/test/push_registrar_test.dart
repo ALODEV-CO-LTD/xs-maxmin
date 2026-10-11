@@ -51,6 +51,12 @@ class _Port implements PushPort {
 
   @override
   Future<PushInitial> initial() async => initialValue;
+
+  @override
+  bool get available => true;
+
+  @override
+  Future<bool> isPermitted() async => false;
 }
 
 final _t1 = 'ab' * 32;

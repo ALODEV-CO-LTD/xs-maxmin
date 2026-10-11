@@ -244,6 +244,41 @@ Environment=XOSO_APNS_SANDBOX=false
 
 **Chưa kiểm chứng được** (không có tài khoản Apple khi làm): gửi thật tới APNs, nhận push trên iPhone, quyền thông báo, bấm thông báo khi khởi động nguội, kết nối HTTP/2 thật (`Http2ApnsTransport`). Các phần còn lại có unit test (`backend/test/push_*_test.dart`, `app/test/push_registrar_test.dart`) với bộ gửi/đường truyền giả. Server build cần tải được gói `http2` từ pub.dev (xem lưu ý `.dart_tool` ở mục 7).
 
+## 9f. Thông báo đẩy Android (FCM)
+
+**Thiết kế.** Giống hệt iOS (mục 9e) nhưng đi qua Firebase Cloud Messaging (HTTP v1). Khi người nhận **đang offline**, `notifyOfflineRecipient` gửi tới **mọi** token của họ (iPhone qua APNs, Android qua FCM; bộ giới hạn 60 giây tính **một lần cho mỗi (người gửi, người nhận, loại)**, không tính riêng từng nền tảng). Bảng `push_tokens` nay cho `platform` là `'ios'` hoặc `'android'` (bảng chưa deploy ở đâu nên đã sửa thẳng định nghĩa; `ensurePushTokensTable` trong `push_tokens.dart` tự dựng lại bảng và chép dữ liệu nếu DB dev còn bản chỉ-iOS). Token Android là chuỗi FCM 100..400 ký tự gồm chữ, số, `-`, `_`, `:` (**phân biệt hoa thường**, không bị đổi sang chữ thường như token iOS). `POST/DELETE /api/me/push-token` dùng chung cho cả hai (`{platform:'ios'|'android', token, deviceLabel?}`).
+
+Code máy chủ: `backend/lib/src/fcm.dart` (`FcmConfig`, `FcmSender`, đường truyền HTTP tiêm được như APNs), `push_message.dart` (`PushMessage`, `PushSender`, `CompositePushSender`), `apns.dart` (ghép các bộ gửi theo cấu hình). `FcmSender` ký JWT RS256 (`iss`=`client_email`, `scope`=`https://www.googleapis.com/auth/firebase.messaging`, `aud`=`token_uri`, hiệu lực 1 giờ) bằng khoá trong file service account, đổi lấy access token OAuth2 (`urn:ietf:params:oauth:grant-type:jwt-bearer`), lưu cache tới khi còn ~5 phút, rồi `POST https://fcm.googleapis.com/v1/projects/<project_id>/messages:send` với `Authorization: Bearer ...`. Lỗi 404 / `UNREGISTERED` / `INVALID_ARGUMENT` do token sai thì **xoá token đó**. Dùng `dart:io HttpClient`, không thêm gói backend nào.
+
+**Quy tắc riêng tư (như iOS).** Thông điệp chỉ có tên hiển thị người gửi, loại và id người gửi; **không bao giờ** có nội dung tin, khoá, tên tệp, kể cả trong log. Dạng thông điệp: `notification:{title,body}` (khối thông báo hệ thống, nên Android tự hiện khi app đã đóng, không cần mã Dart), `data:{friendId,kind}`, `android:{priority:HIGH, ttl:"30s" (cuộc gọi) | "3600s" (tin nhắn), notification:{channel_id:"mamba_calls" | "mamba_messages", sound:"default"}}`.
+
+**Tin nhắn vẫn có thể mất** (cùng ngữ nghĩa như iOS): push chỉ đánh thức người nhận; tin không được lưu, người gửi thấy "chưa gửi được" và bấm "Gửi lại". Cuộc gọi qua push chỉ là thông báo (mở app thì cuộc gọi đã kết thúc, hiện là cuộc gọi nhỡ). Lựa chọn **"Giữ kết nối"** (dịch vụ nền, mục 9c) vẫn còn như phương án thay thế/bổ sung: khi app còn kết nối WebSocket thì máy chủ coi là online và không gửi push.
+
+**App.** `push_registrar.dart` dùng chung cho iOS và Android; Android dùng `fcm_push_port.dart` (`firebase_core`, `firebase_messaging`): `Firebase.initializeApp()` (**lỗi khi build thiếu `google-services.json` ⇒ bỏ qua âm thầm, không xin quyền, không gọi máy chủ**), xin `POST_NOTIFICATIONS` (Android 13+, qua hộp thoại giải thích có sẵn; bỏ qua hộp thoại nếu đã được cấp), lấy token, `POST /me/push-token {platform:'android'}` sau khi **khách hàng** đăng nhập và khi `onTokenRefresh`, `DELETE` trước khi đăng xuất (`auth.beforeLogout`). Bấm thông báo: `getInitialMessage()` (khởi động nguội) và `onMessageOpenedApp` ⇒ `/friends/chat/<friendId>` (cuộc gọi cũng mở cuộc trò chuyện). Đang mở app thì **không** hiện banner FCM (không nghe `onMessage`; app có socket, banner và chuông riêng). Kênh thông báo `mamba_messages` và `mamba_calls` (chuông điện thoại) được tạo lúc khởi động trong `notifications.dart` để thông báo do hệ điều hành vẽ dùng đúng kênh (lưu ý: `mamba_messages` đã tồn tại từ trước với độ ưu tiên cao nên giữ nguyên). Gradle: plugin `com.google.gms.google-services` chỉ được áp dụng **nếu có** `app/android/app/google-services.json` (`settings.gradle.kts` khai báo `apply false`, `app/build.gradle.kts` áp dụng có điều kiện), nên build chạy được cả khi có lẫn không có file. Trong `android/build.gradle.kts` có thêm một đoạn nhỏ cho plugin `screen_protector` (bật Kotlin cho riêng nó, vì dự án đang tắt `android.builtInKotlin`), nếu không build APK lỗi `cannot find symbol ScreenProtectorPlugin`.
+
+**Cách bật (người vận hành).**
+1. Vào https://console.firebase.google.com > **Add project** (tạo dự án Firebase, ví dụ "MAMBA"; Google Analytics có thể tắt).
+2. Trong dự án: **Add app > Android**, **Android package name = `vn.mamba.mamba_app`** (đúng chữ, không đổi), bỏ trống SHA-1, Register.
+3. **Tải `google-services.json`** và đặt vào `app/android/app/google-services.json`. Đây là cấu hình phía **client** (không phải khoá bí mật như service account; API key trong đó nằm sẵn trong mọi APK), nên có thể commit; nếu không muốn commit thì cứ để ngoài git và chép vào mỗi lần build. **Không có file này app vẫn build và chạy bình thường, chỉ là không có push Android.** Bỏ qua các bước "Add Firebase SDK" của console (đã làm trong repo).
+4. Firebase console > **Project settings > Service accounts > Generate new private key** ⇒ tải file JSON. **Đây là bí mật**: không commit, không dán vào chat/ticket. Chép lên máy chủ, ngoài thư mục web, quyền chặt: ví dụ `pct push 501 firebase-sa.json /etc/xs-maxmin/fcm/service-account.json` rồi `chmod 700 /etc/xs-maxmin/fcm; chmod 600 /etc/xs-maxmin/fcm/service-account.json; chown` cho user chạy service. Xoá bản trên máy cá nhân.
+5. Tạo drop-in như `XOSO_JWT_SECRET` ở mục 7, ví dụ `/etc/systemd/system/xs-maxmin-backend.service.d/fcm.conf` (chmod 600):
+```
+[Service]
+Environment=XOSO_FCM_CREDENTIALS_PATH=/etc/xs-maxmin/fcm/service-account.json
+Environment=XOSO_FCM_PROJECT_ID=<project id Firebase>
+```
+`XOSO_FCM_PROJECT_ID` có thể bỏ (mặc định lấy `project_id` trong file JSON).
+6. `systemctl daemon-reload && systemctl restart xs-maxmin-backend` (**khởi động lại ⇒ mọi người bị đăng xuất một lần** nếu chưa đặt `XOSO_JWT_SECRET`). Kiểm tra log không còn dòng "[push] not configured" (dòng này xuất hiện khi cả APNs lẫn FCM đều chưa cấu hình; thiếu/hỏng file FCM thì FCM bị bỏ qua âm thầm).
+7. **Dựng lại APK với file `google-services.json` đã có** (`cd app && flutter build apk --release`) và cài lại. Các bản APK cũ không có push.
+8. Thử: đăng nhập khách hàng A trên điện thoại Android (chấp nhận hộp thoại thông báo), kiểm tra bảng `push_tokens` có một dòng `android` (`sqlite3 data/xoso.db "select platform,device_label,substr(token,1,12) from push_tokens"`). Vuốt tắt hẳn app (hoặc khoá máy), từ tài khoản B nhắn tin/gọi cho A ⇒ A thấy thông báo trong vài giây; bấm vào mở đúng cuộc trò chuyện. Đăng xuất A rồi gửi lại ⇒ không có thông báo. Chạy thử sau khi cài mới: nếu thông báo không hiện, kiểm tra Cài đặt > Ứng dụng > MAMBA > Thông báo (kênh `mamba_messages` / `mamba_calls`) và tối ưu pin của hãng máy.
+
+| Biến | Ý nghĩa |
+|---|---|
+| `XOSO_FCM_CREDENTIALS_PATH` | đường dẫn file JSON service account (bắt buộc để bật FCM) |
+| `XOSO_FCM_PROJECT_ID` | tuỳ chọn, mặc định `project_id` trong file JSON |
+
+**Chưa kiểm chứng được** (không có tài khoản Firebase khi làm, và không được liên lạc Google): gửi thật tới FCM và đổi token OAuth thật, nhận push trên máy Android thật, hành vi kênh thông báo/chuông cuộc gọi trên máy thật, plugin google-services với file thật (chỉ thử với file giả: plugin áp dụng và build qua, sau đó đã xoá), bấm thông báo khi khởi động nguội, và `firebase_messaging` cùng AppDelegate APNs tự viết trên iOS (build iOS vẫn qua; app iOS không khởi tạo Firebase). Phần còn lại có unit test (`backend/test/push_fcm_test.dart`, `push_token_test.dart`, `app/test/fcm_push_test.dart`) với đường truyền/FCM giả; khoá RSA trong test là khoá sinh riêng cho test, không phải khoá Google.
+
 ## 10. Việc cần làm ngay khi nhận bàn giao
 
 1. **Đặt `XOSO_JWT_SECRET` cố định** trên máy chủ (drop-in như mục 7) để các lần deploy sau không đăng xuất mọi người.

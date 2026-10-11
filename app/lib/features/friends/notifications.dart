@@ -146,7 +146,10 @@ class NoopNotifier implements AppNotifier {
   Future<String?> launchPayload() async => null;
 }
 
+// `mamba_messages` and `mamba_calls` are also the channel ids the server names in its FCM messages (backend/lib/src/fcm.dart),
+// so the OS-drawn push notifications use these channels. They must exist before the first push arrives: created at start-up.
 const _msgChannel = 'mamba_messages';
+const _pushCallChannel = 'mamba_calls';
 const _callChannel = 'mamba_calls_incoming_v2';
 const _callChannelInApp = 'mamba_calls_incoming_inapp';
 const _missedChannel = 'mamba_calls_missed';
@@ -168,6 +171,16 @@ class LocalNotifier implements AppNotifier {
       );
       final a = _android;
       await a?.createNotificationChannel(const AndroidNotificationChannel(_msgChannel, 'Tin nhắn mới', description: 'Báo có tin nhắn mới (không hiện nội dung tin nhắn)', importance: Importance.high));
+      // FCM "incoming call" push (app closed): rings with the phone's ringtone.
+      await a?.createNotificationChannel(AndroidNotificationChannel(
+        _pushCallChannel,
+        'Cuộc gọi đến (khi đóng app)',
+        description: 'Báo có cuộc gọi đến khi MAMBA đang đóng',
+        importance: Importance.max,
+        sound: const UriAndroidNotificationSound('content://settings/system/ringtone'),
+        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+        vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800]),
+      ));
       await a?.createNotificationChannel(const AndroidNotificationChannel(_missedChannel, 'Cuộc gọi nhỡ', description: 'Báo cuộc gọi nhỡ', importance: Importance.high));
       await a?.createNotificationChannel(AndroidNotificationChannel(
         _callChannelInApp,

@@ -84,7 +84,7 @@ class _MambaAppState extends State<MambaApp> {
   final LocalNotifier _notifier = LocalNotifier();
   final SystemCallRinger _ringer = SystemCallRinger();
   final ForegroundTaskService _background = ForegroundTaskService();
-  // iOS push notifications (APNs); a no-op on other platforms.
+  // Push notifications: APNs on iOS, FCM on Android (a no-op when FCM is not configured); nothing elsewhere.
   late final PushRegistrar _push = PushRegistrar(
     auth: _auth,
     api: _api,

@@ -51,6 +51,11 @@
             android:foregroundServiceType="remoteMessaging|microphone"
             android:stopWithTask="false"
             android:exported="false"/>
+        <!-- FCM: notifications drawn by the OS while the app is closed use this channel unless the message names one
+             (the server always does). Created at app start, see notifications.dart. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="mamba_messages" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

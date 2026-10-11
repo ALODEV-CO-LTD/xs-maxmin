@@ -1,3 +1,4 @@
+import 'package:server/src/push_tokens.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
@@ -223,20 +224,8 @@ void _createSchema(Database db) {
     db.execute("INSERT INTO settings (key, value) VALUES ('e2ee_friend_chat_purged', ?)", [DateTime.now().toUtc().toIso8601String()]);
   }
 
-  // Push notification device tokens (APNs). A token belongs to exactly ONE
-  // user: registering it again for another account moves it (UNIQUE token).
-  db.execute('''
-    CREATE TABLE IF NOT EXISTS push_tokens (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      platform TEXT NOT NULL CHECK (platform IN ('ios')),
-      token TEXT NOT NULL UNIQUE,
-      device_label TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-  ''');
-  db.execute('CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id)');
+  // Push notification device tokens (APNs / FCM); see push_tokens.dart.
+  ensurePushTokensTable(db);
 
   // Controlled account recovery (A06): the customer files a request, an admin
   // checks who they are and approves it, which issues a one-time ticket (shown

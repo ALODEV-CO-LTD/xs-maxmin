@@ -6,7 +6,7 @@ import 'package:server/src/push_tokens.dart';
 import 'package:server/src/user_repo.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// `POST /api/me/push-token {platform:'ios', token, deviceLabel?}` registers
+/// `POST /api/me/push-token {platform:'ios'|'android', token, deviceLabel?}` registers
 /// (or moves) the device's APNs token for the caller; `DELETE {token}` removes
 /// it (logout). Customers only - admin accounts get 403.
 Future<Response> onRequest(RequestContext context) async {
@@ -32,7 +32,8 @@ Future<Response> onRequest(RequestContext context) async {
   final db = context.read<Database>();
 
   final token = body['token'];
-  if (token is! String || !isValidPushToken(token)) {
+  final platform = body['platform'];
+  if (token is! String || !(isValidPushToken(token) || isValidFcmToken(token))) {
     return Response.json(statusCode: 400, body: {'error': 'Token không hợp lệ'});
   }
 
@@ -42,13 +43,13 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(body: {'removed': removed});
   }
 
-  if (body['platform'] != 'ios') {
-    return Response.json(statusCode: 400, body: {'error': 'Nền tảng không hợp lệ'});
+  if (platform is! String || !isValidPushTokenFor(platform, token)) {
+    return Response.json(statusCode: 400, body: {'error': 'Nền tảng hoặc token không hợp lệ'});
   }
   final label = body['deviceLabel'];
   if (label != null && label is! String) {
     return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
   }
-  upsertPushToken(db, auth.userId, 'ios', token, deviceLabel: (label as String?)?.trim());
+  upsertPushToken(db, auth.userId, platform, token, deviceLabel: (label as String?)?.trim());
   return Response.json(body: {'ok': true});
 }

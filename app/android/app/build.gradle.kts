@@ -51,6 +51,12 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
+// Firebase config: the operator adds android/app/google-services.json (see docs/BAN_GIAO.md, 9f). Without the file the app
+// still builds and runs; FCM push is simply off (Firebase.initializeApp() fails and is ignored at runtime).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 flutter {
     source = "../.."
 }

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import 'call_state.dart';
+import 'fcm_push_port.dart';
 import 'friends_controller.dart';
 import 'messaging_host.dart';
 
@@ -35,11 +36,24 @@ abstract class PushPort {
   });
   Future<bool> requestPermission();
   Future<PushInitial> initial();
+
+  /// False when the platform push is not usable (e.g. Firebase is not configured): the registrar then does nothing.
+  /// Only meaningful after [initial].
+  bool get available => true;
+
+  /// True when notifications are already allowed (no explanation dialog needed).
+  Future<bool> isPermitted() async => false;
 }
 
 /// MethodChannel `vn.mamba/push`: native -> Dart `token`, `error`, `opened`, `presentation`; Dart -> native
 /// `requestPermission`, `initial`.
 class ChannelPushPort implements PushPort {
+  @override
+  bool get available => true;
+
+  @override
+  Future<bool> isPermitted() async => false;
+
   ChannelPushPort([MethodChannel? channel]) : _ch = channel ?? const MethodChannel('vn.mamba/push');
   final MethodChannel _ch;
 
@@ -95,7 +109,7 @@ class ChannelPushPort implements PushPort {
   }
 }
 
-/// iOS only (no-op elsewhere). Keeps this device's APNs token registered on the server for the signed-in CUSTOMER:
+/// iOS (APNs) and Android (FCM, see [FcmPushPort]); a no-op elsewhere. Keeps this device's push token registered on the server for the signed-in CUSTOMER:
 ///  - registers `POST /me/push-token` after a customer signs in and whenever the token changes;
 ///  - removes it (`DELETE /me/push-token`) when they sign out - before the session is cleared when the sign-out goes
 ///    through [AuthStore.logout];
@@ -108,12 +122,15 @@ class PushRegistrar {
     required this.openRoute,
     PushPort? port,
     bool? isIos,
+    bool? isAndroid,
     this.explain,
     this.hub,
     this.retryDelay = const Duration(seconds: 30),
     this.openDelay = const Duration(milliseconds: 400),
-  })  : _port = port ?? ChannelPushPort(),
-        _isIos = isIos ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
+  })  : _isIos = isIos ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS),
+        // An explicit isIos (tests) switches the platform auto-detection off.
+        _isAndroid = isAndroid ?? (isIos == null && !kIsWeb && defaultTargetPlatform == TargetPlatform.android),
+        _port = port ?? ((isIos ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)) ? ChannelPushPort() : FcmPushPort());
 
   final AuthStore auth;
   final ApiClient api;
@@ -133,6 +150,10 @@ class PushRegistrar {
 
   final PushPort _port;
   final bool _isIos;
+  final bool _isAndroid;
+  bool _unavailable = false;
+
+  String get _platform => _isIos ? 'ios' : 'android';
 
   static const _askedKey = 'mamba_push_asked';
 
@@ -144,15 +165,20 @@ class PushRegistrar {
   PushOpened? _pendingOpen;
   Timer? _retry;
 
-  bool get active => _isIos && _started;
+  bool get active => (_isIos || _isAndroid) && _started && !_unavailable;
 
   Future<void> start() async {
-    if (!_isIos || _started) return;
+    if (!(_isIos || _isAndroid) || _started) return;
     _started = true;
     _port.listen(onToken: _onToken, onError: (m) => debugPrint('push: $m'), onOpened: _onOpened, presentation: _present);
+    final init = await _port.initial();
+    if (!_started) return; // disposed meanwhile
+    if (!_port.available) {
+      _unavailable = true; // e.g. Android build without google-services.json: silent no-op
+      return;
+    }
     auth.beforeLogout.add(_unregister);
     auth.addListener(_sync);
-    final init = await _port.initial();
     if (init.token != null) _token = init.token;
     if (init.opened != null) _pendingOpen = init.opened;
     _sync();
@@ -162,6 +188,8 @@ class PushRegistrar {
     if (!_started) return;
     _started = false;
     _retry?.cancel();
+    final p = _port;
+    if (p is FcmPushPort) p.dispose();
     auth.beforeLogout.remove(_unregister);
     auth.removeListener(_sync);
   }
@@ -194,7 +222,7 @@ class PushRegistrar {
     final t = _token;
     if (t == null || !_signedInCustomer || t == _registered) return;
     try {
-      await api.post('/me/push-token', {'platform': 'ios', 'token': t, 'deviceLabel': 'iPhone'});
+      await api.post('/me/push-token', {'platform': _platform, 'token': t, 'deviceLabel': _isIos ? 'iPhone' : 'Android'});
       if (_token == t) _registered = t;
     } catch (_) {
       _retry?.cancel();
@@ -219,6 +247,10 @@ class PushRegistrar {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool(_askedKey) == true) return;
+      if (await _port.isPermitted()) {
+        await prefs.setBool(_askedKey, true);
+        return;
+      }
       final go = await (explain?.call() ?? Future.value(true));
       if (!go) return; // "Để sau": ask again next sign-in
       await prefs.setBool(_askedKey, true);
