@@ -23,7 +23,7 @@ const form = reactive({
   autoLockMinutes: 0,
   watermarkEnabled: false,
   screenshotGuardEnabled: true,
-  blurOnHideEnabled: true,
+  blurOnHideEnabled: false,
 })
 let saved = ''
 
