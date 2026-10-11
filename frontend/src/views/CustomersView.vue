@@ -39,11 +39,9 @@ const router = useRouter()
 const fromEntries = route.query.from === 'entries'
 const addInput = ref(null)
 // Two separate screens: the list of customers, or the form that creates a new one.
-const newConfig = ref(null) // the scoring-config editor of the create form
 const newStation = ref('mb')
-const newKey = ref(0) // bumped to reset the config editor after a customer was created
-const view = ref(route.query.from === 'entries' ? 'new' : 'list')
-watch(view, (v) => v === 'new' && nextTick(() => addInput.value?.focus()))
+// "Thêm khách hàng" opens a small dialog (name, phone, default station); the scoring config is set afterwards per customer.
+const addOpen = ref(route.query.from === 'entries')
 
 const entries = ref([])
 const loading = ref(true)
@@ -113,30 +111,20 @@ async function addCustomer() {
   addError.value = ''
   addingCustomer.value = true
   try {
-    // Everything is set in one go: the config is checked first so a mistake does not leave a half-made customer.
-    const cfg = newConfig.value?.collect()
-    if (cfg?.error) {
-      addError.value = cfg.error
-      return
-    }
     let created = await api.post('/me/customers', { name, phone: newCustomerPhone.value.trim() })
-    const extra = {}
-    if (newStation.value && newStation.value !== 'mb') extra.defaultStation = newStation.value
-    if (cfg?.map) extra.scoringRates = cfg.map
-    if (Object.keys(extra).length) {
+    if (newStation.value && newStation.value !== 'mb') {
       try {
-        created = { ...created, ...(await api.patch(`/me/customers/${created.id}`, extra)) }
+        created = { ...created, ...(await api.patch(`/me/customers/${created.id}`, { defaultStation: newStation.value })) }
       } catch (err) {
-        addError.value = `Đã tạo khách nhưng chưa lưu được đài/cấu hình: ${err instanceof ApiError ? err.message : 'lỗi mạng'}. Mở Cấu hình tính điểm của khách để đặt lại.`
+        addError.value = `Đã tạo khách nhưng chưa lưu được đài mặc định: ${err instanceof ApiError ? err.message : 'lỗi mạng'}.`
       }
     }
     roster.value.push(created)
     roster.value.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-    view.value = 'list'
+    if (!addError.value) addOpen.value = false
     newCustomerName.value = ''
     newCustomerPhone.value = ''
     newStation.value = 'mb'
-    newKey.value++
     if (fromEntries) {
       router.push({ name: 'entries', query: { customer: created.name } })
       return
@@ -320,64 +308,17 @@ async function savePhone() {
 <template>
   <div class="page">
     <h1 class="page-title">Khách hàng</h1>
-    <p class="page-subtitle">Danh sách khách hàng của bạn. Chọn Danh sách để xem và cấu hình khách, hoặc Tạo khách hàng mới để thêm khách; số liệu vào/ra được tổng hợp từ các lượt nhập.</p>
+    <p class="page-subtitle">Danh sách khách hàng của bạn. Bấm "Thêm khách hàng" để thêm khách mới; số liệu vào/ra được tổng hợp từ các lượt nhập.</p>
 
-    <div class="view-tabs" role="tablist" aria-label="Khách hàng">
-      <button type="button" role="tab" class="view-tab" :class="{ active: view === 'list' }" :aria-selected="view === 'list'" @click="view = 'list'">Danh sách khách hàng</button>
-      <button type="button" role="tab" class="view-tab" :class="{ active: view === 'new' }" :aria-selected="view === 'new'" @click="view = 'new'">Tạo khách hàng mới</button>
-    </div>
-
-    <div v-show="view === 'new'" class="card add-customer-card is-new">
-      <form class="add-customer-form" @submit.prevent="addCustomer">
-        <div class="add-customer-row">
-          <div class="field add-customer-field">
-            <label>Tên khách hàng</label>
-            <div class="input-wrap">
-              <input ref="addInput" v-model="newCustomerName" type="text" placeholder="Tên khách hàng mới" :disabled="addingCustomer" />
-            </div>
-          </div>
-          <div class="field add-customer-field">
-            <label>Số điện thoại</label>
-            <div class="input-wrap">
-              <input v-model="newCustomerPhone" type="tel" inputmode="tel" placeholder="Không bắt buộc" :disabled="addingCustomer" />
-            </div>
-          </div>
-          <div class="field add-customer-field">
-            <label>Đài xổ số mặc định khi nhập số</label>
-            <AppSelect v-model="newStation" aria-label="Đài mặc định">
-              <option v-for="o in allStationOptions()" :key="o.value" :value="o.value">{{ o.label }}</option>
-            </AppSelect>
-          </div>
-        </div>
-
-        <h3 class="add-customer-config-title">Cấu hình tính điểm của khách này</h3>
-        <ScoringConfigEditor
-          :key="newKey"
-          ref="newConfig"
-          scope="customer"
-          draft
-          :customer="{ id: null, name: newCustomerName.trim(), scoringRates: null }"
-          :account-rates="accountRates"
-        />
-
-        <div class="add-customer-actions">
-          <button type="submit" class="btn btn-primary" :disabled="addingCustomer || !newCustomerName.trim()">
-            {{ addingCustomer ? 'Đang tạo...' : 'Tạo khách hàng' }}
-          </button>
-        </div>
-      </form>
-      <div v-if="addError" class="alert alert-error add-customer-error">{{ addError }}</div>
-    </div>
-
-    <div v-if="fromCache && view === 'list'" class="alert alert-warning">
+    <div v-if="fromCache" class="alert alert-warning">
       Đang offline: hiển thị số liệu đã lưu trên máy. Thêm/xoá khách hàng cần có mạng.
     </div>
-    <div v-if="view !== 'list'"></div>
-    <div v-else-if="loading" class="card">Đang tải...</div>
+    <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
       <MaskBar class="mask-row" />
       <div class="config-row">
+        <button type="button" class="btn btn-primary btn-sm" @click="addOpen = true">+ Thêm khách hàng</button>
         <button type="button" class="btn btn-secondary btn-sm" @click="defaultConfigOpen = true">Cấu hình tính điểm mặc định</button>
       </div>
       <div class="field search-field">
@@ -387,7 +328,7 @@ async function savePhone() {
         </div>
       </div>
 
-      <div v-if="customers.length === 0" class="card">Chưa có khách hàng nào. Bấm "Tạo khách hàng mới" để bắt đầu.</div>
+      <div v-if="customers.length === 0" class="card">Chưa có khách hàng nào. Bấm "Thêm khách hàng" để bắt đầu.</div>
       <div v-else-if="filteredCustomers.length === 0" class="card">Không tìm thấy khách hàng phù hợp.</div>
 
       <div v-else class="table-wrap">
@@ -437,6 +378,37 @@ async function savePhone() {
 
     <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" xwide @close="defaultConfigOpen = false; loadAccountRates()">
       <ScoringSettingsView embedded @saved="loadAccountRates" />
+    </ModalDialog>
+
+    <ModalDialog :open="addOpen" title="Thêm khách hàng" @close="addOpen = false; addError = ''">
+      <form class="add-dialog-form" @submit.prevent="addCustomer">
+        <div class="field">
+          <label for="add-name">Tên khách hàng</label>
+          <div class="input-wrap">
+            <input id="add-name" ref="addInput" v-model="newCustomerName" type="text" placeholder="Tên khách hàng" :disabled="addingCustomer" data-autofocus />
+          </div>
+        </div>
+        <div class="field">
+          <label for="add-phone">Số điện thoại</label>
+          <div class="input-wrap">
+            <input id="add-phone" v-model="newCustomerPhone" type="tel" inputmode="tel" placeholder="Không bắt buộc" :disabled="addingCustomer" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Đài xổ số mặc định khi nhập số</label>
+          <AppSelect v-model="newStation" aria-label="Đài mặc định">
+            <option v-for="o in allStationOptions()" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </AppSelect>
+        </div>
+        <p class="page-subtitle" style="margin: 0 0 12px">Cấu hình tính điểm của khách đặt sau, ở nút "Cấu hình tính điểm" trong danh sách.</p>
+        <div v-if="addError" class="alert alert-error add-customer-error">{{ addError }}</div>
+        <div class="add-customer-actions">
+          <button type="button" class="btn btn-ghost" :disabled="addingCustomer" @click="addOpen = false">Huỷ</button>
+          <button type="submit" class="btn btn-primary" :disabled="addingCustomer || !newCustomerName.trim()">
+            {{ addingCustomer ? 'Đang thêm...' : 'Thêm khách hàng' }}
+          </button>
+        </div>
+      </form>
     </ModalDialog>
 
     <ModalDialog :open="!!editing" :title="editing ? `Sửa ${editing.name}` : ''" @close="editing = null">
@@ -524,41 +496,14 @@ async function savePhone() {
   font-size: 17px;
 }
 
-.add-customer-card.is-new {
-  max-width: 820px;
-}
-.add-customer-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 16px;
-  width: 100%;
-}
-.add-customer-field label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-.add-customer-row .add-customer-field {
-  flex: none;
-  min-width: 0;
-}
-@media (max-width: 900px) {
-  .add-customer-row {
-    grid-template-columns: 1fr;
-  }
-}
-.add-customer-config-title {
-  width: 100%;
-  margin: 18px 0 8px;
-  font-size: 17px;
+.add-dialog-form .btn {
+  min-height: 44px;
 }
 .add-customer-actions {
-  width: 100%;
   display: flex;
   justify-content: flex-end;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 6px;
 }
 .add-customer-card {
   margin-bottom: 16px;
@@ -859,32 +804,6 @@ async function savePhone() {
 .table-wrap td:nth-child(4),
 .table-wrap td:nth-child(5) {
   font-weight: 600;
-}
-.view-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 4px 0 16px;
-}
-.view-tab {
-  min-height: 44px;
-  padding: 0 22px;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--card);
-  border: 1px solid var(--input-border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.view-tab:hover {
-  border-color: var(--primary);
-}
-.view-tab.active {
-  color: var(--on-primary);
-  background: var(--primary);
-  border-color: var(--primary);
 }
 .table-wrap .row-clickable:hover {
   background: color-mix(in srgb, var(--primary) 6%, transparent);

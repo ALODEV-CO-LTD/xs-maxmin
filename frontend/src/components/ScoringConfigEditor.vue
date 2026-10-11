@@ -26,7 +26,6 @@ const props = defineProps({
   scope: { type: String, default: 'default' }, // 'default' | 'customer'
   customer: { type: Object, default: null }, // { id, name, scoringRates } (customer scope)
   accountRates: { type: Object, default: () => ({}) }, // the account-wide map (customer scope: the fallback)
-  draft: { type: Boolean, default: false }, // customer scope for a customer that does not exist yet: no save button, the parent calls collect()
 })
 const emit = defineEmits(['saved'])
 
@@ -306,23 +305,14 @@ const overrideCount = computed(() => Object.keys(work).filter((k) => isRegionalK
 const regionHasOverride = (id) => Object.keys(work).some((k) => k.endsWith(`@${id}`))
 const regions = REGION_IDS
 
-// Draft mode: the parent creates the customer, then stores what this returns ({ error } or { map } - null = follow the defaults).
-function collect() {
-  const problem = validate()
-  if (problem) return { error: problem }
-  commitRows()
-  const map = JSON.parse(JSON.stringify(work))
-  return { map: Object.keys(map).length ? map : null }
-}
-defineExpose({ collect })
 </script>
 
 <template>
-  <div class="sce" :class="{ 'is-draft': draft }">
+  <div class="sce">
     <div v-if="loading" class="sce-note">Đang tải...</div>
     <template v-else>
       <p class="sce-hint">
-        <template v-if="isCustomer">Cấu hình dùng để tính điểm cho <strong>{{ customer.name || 'khách mới' }}</strong>. Dòng nào không đổi sẽ theo cấu hình mặc định.</template>
+        <template v-if="isCustomer">Cấu hình dùng để tính điểm cho <strong>{{ customer.name }}</strong>. Dòng nào không đổi sẽ theo cấu hình mặc định.</template>
         <template v-else>Cấu hình mặc định dùng cho mọi khách chưa có cấu hình riêng.</template>
         Mỗi miền có thể có tỉ lệ khác nhau: chọn miền rồi sửa. Loại đánh thêm ở tab nào chỉ dùng cho miền đó.
       </p>
@@ -383,7 +373,7 @@ defineExpose({ collect })
       </div>
       </div>
 
-      <div v-if="!draft" class="sce-foot">
+      <div class="sce-foot">
         <span class="sce-muted">{{ overrideCount ? `${overrideCount} mục riêng` : isCustomer ? 'Đang dùng cấu hình mặc định' : 'Chưa có cấu hình riêng theo miền' }}</span>
         <button type="button" class="btn btn-ghost btn-sm" :disabled="saving" @click="resetAll">{{ isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định' }}</button>
         <button type="button" class="btn btn-primary" :disabled="saving || !dirty" @click="save">{{ saving ? 'Đang lưu...' : isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình' }}</button>
@@ -461,11 +451,6 @@ defineExpose({ collect })
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-gutter: stable;
-}
-.sce.is-draft .sce-list {
-  height: auto;
-  overflow: visible;
-  padding-right: 0;
 }
 .sce-row {
   display: grid;
