@@ -119,6 +119,7 @@ const dateFrom = ref('')
 const dateTo = ref('')
 function setPreset(key) {
   preset.value = key
+  if (key === '') return // "Tuỳ chọn": keep the dates as they are
   if (key === 'today') [dateFrom.value, dateTo.value] = [daysAgo(0), daysAgo(0)]
   else if (key === '7') [dateFrom.value, dateTo.value] = [daysAgo(6), daysAgo(0)]
   else if (key === '30') [dateFrom.value, dateTo.value] = [daysAgo(29), daysAgo(0)]
@@ -455,30 +456,22 @@ onMounted(async () => {
             </AppSelect>
           </div>
         </div>
-        <div class="filter-range">
-          <div class="range-chips" role="group" aria-label="Lọc nhanh theo ngày">
-            <button
-              v-for="p in PRESETS"
-              :key="p.key"
-              type="button"
-              class="range-chip"
-              :class="{ on: preset === p.key }"
-              :aria-pressed="preset === p.key"
-              @click="setPreset(p.key)"
-            >
-              {{ p.label }}
-            </button>
+        <div class="field filter-customer">
+          <label>Thời gian</label>
+          <div class="input-wrap">
+            <AppSelect :model-value="preset" aria-label="Lọc nhanh theo ngày" @update:model-value="setPreset">
+              <option v-for="p in PRESETS" :key="p.key" :value="p.key">{{ p.label }}</option>
+              <option value="">Tuỳ chọn</option>
+            </AppSelect>
           </div>
-          <div class="range-dates">
-            <div class="field">
-              <label>Từ ngày</label>
-              <AppDatePicker v-model="dateFrom" @change="onRangeInput" />
-            </div>
-            <div class="field">
-              <label>Đến ngày</label>
-              <AppDatePicker v-model="dateTo" @change="onRangeInput" />
-            </div>
-          </div>
+        </div>
+        <div class="field filter-date">
+          <label>Từ ngày</label>
+          <AppDatePicker v-model="dateFrom" @change="onRangeInput" />
+        </div>
+        <div class="field filter-date">
+          <label>Đến ngày</label>
+          <AppDatePicker v-model="dateTo" @change="onRangeInput" />
         </div>
         <label class="check-field">
           <input type="checkbox" v-model="onlyMissing" />
@@ -710,53 +703,26 @@ onMounted(async () => {
   border-radius: 14px;
 }
 .filter-customer {
-  flex: 0 1 320px;
-  min-width: 220px;
+  flex: 0 1 220px;
+  min-width: 180px;
   margin: 0;
 }
-.filter-customer label,
-.range-dates label {
+.filter-customer label {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
 }
-.filter-range {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1 1 340px;
-}
-.range-chips {
-  display: flex;
-  justify-content: flex-start;
-  align-self: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.range-chip {
-  min-height: 44px;
-  padding: 0 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.range-chip.on {
-  color: var(--on-primary);
-  background: var(--primary);
-  border-color: var(--primary);
-}
-.range-dates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.range-dates .field {
+.filter-date {
+  flex: 0 1 170px;
+  min-width: 150px;
   margin: 0;
+}
+.filter-date label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
 }
 .check-field {
   display: flex;
@@ -1033,12 +999,11 @@ onMounted(async () => {
     align-items: stretch;
     padding: 16px;
   }
-  .filter-customer,
-  .filter-range {
+  .filter-customer {
     flex: 1 1 100%;
   }
-  .range-dates {
-    gap: 8px;
+  .filter-date {
+    flex: 1 1 calc(50% - 12px);
   }
   .toolbar {
     padding: 12px;

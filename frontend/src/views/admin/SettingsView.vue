@@ -21,6 +21,7 @@
 <script setup>
 import AppSelect from '../../components/AppSelect.vue'
 import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../../api'
 import { useAuthStore } from '../../stores/auth'
 
@@ -216,18 +217,66 @@ const canSecurity = auth.can('security.view')
 if (canSettings) onMounted(load)
 else loading.value = false
 if (canSecurity) onMounted(loadEvents)
+
+const route = useRoute()
+const router = useRouter()
+const TABS = computed(() => [
+  ...(canSettings
+    ? [
+        { key: 'payment', label: 'Thanh toán' },
+        { key: 'prices', label: 'Giá gói' },
+        { key: 'limits', label: 'Giới hạn ID' },
+      ]
+    : []),
+  ...(canSecurity ? [{ key: 'security', label: 'Nhật ký bảo mật' }] : []),
+  ...(canSettings && otherKeys.value.length > 0 ? [{ key: 'other', label: 'Khoá khác' }] : []),
+])
+const tab = ref(route.query.tab)
+const activeTab = computed(() => (TABS.value.some((t) => t.key === tab.value) ? tab.value : TABS.value[0]?.key))
+function selectTab(key) {
+  tab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
+function onTabKey(e) {
+  const list = TABS.value
+  const i = list.findIndex((t) => t.key === activeTab.value)
+  const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null
+  if (next === null) return
+  e.preventDefault()
+  const t = list[(next + list.length) % list.length]
+  selectTab(t.key)
+  document.getElementById(`set-tab-${t.key}`)?.focus()
+}
 </script>
 
 <template>
   <div class="page">
     <h1 class="page-title">Cài đặt hệ thống</h1>
-    <p class="page-subtitle">Ghi đè giá gói dịch vụ (để trống để dùng giá mặc định)</p>
+    <p class="page-subtitle">Thanh toán, giá gói, giới hạn tài khoản và nhật ký bảo mật</p>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
     <div v-if="saved" class="alert alert-success">Đã lưu cài đặt</div>
     <div v-if="loading">Đang tải...</div>
 
-    <template v-else-if="canSettings">
+    <div v-if="!loading && TABS.length > 0" class="set-tabs" role="tablist" aria-label="Mục cài đặt" @keydown="onTabKey">
+      <button
+        v-for="t in TABS"
+        :id="`set-tab-${t.key}`"
+        :key="t.key"
+        type="button"
+        role="tab"
+        class="set-tab"
+        :class="{ active: activeTab === t.key }"
+        :aria-selected="activeTab === t.key"
+        :tabindex="activeTab === t.key ? 0 : -1"
+        @click="selectTab(t.key)"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+
+    <template v-if="!loading && canSettings">
+      <div v-show="activeTab === 'payment'" role="tabpanel">
       <h2 style="margin-top: 0">Tài khoản nhận thanh toán</h2>
       <p class="page-subtitle">
         Khách hàng sẽ thấy thông tin này (và mã QR chuyển khoản nhanh) ở trang Gói dịch vụ khi mua gói.
@@ -252,8 +301,10 @@ if (canSecurity) onMounted(loadEvents)
           {{ bankSaving ? 'Đang lưu...' : 'Lưu cấu hình thanh toán' }}
         </button>
       </form>
+      </div>
 
-      <h2>Giới hạn ID ảo</h2>
+      <div v-show="activeTab === 'limits'" role="tabpanel">
+      <h2 style="margin-top: 0">Giới hạn ID ảo</h2>
       <p class="page-subtitle">Số Mã ID (ID ảo) tối đa mỗi tài khoản khách hàng được tạo. Mặc định 5.</p>
       <form class="card" @submit.prevent="saveMaxIds">
         <div v-if="maxIdsError" class="alert alert-error">{{ maxIdsError }}</div>
@@ -266,8 +317,10 @@ if (canSecurity) onMounted(loadEvents)
           {{ maxIdsSaving ? 'Đang lưu...' : 'Lưu giới hạn' }}
         </button>
       </form>
+      </div>
 
-      <h2>Giá gói dịch vụ</h2>
+      <div v-show="activeTab === 'prices'" role="tabpanel">
+      <h2 style="margin-top: 0">Giá gói dịch vụ</h2>
       <form class="card" @submit.prevent="save">
       <div v-for="pkg in packages" :key="pkg.wire" class="field">
         <label>{{ pkg.label }} (mặc định {{ pkg.default.toLocaleString('vi-VN') }} đ)</label>
@@ -293,10 +346,11 @@ if (canSecurity) onMounted(loadEvents)
         {{ saving ? 'Đang lưu...' : 'Lưu cài đặt' }}
       </button>
     </form>
+      </div>
     </template>
 
-    <template v-if="canSecurity">
-    <h2 style="margin-top: 32px">Nhật ký bảo mật gần đây</h2>
+    <template v-if="canSecurity && activeTab === 'security'">
+    <h2 style="margin-top: 0">Nhật ký bảo mật gần đây</h2>
     <p class="page-subtitle">Không ghi mật khẩu hay token.</p>
     <div v-if="eventsError" class="alert alert-error">{{ eventsError }}</div>
     <div class="card" style="padding: 0">
@@ -325,8 +379,8 @@ if (canSecurity) onMounted(loadEvents)
 
     </template>
 
-    <template v-if="canSettings && !loading && otherKeys.length > 0">
-      <h2 style="margin-top: 32px">Các khoá cài đặt khác</h2>
+    <template v-if="canSettings && !loading && otherKeys.length > 0 && activeTab === 'other'">
+      <h2 style="margin-top: 0">Các khoá cài đặt khác</h2>
       <div class="card" style="padding: 0">
         <table class="table">
           <thead>
@@ -346,3 +400,39 @@ if (canSecurity) onMounted(loadEvents)
     </template>
   </div>
 </template>
+
+<style scoped>
+.set-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.set-tab {
+  flex: 1 0 auto;
+  min-height: 44px;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.set-tab:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+.set-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.set-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+</style>
