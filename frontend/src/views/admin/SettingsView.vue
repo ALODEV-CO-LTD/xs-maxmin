@@ -72,6 +72,10 @@ const saving = ref(false)
 const raw = ref({})
 const prices = ref({})
 const bank = ref({ bank_bin: '', bank_account_number: '', bank_account_holder: '' })
+// Each form only shows its values; "Sửa" unlocks it, "Lưu" / "Huỷ" lock it again.
+const editBank = ref(false)
+const editMax = ref(false)
+const editPrices = ref(false)
 const bankSaving = ref(false)
 const bankSaved = ref(false)
 const bankError = ref('')
@@ -120,6 +124,7 @@ async function saveMaxIds() {
     raw.value = await api.put('/admin/settings', { max_virtual_ids: String(maxIds.value).trim() || '5' })
     maxIds.value = raw.value.max_virtual_ids ?? ''
     maxIdsSaved.value = true
+    editMax.value = false
   } catch (err) {
     maxIdsError.value = err instanceof ApiError ? err.message : 'Không thể lưu giới hạn ID ảo'
   } finally {
@@ -151,6 +156,7 @@ async function saveBank() {
       bank_account_holder: holder,
     })
     bankSaved.value = true
+    editBank.value = false
   } catch (err) {
     bankError.value = err instanceof ApiError ? err.message : 'Không thể lưu cấu hình thanh toán'
   } finally {
@@ -180,11 +186,34 @@ async function save() {
       raw.value = await api.del('/admin/settings', { keys: keysToDelete })
     }
     saved.value = true
+    editPrices.value = false
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Không thể lưu cài đặt'
   } finally {
     saving.value = false
   }
+}
+
+function cancelBank() {
+  bank.value = {
+    bank_bin: raw.value.bank_bin ?? '',
+    bank_account_number: raw.value.bank_account_number ?? '',
+    bank_account_holder: raw.value.bank_account_holder ?? '',
+  }
+  bankError.value = ''
+  editBank.value = false
+}
+function cancelMax() {
+  maxIds.value = raw.value.max_virtual_ids ?? ''
+  maxIdsError.value = ''
+  editMax.value = false
+}
+function cancelPrices() {
+  const p = {}
+  for (const pkg of packages) p[pkg.wire] = raw.value[keyFor(pkg.wire)] ?? ''
+  prices.value = p
+  error.value = ''
+  editPrices.value = false
 }
 
 async function resetPrice(wire) {
@@ -291,21 +320,27 @@ function onTabKey(e) {
         <div v-if="bankError" class="alert alert-error">{{ bankError }}</div>
         <div v-if="bankSaved" class="alert alert-success">Đã lưu cấu hình thanh toán</div>
 
-        <div class="field">
-          <label>Ngân hàng</label>
-          <AppSelect v-model="bank.bank_bin">
-            <option value="" disabled>-- Chọn ngân hàng --</option>
-            <option v-for="b in BANKS" :key="b.bin" :value="b.bin">{{ b.name }}</option>
-          </AppSelect>
-        </div>
-        <div v-for="f in bankFields" :key="f.key" class="field">
-          <label>{{ f.label }}</label>
-          <input v-model="bank[f.key]" type="text" :placeholder="f.label" />
-        </div>
+        <fieldset class="ro" :disabled="!editBank">
+          <div class="field">
+            <label>Ngân hàng</label>
+            <AppSelect v-model="bank.bank_bin">
+              <option value="" disabled>-- Chưa chọn ngân hàng --</option>
+              <option v-for="b in BANKS" :key="b.bin" :value="b.bin">{{ b.name }}</option>
+            </AppSelect>
+          </div>
+          <div v-for="f in bankFields" :key="f.key" class="field">
+            <label>{{ f.label }}</label>
+            <input v-model="bank[f.key]" type="text" :placeholder="f.label" />
+          </div>
+        </fieldset>
 
-        <button class="btn btn-primary btn-block" type="submit" :disabled="bankSaving">
-          {{ bankSaving ? 'Đang lưu...' : 'Lưu cấu hình thanh toán' }}
-        </button>
+        <div class="edit-actions">
+          <button v-if="!editBank" class="btn btn-secondary" type="button" @click="editBank = true">Sửa</button>
+          <template v-else>
+            <button class="btn btn-ghost" type="button" :disabled="bankSaving" @click="cancelBank">Huỷ</button>
+            <button class="btn btn-primary" type="submit" :disabled="bankSaving">{{ bankSaving ? 'Đang lưu...' : 'Lưu cấu hình thanh toán' }}</button>
+          </template>
+        </div>
       </form>
       </div>
 
@@ -315,19 +350,26 @@ function onTabKey(e) {
       <form class="card" @submit.prevent="saveMaxIds">
         <div v-if="maxIdsError" class="alert alert-error">{{ maxIdsError }}</div>
         <div v-if="maxIdsSaved" class="alert alert-success">Đã lưu giới hạn ID ảo</div>
-        <div class="field">
-          <label>Số ID tối đa mỗi tài khoản (1-100)</label>
-          <input v-model="maxIds" type="number" min="1" max="100" placeholder="5" />
+        <fieldset class="ro" :disabled="!editMax">
+          <div class="field">
+            <label>Số ID tối đa mỗi tài khoản (1-100)</label>
+            <input v-model="maxIds" type="number" min="1" max="100" placeholder="5" />
+          </div>
+        </fieldset>
+        <div class="edit-actions">
+          <button v-if="!editMax" class="btn btn-secondary" type="button" @click="editMax = true">Sửa</button>
+          <template v-else>
+            <button class="btn btn-ghost" type="button" :disabled="maxIdsSaving" @click="cancelMax">Huỷ</button>
+            <button class="btn btn-primary" type="submit" :disabled="maxIdsSaving">{{ maxIdsSaving ? 'Đang lưu...' : 'Lưu giới hạn' }}</button>
+          </template>
         </div>
-        <button class="btn btn-primary btn-block" type="submit" :disabled="maxIdsSaving">
-          {{ maxIdsSaving ? 'Đang lưu...' : 'Lưu giới hạn' }}
-        </button>
       </form>
       </div>
 
       <div v-show="activeTab === 'prices'" role="tabpanel">
       <h2 style="margin-top: 0">Giá gói dịch vụ</h2>
       <form class="card" @submit.prevent="save">
+      <fieldset class="ro" :disabled="!editPrices">
       <div v-for="pkg in packages" :key="pkg.wire" class="field">
         <label>{{ pkg.label }} (mặc định {{ pkg.default.toLocaleString('vi-VN') }} đ)</label>
         <div style="display: flex; gap: 8px">
@@ -338,7 +380,7 @@ function onTabKey(e) {
             :placeholder="String(pkg.default)"
           />
           <button
-            v-if="raw[keyFor(pkg.wire)] !== undefined"
+            v-if="editPrices && raw[keyFor(pkg.wire)] !== undefined"
             type="button"
             class="btn btn-ghost btn-sm"
             @click="resetPrice(pkg.wire)"
@@ -348,9 +390,15 @@ function onTabKey(e) {
         </div>
       </div>
 
-      <button class="btn btn-primary btn-block" type="submit" :disabled="saving">
-        {{ saving ? 'Đang lưu...' : 'Lưu cài đặt' }}
-      </button>
+      </fieldset>
+
+      <div class="edit-actions">
+        <button v-if="!editPrices" class="btn btn-secondary" type="button" @click="editPrices = true">Sửa</button>
+        <template v-else>
+          <button class="btn btn-ghost" type="button" :disabled="saving" @click="cancelPrices">Huỷ</button>
+          <button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? 'Đang lưu...' : 'Lưu cài đặt' }}</button>
+        </template>
+      </div>
     </form>
       </div>
     </template>
@@ -447,5 +495,25 @@ function onTabKey(e) {
 .set-tab:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+fieldset.ro {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+fieldset.ro:disabled input,
+fieldset.ro:disabled :deep(button),
+fieldset.ro:disabled :deep(.app-select-trigger) {
+  opacity: 1;
+  cursor: default;
+  color: var(--text-primary);
+}
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 </style>

@@ -12,6 +12,7 @@ import { api, ApiError } from '../../api'
 import { showConfirm } from '../../confirm'
 
 const loading = ref(true)
+const editing = ref(false) // values are only displayed until "Sửa"
 const saving = ref(false)
 const error = ref('')
 const notice = ref('')
@@ -67,11 +68,18 @@ async function save() {
     for (const k of Object.keys(form)) body[k] = typeof form[k] === 'boolean' ? !!form[k] : Number(form[k])
     fill(await api.put('/admin/security-policy', body))
     notice.value = 'Đã lưu chính sách bảo mật.'
+    editing.value = false
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Không lưu được'
   } finally {
     saving.value = false
   }
+}
+
+function cancel() {
+  Object.assign(form, JSON.parse(saved))
+  error.value = ''
+  editing.value = false
 }
 
 async function reset() {
@@ -81,6 +89,7 @@ async function reset() {
   try {
     fill(await api.del('/admin/security-policy'))
     notice.value = 'Đã đặt lại về mặc định.'
+    editing.value = false
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Không đặt lại được'
   } finally {
@@ -99,6 +108,7 @@ async function reset() {
     <div v-if="loading" class="card">Đang tải...</div>
 
     <form v-else @submit.prevent="save">
+      <fieldset class="ro" :disabled="!editing">
       <section class="card block">
         <h2>Chống đoán mật khẩu</h2>
         <p class="hint">Áp dụng cho đăng nhập, mật khẩu lớp hai và các ô nhập lại mật khẩu. Nhập sai quá số lần cho phép thì bị khoá tạm theo tài khoản và địa chỉ IP; mỗi lần sai tiếp theo, thời gian khoá nhân đôi đến mức tối đa.</p>
@@ -128,15 +138,32 @@ async function reset() {
         <label class="check"><input v-model="form.blurOnHideEnabled" type="checkbox" /> Làm mờ màn hình khi ẩn trang hoặc mất focus</label>
       </section>
 
+      </fieldset>
+
       <div class="actions">
-        <button type="button" class="btn btn-ghost" :disabled="saving" @click="reset">Đặt lại mặc định</button>
-        <button type="submit" class="btn btn-primary" :disabled="saving || !dirty">{{ saving ? 'Đang lưu...' : 'Lưu chính sách' }}</button>
+        <button v-if="!editing" type="button" class="btn btn-secondary" @click="editing = true">Sửa</button>
+        <template v-else>
+          <button type="button" class="btn btn-ghost" :disabled="saving" @click="reset">Đặt lại mặc định</button>
+          <button type="button" class="btn btn-ghost" :disabled="saving" @click="cancel">Huỷ</button>
+          <button type="submit" class="btn btn-primary" :disabled="saving || !dirty">{{ saving ? 'Đang lưu...' : 'Lưu chính sách' }}</button>
+        </template>
       </div>
     </form>
   </div>
 </template>
 
 <style scoped>
+fieldset.ro {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+fieldset.ro:disabled input {
+  opacity: 1;
+  cursor: default;
+  color: var(--text-primary);
+}
 .block {
   margin-bottom: 12px;
   padding: 16px;
