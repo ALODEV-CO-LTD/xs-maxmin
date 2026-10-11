@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'core/admin_session.dart';
 import 'core/api_client.dart';
 import 'core/auth_store.dart';
 import 'core/lottery_stations.dart';
@@ -19,7 +20,7 @@ import 'features/entries/entries_screen.dart';
 import 'features/friends/friends_screen.dart';
 import 'features/results/results_screen.dart';
 import 'features/scoring/scoring_screen.dart';
-import 'features/shell/admin_notice_screen.dart';
+import 'features/admin/admin_shell.dart';
 import 'features/shell/app_shell.dart';
 import 'features/shell/more_screen.dart';
 
@@ -32,7 +33,7 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
         if (!auth.ready) return null;
         final loc = state.matchedLocation;
         if (!auth.signedIn) return _authRoutes.contains(loc) ? null : '/login';
-        if (auth.isAdmin) return loc == '/admin' ? null : '/admin';
+        if (auth.isAdmin) return (loc == '/admin' || loc == '/account') ? null : '/admin';
         if (_authRoutes.contains(loc) || loc == '/admin' || loc == '/') return '/entries';
         return null;
       },
@@ -40,7 +41,7 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
         GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
         GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
         GoRoute(path: '/recover', builder: (_, _) => const RecoverScreen()),
-        GoRoute(path: '/admin', builder: (_, _) => const AdminNoticeScreen()),
+        GoRoute(path: '/admin', builder: (_, _) => const AdminShell()),
         GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
         StatefulShellRoute.indexedStack(
@@ -68,6 +69,7 @@ class _MambaAppState extends State<MambaApp> {
   late final ApiClient _api = ApiClient(_auth);
   final LotteryStations _stations = LotteryStations();
   final MaskStore _mask = MaskStore()..load();
+  final AdminSession _admin = AdminSession();
   final PrivacyStore _privacy = PrivacyStore();
   late final GoRouter _router = buildRouter(_auth);
 
@@ -79,6 +81,7 @@ class _MambaAppState extends State<MambaApp> {
         Provider<ApiClient>.value(value: _api),
         ChangeNotifierProvider<LotteryStations>.value(value: _stations),
         ChangeNotifierProvider<MaskStore>.value(value: _mask),
+        ChangeNotifierProvider<AdminSession>.value(value: _admin),
         ChangeNotifierProvider<PrivacyStore>.value(value: _privacy),
       ],
       child: MaterialApp.router(
