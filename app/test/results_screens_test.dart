@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
 import 'package:mamba_app/core/auth_store.dart';
@@ -25,6 +26,7 @@ Widget host(FakeServer f, Widget screen) {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets('Nhập kết quả renders on a small phone (Miền Bắc and the Miền Nam table)', (tester) async {
     tester.view.physicalSize = const Size(360 * 3, 640 * 3);
     tester.view.devicePixelRatio = 3;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
@@ -72,6 +73,7 @@ void fillColumn(ResultsController c, String st, {String tam = '11', String db = 
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   test('Miền Nam table: partly filled column is an error; full columns are saved and the day is scored', () async {
     final f = FakeServer();
     final c = ResultsController(client(f), testStations(), initialDate: date);
