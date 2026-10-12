@@ -33,6 +33,18 @@ const SPEC = [
   { len: 5, take: [['giaiTu', 7], ['giaiBa', 2], ['giaiNhi', 1], ['giaiNhat', 1]] },
   { len: 6, take: [['dacBiet', 1]] },
 ]
+// The same 18 numbers in table order, top to bottom: tier, how many, digits each.
+const POSITIONS = [
+  ['giaiTam', 1, 2],
+  ['giaiBay', 1, 3],
+  ['giaiSau', 3, 4],
+  ['giaiNam', 1, 4],
+  ['giaiTu', 7, 5],
+  ['giaiBa', 2, 5],
+  ['giaiNhi', 1, 5],
+  ['giaiNhat', 1, 5],
+  ['dacBiet', 1, 6],
+]
 const EXPECTED_BY_LEN = Object.fromEntries(SPEC.map((s) => [s.len, s.take.reduce((n, [, c]) => n + c, 0)]))
 
 const centreX = (w) => (w.x0 + w.x1) / 2
@@ -103,9 +115,15 @@ export function assignStations(columns, candidates) {
 
 export function parseColumns(words) {
   // The title line of the page ("XSMN Thứ 4 » XSMN 07/10/2026") holds a date whose digits must not count as prizes:
-  // everything on or above the lowest date word is ignored.
-  const dateYs = words.filter((w) => /\/|^20\d\d$/.test(String(w.text || '').trim())).map(centreY)
-  const cut = dateYs.length ? Math.max(...dateYs) + 14 : -Infinity
+  // everything down to the date word is ignored. Only the FIRST real date in the top third of the picture counts: a stray
+  // "/" read from a table line further down must never raise the cut (that used to swallow the first prize rows).
+  const allY = words.map(centreY)
+  const top = allY.length ? Math.min(...allY) : 0
+  const span = allY.length ? Math.max(...allY) - top : 0
+  const isDate = (t) => /^\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*(20)?\d{2}$/.test(t) || /^20\d\d$/.test(t)
+  const dateWords = words.filter((w) => isDate(String(w.text || '').trim()) && centreY(w) <= top + span * 0.35)
+  const dateTop = dateWords.length ? dateWords.reduce((m, w) => (centreY(w) < centreY(m) ? w : m)) : null
+  const cut = dateTop ? centreY(dateTop) + (dateTop.y1 - dateTop.y0) * 0.9 : -Infinity
   const nums = words
     .map((w) => ({ ...w, text: String(w.text || '').trim() }))
     .filter((w) => /^\d+$/.test(w.text) && w.text.length >= 2 && w.text.length <= 6)
@@ -133,6 +151,24 @@ export function parseColumns(words) {
     col.header.sort((a, b) => a.cx - b.cx)
     col.headerText = col.header.map((h) => h.text).join(' ')
     col.station = matchStation(col.headerText)
+    // Exactly the 18 numbers of a column were seen: take them by their place in the table, top to bottom, even when one
+    // of them has a wrong length (a digit lost or added by the reader). The wrong-length cell is reported and shown red
+    // for the user to fix, instead of every row after it shifting out of place.
+    if (col.tokens.length === 18) {
+      const sorted = [...col.tokens].sort((a, b) => a.cy - b.cy)
+      let i = 0
+      for (const [tier, count, digits] of POSITIONS) {
+        const vals = []
+        for (let k = 0; k < count; k++) {
+          const t = sorted[i++].text
+          vals.push(t)
+          if (t.length !== digits) col.issues.push(`${tier}: số "${t}" có ${t.length} chữ số, cần ${digits}`)
+        }
+        col.values[tier] = tier === 'dacBiet' || tier === 'giaiNhat' ? vals[0] : vals
+      }
+      col.complete = col.issues.length === 0
+      continue
+    }
     for (const { len, take } of SPEC) {
       const list = col.tokens.filter((t) => t.text.length === len).sort((a, b) => a.cy - b.cy)
       const want = EXPECTED_BY_LEN[len]

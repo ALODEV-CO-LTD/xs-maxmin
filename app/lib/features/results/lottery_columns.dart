@@ -171,11 +171,33 @@ List<OcrColumn> assignStations(List<OcrColumn> columns, List<String> candidates,
   return columns;
 }
 
+/// The same 18 numbers in table order, top to bottom: tier, how many, digits each.
+const _positions = <(String, int, int)>[
+  ('giaiTam', 1, 2),
+  ('giaiBay', 1, 3),
+  ('giaiSau', 3, 4),
+  ('giaiNam', 1, 4),
+  ('giaiTu', 7, 5),
+  ('giaiBa', 2, 5),
+  ('giaiNhi', 1, 5),
+  ('giaiNhat', 1, 5),
+  ('dacBiet', 1, 6),
+];
+
 ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
   // The title line of the page ("XSMN Thứ 4 » XSMN 07/10/2026") holds a date whose digits must not count as prizes:
-  // everything on or above the lowest date word is ignored.
-  final dateYs = [for (final w in words) if (RegExp(r'/|^20\d\d$').hasMatch(w.text.trim())) w.cy];
-  final cut = dateYs.isEmpty ? double.negativeInfinity : dateYs.reduce(math.max) + 14;
+  // everything down to the date word is ignored. Only the FIRST real date in the top third of the picture counts: a stray
+  // "/" read from a table line further down must never raise the cut (that swallowed the first prize rows).
+  final allY = [for (final w in words) w.cy];
+  final top = allY.isEmpty ? 0.0 : allY.reduce(math.min);
+  final span = allY.isEmpty ? 0.0 : allY.reduce(math.max) - top;
+  final dateRe = RegExp(r'^\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*(20)?\d{2}$');
+  OcrWord? dateTop;
+  for (final w in words) {
+    final t = w.text.trim();
+    if ((dateRe.hasMatch(t) || RegExp(r'^20\d\d$').hasMatch(t)) && w.cy <= top + span * 0.35 && (dateTop == null || w.cy < dateTop.cy)) dateTop = w;
+  }
+  final cut = dateTop == null ? double.negativeInfinity : dateTop.cy + (dateTop.y1 - dateTop.y0) * 0.9;
   final nums = <OcrWord>[
     for (final w in words)
       if (RegExp(r'^\d+$').hasMatch(w.text.trim()) && w.text.trim().length >= 2 && w.text.trim().length <= 6 && w.cy > cut) OcrWord(w.text.trim(), w.x0, w.y0, w.x1, w.y1),
@@ -213,6 +235,23 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
     final h = headers[ci]..sort((a, b) => a.cx.compareTo(b.cx));
     col.headerText = h.map((x) => x.text).join(' ');
     col.station = matchStation(col.headerText, stations);
+    // Exactly the 18 numbers of a column were seen: take them by their place in the table (top to bottom) even when one
+    // has a wrong length, so a lost or added digit flags that cell instead of shifting every row after it.
+    if (tokens[ci].length == 18) {
+      final sorted = [...tokens[ci]]..sort((a, b) => a.cy.compareTo(b.cy));
+      var n = 0;
+      for (final (tier, count, digits) in _positions) {
+        final vals = <String>[];
+        for (var k = 0; k < count; k++) {
+          final t = sorted[n++].text;
+          vals.add(t);
+          if (t.length != digits) col.issues.add('$tier: số "$t" có ${t.length} chữ số, cần $digits');
+        }
+        col.values[tier] = vals;
+      }
+      col.complete = col.issues.isEmpty;
+      continue;
+    }
     for (final s in _spec) {
       final list = tokens[ci].where((t) => t.text.length == s.len).toList()..sort((a, b) => a.cy.compareTo(b.cy));
       final want = _expectedFor(s);

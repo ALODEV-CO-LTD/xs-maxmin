@@ -46,6 +46,7 @@ List<OcrWord> titleWords() => [
     ];
 
 void main() {
+  _extraColumnTests();
   final st = testStations();
   const xs = [200.0, 500.0, 800.0];
 
@@ -165,5 +166,42 @@ void main() {
     // a second reading does not overwrite what is there
     guessNorthForm('99999', form);
     expect(form['dacBiet'], ['10001']);
+  });
+}
+
+// A stray "/" read from a table line below the title must not swallow the first prize rows, and a column with exactly
+// 18 numbers is placed by position even when one number lost a digit.
+void _extraColumnTests() {
+  group('parseColumns robustness', () {
+    List<OcrWord> table({bool strayLine = false, bool lostDigit = false}) {
+      const seq = [2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6];
+      final words = <OcrWord>[const OcrWord('07/10/2026', 10, 5, 120, 25)];
+      for (var c = 0; c < 3; c++) {
+        for (var r = 0; r < seq.length; r++) {
+          var t = List.generate(seq[r], (i) => '${(c + r + i) % 10}').join();
+          if (lostDigit && c == 1 && r == 8) t = t.substring(0, 4);
+          words.add(OcrWord(t, 100.0 + c * 200, 100.0 + r * 40, 160.0 + c * 200, 130.0 + r * 40));
+        }
+      }
+      if (strayLine) words.add(const OcrWord('/', 30, 400, 40, 430)); // a table border read as a slash, mid-table
+      return words;
+    }
+
+    test('stray slash below the title does not hide rows', () {
+      final p = parseColumns(table(strayLine: true), testStations());
+      expect(p.columns.length, 3);
+      expect(p.columns.every((c) => c.complete), isTrue);
+    });
+
+    test('exactly 18 numbers: positional, wrong-length cell flagged without shifting', () {
+      final p = parseColumns(table(lostDigit: true), testStations());
+      final c = p.columns[1];
+      expect(c.complete, isFalse);
+      expect(c.issues.length, 1);
+      expect(c.values['giaiTu']![2], hasLength(4));
+      expect(c.values['giaiTu']!.length, 7);
+      expect(c.values['giaiBa']!.length, 2);
+      expect(p.columns[0].complete, isTrue);
+    });
   });
 }
