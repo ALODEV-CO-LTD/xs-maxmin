@@ -8,9 +8,9 @@ import 'package:sqlite3/sqlite3.dart';
 
 /// Official lottery draws, one result per (date, station): Miền Bắc ('mb') or a Miền Nam / Miền
 /// Trung station such as 'mn-tphcm' (lib/src/lottery_stations.dart; Miền Bắc has 8 prize groups,
-/// Miền Nam/Trung 9 with a 6-digit special prize and an eighth prize). A draw is a shared, public
-/// fact (not scoped to a user): whoever enters it first makes it available to everyone, and
-/// anyone can correct it afterward (upsert by date + station).
+/// Miền Nam/Trung 9 with a 6-digit special prize and an eighth prize). Results belong to the
+/// ACCOUNT (not to its customers, and not shared between accounts): what one account saves or
+/// corrects is never seen by another (upsert by user + date + station).
 ///
 /// GET    ?date=YYYY-MM-DD[&station=mb]  -> { result: {...} | null }   (station defaults to 'mb')
 /// GET    ?date=YYYY-MM-DD&all=1         -> { results: [{...}, ...] }  every station saved that day
@@ -22,9 +22,9 @@ Future<Response> onRequest(RequestContext context) async {
   if (auth == null) return unauthorized();
 
   return switch (context.request.method) {
-    HttpMethod.get => _get(context),
-    HttpMethod.post => _upsert(context),
-    HttpMethod.delete => _delete(context),
+    HttpMethod.get => _get(context, auth.userId),
+    HttpMethod.post => _upsert(context, auth.userId),
+    HttpMethod.delete => _delete(context, auth.userId),
     _ => Response(statusCode: 405, body: 'Method not allowed'),
   };
 }
@@ -36,7 +36,7 @@ Map<String, dynamic> _rowToJson(Row r) => {
       'updatedAt': r['updated_at'],
     };
 
-Response _get(RequestContext context) {
+Response _get(RequestContext context, String userId) {
   final qp = context.request.uri.queryParameters;
   final date = qp['date'];
   if (date == null || date.isEmpty) {
@@ -44,25 +44,25 @@ Response _get(RequestContext context) {
   }
   final db = context.read<Database>();
   if (qp['all'] == '1') {
-    final rows = db.select('SELECT * FROM lottery_results WHERE draw_date = ? ORDER BY station', [date]);
+    final rows = db.select('SELECT * FROM lottery_results WHERE user_id = ? AND draw_date = ? ORDER BY station', [userId, date]);
     return Response.json(body: {'results': [for (final r in rows) _rowToJson(r)]});
   }
   final station = qp['station'] ?? 'mb';
-  final rows = db.select('SELECT * FROM lottery_results WHERE draw_date = ? AND station = ?', [date, station]);
+  final rows = db.select('SELECT * FROM lottery_results WHERE user_id = ? AND draw_date = ? AND station = ?', [userId, date, station]);
   return Response.json(body: {'result': rows.isEmpty ? null : _rowToJson(rows.first)});
 }
 
-Response _delete(RequestContext context) {
+Response _delete(RequestContext context, String userId) {
   final qp = context.request.uri.queryParameters;
   final date = qp['date'];
   if (date == null || date.isEmpty) {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu ngày (date)'});
   }
-  context.read<Database>().execute('DELETE FROM lottery_results WHERE draw_date = ? AND station = ?', [date, qp['station'] ?? 'mb']);
+  context.read<Database>().execute('DELETE FROM lottery_results WHERE user_id = ? AND draw_date = ? AND station = ?', [userId, date, qp['station'] ?? 'mb']);
   return Response.json(body: {'ok': true});
 }
 
-Future<Response> _upsert(RequestContext context) async {
+Future<Response> _upsert(RequestContext context, String userId) async {
   final Map<String, dynamic> body;
   try {
     body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
@@ -104,17 +104,17 @@ Future<Response> _upsert(RequestContext context) async {
 
   final db = context.read<Database>();
   final now = DateTime.now().toUtc().toIso8601String();
-  final existing = db.select('SELECT id, created_at FROM lottery_results WHERE draw_date = ? AND station = ?', [drawDate, station]);
+  final existing = db.select('SELECT id, created_at FROM lottery_results WHERE user_id = ? AND draw_date = ? AND station = ?', [userId, drawDate, station]);
   final id = existing.isEmpty ? newId() : existing.first['id'] as String;
   final createdAt = existing.isEmpty ? now : existing.first['created_at'] as String;
   db.execute(
     '''
-    INSERT INTO lottery_results (id, draw_date, station, data, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT (draw_date, station) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+    INSERT INTO lottery_results (id, user_id, draw_date, station, data, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (user_id, draw_date, station) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
     ''',
-    [id, drawDate, station, jsonEncode(data), createdAt, now],
+    [id, userId, drawDate, station, jsonEncode(data), createdAt, now],
   );
-  final saved = db.select('SELECT * FROM lottery_results WHERE draw_date = ? AND station = ?', [drawDate, station]);
+  final saved = db.select('SELECT * FROM lottery_results WHERE user_id = ? AND draw_date = ? AND station = ?', [userId, drawDate, station]);
   return Response.json(body: {'result': _rowToJson(saved.first)});
 }

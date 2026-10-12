@@ -33,6 +33,7 @@ Map<String, int> wipeUserData(Database db, String userId) {
   db.execute('BEGIN IMMEDIATE');
   try {
     del('data_entries', 'DELETE FROM data_entries WHERE user_id = ?');
+    del('lottery_results', 'DELETE FROM lottery_results WHERE user_id = ?');
     del('customers', 'DELETE FROM customers WHERE user_id = ?');
     del('customer_syntax_templates', 'DELETE FROM customer_syntax_templates WHERE user_id = ?');
     del('deletion_schedules', 'DELETE FROM deletion_schedules WHERE user_id = ?');

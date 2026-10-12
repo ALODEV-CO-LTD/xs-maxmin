@@ -155,7 +155,7 @@ TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc A
 **Đề xuất chống chụp màn hình** (đã trao đổi, chưa làm): web chỉ giảm rủi ro – "giữ để xem" + watermark động + nhật ký; chặn thật cần app: Android `FLAG_SECURE`, iOS phát hiện chụp/quay và che, PC (Electron) `setContentProtection`. Hướng nhanh nhất là bọc web bằng Capacitor.
 
 **Quyết định còn mở (cần người phụ trách chốt):**
-1. Kết quả xổ số (`lottery_results`) hiện dùng chung và **bất kỳ tài khoản nào cũng ghi được** – nên chuyển sang theo tài khoản hay chỉ Admin?
+1. ~~Kết quả xổ số dùng chung~~ — **đã chốt: theo từng tài khoản** (`lottery_results.user_id`, duy nhất theo tài khoản + ngày + đài). Tài khoản khác không thấy và không ghi đè. Bản dùng chung cũ giữ ở bảng `lottery_results_shared_legacy` và được sao cho mọi tài khoản khách hàng khi nâng cấp. App lưu kết quả trên máy trước rồi tự đồng bộ khi có mạng.
 2. Mật khẩu lớp 2 hiện bắt buộc khi đăng ký mới (≥4 ký tự) nhưng các tài khoản tạo sẵn từ seed không có – có ép tất cả tài khoản cũ phải đặt không.
 3. Kết bạn: có cần bên kia chấp nhận không (hiện thêm bằng mã ID là thành bạn ngay).
 4. Tự xoá dữ liệu sau n lần nhập sai (YC4) – làm hay không.

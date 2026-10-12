@@ -37,6 +37,7 @@ List<Object?> _ids(Database db, String table) =>
     db.select('SELECT id FROM $table ORDER BY id').map((r) => r['id']).toList();
 
 void main() {
+  lotteryResultsPerAccountTests();
   test('wipeUserData deletes only A\'s scope; B, account, friends, friend chat stay', () {
     final db = _db();
     _user(db, 'a');
@@ -131,5 +132,24 @@ void main() {
     // never logs the password, only the action
     final ev = db.select("SELECT detail FROM security_events WHERE type = 'reauth_failed'");
     expect(ev.length, 6);
+  });
+}
+
+void _result(Database db, String id, String user, String date) => db.execute(
+      'INSERT INTO lottery_results (id, user_id, draw_date, station, data, created_at, updated_at) '
+      "VALUES (?, ?, ?, 'mb', '{}', '2026-01-01', '2026-01-01')",
+      [id, user, date],
+    );
+
+void lotteryResultsPerAccountTests() {
+  test('lottery results are per account: same day for two accounts, wipe only clears A', () {
+    final db = _db();
+    _user(db, 'a');
+    _user(db, 'b');
+    _result(db, 'r1', 'a', '2026-10-01');
+    _result(db, 'r2', 'b', '2026-10-01'); // same date for another account is allowed
+    expect(() => _result(db, 'r3', 'a', '2026-10-01'), throwsA(isA<SqliteException>())); // but not twice in one account
+    wipeUserData(db, 'a');
+    expect(_ids(db, 'lottery_results'), ['r2']);
   });
 }

@@ -82,22 +82,18 @@ CREATE INDEX IF NOT EXISTS idx_data_entries_user_date ON data_entries(user_id, e
 
 
 -- -----------------------------------------------------------------------------
--- Daily lottery draw results (27 numbers across 8 prize tiers). Shared
--- across all accounts (not user-scoped) -- one row per draw_date.
+-- Daily lottery draw results, one per (account, date, station). Each ACCOUNT has its own copy:
+-- nothing is shared between accounts. `data` = JSON prize map of the station's region.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lottery_results (
   id          TEXT PRIMARY KEY,
-  draw_date   TEXT NOT NULL UNIQUE,
-  dac_biet    TEXT NOT NULL,   -- JSON array, 1 number
-  giai_nhat   TEXT NOT NULL,   -- JSON array, 1 number
-  giai_nhi    TEXT NOT NULL,   -- JSON array, 2 numbers
-  giai_ba     TEXT NOT NULL,   -- JSON array, 6 numbers
-  giai_tu     TEXT NOT NULL,   -- JSON array, 4 numbers
-  giai_nam    TEXT NOT NULL,   -- JSON array, 6 numbers
-  giai_sau    TEXT NOT NULL,   -- JSON array, 3 numbers
-  giai_bay    TEXT NOT NULL,   -- JSON array, 4 numbers
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  draw_date   TEXT NOT NULL,
+  station     TEXT NOT NULL DEFAULT 'mb',
+  data        TEXT NOT NULL,
   created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
+  updated_at  TEXT NOT NULL,
+  UNIQUE (user_id, draw_date, station)
 );
 
 

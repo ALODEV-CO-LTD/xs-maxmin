@@ -78,6 +78,7 @@ void _migrateSchema(Database db) {
   // Station (đài) of an entry: 'mb' / region code / station id; NULL = Miền Bắc (older entries).
   _ensureColumn(db, 'data_entries', 'station', 'TEXT');
   _migrateLotteryResults(db);
+  _migrateLotteryResultsPerUser(db);
   // Per-customer scoring override (JSON map typeKey -> {rate, tiers, digits}); NULL = follow the account's settings.
   _ensureColumn(db, 'customers', 'scoring_rates', 'TEXT');
   // Per-user payout-rate config ("tỉ lệ ăn"): JSON object of
@@ -417,9 +418,8 @@ void _createSchema(Database db) {
   ''');
 
   // The official Miền Bắc lottery draw for one day - an objective public
-  // fact, the same for every user, so unlike data_entries this is NOT
-  // scoped to a user_id: whoever enters it first makes it available to
-  // everyone, and anyone can correct it afterward (upsert by draw_date).
+  // fact, but each ACCOUNT keeps its own copy (user_id): what one account
+  // saves or corrects never reaches another account (upsert by user + date + station).
   // Each prize tier is stored as a JSON array of its numbers (as printed,
   // left-to-right/top-to-bottom) even when it only holds one value, so
   // every tier is read the same way.
@@ -429,12 +429,13 @@ void _createSchema(Database db) {
   db.execute('''
     CREATE TABLE IF NOT EXISTS lottery_results (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       draw_date TEXT NOT NULL,
       station TEXT NOT NULL DEFAULT 'mb',
       data TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      UNIQUE (draw_date, station)
+      UNIQUE (user_id, draw_date, station)
     );
   ''');
 
@@ -604,6 +605,39 @@ void _migrateLotteryResults(Database db) {
       "INSERT INTO lottery_results (id, draw_date, station, data, created_at, updated_at) VALUES (?, ?, 'mb', ?, ?, ?)",
       [r['id'], r['draw_date'], data, r['created_at'], r['updated_at'] ?? r['created_at']],
     );
+  }
+}
+
+/// Results used to be ONE shared row per (date, station) for every account. Now each account has its
+/// own. The shared rows are copied to every existing customer account (so nobody loses what they
+/// were seeing), and the old table is kept as `lottery_results_shared_legacy` (nothing is deleted).
+void _migrateLotteryResultsPerUser(Database db) {
+  final cols = db.select('PRAGMA table_info(lottery_results)').map((r) => r['name']).toSet();
+  if (cols.isEmpty || cols.contains('user_id')) return;
+  db.execute('BEGIN IMMEDIATE');
+  try {
+    db.execute('ALTER TABLE lottery_results RENAME TO lottery_results_shared_legacy');
+    db.execute('''
+      CREATE TABLE lottery_results (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        draw_date TEXT NOT NULL,
+        station TEXT NOT NULL DEFAULT 'mb',
+        data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (user_id, draw_date, station)
+      );
+    ''');
+    db.execute('''
+      INSERT INTO lottery_results (id, user_id, draw_date, station, data, created_at, updated_at)
+      SELECT lower(hex(randomblob(16))), u.id, r.draw_date, r.station, r.data, r.created_at, r.updated_at
+      FROM lottery_results_shared_legacy r CROSS JOIN users u WHERE u.role = 'user'
+    ''');
+    db.execute('COMMIT');
+  } catch (_) {
+    db.execute('ROLLBACK');
+    rethrow;
   }
 }
 
