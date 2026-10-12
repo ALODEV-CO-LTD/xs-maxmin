@@ -33,16 +33,23 @@ const sending = ref(false)
 const attachment = ref(null)
 
 const unread = computed(() => notify.supportUnread)
-// newest first
-const ordered = computed(() => [...messages.value].reverse())
+// Oldest at the top, newest at the bottom (like every chat, and like the Admin side); the list sticks to the bottom.
+const ordered = computed(() => messages.value)
+const bodyEl = ref(null)
+async function scrollToEnd() {
+  await nextTick()
+  if (bodyEl.value) bodyEl.value.scrollTop = bodyEl.value.scrollHeight
+}
 
 let timer = null
 async function load({ initial = false } = {}) {
   if (initial) loading.value = true
   try {
     const res = await api.get('/me/messages')
+    const grew = res.messages.length !== messages.value.length
     messages.value = res.messages
     loadError.value = ''
+    if (initial || grew) scrollToEnd()
   } catch (err) {
     if (initial) loadError.value = err.message || 'Không tải được tin nhắn'
   } finally {
@@ -59,6 +66,7 @@ async function openChat() {
   timer = setInterval(load, 8000)
   await nextTick()
   input.value?.focus()
+  scrollToEnd()
 }
 function closeChat() {
   open.value = false
@@ -80,6 +88,7 @@ async function send() {
     if (attachment.value) body.attachment = await fileToPayload(attachment.value)
     const msg = await api.post('/me/messages', body)
     messages.value.push(msg)
+    scrollToEnd()
     draft.value = ''
     attachment.value = null
   } catch (err) {
@@ -157,7 +166,7 @@ onBeforeUnmount(() => {
         <button type="button" class="sp-close" aria-label="Đóng" @click="closeChat"><AppIcon name="x" /></button>
       </header>
 
-      <div class="sp-body">
+      <div ref="bodyEl" class="sp-body">
         <p v-if="loadError" class="sp-note sp-error">{{ loadError }}</p>
         <p v-else-if="loading" class="sp-note">Đang tải tin nhắn...</p>
         <p v-else-if="messages.length === 0" class="sp-note">Chưa có tin nhắn nào. Hãy gửi tin nhắn đầu tiên cho Admin.</p>

@@ -17,6 +17,7 @@
 import { showConfirm } from '../confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
+import ModalDialog from '../components/ModalDialog.vue'
 import MaskBar from '../components/MaskBar.vue'
 import MaskedValue from '../components/MaskedValue.vue'
 import { mask } from '../stores/mask'
@@ -157,6 +158,15 @@ function entryCount(name) {
 const submitting = ref(false)
 const formError = ref('')
 const notice = ref('') // informational (e.g. saved offline)
+// "Đã thêm N số liệu" confirmation shown right above the submit button for a few seconds.
+const addedMsg = ref('')
+let addedTimer = null
+function flashAdded(text) {
+  addedMsg.value = text
+  clearTimeout(addedTimer)
+  addedTimer = setTimeout(() => (addedMsg.value = ''), 7000)
+}
+onBeforeUnmount(() => clearTimeout(addedTimer))
 
 const editingId = ref(null)
 const editForm = reactive({
@@ -182,6 +192,8 @@ const ocrError = ref('')
 const ocrRawText = ref('')
 const ocrPreviewUrl = ref('')
 const ocrFileInput = ref(null)
+const ocrZoom = ref(false) // full-size view of the image that was read
+const dragOver = ref(false)
 
 function pickImage() {
   ocrFileInput.value?.click()
@@ -260,7 +272,14 @@ function applyOcrGuess(text) {
   }
 }
 
+function onDropImage(e) {
+  dragOver.value = false
+  const file = [...(e.dataTransfer?.files || [])].find((f) => /^image\//.test(f.type))
+  if (file && !ocrRunning.value) processImage(file)
+}
+
 function clearOcr() {
+  ocrZoom.value = false
   if (ocrPreviewUrl.value) URL.revokeObjectURL(ocrPreviewUrl.value)
   ocrPreviewUrl.value = ''
   ocrRawText.value = ''
@@ -378,6 +397,7 @@ async function submitForm() {
     )
     const failed = []
     let anySucceeded = false
+    let okCount = 0
     let queuedCount = 0
     for (let i = 0; i < results.length; i++) {
       const r = results[i]
@@ -387,6 +407,7 @@ async function submitForm() {
         if (auth.user?.stats && !r.value.queued) auth.user.stats.used += 1
         if (r.value.queued) queuedCount++
         anySucceeded = true
+        okCount++
         const idx = rows.value.indexOf(task.row)
         if (idx !== -1) rows.value.splice(idx, 1)
         selectedIds.value = selectedIds.value.filter((id) => id !== task.row.uid)
@@ -399,6 +420,7 @@ async function submitForm() {
     if (failed.length) formError.value = failed.join(' · ')
     if (queuedCount) notice.value = `Đang offline: ${queuedCount} số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.`
     if (anySucceeded) form.note = ''
+    if (okCount) flashAdded(`Đã thêm ${okCount} số liệu cho ${form.customerName.trim()}${queuedCount ? ' (đang offline, sẽ tự đồng bộ)' : ''}.`)
     // Keep customerName + date - common to add several customers/entries
     // for the same day in a row.
   } finally {
@@ -581,6 +603,18 @@ async function copyShown() {
 // syntax template is saved only when the user presses "Lưu mẫu", never learned.
 const pasteOpen = ref(false)
 const pasteText = ref('')
+const pasteTa = ref(null)
+// Text boxes grow with what is typed or pasted (no inner scrollbar): the height follows the content.
+function autoGrow(e) {
+  const el = e?.target || e
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight + 2}px`
+}
+watch(pasteText, async () => {
+  await nextTick()
+  autoGrow(pasteTa.value)
+})
 const previewRows = ref([])
 const previewIgnored = ref([])
 const pasteError = ref('')
@@ -683,6 +717,7 @@ async function savePreview() {
   }))) return
   pasteSaving.value = true
   let queued = 0
+  let savedCount = 0
   const failed = []
   try {
     for (const r of picked) {
@@ -697,6 +732,7 @@ async function savePreview() {
           note: form.note.trim() || undefined,
         })
         entries.value.unshift(res.entry)
+        savedCount++
         if (res.queued) queued++
         else if (auth.user?.stats) auth.user.stats.used += 1
         previewRows.value = previewRows.value.filter((x) => x.uid !== r.uid)
@@ -707,6 +743,7 @@ async function savePreview() {
   } finally {
     pasteSaving.value = false
   }
+  if (savedCount) flashAdded(`Đã thêm ${savedCount} số liệu cho ${form.customerName.trim()}${queued ? ' (đang offline, sẽ tự đồng bộ)' : ''}.`)
   if (failed.length) pasteError.value = failed.join(' · ')
   if (queued) notice.value = `Đang offline: ${queued} số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.`
   if (!previewRows.value.length) pasteText.value = ''
@@ -809,22 +846,35 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
               style="display: none"
               @change="onImageSelected"
             />
-            <button type="button" class="btn btn-secondary btn-block" :disabled="ocrRunning" @click="pickImage">
-              <AppIcon v-if="!ocrRunning" name="camera" />
-              {{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Nhập từ ảnh (đọc tự động)' }}
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top: 6px" :disabled="ocrRunning" @click="pasteImageFromButton">Dán ảnh từ bộ nhớ tạm</button>
-            <p class="ocr-hint">Chọn ảnh hoặc dán ảnh (Ctrl/Cmd+V). Ảnh xử lý ngay trên trình duyệt, không gửi lên đâu cả. Kết quả chỉ là gợi ý. Hãy kiểm tra lại trước khi lưu.</p>
+            <!-- One control for both ways in: choose / drop a picture, or paste it (Ctrl/Cmd+V or the "Dán" button inside) -->
+            <div class="img-drop" :class="{ over: dragOver }" @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDropImage">
+              <button type="button" class="img-drop-main" :disabled="ocrRunning" @click="pickImage">
+                <AppIcon v-if="!ocrRunning" name="camera" />
+                <strong>{{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Nhập từ ảnh (đọc tự động)' }}</strong>
+                <small>Chọn ảnh, kéo thả vào đây, hoặc dán (Ctrl/Cmd+V)</small>
+              </button>
+              <button type="button" class="img-drop-paste" :disabled="ocrRunning" title="Dán ảnh từ bộ nhớ tạm" @click="pasteImageFromButton">Dán</button>
+            </div>
+            <p class="ocr-hint">Ảnh xử lý ngay trên trình duyệt, không gửi lên đâu cả. Kết quả chỉ là gợi ý. Hãy kiểm tra lại trước khi lưu.</p>
 
             <div v-if="ocrError" class="alert alert-error" style="margin-top: 8px">{{ ocrError }}</div>
 
-            <div v-if="ocrPreviewUrl && !ocrRunning" class="ocr-result">
-              <img :src="ocrPreviewUrl" alt="Ảnh đã chọn" class="ocr-thumb" />
+            <div v-if="ocrPreviewUrl" class="ocr-result">
+              <button type="button" class="ocr-thumb-btn" title="Bấm để xem ảnh lớn" @click="ocrZoom = true">
+                <img :src="ocrPreviewUrl" alt="Ảnh đã chọn" class="ocr-thumb" />
+                <span>Xem ảnh</span>
+              </button>
               <div class="ocr-text-wrap">
                 <label>Văn bản đọc được (để đối chiếu)</label>
-                <textarea v-model="ocrRawText" rows="3" class="ocr-raw"></textarea>
+                <textarea v-model="ocrRawText" rows="3" class="ocr-raw" @input="autoGrow"></textarea>
+                <div>
+                  <button type="button" class="btn btn-ghost btn-sm" :disabled="ocrRunning" @click="clearOcr">Xoá ảnh</button>
+                </div>
               </div>
             </div>
+            <ModalDialog :open="ocrZoom" title="Ảnh đã chọn" xwide @close="ocrZoom = false">
+              <img :src="ocrPreviewUrl" alt="Ảnh đã chọn (xem lớn)" class="ocr-zoom-img" />
+            </ModalDialog>
           </div>
 
           <!-- Nhập từ tin nhắn: paste -> preview -> confirm. Nothing is saved until "Lưu". -->
@@ -838,8 +888,10 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
               </p>
               <textarea
                 v-model="pasteText"
+                ref="pasteTa"
                 rows="5"
                 class="ocr-raw"
+                @input="autoGrow"
                 placeholder="Vd:&#10;de 12 34 56 x 10&#10;lo 45 78 con 3"
                 aria-label="Nội dung tin nhắn"
               ></textarea>
@@ -992,6 +1044,7 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
 
           <div v-if="deleteAllError" class="alert alert-error">{{ deleteAllError }}</div>
           <div class="form-actions">
+            <div v-if="addedMsg" class="alert alert-success" role="status">{{ addedMsg }}</div>
             <button type="submit" class="btn btn-primary" :disabled="submitting || !canAdd">
               {{ submitting ? 'Đang thêm...' : 'Thêm số liệu' }}
             </button>
@@ -2978,5 +3031,83 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
   white-space: nowrap;
   border-radius: 999px;
 }
+
+/* ---- Image import: one control (choose / drop / paste) + a viewable preview ---- */
+.img-drop {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1.5px dashed var(--input-border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.img-drop.over {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.img-drop-main {
+  flex: 1;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.img-drop-main small {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.img-drop-main:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+.img-drop-paste {
+  flex: 0 0 auto;
+  padding: 0 18px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--primary);
+  background: transparent;
+  border: 0;
+  border-left: 1px dashed var(--input-border);
+  cursor: pointer;
+}
+.img-drop-paste:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+.ocr-thumb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--primary);
+  background: transparent;
+  border: 0;
+  cursor: zoom-in;
+}
+.ocr-zoom-img {
+  display: block;
+  max-width: 100%;
+  max-height: 78vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.ocr-raw {
+  resize: none;
+  overflow: hidden;
+  min-height: 64px;
+}
 </style>
+
 

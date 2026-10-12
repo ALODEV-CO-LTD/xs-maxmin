@@ -263,6 +263,13 @@ watch([region, lotteryDate], () => {
   resetLotteryForm(null)
   loadLottery()
 })
+// Notices belong to the region they were produced in: switching Miền Bắc / Trung / Nam starts with a clean slate
+// (a photo that switches the region by itself keeps its own note, see processMcImage).
+watch(region, () => {
+  if (applying) return
+  for (const m of [lotteryError, lotterySaveMsg, lrOcrError, mcError, mcNote, syncMsg, syncError]) m.value = ''
+  mcWarnings.value = []
+})
 watch(station, () => {
   if (applying) return
   resetLotteryForm(null)
