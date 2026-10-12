@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
 import 'package:mamba_app/core/auth_store.dart';
 import 'package:mamba_app/core/scoring_config.dart';
+import 'package:mamba_app/features/entries/offline_store.dart';
 import 'package:mamba_app/features/scoring/scoring_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -82,5 +83,32 @@ void main() {
   test('the calculation itself is pure: same numbers with and without a network', () {
     // 10 điểm lô, ratio 3.5 hits -> 805.000đ at 23.000đ per điểm (hand-checked in scoring_logic_test)
     expect(toMoney('lo', {'unit': 'point', 'pointValue': 23000}, 35), 805000);
+  });
+
+  Map<String, dynamic> body(String date) => {
+        'drawDate': date, 'station': 'mb', 'dacBiet': '12345', 'giaiNhat': '11111', 'giaiNhi': ['22222', '33333'],
+        'giaiBa': ['1', '2', '3', '4', '5', '6'], 'giaiTu': ['1', '2', '3', '4'], 'giaiNam': ['1', '2', '3', '4', '5', '6'],
+        'giaiSau': ['1', '2', '3'], 'giaiBay': ['1', '2', '3', '4'],
+      };
+
+  test('a result saved offline stays on the phone, is used at once, and is sent when the network is back', () async {
+    final net = _Net()..offline = true;
+    final api = net.api('u1');
+    final store = await OfflineStore.open(api, api.auth);
+
+    expect(await store.saveResult(body('2026-10-12')), isTrue); // only on the phone so far
+    expect(await store.pendingResultCount(), 1);
+    expect((await fetchLotteryResult(api, '2026-10-12', 'mb'))!['dacBiet'], '12345'); // calculation can use it offline
+    expect((await fetchDayResults(api, '2026-10-12')).keys, ['mb']);
+
+    // another account on the same phone does not see it
+    final other = net.api('u2');
+    expect(await (await OfflineStore.open(other, other.auth)).pendingResultCount(), 0);
+
+    net.offline = false;
+    net.routes['/api/lottery-results'] = {'result': body('2026-10-12')};
+    final r = await store.flush();
+    expect(r.changed, isTrue);
+    expect(await store.pendingResultCount(), 0);
   });
 }

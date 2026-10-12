@@ -38,18 +38,10 @@ Future<RatesMap> fetchAccountRates(ApiClient api) async {
   return Map<String, dynamic>.from(defaultRates);
 }
 
-/// Saved result of one station on one day, or null.
-Future<Map<String, dynamic>?> fetchLotteryResult(ApiClient api, String date, String station) async {
-  final res = await _cachedGet(api, '/lottery-results?date=$date&station=${Uri.encodeQueryComponent(station)}') as Map;
-  final r = res['result'];
-  return r is Map ? Map<String, dynamic>.from(r) : null;
-}
+/// Saved result of one station on one day, or null. The account's own result; what is kept on the phone wins.
+Future<Map<String, dynamic>?> fetchLotteryResult(ApiClient api, String date, String station) async =>
+    (await OfflineStore.open(api, api.auth)).lotteryResult(date, station);
 
-/// Every station's saved result of [date], keyed by station id.
-Future<Map<String, Map<String, dynamic>>> fetchDayResults(ApiClient api, String date) async {
-  final res = await _cachedGet(api, '/lottery-results?date=$date&all=1') as Map;
-  return {
-    for (final r in (res['results'] as List? ?? const []))
-      (r as Map)['station'] as String: Map<String, dynamic>.from(r),
-  };
-}
+/// Every station's saved result of [date], keyed by station id (the account's own).
+Future<Map<String, Map<String, dynamic>>> fetchDayResults(ApiClient api, String date) async =>
+    (await OfflineStore.open(api, api.auth)).dayResults(date);

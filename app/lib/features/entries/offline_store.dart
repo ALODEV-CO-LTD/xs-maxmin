@@ -5,7 +5,7 @@
 // - Creates carry a client-chosen id (`clientId`) so a retry after a lost response can never create a duplicate.
 // - An edit carries the `updatedAt` it was based on; the server answers 409 `{conflict, server}` when the row changed
 //   meanwhile, and the user then chooses which version to keep.
-// - Not available offline: deleting entries.
+// - Not available offline: deleting entries. Lottery results (Nhập kết quả) are kept on the phone first and sent later.
 // - The last loaded entry list / customers / profile are cached per account for offline viewing.
 import 'dart:async';
 import 'dart:convert';
@@ -197,16 +197,19 @@ class OfflineStore {
   // ---- cached GETs -----------------------------------------------------------------------------------------------
 
   /// GET with a cached fallback: the fresh answer, or the last cached one when the network is down.
-  Future<dynamic> cachedGet(String path) async {
+  Future<dynamic> cachedGet(String path) async => (await _cachedGetFlag(path)).$1;
+
+  /// Like [cachedGet] but also says whether the answer came from the saved copy (the network was down).
+  Future<(dynamic, bool)> _cachedGetFlag(String path) async {
     final key = 'get:$userId:$path';
     try {
       final data = await api.get(path);
       await _kvSet(key, data);
-      return data;
+      return (data, false);
     } catch (e) {
       if (!isNetworkError(e)) rethrow;
       final cached = _kvGet(key);
-      if (cached != null) return cached;
+      if (cached != null) return (cached, true);
       rethrow;
     }
   }
@@ -225,6 +228,120 @@ class OfflineStore {
     try {
       await prefs.setString('xoso_cache:$key', jsonEncode(value));
     } catch (_) {/* cache is best-effort */}
+  }
+
+  // ---- lottery results (Nhập kết quả): belong to the ACCOUNT, saved on this phone first -------------------------------
+
+  String get _resultsKey => 'xoso_results:$userId';
+
+  /// "date|station" -> {json: the result as the server shows it, pending: true until it reached the server}.
+  Map<String, Map<String, dynamic>> _localResults() {
+    final raw = prefs.getString(_resultsKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      return {for (final e in (jsonDecode(raw) as Map).entries) e.key as String: Map<String, dynamic>.from(e.value as Map)};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _writeLocalResults(Map<String, Map<String, dynamic>> m) => _locked(() => prefs.setString(_resultsKey, jsonEncode(m)));
+
+  static String _rk(String date, String station) => '$date|$station';
+
+  /// Results saved on this phone that the server has not received yet.
+  Future<int> pendingResultCount() async => _localResults().values.where((v) => v['pending'] == true).length;
+
+  /// Saves a result ([body] = the POST /lottery-results body) ON THIS PHONE first, then sends it. Returns true when it
+  /// is only on the phone so far (no network) and will be sent later. Validation errors from the server are thrown.
+  Future<bool> saveResult(Map<String, dynamic> body) async {
+    final date = body['drawDate'] as String;
+    final station = (body['station'] as String?) ?? 'mb';
+    final local = _localResults();
+    local[_rk(date, station)] = {'json': {...body, 'updatedAt': _now().toUtc().toIso8601String()}, 'pending': true};
+    await _writeLocalResults(local);
+    try {
+      final res = await api.post('/lottery-results', body);
+      final saved = res is Map ? res['result'] : null;
+      final after = _localResults();
+      after[_rk(date, station)] = {'json': saved is Map ? Map<String, dynamic>.from(saved) : local[_rk(date, station)]!['json'], 'pending': false};
+      await _writeLocalResults(after);
+      return false;
+    } catch (e) {
+      if (isNetworkError(e)) return true;
+      final after = _localResults()..remove(_rk(date, station));
+      await _writeLocalResults(after);
+      rethrow;
+    }
+  }
+
+  /// Forgets the copy kept on this phone (after a delete). Returns true when it was still waiting to be sent.
+  Future<bool> forgetResult(String date, String station) async {
+    final local = _localResults();
+    final was = local.remove(_rk(date, station));
+    await _writeLocalResults(local);
+    return was != null && was['pending'] == true;
+  }
+
+  /// Sends the results still waiting. Returns (sent any, offline, refused messages).
+  Future<(bool, bool, List<String>)> _flushResults() async {
+    var sent = false;
+    final refused = <String>[];
+    for (final e in _localResults().entries.where((e) => e.value['pending'] == true).toList()) {
+      final body = Map<String, dynamic>.from(e.value['json'] as Map)..remove('updatedAt');
+      try {
+        final res = await api.post('/lottery-results', body);
+        final saved = res is Map ? res['result'] : null;
+        final after = _localResults();
+        after[e.key] = {'json': saved is Map ? Map<String, dynamic>.from(saved) : e.value['json'], 'pending': false};
+        await _writeLocalResults(after);
+        sent = true;
+      } on ApiError catch (err) {
+        if (err.status == 0) return (sent, true, refused);
+        if (err.status == 401 || err.status >= 500) return (sent, false, refused);
+        final after = _localResults()..remove(e.key);
+        await _writeLocalResults(after);
+        refused.add('Kết quả ${e.key.replaceAll('|', ' ')}: ${err.message}');
+      }
+    }
+    return (sent, false, refused);
+  }
+
+  /// One station's result of one day: what is saved on the phone (not yet sent, or the network is down) wins over the server.
+  Future<Map<String, dynamic>?> lotteryResult(String date, String station) async {
+    final mine = _localResults()[_rk(date, station)];
+    if (mine != null && mine['pending'] == true) return Map<String, dynamic>.from(mine['json'] as Map);
+    try {
+      final (res, _) = await _cachedGetFlag('/lottery-results?date=$date&station=${Uri.encodeQueryComponent(station)}');
+      final r = res is Map ? res['result'] : null;
+      return r is Map ? Map<String, dynamic>.from(r) : null;
+    } catch (e) {
+      if (isNetworkError(e) && mine != null) return Map<String, dynamic>.from(mine['json'] as Map);
+      rethrow;
+    }
+  }
+
+  /// All stations' results of one day, keyed by station id (same rules as [lotteryResult]).
+  Future<Map<String, Map<String, dynamic>>> dayResults(String date) async {
+    final mine = {
+      for (final e in _localResults().entries)
+        if (e.key.startsWith('$date|')) e.key.substring(date.length + 1): e.value,
+    };
+    final out = <String, Map<String, dynamic>>{};
+    var offlineNoCache = false;
+    try {
+      final (res, _) = await _cachedGetFlag('/lottery-results?date=$date&all=1');
+      for (final r in (res is Map ? res['results'] : null) as List? ?? const []) {
+        out[(r as Map)['station'] as String] = Map<String, dynamic>.from(r);
+      }
+    } catch (e) {
+      if (!isNetworkError(e) || mine.isEmpty) rethrow;
+      offlineNoCache = true;
+    }
+    for (final e in mine.entries) {
+      if (e.value['pending'] == true || offlineNoCache) out[e.key] = Map<String, dynamic>.from(e.value['json'] as Map);
+    }
+    return out;
   }
 
   // ---- entries ---------------------------------------------------------------------------------------------------
@@ -385,6 +502,12 @@ class OfflineStore {
           changed = true;
           failures.add(SyncFailure(op.opId, 'Không đồng bộ được "${op.payload['value'] ?? ''}": ${err.message}'));
         }
+      }
+      if (!offline) {
+        final (sent, off, refused) = await _flushResults();
+        changed = changed || sent;
+        offline = off;
+        failures.addAll([for (final m in refused) SyncFailure('result', m)]);
       }
     } finally {
       syncing = false;

@@ -6,6 +6,8 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/scoring_config.dart';
+import '../entries/entry_model.dart' as stored;
+import '../entries/offline_store.dart';
 import '../scoring/entry_model.dart';
 import '../scoring/scoring_data.dart';
 import '../scoring/scoring_days.dart';
@@ -156,6 +158,9 @@ class ResultsController extends ChangeNotifier {
     }
     notifyListeners();
     try {
+      try {
+        await (await _store()).flush();
+      } catch (_) {/* sending later is fine */}
       final res = await fetchDayResults(api, date);
       if (token != _dayToken) return;
       dayResults = res;
@@ -291,8 +296,8 @@ class ResultsController extends ChangeNotifier {
     saving = true;
     notifyListeners();
     try {
-      await api.post('/lottery-results', resultBody(date, 'mb', structure, mbForm));
-      saveMsg = 'Đã lưu kết quả xổ số Miền Bắc ngày ${viDate(date)}.';
+      final queued = await (await _store()).saveResult(resultBody(date, 'mb', structure, mbForm));
+      saveMsg = 'Đã lưu kết quả xổ số Miền Bắc ngày ${viDate(date)}.${queued ? _offlineNote : ''}';
       mbSaved = true;
       mbLocked = true;
       await _afterSave();
@@ -324,13 +329,14 @@ class ResultsController extends ChangeNotifier {
     saving = true;
     notifyListeners();
     try {
+      var queued = false;
       for (final st in todo) {
-        await api.post('/lottery-results', resultBody(date, st, structure, board[st]!));
+        queued = await (await _store()).saveResult(resultBody(date, st, structure, board[st]!)) || queued;
         boardSaved.add(st);
         boardRead.remove(st);
         boardEdit.remove(st);
       }
-      saveMsg = 'Đã lưu kết quả ${todo.map(stations.stationName).join(', ')} ngày ${viDate(date)}.';
+      saveMsg = 'Đã lưu kết quả ${todo.map(stations.stationName).join(', ')} ngày ${viDate(date)}.${queued ? _offlineNote : ''}';
       await _afterSave();
     } on ApiError catch (e) {
       error = e.message;
@@ -340,6 +346,10 @@ class ResultsController extends ChangeNotifier {
     saving = false;
     notifyListeners();
   }
+
+  OfflineStore? _offline;
+  Future<OfflineStore> _store() async => _offline ??= await OfflineStore.open(api, api.auth);
+  static const _offlineNote = ' Đang offline: kết quả được lưu trên máy và sẽ tự gửi lên khi có mạng.';
 
   Future<void> _afterSave() async {
     try {
@@ -355,7 +365,12 @@ class ResultsController extends ChangeNotifier {
     deleting = station;
     notifyListeners();
     try {
-      await api.delete('/lottery-results?date=$date&station=${Uri.encodeQueryComponent(station)}');
+      final waiting = await (await _store()).forgetResult(date, station);
+      try {
+        await api.delete('/lottery-results?date=$date&station=${Uri.encodeQueryComponent(station)}');
+      } on ApiError catch (e) {
+        if (e.status != 0 || !waiting) rethrow; // only a result that never reached the server can be dropped offline
+      }
       if (station == 'mb') {
         mbForm = blankForm(structure);
         mbSaved = false;
@@ -425,7 +440,10 @@ class ResultsController extends ChangeNotifier {
       final s = numToString(v);
       if (s == (e.result ?? '')) continue;
       try {
-        await api.patch('/me/entries/${e.id}', {'result': s});
+        await (await _store()).updateEntry(
+          stored.Entry.fromJson({'id': e.id, 'customerName': e.customerName, 'entryDate': e.entryDate, 'value': e.value}),
+          {'result': s},
+        );
         final i = entries.indexWhere((x) => x.id == e.id);
         if (i != -1) entries[i] = e.withResult(s);
         ok++;
