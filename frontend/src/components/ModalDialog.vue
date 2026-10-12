@@ -13,7 +13,8 @@ const props = defineProps({
   title: { type: String, default: '' },
   description: { type: String, default: '' },
   wide: { type: Boolean, default: false },
-  xwide: { type: Boolean, default: false }, // very wide (about 960px): big forms such as Cấu hình tính điểm
+  xwide: { type: Boolean, default: false },
+  closeButton: { type: Boolean, default: true }, // the X in the corner (Esc and a click outside also close) // very wide (about 960px): big forms such as Cấu hình tính điểm
 })
 const emit = defineEmits(['close'])
 
@@ -50,7 +51,12 @@ function onKey(e) {
   <Teleport to="body">
     <div v-if="open" class="md-overlay" @mousedown.self="emit('close')" @keydown="onKey">
       <div ref="box" class="md-box" :class="{ 'md-wide': wide, 'md-xwide': xwide }" role="dialog" aria-modal="true" aria-labelledby="md-title">
-        <h2 id="md-title" class="md-title">{{ title }}</h2>
+        <div class="md-head">
+          <h2 id="md-title" class="md-title">{{ title }}</h2>
+          <button v-if="closeButton" type="button" class="md-close" aria-label="Đóng" title="Đóng" @click="emit('close')">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
         <p v-if="description" class="md-desc">{{ description }}</p>
         <div class="md-body"><slot /></div>
         <div v-if="$slots.footer" class="md-actions"><slot name="footer" /></div>
@@ -85,10 +91,34 @@ function onKey(e) {
 .md-box.md-xwide {
   max-width: 1080px;
   max-height: 92vh;
-  overflow-y: auto;
 }
 .md-box.md-wide {
   max-width: 600px;
+}
+.md-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.md-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -8px 0 0;
+  padding: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.md-close:hover {
+  color: var(--text-primary);
+  background: var(--surface);
 }
 .md-title {
   margin: 0 0 8px;
