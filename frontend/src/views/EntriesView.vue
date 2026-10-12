@@ -231,7 +231,20 @@ async function processImage(file) {
     const { recognizeText } = await import('../ocr')
     const { text } = await recognizeText(file, { onProgress: (p) => (ocrProgress.value = p) })
     ocrRawText.value = text.trim()
-    applyOcrGuess(ocrRawText.value)
+    if (ocrRawText.value) {
+      // The text of the picture joins the message box and is analysed like a pasted message; when that finds nothing
+      // (a plain list of numbers), the numbers become rows to check, as before.
+      pasteText.value = pasteText.value.trim() ? `${pasteText.value.trim()}\n${ocrRawText.value}` : ocrRawText.value
+      await nextTick()
+      autoGrow(pasteTa.value)
+      analyzeMessage()
+      if (!previewRows.value.length) {
+        applyOcrGuess(ocrRawText.value)
+        pasteError.value = 'Không thấy dạng "loại số x điểm" trong ảnh: các số đọc được đã thêm vào danh sách phía trên để bạn kiểm tra.'
+      }
+    } else {
+      ocrError.value = 'Không đọc được chữ nào từ ảnh. Hãy chụp rõ hơn hoặc nhập tay.'
+    }
   } catch (err) {
     const { describeOcrError } = await import('../ocr')
     ocrError.value = describeOcrError(err)
@@ -601,7 +614,6 @@ async function copyShown() {
 // Paste -> parse into a PREVIEW (uncertain lines highlighted, unticked) -> the
 // user edits/ticks and confirms -> only then are rows saved. The per-customer
 // syntax template is saved only when the user presses "Lưu mẫu", never learned.
-const pasteOpen = ref(false)
 const pasteText = ref('')
 const pasteTa = ref(null)
 // Text boxes grow with what is typed or pasted (no inner scrollbar): the height follows the content.
@@ -837,66 +849,46 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
             </AppSelect>
           </div>
 
-          <div class="ocr-box">
-            <input
-              ref="ocrFileInput"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style="display: none"
-              @change="onImageSelected"
-            />
-            <!-- One control for both ways in: choose / drop a picture, or paste it (Ctrl/Cmd+V or the "Dán" button inside) -->
-            <div class="img-drop" :class="{ over: dragOver }" @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDropImage">
-              <button type="button" class="img-drop-main" :disabled="ocrRunning" @click="pickImage">
-                <AppIcon v-if="!ocrRunning" name="camera" />
-                <strong>{{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Nhập từ ảnh (đọc tự động)' }}</strong>
-                <small>Chọn ảnh, kéo thả vào đây, hoặc dán (Ctrl/Cmd+V)</small>
-              </button>
-              <button type="button" class="img-drop-paste" :disabled="ocrRunning" title="Dán ảnh từ bộ nhớ tạm" @click="pasteImageFromButton">Dán</button>
-            </div>
-            <p class="ocr-hint">Ảnh xử lý ngay trên trình duyệt, không gửi lên đâu cả. Kết quả chỉ là gợi ý. Hãy kiểm tra lại trước khi lưu.</p>
-
-            <div v-if="ocrError" class="alert alert-error" style="margin-top: 8px">{{ ocrError }}</div>
-
-            <div v-if="ocrPreviewUrl" class="ocr-result">
-              <button type="button" class="ocr-thumb-btn" title="Bấm để xem ảnh lớn" @click="ocrZoom = true">
-                <img :src="ocrPreviewUrl" alt="Ảnh đã chọn" class="ocr-thumb" />
-                <span>Xem ảnh</span>
-              </button>
-              <div class="ocr-text-wrap">
-                <label>Văn bản đọc được (để đối chiếu)</label>
-                <textarea v-model="ocrRawText" rows="3" class="ocr-raw" @input="autoGrow"></textarea>
-                <div>
-                  <button type="button" class="btn btn-ghost btn-sm" :disabled="ocrRunning" @click="clearOcr">Xoá ảnh</button>
-                </div>
-              </div>
-            </div>
-            <ModalDialog :open="ocrZoom" title="Ảnh đã chọn" xwide @close="ocrZoom = false">
-              <img :src="ocrPreviewUrl" alt="Ảnh đã chọn (xem lớn)" class="ocr-zoom-img" />
-            </ModalDialog>
-          </div>
-
-          <!-- Nhập từ tin nhắn: paste -> preview -> confirm. Nothing is saved until "Lưu". -->
-          <div class="paste-box">
-            <button type="button" class="btn btn-secondary btn-block" :aria-expanded="pasteOpen" @click="pasteOpen = !pasteOpen">
-              Nhập từ tin nhắn (dán nội dung)
-            </button>
-            <div v-if="pasteOpen" class="paste-body">
-              <p class="ocr-hint">
-                Dán tin nhắn của khách, bấm Phân tích để xem trước. Dòng chưa chắc chắn được tô màu và chưa được chọn. Chỉ khi bạn bấm Lưu mới ghi vào dữ liệu.
-              </p>
+          <!-- Nhập nhanh: ONE box for a pasted message or a picture of it (choose / drop / paste). A picture is read into the
+               text box, then both go through the same "Phân tích" preview. Nothing is saved until "Lưu". -->
+          <div class="paste-box smart-box" :class="{ over: dragOver }" @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDropImage">
+            <input ref="ocrFileInput" type="file" accept="image/*" capture="environment" style="display: none" @change="onImageSelected" />
+            <div class="paste-body">
               <textarea
                 v-model="pasteText"
                 ref="pasteTa"
-                rows="5"
+                rows="4"
                 class="ocr-raw"
                 @input="autoGrow"
-                placeholder="Vd:&#10;de 12 34 56 x 10&#10;lo 45 78 con 3"
-                aria-label="Nội dung tin nhắn"
+                placeholder="Dán tin nhắn của khách, hoặc dán / thả ảnh vào đây (Ctrl/Cmd+V)&#10;Vd: de 12 34 56 x 10&#10;      lo 45 78 con 3"
+                aria-label="Tin nhắn hoặc ảnh cần đọc"
               ></textarea>
+              <p class="ocr-hint">Ảnh được đọc ngay trên trình duyệt, không gửi lên đâu cả. Bấm Phân tích để xem trước; dòng chưa chắc chắn được tô màu và chưa chọn. Chỉ khi bạn bấm Lưu mới ghi vào dữ liệu.</p>
+
+              <div v-if="ocrError" class="alert alert-error" style="margin-top: 8px">{{ ocrError }}</div>
+
+              <div v-if="ocrPreviewUrl" class="ocr-result">
+                <button type="button" class="ocr-thumb-btn" title="Bấm để xem ảnh lớn" @click="ocrZoom = true">
+                  <img :src="ocrPreviewUrl" alt="Ảnh đã chọn" class="ocr-thumb" />
+                  <span>Xem ảnh</span>
+                </button>
+                <div class="ocr-text-wrap">
+                  <span class="ocr-hint" style="margin: 0">{{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Văn bản đọc từ ảnh đã đưa vào ô trên.' }}</span>
+                  <div>
+                    <button type="button" class="btn btn-ghost btn-sm" :disabled="ocrRunning" @click="clearOcr">Xoá ảnh</button>
+                  </div>
+                </div>
+              </div>
+              <ModalDialog :open="ocrZoom" title="Ảnh đã chọn" xwide @close="ocrZoom = false">
+                <img :src="ocrPreviewUrl" alt="Ảnh đã chọn (xem lớn)" class="ocr-zoom-img" />
+              </ModalDialog>
+
               <div class="paste-actions">
-                <button type="button" class="btn btn-primary btn-sm" :disabled="!pasteText.trim()" @click="analyzeMessage">Phân tích</button>
+                <button type="button" class="btn btn-primary btn-sm" :disabled="!pasteText.trim() || ocrRunning" @click="analyzeMessage">Phân tích</button>
+                <button type="button" class="btn btn-secondary btn-sm" :disabled="ocrRunning" @click="pickImage">
+                  <AppIcon name="camera" /> {{ ocrRunning ? `Đang đọc ${ocrProgress}%` : 'Chọn ảnh' }}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" :disabled="ocrRunning" title="Dán ảnh từ bộ nhớ tạm" @click="pasteImageFromButton">Dán ảnh</button>
                 <button type="button" class="btn btn-ghost btn-sm" @click="templateOpen = !templateOpen">
                   Mẫu cú pháp của khách này {{ savedTemplate ? '(đã lưu)' : '(chưa lưu)' }}
                 </button>
@@ -3108,6 +3100,30 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
   overflow: hidden;
   min-height: 64px;
 }
+
+/* ---- Nhập nhanh: one box for a message or a picture ---- */
+.smart-box {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1.5px dashed var(--input-border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.smart-box.over {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.smart-box .paste-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.smart-box .ocr-raw {
+  background: var(--card);
+}
 </style>
+
 
 
