@@ -14,7 +14,8 @@ const props = defineProps({
   description: { type: String, default: '' },
   wide: { type: Boolean, default: false },
   xwide: { type: Boolean, default: false },
-  closeButton: { type: Boolean, default: true }, // the X in the corner (Esc and a click outside also close) // very wide (about 960px): big forms such as Cấu hình tính điểm
+  closeButton: { type: Boolean, default: true }, // the X in the corner (Esc and a click outside also close)
+  back: { type: Boolean, default: false }, // big screens (cấu hình): the same ← back button as Khách hàng > chi tiết, instead of the X // very wide (about 960px): big forms such as Cấu hình tính điểm
 })
 const emit = defineEmits(['close'])
 
@@ -51,9 +52,12 @@ function onKey(e) {
   <Teleport to="body">
     <div v-if="open" class="md-overlay" @mousedown.self="emit('close')" @keydown="onKey">
       <div ref="box" class="md-box" :class="{ 'md-wide': wide, 'md-xwide': xwide }" role="dialog" aria-modal="true" aria-labelledby="md-title">
-        <div class="md-head">
+        <div class="md-head" :class="{ 'md-head-back': back }">
+          <button v-if="back" type="button" class="md-back" aria-label="Quay lại" title="Quay lại" @click="emit('close')">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+          </button>
           <h2 id="md-title" class="md-title">{{ title }}</h2>
-          <button v-if="closeButton" type="button" class="md-close" aria-label="Đóng" title="Đóng" @click="emit('close')">
+          <button v-if="closeButton && !back" type="button" class="md-close" aria-label="Đóng" title="Đóng" @click="emit('close')">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
@@ -100,6 +104,35 @@ function onKey(e) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+.md-head-back {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin: -8px 0 8px -10px;
+}
+.md-head-back .md-title {
+  margin: 0;
+  font-size: 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.md-back {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.md-back:hover {
+  background: var(--surface);
 }
 .md-close {
   flex: none;

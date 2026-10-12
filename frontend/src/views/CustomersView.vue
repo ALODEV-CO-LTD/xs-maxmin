@@ -376,7 +376,7 @@ async function savePhone() {
       </div>
     </template>
 
-    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" xwide @close="defaultConfigOpen = false; loadAccountRates()">
+    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" xwide back @close="defaultConfigOpen = false; loadAccountRates()">
       <ScoringSettingsView embedded @saved="loadAccountRates" />
     </ModalDialog>
 
@@ -446,9 +446,6 @@ async function savePhone() {
             <h3 class="cd-config-title">Cấu hình tính điểm của khách này{{ rosterRow.scoringRates ? ' (có cấu hình riêng)' : '' }}</h3>
             <ScoringConfigEditor scope="customer" :customer="rosterRow" :account-rates="accountRates" @saved="onCustomerConfigSaved" />
           </section>
-          <div class="cd-actions">
-            <button type="button" class="btn btn-secondary" @click="expanded = null">Đóng</button>
-          </div>
         </div>
       </div>
     </Teleport>
