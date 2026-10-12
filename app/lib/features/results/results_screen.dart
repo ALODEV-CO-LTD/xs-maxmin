@@ -9,6 +9,7 @@ import '../../core/lottery_stations.dart';
 import '../../core/theme.dart';
 import '../scoring/date_field.dart';
 import '../scoring/entry_model.dart';
+import '../scoring/scoring_data.dart';
 import '../scoring/scoring_logic.dart';
 import 'results_controller.dart';
 
@@ -473,6 +474,7 @@ class _ScoreList extends StatelessWidget {
           ),
           if (c.syncMsg != null) _Msg(c.syncMsg!, error: false),
           if (c.syncError != null) _Msg(c.syncError!, error: true),
+          if (DataSource.fromCache) const _Msg('Đang offline: đang dùng số liệu đã lưu trên máy. Lưu kết quả và lưu điểm ra cần có mạng.', error: false),
           const SizedBox(height: 10),
           if (c.entriesLoading)
             const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Center(child: CircularProgressIndicator()))

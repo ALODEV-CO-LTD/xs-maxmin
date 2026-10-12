@@ -95,7 +95,7 @@ class ScoringController extends ChangeNotifier {
     notifyListeners();
     try {
       final r = await Future.wait([
-        fetchAllEntries(api),
+        fetchAllEntries(api, overlay: true),
         fetchCustomers(api).catchError((_) => <CustomerRec>[]),
         fetchAccountRates(api),
         stations.load(api),
@@ -222,6 +222,10 @@ class ScoringController extends ChangeNotifier {
     LotteryResult? r;
     try {
       r = await fetchLotteryResult(api, date, station);
+    } on ApiError catch (e) {
+      // Offline and this day was never saved: do not remember "no result" (it may exist), try again later.
+      if (e.status == 0) return null;
+      r = null;
     } catch (_) {
       r = null;
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'scoring_data.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -84,6 +85,7 @@ class _Body extends StatelessWidget {
         const _Toolbar(),
         if (c.autoCalcError != null) _Banner(c.autoCalcError!, error: true),
         if (c.notice != null) _Banner(c.notice!, error: false),
+        if (DataSource.fromCache) const _Banner('Đang offline: đang tính theo số liệu và kết quả xổ số đã lưu trên máy. Ngày nào chưa từng mở khi có mạng thì chưa có kết quả.', error: false),
         const SizedBox(height: 12),
         if (c.loading)
           const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator()))
