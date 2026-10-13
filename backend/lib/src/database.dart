@@ -212,19 +212,6 @@ void _createSchema(Database db) {
   ''');
   db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)');
 
-  // One-time: friend-to-friend chat is now end-to-end encrypted and relayed over
-  // the WebSocket without being stored (docs/MA_HOA_2_DAU.md). Plaintext history
-  // between two customers cannot be migrated to E2EE, so it is removed. Admin
-  // support threads (Phản hồi) are untouched.
-  if (db.select("SELECT 1 FROM settings WHERE key = 'e2ee_friend_chat_purged'").isEmpty) {
-    db.execute('''
-      DELETE FROM direct_messages
-      WHERE from_user_id NOT IN (SELECT id FROM users WHERE role = 'admin')
-        AND to_user_id NOT IN (SELECT id FROM users WHERE role = 'admin')
-    ''');
-    db.execute("INSERT INTO settings (key, value) VALUES ('e2ee_friend_chat_purged', ?)", [DateTime.now().toUtc().toIso8601String()]);
-  }
-
   // Push notification device tokens (APNs / FCM); see push_tokens.dart.
   ensurePushTokensTable(db);
 
@@ -416,6 +403,19 @@ void _createSchema(Database db) {
       attachment_data BLOB
     );
   ''');
+
+  // One-time: friend-to-friend chat is now end-to-end encrypted and relayed over
+  // the WebSocket without being stored (docs/MA_HOA_2_DAU.md). Plaintext history
+  // between two customers cannot be migrated to E2EE, so it is removed. Admin
+  // support threads (Phản hồi) are untouched.
+  if (db.select("SELECT 1 FROM settings WHERE key = 'e2ee_friend_chat_purged'").isEmpty) {
+    db.execute('''
+      DELETE FROM direct_messages
+      WHERE from_user_id NOT IN (SELECT id FROM users WHERE role = 'admin')
+        AND to_user_id NOT IN (SELECT id FROM users WHERE role = 'admin')
+    ''');
+    db.execute("INSERT INTO settings (key, value) VALUES ('e2ee_friend_chat_purged', ?)", [DateTime.now().toUtc().toIso8601String()]);
+  }
 
   // The official Miền Bắc lottery draw for one day - an objective public
   // fact, but each ACCOUNT keeps its own copy (user_id): what one account

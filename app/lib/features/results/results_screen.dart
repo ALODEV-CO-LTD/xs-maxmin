@@ -11,6 +11,7 @@ import '../scoring/date_field.dart';
 import '../scoring/entry_model.dart';
 import '../scoring/scoring_data.dart';
 import '../scoring/scoring_logic.dart';
+import '../entries/dialogs.dart';
 import 'results_controller.dart';
 
 /// Nhập kết quả: lottery results per day (Miền Bắc form, Miền Trung / Miền Nam table), reading them from a photo, and the
@@ -30,6 +31,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
     super.initState();
     _c = ResultsController(context.read<ApiClient>(), context.read<LotteryStations>(), initialDate: _queryDate());
     _routeDate = _queryDate();
+    _c.confirmOverwrite = (total, overwrites) async {
+      if (!mounted) return false;
+      return confirmDialog(
+        context,
+        title: 'Cập nhật Điểm ra',
+        message: 'Kết quả vừa lưu sẽ cập nhật Điểm ra của $total số liệu, trong đó $overwrites số liệu đã có Điểm ra khác sẽ bị ghi đè. '
+            'Bạn có thể bấm "Hoàn tác" ngay sau đó. Tiếp tục?',
+        confirmText: 'Cập nhật',
+      );
+    };
     _c.init();
   }
 
@@ -99,9 +110,11 @@ class _Header extends StatelessWidget {
 }
 
 class _Msg extends StatelessWidget {
-  const _Msg(this.text, {required this.error});
+  const _Msg(this.text, {required this.error, this.action, this.onAction});
   final String text;
   final bool error;
+  final String? action;
+  final VoidCallback? onAction;
   @override
   Widget build(BuildContext context) {
     final color = error ? context.badColor : context.okColor;
@@ -110,7 +123,12 @@ class _Msg extends StatelessWidget {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.5))),
-      child: Text(text, style: TextStyle(color: color, fontSize: 13.5)),
+      child: action == null
+          ? Text(text, style: TextStyle(color: color, fontSize: 13.5))
+          : Row(children: [
+              Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13.5))),
+              TextButton(onPressed: onAction, child: Text(action!)),
+            ]),
     );
   }
 }
@@ -472,7 +490,7 @@ class _ScoreList extends StatelessWidget {
             ],
             onChanged: (v) => c.setCustomerFilter(v ?? ''),
           ),
-          if (c.syncMsg != null) _Msg(c.syncMsg!, error: false),
+          if (c.syncMsg != null) _Msg(c.syncMsg!, error: false, action: c.undoItems == null ? null : (c.undoing ? 'Đang hoàn tác...' : 'Hoàn tác'), onAction: c.undoing ? null : c.undoScores),
           if (c.syncError != null) _Msg(c.syncError!, error: true),
           if (DataSource.fromCache) const _Msg('Đang offline: đang dùng số liệu đã lưu trên máy. Lưu kết quả và lưu điểm ra cần có mạng.', error: false),
           const SizedBox(height: 10),

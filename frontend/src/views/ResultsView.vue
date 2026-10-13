@@ -147,26 +147,75 @@ async function loadDayResults() {
 const scoreOf = (e) => computeScoreFromResults(e, dayResults.value)
 
 // Stores the calculated value on every entry of the day (called after a result is saved).
+// Safety: when this would OVERWRITE an "Điểm ra" that is already there with a different number, ask first
+// (a misread result would otherwise silently change the money of every customer that day), and keep the old
+// values so "Hoàn tác" can put them back.
+const undoSync = ref(null) // { date, items: [{ id, prev }] } of the last automatic update
 async function syncScores() {
   syncMsg.value = ''
   syncError.value = ''
-  let ok = 0
-  let failed = 0
+  const changes = []
   for (const e of entries.value) {
     if (e.entryDate !== lotteryDate.value) continue
     const v = scoreOf(e)
     if (v === null || String(v) === (e.result || '')) continue
+    changes.push({ e, value: String(v), prev: e.result || '' })
+  }
+  if (!changes.length) return
+  const overwrites = changes.filter((c) => c.prev !== '' && toNumber(c.prev) !== toNumber(c.value))
+  if (overwrites.length) {
+    const ok = await showConfirm({
+      title: 'Cập nhật Điểm ra',
+      message:
+        `Kết quả vừa lưu sẽ cập nhật Điểm ra của ${changes.length} số liệu ngày ${lotteryDate.value.split('-').reverse().join('/')}, ` +
+        `trong đó ${overwrites.length} số liệu đã có Điểm ra khác sẽ bị ghi đè. Bạn có thể bấm "Hoàn tác" ngay sau đó. Tiếp tục?`,
+      confirmText: 'Cập nhật',
+    })
+    if (!ok) {
+      syncMsg.value = 'Đã lưu kết quả xổ số, chưa cập nhật Điểm ra (bạn chọn không ghi đè).'
+      return
+    }
+  }
+  const done = []
+  let failed = 0
+  for (const c of changes) {
     try {
-      const updated = await api.patch(`/me/entries/${e.id}`, { result: String(v) })
-      const idx = entries.value.findIndex((x) => x.id === e.id)
+      const updated = await api.patch(`/me/entries/${c.e.id}`, { result: c.value })
+      const idx = entries.value.findIndex((x) => x.id === c.e.id)
       if (idx !== -1) entries.value[idx] = updated
-      ok++
+      done.push({ id: c.e.id, prev: c.prev })
     } catch (_) {
       failed++
     }
   }
-  if (ok) syncMsg.value = `Đã tính và lưu điểm ra cho ${ok} số liệu.`
+  undoSync.value = done.length ? { date: lotteryDate.value, items: done } : null
+  if (done.length) syncMsg.value = `Đã tính và lưu điểm ra cho ${done.length} số liệu.`
   if (failed) syncError.value = `${failed} số liệu chưa lưu được điểm ra, lưu lại kết quả để thử lại.`
+}
+
+// Puts back the "Điểm ra" values that the last automatic update replaced.
+const undoing = ref(false)
+async function undoScores() {
+  const u = undoSync.value
+  if (!u || undoing.value) return
+  undoing.value = true
+  syncError.value = ''
+  let back = 0
+  let failed = 0
+  for (const it of u.items) {
+    try {
+      const updated = await api.patch(`/me/entries/${it.id}`, { result: it.prev })
+      const idx = entries.value.findIndex((x) => x.id === it.id)
+      if (idx !== -1) entries.value[idx] = updated
+      back++
+    } catch (_) {
+      failed++
+    }
+  }
+  undoSync.value = null
+  syncMsg.value = `Đã hoàn tác Điểm ra của ${back} số liệu.`
+  if (failed) syncError.value = `${failed} số liệu chưa hoàn tác được.`
+  undoing.value = false
 }
 
 // ---- Kết quả xổ số (Miền Bắc / Miền Trung / Miền Nam, theo đài) ------------------------------------------
@@ -835,7 +884,12 @@ function clearLotteryForm() {
         <span class="page-subtitle filters-note">Tự tính theo kết quả đã lưu và công thức của từng khách.</span>
       </div>
 
-      <div v-if="syncMsg" class="alert alert-success">{{ syncMsg }}</div>
+      <div v-if="syncMsg" class="alert alert-success sync-msg">
+        <span>{{ syncMsg }}</span>
+        <button v-if="undoSync" type="button" class="btn btn-secondary btn-sm" :disabled="undoing" @click="undoScores">
+          {{ undoing ? 'Đang hoàn tác...' : 'Hoàn tác' }}
+        </button>
+      </div>
       <div v-if="syncError" class="alert alert-error">{{ syncError }}</div>
 
       <div v-if="groupedByCustomer.length === 0" class="card">Không có số liệu nào của ngày này.</div>
@@ -1742,5 +1796,11 @@ function clearLotteryForm() {
     height: 36px;
     padding: 0;
   }
+}
+.sync-msg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 </style>

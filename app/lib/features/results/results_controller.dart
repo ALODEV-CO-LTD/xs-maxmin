@@ -425,34 +425,96 @@ class ResultsController extends ChangeNotifier {
     return [for (final n in names) (name: n, entries: by[n]!)];
   }
 
+  /// Asked before an automatic update would OVERWRITE an "Điểm ra" that is already there with a different number
+  /// (a misread result would otherwise silently change every customer's money that day). null = no question.
+  Future<bool> Function(int total, int overwrites)? confirmOverwrite;
+
+  /// What the last automatic update replaced, so [undoScores] can put it back (null = nothing to undo).
+  List<({String id, String prev})>? undoItems;
+  bool undoing = false;
+
+  static bool _isOverwrite(String prev, String next) {
+    if (prev.isEmpty) return false;
+    double? n(String t) => double.tryParse(t.replaceAll(RegExp(r'[^\d.-]'), ''));
+    final a = n(prev), b = n(next);
+    return a == null || b == null || a != b;
+  }
+
+  Future<void> _writeResult(Entry e, String value) async {
+    await (await _store()).updateEntry(
+      stored.Entry.fromJson({'id': e.id, 'customerName': e.customerName, 'entryDate': e.entryDate, 'value': e.value}),
+      {'result': value},
+    );
+    final i = entries.indexWhere((x) => x.id == e.id);
+    if (i != -1) entries[i] = e.withResult(value);
+  }
+
   /// Stores the calculated value on every entry of the day (after a result was saved).
   Future<void> syncScores() async {
     syncMsg = null;
     syncError = null;
+    undoItems = null;
     try {
       entries = await fetchAllEntries(api);
     } catch (_) {/* score what is already loaded */}
-    var ok = 0, failed = 0;
+    final changes = <({Entry e, String value, String prev})>[];
     for (final e in List<Entry>.of(entries)) {
       if (e.entryDate != date) continue;
       final v = scoreOf(e);
       if (v == null) continue;
       final s = numToString(v);
       if (s == (e.result ?? '')) continue;
+      changes.add((e: e, value: s, prev: e.result ?? ''));
+    }
+    if (changes.isEmpty) return;
+    final overwrites = changes.where((c) => _isOverwrite(c.prev, c.value)).length;
+    if (overwrites > 0 && confirmOverwrite != null) {
+      final ok = await confirmOverwrite!(changes.length, overwrites);
+      if (!ok) {
+        syncMsg = 'Đã lưu kết quả xổ số, chưa cập nhật Điểm ra (bạn chọn không ghi đè).';
+        return;
+      }
+    }
+    final done = <({String id, String prev})>[];
+    var failed = 0;
+    for (final c in changes) {
       try {
-        await (await _store()).updateEntry(
-          stored.Entry.fromJson({'id': e.id, 'customerName': e.customerName, 'entryDate': e.entryDate, 'value': e.value}),
-          {'result': s},
-        );
-        final i = entries.indexWhere((x) => x.id == e.id);
-        if (i != -1) entries[i] = e.withResult(s);
-        ok++;
+        await _writeResult(c.e, c.value);
+        done.add((id: c.e.id, prev: c.prev));
       } catch (_) {
         failed++;
       }
     }
-    if (ok > 0) syncMsg = 'Đã tính và lưu điểm ra cho $ok số liệu.';
+    if (done.isNotEmpty) {
+      undoItems = done;
+      syncMsg = 'Đã tính và lưu điểm ra cho ${done.length} số liệu.';
+    }
     if (failed > 0) syncError = '$failed số liệu chưa lưu được điểm ra, lưu lại kết quả để thử lại.';
+  }
+
+  /// Puts back the "Điểm ra" values the last automatic update replaced.
+  Future<void> undoScores() async {
+    final items = undoItems;
+    if (items == null || undoing) return;
+    undoing = true;
+    syncError = null;
+    notifyListeners();
+    var back = 0, failed = 0;
+    for (final it in items) {
+      final i = entries.indexWhere((x) => x.id == it.id);
+      if (i == -1) continue;
+      try {
+        await _writeResult(entries[i], it.prev);
+        back++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    undoItems = null;
+    undoing = false;
+    syncMsg = 'Đã hoàn tác Điểm ra của $back số liệu.';
+    if (failed > 0) syncError = '$failed số liệu chưa hoàn tác được.';
+    notifyListeners();
   }
 
   // ---- photo ------------------------------------------------------------------------------------------------

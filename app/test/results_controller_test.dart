@@ -127,6 +127,48 @@ void main() {
     expect(filledCount(c.board['mn-cantho']!), 0);
   });
 
+  test('automatic Điểm ra asks before overwriting a different value and can be undone', () async {
+    final f = FakeServer();
+    final c = ResultsController(client(f), testStations(), initialDate: date);
+    await c.init();
+    c.setRegion('mn');
+    await Future<void>.delayed(Duration.zero);
+    await c.loadDay();
+    fillColumn(c, 'mn-dongnai', tam: '47');
+    fillColumn(c, 'mn-cantho', db: '999956');
+    // one entry already carries a different manual Điểm ra
+    f.entries = [
+      {...f.entries[0], 'result': '999'},
+      f.entries[1],
+      f.entries[2],
+    ];
+    var asked = 0;
+    var answer = false;
+    int? total, over;
+    c.confirmOverwrite = (t, o) async {
+      asked++;
+      total = t;
+      over = o;
+      return answer;
+    };
+    await c.save();
+    expect(asked, 1);
+    expect([total, over], [2, 1]);
+    expect(f.patches, isEmpty); // answered "no": nothing overwritten
+    expect(c.syncMsg, contains('chưa cập nhật'));
+
+    answer = true;
+    await c.syncScores();
+    expect(f.patches, {'e1': '35', 'e3': '7000000'});
+    expect(c.undoItems, isNotNull);
+
+    await c.undoScores();
+    expect(f.patches['e1'], '999'); // the old value is back
+    expect(f.patches['e3'], ''); // the empty one is cleared again
+    expect(c.undoItems, isNull);
+    expect(c.syncMsg, contains('hoàn tác'));
+  });
+
   test('Miền Bắc form needs all 27 numbers and is read-only after saving', () async {
     final f = FakeServer();
     final c = ResultsController(client(f), testStations(), initialDate: date);
