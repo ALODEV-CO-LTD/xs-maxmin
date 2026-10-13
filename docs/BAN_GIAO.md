@@ -1,8 +1,8 @@
 # MAMBA (XS Maxmin) – Tài liệu bàn giao dự án
 
-> Cập nhật: 10/10/2026 · Nhánh làm việc hiện tại: `mask-short` (chứa toàn bộ công việc mới nhất) · Bản đang chạy: https://xs.massagehomeriyadh.com/
+> Cập nhật: 13/10/2026 · Nhánh làm việc hiện tại: `mask-short` (chứa toàn bộ công việc mới nhất) · Bản đang chạy: https://xs.massagehomeriyadh.com/
 >
-> **Tài liệu này không chứa mật khẩu, token hay khoá bí mật.** Các giá trị đó được bàn giao riêng (xem mục 10).
+> **Tài liệu này không chứa mật khẩu thật, token hay khoá bí mật** (chỉ nhắc mật khẩu mock của dữ liệu seed trong code, mục 4 và 10). Các giá trị thật được bàn giao riêng (xem mục 10).
 
 ## 1. Dự án là gì
 
@@ -24,6 +24,7 @@ Hai khái niệm dễ nhầm: **tài khoản** (người đăng nhập, có gói
 | Realtime | WebSocket `/api/ws/calls` (báo tin nhắn mới + báo hiệu cuộc gọi), WebRTC cho gọi thoại (không có video) |
 | Gọi thoại qua mạng ngoài | STUN/TURN. Đang dùng **Cloudflare Realtime TURN** (xem mục 7) |
 | Offline | Service worker `public/sw.js` + hàng đợi IndexedDB (`src/offline.js`) |
+| App Android + iOS | Flutter, thư mục `app/` (xem mục 9c); thông báo đẩy qua APNs (iOS) và FCM (Android), xem mục 9e, 9f |
 | Hạ tầng | Proxmox host `10.5.100.5` → container `501` → nginx + systemd + Cloudflare Tunnel |
 
 ## 3. Cấu trúc thư mục
@@ -43,10 +44,12 @@ xs-maxmin/
 │  ├─ src/stores/      Pinia: auth, call, notify, mask, privacy
 │  ├─ src/assets/      logo MAMBA (+ bản gốc mamba-logo-original.webp)
 │  └─ public/          manifest, icon, service worker, mô hình OCR
+├─ app/                App Android + iOS (Flutter): lib/core, lib/features/*, test/ (xem mục 9c)
 ├─ deploy/             deploy.sh (web + backend), deploy-web.sh (chỉ web) – chạy trong container 501
-├─ tools/e2e/          script kiểm thử giao diện/API bằng puppeteer (xem tools/e2e/README.md)
+├─ tools/              e2e/ (script puppeteer, xem tools/e2e/README.md) và seed_demo.py (tạo dữ liệu demo)
 └─ docs/
    ├─ BAN_GIAO.md      tài liệu này
+   ├─ MA_HOA_2_DAU.md  kế hoạch và thiết kế mã hoá 2 đầu cho chat bạn bè
    └─ yeu_cau/         SRS gốc, SRS thống nhất v2, bảng tiến độ chức năng (csv/xlsx)
 ```
 
@@ -94,7 +97,7 @@ Bảng đầy đủ theo từng mã yêu cầu (K01…, A01…, S01…, NFR…) 
 
 SQLite một file. Local: `backend/data/xoso.db`. Máy chủ: `/opt/xs-maxmin/backend/build/data/xoso.db`.
 
-Bảng: `users`, `device_sessions`, `login_attempts`, `security_events`, `data_entries`, `customers`, `customer_codes`, `retired_codes`, `customer_syntax_templates`, `lottery_results`, `friendships`, `direct_messages`, `message_reads`, `messages` (hỗ trợ Admin), `call_logs`, `deletion_schedules`, `payment_requests`, `transactions`, `packages`, `settings`, `announcements`.
+Bảng: `users`, `device_sessions`, `login_attempts`, `security_events`, `data_entries`, `customers`, `customer_codes`, `retired_codes`, `customer_syntax_templates`, `lottery_results` (theo tài khoản, `user_id`), `friendships`, `direct_messages`, `message_reads`, `messages` (hỗ trợ Admin), `call_logs`, `deletion_schedules`, `payment_requests`, `transactions`, `packages`, `settings`, `announcements`.
 
 Migration: thêm cột bằng `_ensureColumn(...)` trong `lib/src/database.dart` (tự chạy khi khởi động). SQLite không sửa được ràng buộc `CHECK` – nếu cần đổi, phải tạo lại bảng. Seed (admin + 5 tài khoản mẫu) chỉ chạy khi DB trống.
 
@@ -134,6 +137,7 @@ Quay lại thủ công: `systemctl stop xs-maxmin-backend; rm -rf /opt/xs-maxmin
 |---|---|---|
 | `XOSO_JWT_SECRET` | Khoá ký token (≥16 ký tự). Không đặt thì mỗi lần khởi động tạo khoá ngẫu nhiên ⇒ đăng xuất toàn bộ | **Chưa đặt trên máy chủ** (nên đặt) |
 | `XOSO_CF_TURN_KEY_ID`, `XOSO_CF_TURN_API_TOKEN` | Khoá Cloudflare Realtime TURN | Đã đặt (file `turn.conf`, quyền 600) |
+| `XOSO_FCM_CREDENTIALS_PATH`, `XOSO_FCM_PROJECT_ID` (và khoá APNs, xem mục 9e) | Thông báo đẩy Android (FCM) / iOS (APNs) | **Chưa cấu hình trên máy chủ**, chi tiết cách bật ở mục 9e, 9f |
 | `XOSO_STUN_URLS`, `XOSO_TURN_URLS`, `XOSO_TURN_SECRET` / `XOSO_TURN_USERNAME` + `XOSO_TURN_CREDENTIAL` | Phương án TURN tự dựng (coturn) thay cho Cloudflare | Không dùng |
 
 TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc API `POST /accounts/{id}/calls/turn_keys`; **mã bí mật `secret` chỉ hiện đúng một lần lúc tạo**). Kiểm tra: đăng nhập rồi gọi `GET /api/calls/ice-servers` – phải thấy `"turn": true`.
@@ -142,17 +146,18 @@ TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc A
 
 - Backend: `cd backend && dart test` (xác thực, xoá dữ liệu, lịch xoá lặp lại, mã ID, tìm kiếm không dấu, nhật ký cuộc gọi, quyền riêng tư).
 - Giao diện/API: `tools/e2e/*.mjs` (puppeteer + Chrome cài trên máy). Cách dựng môi trường cô lập ở `tools/e2e/README.md`. Mỗi lần kiểm thử nên chạy backend riêng (bản sao thư mục `backend` + `XOSO_JWT_SECRET` riêng) để không đụng DB thật.
-- Chưa có CI. Kiểm thử trên Android/iOS thật chưa làm (mới có web).
+- App Flutter: `cd app && flutter test` (176 test lúc viết mục 9c) và `flutter analyze`. Đã cài thử APK trên Android và iPhone; các mục chưa thử trên máy thật được liệt kê ở 9c và 9g.
+- Chưa có CI.
 
 ## 9. Tình trạng công việc
 
-**Đã xong và đã lên máy chủ thật:** toàn bộ các mục ở mục 5 (nhánh `mask-short` đã deploy đến commit mới nhất ngày 08/10/2026).
+**Đã xong và đã lên máy chủ thật:** toàn bộ các mục ở mục 5; lần deploy gần nhất 13/10/2026 (xem 9g). Riêng sửa `frontend/src/screenshotGuard.js` (báo chụp màn hình khi tắt che màn hình) chưa commit và chưa deploy.
 
 **Chưa làm hẳn / làm một phần** (chi tiết từng mã trong `tien_do_chuc_nang.csv`):
-- Chưa làm: mã hoá đầu cuối cho phản hồi Admin và dữ liệu số liệu/khách hàng (K28; chat bạn bè đã mã hoá, xem `docs/MA_HOA_2_DAU.md`), đổi giọng nói đầy đủ (K30; hiện mới có nút "Méo giọng" trong cuộc gọi), chính sách lưu trữ trên app (A08: web như hiện tại, app lưu trên máy và xoá sạch được), quản lý quyền camera/vị trí/thông báo (K39), quản lý phiên bản app (A17), tách dịch vụ (NFR-08), app Android/iOS, Face ID.
-- Một phần: bảo vệ chụp màn hình (K33 – mới có Ẩn số liệu), xác thực lớp 2/mật khẩu dữ liệu riêng, mã hoá dữ liệu khi lưu (SQLite chưa mã hoá), đồng bộ/offline (đã có hàng đợi nhập số, chưa phủ hết), quản lý thanh toán (A18 đã mở rộng, chưa có đối soát tự động với ngân hàng).
+- Chưa làm: mã hoá đầu cuối cho phản hồi Admin và dữ liệu số liệu/khách hàng (K28; chat bạn bè đã mã hoá, xem `docs/MA_HOA_2_DAU.md`), đổi giọng nói đầy đủ (K30; hiện mới có nút "Méo giọng" trong cuộc gọi), chính sách lưu trữ trên app (A08: web như hiện tại, app lưu trên máy và xoá sạch được), quản lý quyền camera/vị trí/thông báo (K39), tách dịch vụ (NFR-08), Face ID. (Phân quyền Admin A07, quản lý phiên bản app A17 và app Android/iOS đã làm: xem 9b–9d.)
+- Một phần: bảo vệ chụp màn hình (K33 – web: Ẩn số liệu, che khi bấm phím chụp, dấu tên người xem; app: Android FLAG_SECURE, iOS screen_protector, chưa thử iOS thật; xem 9g), xác thực lớp 2/mật khẩu dữ liệu riêng, mã hoá dữ liệu khi lưu (SQLite chưa mã hoá), đồng bộ/offline (đã có hàng đợi nhập số, chưa phủ hết), quản lý thanh toán (A18 đã mở rộng, chưa có đối soát tự động với ngân hàng).
 
-**Đề xuất chống chụp màn hình** (đã trao đổi, chưa làm): web chỉ giảm rủi ro – "giữ để xem" + watermark động + nhật ký; chặn thật cần app: Android `FLAG_SECURE`, iOS phát hiện chụp/quay và che, PC (Electron) `setContentProtection`. Hướng nhanh nhất là bọc web bằng Capacitor.
+**Chống chụp màn hình:** web chỉ giảm rủi ro (không chặn được); chặn thật ở app (Android `FLAG_SECURE`, iOS `screen_protector`). Còn chờ quyết định: trên Android không thể vừa chặn chụp vừa báo bạn chat khi bị chụp (xem 9g). PC (Electron `setContentProtection`) chưa làm.
 
 **Quyết định còn mở (cần người phụ trách chốt):**
 1. ~~Kết quả xổ số dùng chung~~ — **đã chốt: theo từng tài khoản** (`lottery_results.user_id`, duy nhất theo tài khoản + ngày + đài). Tài khoản khác không thấy và không ghi đè. Bản dùng chung cũ giữ ở bảng `lottery_results_shared_legacy` và được sao cho mọi tài khoản khách hàng khi nâng cấp. App lưu kết quả trên máy trước rồi tự đồng bộ khi có mạng.
@@ -188,13 +193,13 @@ Việc kiểm tra tay trong đợt này: chuyển tab Miền Bắc/Trung/Nam tro
 
 ## 9c. Ứng dụng Android (Flutter) - thư mục `app/`
 
-Bản app khách hàng cho Android, dùng chung API với bản web. Chạy: `cd app && flutter pub get && flutter run --dart-define=API_BASE=http://10.0.2.2:8080` (emulator + backend local) hoặc `flutter run` (máy chủ thật). Build: `flutter build apk --release`; **cần cài Android SDK (Android Studio)**, máy phát triển lúc viết chưa có nên **chưa build được APK và chưa chạy thử trên thiết bị** (mới có `flutter analyze` sạch và 176 test qua).
+Bản app khách hàng cho Android, dùng chung API với bản web. Chạy: `cd app && flutter pub get && flutter run --dart-define=API_BASE=http://10.0.2.2:8080` (emulator + backend local) hoặc `flutter run` (máy chủ thật). Build: `flutter build apk --release`; cần cài Android SDK (Android Studio). Lúc viết mục này máy phát triển chưa có SDK nên chưa build được; về sau đã build APK `MAMBA.apk` và cài thử trên Android + iPhone (xem 9g).
 
 - Cấu trúc: `lib/core` (API client, phiên đăng nhập, theme, đài/miền, cấu hình tính điểm, Ẩn số liệu), `lib/features/{entries,customers,results,scoring,friends,account,auth,shell}`, `lib/app.dart` (router + providers).
 - Đã có: đăng nhập 2 lớp, đăng ký, khôi phục (kể cả nhờ Admin), Nhập số (tay, dán tin nhắn, ảnh bằng ML Kit, hàng đợi offline), Khách hàng và cấu hình tính điểm theo miền, Nhập kết quả (Miền Bắc, bảng Miền Nam/Trung, đọc ảnh), Tính điểm (tổng kết tiền), Bạn bè (chat mã hoá 2 đầu tương thích bản web, ảnh, gọi thoại WebRTC), Tài khoản (hồ sơ, mật khẩu, thiết bị, gói và thanh toán, thống kê), chống chụp màn hình (FLAG_SECURE), tự khoá, làm mờ theo chính sách.
 - **Khu Admin trong cùng app** (`lib/features/admin/`, ngăn kéo theo quyền như bản web): Thống kê (biểu đồ), Khách hàng (khoá, thiết bị, đặt lại mật khẩu, khôi phục), Thanh toán & gia hạn, Phản hồi (hộp thư hỗ trợ), Thông báo & bảo trì, Cài đặt (thanh toán, gói, giới hạn ID, nhật ký, chính sách bảo mật, sao lưu; chỉ hiển thị, bấm Sửa mới chỉnh), Phân quyền (Admin gốc). App tự chọn giao diện khách hàng hoặc Admin theo vai trò tài khoản đăng nhập.
 - **Nhắn tin và gọi chạy toàn app** (`MessagingHost`, `lib/features/friends/`): kết nối WebSocket giữ suốt khi đã đăng nhập tài khoản khách hàng, cuộc gọi đến hiện trên mọi màn hình (chuông, rung, nhận/từ chối), huy hiệu tin chưa đọc, thông báo Android (không lộ nội dung tin), tuỳ chọn "Giữ kết nối khi thoát app" (dịch vụ nền, mặc định tắt, tốn pin). Tin nhắn mã hoá 2 đầu không lưu trên máy chủ nên vẫn chỉ nhận được khi tiến trình app còn sống.
-- Chưa có: dấu tên người xem, lịch xoá dữ liệu, "méo giọng" (thư viện WebRTC không cho xử lý micro), thông báo đẩy qua Firebase (khi app bị hệ thống tắt hẳn thì không nhận được), iOS. Chưa thử trên điện thoại thật: chuông cuộc gọi, thông báo, dịch vụ nền, âm thanh WebRTC giữa hai máy.
+- Chưa có: dấu tên người xem, lịch xoá dữ liệu, "méo giọng" (thư viện WebRTC không cho xử lý micro), (đã bổ sung sau: thông báo đẩy FCM/APNs, bản iOS, xem 9e–9g). Chưa thử trên điện thoại thật: chuông cuộc gọi, thông báo, dịch vụ nền, âm thanh WebRTC giữa hai máy.
 - Cần kiểm tra trên máy thật: camera/ML Kit, gọi thoại, FLAG_SECURE, phát hiện chụp màn hình (Android 14+), minSdk của ML Kit.
 
 ## 9d. Quản lý phiên bản ứng dụng (A17)
@@ -278,6 +283,19 @@ Environment=XOSO_FCM_PROJECT_ID=<project id Firebase>
 | `XOSO_FCM_PROJECT_ID` | tuỳ chọn, mặc định `project_id` trong file JSON |
 
 **Chưa kiểm chứng được** (không có tài khoản Firebase khi làm, và không được liên lạc Google): gửi thật tới FCM và đổi token OAuth thật, nhận push trên máy Android thật, hành vi kênh thông báo/chuông cuộc gọi trên máy thật, plugin google-services với file thật (chỉ thử với file giả: plugin áp dụng và build qua, sau đó đã xoá), bấm thông báo khi khởi động nguội, và `firebase_messaging` cùng AppDelegate APNs tự viết trên iOS (build iOS vẫn qua; app iOS không khởi tạo Firebase). Phần còn lại có unit test (`backend/test/push_fcm_test.dart`, `push_token_test.dart`, `app/test/fcm_push_test.dart`) với đường truyền/FCM giả; khoá RSA trong test là khoá sinh riêng cho test, không phải khoá Google.
+
+## 9g. Nhật ký đợt 11–13/10/2026 (app, offline, kết quả theo tài khoản)
+
+**Đã deploy lên máy chủ thật** (web + backend) lần cuối 13/10/2026 (bản sao lưu `backend.bak-20261012-095507`, DB `/root/xoso-live-20261012-095507.db`). App hiện hành: **1.4.2 (8)** (APK `MAMBA.apk` + iPhone cài thử). Phiên bản app phải khớp ở hai chỗ: `app/pubspec.yaml` và `app/lib/core/config.dart`.
+
+- **Kết quả xổ số theo từng tài khoản** (`d94382a`): trước đây bảng `lottery_results` dùng chung cho mọi tài khoản. Nay có cột `user_id`, duy nhất theo (tài khoản, ngày, đài); GET/POST/DELETE `/lottery-results` chỉ tác động lên tài khoản đang đăng nhập; xoá dữ liệu tài khoản cũng xoá kết quả. "Tài khoản khách hàng" khác "khách hàng trong tài khoản": kết quả thuộc tài khoản và áp cho mọi khách trong đó. Nâng cấp một chiều: bảng cũ giữ nguyên tên `lottery_results_shared_legacy`, các dòng dùng chung được sao cho **mọi tài khoản khách hàng** (kể cả 91 kết quả ảo của dữ liệu thử, Admin có thể xoá từng ngày).
+- **App lưu kết quả trên máy trước** (`65fbc0d`): Lưu kết quả ghi vào máy, rồi gửi; mất mạng thì báo đang offline và tự gửi khi có mạng (mỗi lần mở một ngày ở Nhập kết quả, hoặc khi Nhập số tự đồng bộ). Tính điểm dùng luôn kết quả trên máy. Điểm ra tự lưu đi qua hàng chờ offline của Nhập số. Xoá kết quả vẫn cần mạng, trừ khi kết quả đó chưa từng gửi. Code: `OfflineStore.saveResult/lotteryResult/dayResults/_flushResults`.
+- **Tính điểm và Nhập kết quả chạy offline** (`3b33f14`, `544c0f8`): số liệu, khách hàng, tỉ lệ ăn, kết quả từng ngày đã xem được lưu trên máy theo tài khoản; offline hiện thanh "Đang offline: …"; ngày chưa từng mở khi có mạng thì chưa có kết quả và không bị ghi nhớ nhầm là "không có kết quả". Mở app lần đầu khi offline và chưa lưu gì thì báo rõ.
+- **Sửa đọc ảnh Miền Nam thiếu số** (web `lotteryColumns.js` + app `lottery_columns.dart`): một dấu "/" lẻ làm đường cắt ngày tiêu đề bị đẩy cao; nay chỉ lấy từ ngày thật đầu tiên ở 35% trên của ảnh, và cột đủ 18 số được gán theo vị trí giải.
+- **Nhập số (web)**: một ô "nhập nhanh" tự giãn dài dùng cho cả dán tin nhắn lẫn ảnh (Chọn ảnh / Dán ảnh / kéo thả, xem lại ảnh đã gửi), có thông báo sau khi thêm. **Nhập kết quả**: thông báo không nhảy giữa Miền Bắc/Trung/Nam. **Hỗ trợ chat**: tin cũ ở trên, mới ở dưới (cả khách lẫn Admin). **Hộp thoại**: nút ← và ✕ đồng bộ (`ModalDialog` có `back` và `closeButton`). Cài đặt Admin chỉ hiển thị, bấm Sửa mới chỉnh.
+- **App Android + iOS** (một app, giao diện theo vai trò): đã có khu Admin, nhắn tin/gọi toàn app, thông báo đẩy (APNs, FCM), quản lý phiên bản (mục 9d), nút Đăng xuất ở Tài khoản khách và Admin, hiện "Phiên bản x (n)". Android chặn chụp bằng FLAG_SECURE; iOS bằng `screen_protector`. Chi tiết xem mục 9c–9f.
+- **Phát hiện chụp màn hình để báo bạn chat** (kiểm tra 13/10): bên nhận (web và app) đã hiển thị thông báo; chỗ yếu là bên chụp. **Web**: bắt phím Cmd+Shift+3/4/5, PrintScreen, Win+Shift+S; **đã sửa** để vẫn báo khi Admin tắt chế độ che màn hình (`screenshotGuard.js`, **chưa deploy/commit**). **Android**: khi FLAG_SECURE bật (bản phát hành) hệ thống chặn chụp trước khi app nhận được tín hiệu `ScreenCaptureCallback` (thử trên giả lập Android 17: tắt FLAG_SECURE thì callback chạy, bật thì không), và Android dưới 14 không có tín hiệu này ⇒ **không báo được khi đang chặn chụp**; cần chọn giữa "chặn chụp" và "cho chụp + báo" ở màn chat (chờ quyết định). **iOS**: theo thiết kế chạy được, chưa thử trên máy thật.
+- **Việc còn mở**: đồng bộ dữ liệu ảo lên bản live (đã dừng vì quyền ghi vào máy chủ; chưa làm); dọn 91 kết quả ảo sau nâng cấp ở trên; cấu hình khoá APNs/Firebase thật (mục 9e, 9f); "méo giọng" không làm được với flutter_webrtc; iOS simulator không build được (ML Kit thiếu arm64 simulator) nên thử trên iPhone thật; chưa kiểm tra tay trên máy thật: thông báo đẩy, cuộc gọi, chặn chụp iOS, đồng bộ kết quả offline.
 
 ## 10. Việc cần làm ngay khi nhận bàn giao
 
