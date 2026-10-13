@@ -11,6 +11,7 @@ import 'account_widgets.dart';
 import 'auth_flows.dart' show errorText;
 import 'me_profile.dart';
 import 'password_rules.dart';
+import '../shell/version_card.dart';
 
 /// Hồ sơ: personal info (edit), package info, password dialogs, Mã ID kết bạn, logout.
 class AccountProfileTab extends StatelessWidget {
@@ -148,7 +149,9 @@ class _ProfileCardState extends State<_ProfileCard> {
         OutlinedButton.icon(icon: const Icon(Icons.shield_outlined, size: 18), label: Text(me.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai'), onPressed: () => _dialog(_secondDialog(api, me))),
         const SizedBox(height: 8),
         OutlinedButton.icon(icon: const Icon(Icons.delete_sweep_outlined, size: 18), label: Text(me.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu'), onPressed: () => _wipeFlow(api, me)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 14),
+        const VersionCard(),
+        const SizedBox(height: 10),
         FilledButton.tonalIcon(icon: const Icon(Icons.logout, size: 18), label: const Text('Đăng xuất'), onPressed: _logout),
       ],
     );

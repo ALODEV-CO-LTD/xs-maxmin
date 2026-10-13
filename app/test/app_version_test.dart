@@ -8,6 +8,7 @@ import 'package:mamba_app/core/api_client.dart';
 import 'package:mamba_app/core/app_version.dart';
 import 'package:mamba_app/core/auth_store.dart';
 import 'package:mamba_app/features/shell/update_gate.dart';
+import 'package:mamba_app/features/shell/version_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 ApiClient _api(String body, {int status = 200, bool fail = false}) => ApiClient(
@@ -26,6 +27,7 @@ Future<void> _pump(WidgetTester t, ApiClient api, {String current = '1.2.0'}) as
 }
 
 void main() {
+  versionCardTests();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test('compareVersions and updateNeed', () {
@@ -76,5 +78,42 @@ void main() {
     expect(find.text('Cần cập nhật ứng dụng'), findsNothing);
     await _pump(t, _api('{}', status: 500));
     expect(find.text('Cần cập nhật ứng dụng'), findsNothing);
+  });
+}
+
+// ---- VersionCard (installed version + update status in Tài khoản / Admin menu) ------------------------------------
+Future<void> _pumpCard(WidgetTester t, ApiClient api, {String current = '1.2.0'}) async {
+  await t.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: VersionCard(api: api, currentVersion: current, display: '$current (7)')))));
+  await t.pumpAndSettle();
+}
+
+void versionCardTests() {
+  group('VersionCard', () {
+    testWidgets('shows the installed version and says it is the newest', (t) async {
+      await _pumpCard(t, _api(_json(latest: '1.2.0')));
+      expect(find.byKey(const Key('version-text')), findsOneWidget);
+      expect(find.text('1.2.0 (7)'), findsOneWidget);
+      expect(find.text('Bạn đang dùng phiên bản mới nhất.'), findsOneWidget);
+      expect(find.text('Tải bản mới'), findsNothing);
+    });
+    testWidgets('offers the download when a newer version exists', (t) async {
+      await _pumpCard(t, _api(_json(latest: '1.3.0', url: 'https://example.com/m.apk', notes: 'Sửa lỗi')));
+      expect(find.text('Có phiên bản mới 1.3.0.'), findsOneWidget);
+      expect(find.text('Sửa lỗi'), findsOneWidget);
+      expect(find.text('Tải bản mới'), findsOneWidget);
+    });
+    testWidgets('below the minimum says the version is unsupported', (t) async {
+      await _pumpCard(t, _api(_json(latest: '1.5.0', min: '1.4.0')));
+      expect(find.textContaining('không còn được hỗ trợ'), findsOneWidget);
+    });
+    testWidgets('no Admin setting yet is explained', (t) async {
+      await _pumpCard(t, _api(_json()));
+      expect(find.textContaining('chưa đăng thông tin'), findsOneWidget);
+    });
+    testWidgets('server unreachable is explained, never an error, and can be retried', (t) async {
+      await _pumpCard(t, _api('{}', fail: true));
+      expect(find.textContaining('Không kiểm tra được'), findsOneWidget);
+      expect(find.text('Kiểm tra cập nhật'), findsOneWidget);
+    });
   });
 }
