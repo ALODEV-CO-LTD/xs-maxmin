@@ -121,7 +121,7 @@ scp /tmp/web_dist.tar.gz deploy/deploy-web.sh root@10.5.100.5:/tmp/
 ssh root@10.5.100.5 'pct push 501 /tmp/web_dist.tar.gz /root/web_dist.tar.gz; pct push 501 /tmp/deploy-web.sh /root/deploy-web.sh; pct exec 501 -- bash /root/deploy-web.sh'
 ```
 
-**Deploy cả backend** (**khởi động lại backend ⇒ mọi người bị đăng xuất một lần** vì chưa đặt `XOSO_JWT_SECRET` cố định):
+**Deploy cả backend** (từ 13/10/2026 `XOSO_JWT_SECRET` đã đặt cố định trên máy chủ nên khởi động lại không còn đăng xuất mọi người; lần đặt đầu tiên thì có):
 ```bash
 cd backend && tar --no-xattrs --no-mac-metadata --exclude='._*' -czf /tmp/backend_deploy.tar.gz lib routes pubspec.yaml pubspec.lock schema.sql
 # gửi backend_deploy.tar.gz + web_dist.tar.gz + deploy/deploy.sh vào /root của container 501 như trên, rồi:
@@ -135,7 +135,7 @@ Quay lại thủ công: `systemctl stop xs-maxmin-backend; rm -rf /opt/xs-maxmin
 
 | Biến | Ý nghĩa | Trạng thái |
 |---|---|---|
-| `XOSO_JWT_SECRET` | Khoá ký token (≥16 ký tự). Không đặt thì mỗi lần khởi động tạo khoá ngẫu nhiên ⇒ đăng xuất toàn bộ | **Chưa đặt trên máy chủ** (nên đặt) |
+| `XOSO_JWT_SECRET` | Khoá ký token (≥16 ký tự). Không đặt thì mỗi lần khởi động tạo khoá ngẫu nhiên ⇒ đăng xuất toàn bộ | **Đã đặt (13/10/2026)** trong drop-in `jwt.conf` (quyền 600); đừng xoá, mất khoá là đăng xuất toàn bộ |
 | `XOSO_CF_TURN_KEY_ID`, `XOSO_CF_TURN_API_TOKEN` | Khoá Cloudflare Realtime TURN | Đã đặt (file `turn.conf`, quyền 600) |
 | `XOSO_FCM_CREDENTIALS_PATH`, `XOSO_FCM_PROJECT_ID` (và khoá APNs, xem mục 9e) | Thông báo đẩy Android (FCM) / iOS (APNs) | **Chưa cấu hình trên máy chủ**, chi tiết cách bật ở mục 9e, 9f |
 | `XOSO_STUN_URLS`, `XOSO_TURN_URLS`, `XOSO_TURN_SECRET` / `XOSO_TURN_USERNAME` + `XOSO_TURN_CREDENTIAL` | Phương án TURN tự dựng (coturn) thay cho Cloudflare | Không dùng |
@@ -151,7 +151,7 @@ TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc A
 
 ## 9. Tình trạng công việc
 
-**Đã xong và đã lên máy chủ thật:** toàn bộ các mục ở mục 5; lần deploy gần nhất 13/10/2026 (xem 9g). Riêng sửa `frontend/src/screenshotGuard.js` (báo chụp màn hình khi tắt che màn hình) chưa commit và chưa deploy.
+**Đã xong và đã lên máy chủ thật:** toàn bộ các mục ở mục 5; lần deploy gần nhất 13/10/2026 (xem 9g). Sửa `screenshotGuard.js` (báo chụp màn hình khi tắt che màn hình) đã commit và deploy web 13/10.
 
 **Chưa làm hẳn / làm một phần** (chi tiết từng mã trong `tien_do_chuc_nang.csv`):
 - Chưa làm: mã hoá đầu cuối cho phản hồi Admin và dữ liệu số liệu/khách hàng (K28; chat bạn bè đã mã hoá, xem `docs/MA_HOA_2_DAU.md`), đổi giọng nói đầy đủ (K30; hiện mới có nút "Méo giọng" trong cuộc gọi), chính sách lưu trữ trên app (A08: web như hiện tại, app lưu trên máy và xoá sạch được), quản lý quyền camera/vị trí/thông báo (K39), tách dịch vụ (NFR-08), Face ID. (Phân quyền Admin A07, quản lý phiên bản app A17 và app Android/iOS đã làm: xem 9b–9d.)
@@ -286,7 +286,7 @@ Environment=XOSO_FCM_PROJECT_ID=<project id Firebase>
 
 ## 9g. Nhật ký đợt 11–13/10/2026 (app, offline, kết quả theo tài khoản)
 
-**Đã deploy lên máy chủ thật** (web + backend) lần cuối 13/10/2026 (bản sao lưu `backend.bak-20261012-095507`, DB `/root/xoso-live-20261012-095507.db`). App hiện hành: **1.4.2 (8)** (APK `MAMBA.apk` + iPhone cài thử). Phiên bản app phải khớp ở hai chỗ: `app/pubspec.yaml` và `app/lib/core/config.dart`.
+**Đã deploy lên máy chủ thật** (web + backend) lần cuối 12/10/2026 (web được deploy lại 13/10 kèm sửa `screenshotGuard.js`) (bản sao lưu `backend.bak-20261012-095507`, DB `/root/xoso-live-20261012-095507.db`). App hiện hành: **1.4.2 (8)** (APK `MAMBA.apk` + iPhone cài thử). Phiên bản app phải khớp ở hai chỗ: `app/pubspec.yaml` và `app/lib/core/config.dart`.
 
 - **Kết quả xổ số theo từng tài khoản** (`d94382a`): trước đây bảng `lottery_results` dùng chung cho mọi tài khoản. Nay có cột `user_id`, duy nhất theo (tài khoản, ngày, đài); GET/POST/DELETE `/lottery-results` chỉ tác động lên tài khoản đang đăng nhập; xoá dữ liệu tài khoản cũng xoá kết quả. "Tài khoản khách hàng" khác "khách hàng trong tài khoản": kết quả thuộc tài khoản và áp cho mọi khách trong đó. Nâng cấp một chiều: bảng cũ giữ nguyên tên `lottery_results_shared_legacy`, các dòng dùng chung được sao cho **mọi tài khoản khách hàng** (kể cả 91 kết quả ảo của dữ liệu thử, Admin có thể xoá từng ngày).
 - **App lưu kết quả trên máy trước** (`65fbc0d`): Lưu kết quả ghi vào máy, rồi gửi; mất mạng thì báo đang offline và tự gửi khi có mạng (mỗi lần mở một ngày ở Nhập kết quả, hoặc khi Nhập số tự đồng bộ). Tính điểm dùng luôn kết quả trên máy. Điểm ra tự lưu đi qua hàng chờ offline của Nhập số. Xoá kết quả vẫn cần mạng, trừ khi kết quả đó chưa từng gửi. Code: `OfflineStore.saveResult/lotteryResult/dayResults/_flushResults`.
@@ -299,7 +299,7 @@ Environment=XOSO_FCM_PROJECT_ID=<project id Firebase>
 
 ## 10. Việc cần làm ngay khi nhận bàn giao
 
-1. **Đặt `XOSO_JWT_SECRET` cố định** trên máy chủ (drop-in như mục 7) để các lần deploy sau không đăng xuất mọi người.
+1. ~~Đặt `XOSO_JWT_SECRET` cố định~~ — **đã làm 13/10/2026** (drop-in `jwt.conf` trên máy chủ). Hãy sao lưu giá trị này ở nơi an toàn nếu cần dựng lại máy chủ.
 2. **Đổi mật khẩu mặc định:** admin `1` (mật khẩu seed `1234`) và các tài khoản demo `2`–`6` (mật khẩu seed `1235`–`1239`) – đều là mật khẩu mock trong `_seed()` của `backend/lib/src/database.dart`, chỉ dùng thử. Seed chỉ chạy khi DB trống nên tài khoản đã có trên máy chủ thật giữ mật khẩu cũ (admin vẫn có thể là `1`/`1`). Trước khi cho khách thật dùng phải đổi hết.
 3. **Thu hồi token Cloudflare đã từng gửi qua chat** (ba token) và tạo token riêng cho người mới nếu cần. Khoá TURN hiện dùng nằm trong file cấu hình trên máy chủ, không nằm trong code.
 4. Xác nhận quyền truy cập: SSH vào `root@10.5.100.5`, repo GitHub `trancongthangvn/xs-maxmin`, tài khoản Cloudflare chứa tunnel `xs.massagehomeriyadh.com`.
