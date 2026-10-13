@@ -31,6 +31,8 @@ let freshInput = false
 let hardTimer = null
 let softTimer = null
 let held = { meta: false, shift: false }
+let noticed = false
+let noticeTimer = null
 
 function injectStyle() {
   if (document.getElementById(STYLE_ID)) return
@@ -61,7 +63,14 @@ function emitAttempt() {
 }
 
 function cover() {
-  if (!enabled) return
+  // Cover switched off by the Admin policy: still tell the chat friend about the attempt (the notice and the cover are separate features).
+  if (!enabled) {
+    if (!noticed) emitAttempt()
+    noticed = true
+    clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => (noticed = false), 3000)
+    return
+  }
   injectStyle()
   if (!covered) emitAttempt()
   covered = true
