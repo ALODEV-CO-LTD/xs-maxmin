@@ -6,10 +6,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
+import '../chat_calc/chat_calc_entry.dart';
 import 'call_service.dart';
 import 'chat_models.dart';
 import 'chat_service.dart';
 import 'friends_controller.dart';
+import 'friends_screen.dart' show initialOf;
 import 'image_scrub.dart';
 import 'realtime_socket.dart';
 
@@ -49,6 +51,12 @@ class _ChatPageState extends State<ChatPage> {
   OutgoingImage? _pending;
   int _lastTick = -1;
   int _lastEnded = 0;
+  ChatMessage? _replyTo; // the message being answered (shown above the input)
+  List<String> _pins = [];
+  bool _selecting = false; // "Nhập số liệu": tick messages, then "Tính toán"
+  final Set<String> _picked = {};
+  final Map<String, GlobalKey> _keys = {};
+  final _input = FocusNode();
 
   FriendsController get _c => widget.controller;
   ChatService get _chat => _c.chat!;
@@ -67,6 +75,9 @@ class _ChatPageState extends State<ChatPage> {
     _lastEnded = _c.call?.endedTick ?? 0;
     _reload(first: true);
     _loadCalls();
+    _chat.pinsOf(_f.id).then((p) {
+      if (mounted) setState(() => _pins = p);
+    });
     _chat.retentionOf(_f.id).then((r) {
       if (mounted) setState(() => _rule = r);
     });
@@ -80,6 +91,7 @@ class _ChatPageState extends State<ChatPage> {
     _c.socket.removeListener(_onSocket);
     _scroll.removeListener(_onScroll);
     _text.dispose();
+    _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -165,9 +177,10 @@ class _ChatPageState extends State<ChatPage> {
     if ((text.isEmpty && _pending == null) || _sending) return;
     setState(() { _sending = true; _error = ''; });
     try {
-      await _chat.send(_f.id, text, image: _pending);
+      await _chat.send(_f.id, composeReply(_replyTo, text), image: _pending);
       _text.clear();
       _pending = null;
+      _replyTo = null;
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
     }
@@ -188,6 +201,189 @@ class _ChatPageState extends State<ChatPage> {
     _rebuildItems(await _chat.messages(_f.id));
   }
 
+  // ---- long-press menu, pins, forward, delete, pick (FriendsView.vue) -----------------------------------------------
+
+  List<ChatMessage> get _msgs => [for (final i in _items) if (i is _Msg) i.m];
+
+  ChatMessage? get _pinned {
+    final byId = {for (final m in _msgs) m.id: m};
+    for (var i = _pins.length - 1; i >= 0; i--) {
+      final m = byId[_pins[i]];
+      if (m != null) return m;
+    }
+    return null;
+  }
+
+  Future<void> _menu(ChatMessage m) async {
+    if (_selecting || m.sys != null) return;
+    final pinned = _pins.contains(m.id);
+    final pick = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(title: const Text('Trả lời'), onTap: () => Navigator.pop(ctx, 'reply')),
+          if (m.text.isNotEmpty) ListTile(title: const Text('Sao chép'), onTap: () => Navigator.pop(ctx, 'copy')),
+          ListTile(title: Text(pinned ? 'Bỏ ghim' : 'Ghim'), onTap: () => Navigator.pop(ctx, 'pin')),
+          ListTile(title: const Text('Chuyển tiếp'), onTap: () => Navigator.pop(ctx, 'forward')),
+          ListTile(title: Text('Xoá', style: TextStyle(color: context.badColor)), onTap: () => Navigator.pop(ctx, 'delete')),
+          if (m.text.isNotEmpty) ListTile(title: const Text('Chọn'), onTap: () => Navigator.pop(ctx, 'select')),
+        ]),
+      ),
+    );
+    if (!mounted || pick == null) return;
+    switch (pick) {
+      case 'reply':
+        setState(() => _replyTo = m);
+        _input.requestFocus();
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: quoteOf(m.text).body));
+      case 'pin':
+        await _togglePin(m.id);
+      case 'forward':
+        await _forward(m);
+      case 'delete':
+        await _delete(m);
+      case 'select':
+        setState(() { _selecting = true; _picked.add(m.id); });
+    }
+  }
+
+  Future<void> _togglePin(String id) async {
+    final pins = await _chat.togglePin(_f.id, id);
+    if (mounted) setState(() => _pins = pins);
+  }
+
+  Future<void> _delete(ChatMessage m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xoá tin nhắn'),
+        content: const Text('Xoá tin nhắn này khỏi máy này? Người kia vẫn giữ bản của họ.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Xoá', style: TextStyle(color: ctx.badColor))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _chat.deleteMessage(_f.id, m.id);
+    final pins = await _chat.pinsOf(_f.id);
+    if (mounted) setState(() { _pins = pins; _picked.remove(m.id); if (_replyTo?.id == m.id) _replyTo = null; });
+  }
+
+  Future<void> _forward(ChatMessage m) async {
+    final target = await showDialog<Friend>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Chuyển tiếp tới'),
+        children: [
+          for (final f in _c.friends.where((x) => !x.isAdmin)) SimpleDialogOption(onPressed: () => Navigator.pop(ctx, f), child: Text(_c.nameOf(f))),
+          if (_c.friends.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Chưa có bạn bè.')),
+        ],
+      ),
+    );
+    if (target == null || !mounted) return;
+    try {
+      OutgoingImage? image;
+      final a = m.att;
+      if (a != null && a.isImage && a.path != null) {
+        final bytes = await _chat.store.readFile(a.path!);
+        if (bytes != null) image = OutgoingImage(bytes, a.type);
+      }
+      await _chat.send(target.id, quoteOf(m.text).body, image: image);
+      if (!mounted) return;
+      if (target.id != _f.id) {
+        await Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => ChatPage(controller: _c, friend: target)));
+      } else {
+        setState(() => _error = '');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  /// Scrolls to a message (the pin bar). The list is lazy, so first jump near it, then bring it fully into view.
+  Future<void> _jumpTo(String id) async {
+    final rev = _items.reversed.toList();
+    final idx = rev.indexWhere((i) => i is _Msg && i.m.id == id);
+    if (idx < 0 || !_scroll.hasClients) return;
+    for (var tries = 0; tries < 8; tries++) {
+      final ctx = _keys[id]?.currentContext;
+      if (ctx != null && ctx.mounted) {
+        await Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.3);
+        return;
+      }
+      final pos = _scroll.position;
+      final avg = pos.maxScrollExtent / (rev.length > 1 ? rev.length : 1);
+      _scroll.jumpTo((avg * idx).clamp(0.0, pos.maxScrollExtent));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (!mounted) return;
+    }
+  }
+
+  void _cancelPick() => setState(() { _selecting = false; _picked.clear(); });
+
+  /// "Nhập số liệu" starts picking; with something picked the button is "Tính toán" and opens Đối chiếu.
+  void _onAction() {
+    if (!_selecting) {
+      setState(() => _selecting = true);
+      return;
+    }
+    if (_picked.isEmpty) return;
+    final chosen = [for (final m in _msgs) if (_picked.contains(m.id)) m]; // original display order
+    openChatDecode(context, friendId: _f.id, friendName: _c.nameOf(_f), messages: chosen);
+  }
+
+  void _pickAll() => setState(() => _picked
+    ..clear()
+    ..addAll([for (final m in _msgs) if (m.sys == null && m.text.isNotEmpty) m.id]));
+
+  /// ⚙: own display name (this device only), security code, auto-delete, remove friend.
+  Future<void> _openSettings() async {
+    final r = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _SettingsSheet(
+        friend: _f,
+        alias: _chat.aliases[_f.id] ?? '',
+        hasPeerInfo: _chat.peerInfo[_f.id] != null,
+        hasRule: _rule != null,
+        onSaveAlias: (a) => _chat.setAlias(_f.id, a, _f.name),
+      ),
+    );
+    if (!mounted || r == null) return;
+    switch (r) {
+      case 'security':
+        setState(() => _showSecurity = !_showSecurity);
+      case 'retention':
+        await _openRetention();
+      case 'retention-off':
+        await _chat.setRetention(_f.id, null);
+        if (mounted) setState(() => _rule = null);
+      case 'remove':
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Xoá bạn bè'),
+            content: Text('Xoá bạn bè "${_f.name}"? Cuộc trò chuyện sẽ không còn hiển thị.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Xoá', style: TextStyle(color: ctx.badColor))),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        final err = await _c.removeFriend(_f);
+        if (!mounted) return;
+        if (err != null) {
+          setState(() => _error = err);
+        } else {
+          Navigator.of(context).pop();
+        }
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -197,14 +393,19 @@ class _ChatPageState extends State<ChatPage> {
     final canCall = call != null && call.canCall && !_f.isAdmin;
     return Scaffold(
       appBar: AppBar(
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_f.name, overflow: TextOverflow.ellipsis),
-          _ConnChip(state: _c.socket.state),
+        title: Row(children: [
+          CircleAvatar(radius: 14, backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2), child: Text(initialOf(_c.nameOf(_f)), style: const TextStyle(fontSize: 13))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_c.nameOf(_f), overflow: TextOverflow.ellipsis),
+              _ConnChip(state: _c.socket.state),
+            ]),
+          ),
         ]),
         actions: [
+          IconButton(icon: const Icon(Icons.settings_outlined), tooltip: 'Cài đặt cuộc trò chuyện', onPressed: _openSettings),
           if (canCall) IconButton(icon: const Icon(Icons.call), tooltip: 'Gọi thoại', onPressed: call.busy ? null : () => call.startCall(_f.id, _f.name)),
-          if (info != null) IconButton(icon: Icon(Icons.verified_user_outlined, color: _showSecurity ? theme.colorScheme.primary : null), tooltip: 'Mã bảo mật', onPressed: () => setState(() => _showSecurity = !_showSecurity)),
-          IconButton(icon: Icon(Icons.timer_outlined, color: _rule != null ? theme.colorScheme.primary : null), tooltip: 'Cài đặt tự xoá', onPressed: _openRetention),
         ],
       ),
       body: SafeArea(
@@ -241,6 +442,20 @@ class _ChatPageState extends State<ChatPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Align(alignment: Alignment.centerLeft, child: Text(_rule?.describe ?? 'Tin nhắn không tự xoá', style: theme.textTheme.bodySmall?.copyWith(color: _rule != null ? theme.colorScheme.primary : context.mutedColor))),
             ),
+            if (_pinned case final pm?)
+              Material(
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                child: InkWell(
+                  onTap: () => _jumpTo(pm.id),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: Row(children: [
+                      Expanded(child: Text('📌 ${quoteText(pm)}', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      IconButton(icon: const Icon(Icons.close, size: 18), tooltip: 'Bỏ ghim', onPressed: () => _togglePin(pm.id)),
+                    ]),
+                  ),
+                ),
+              ),
             if (_error.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(16, 6, 16, 0), child: Text(_error, style: TextStyle(color: context.badColor))),
             Expanded(
               child: Stack(children: [
@@ -263,6 +478,33 @@ class _ChatPageState extends State<ChatPage> {
                   IconButton(icon: const Icon(Icons.close), tooltip: 'Bỏ ảnh', onPressed: () => setState(() => _pending = null)),
                 ]),
               ),
+            if (_selecting)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(children: [
+                  Expanded(child: Text('Đã chọn ${_picked.length}', style: TextStyle(color: context.mutedColor))),
+                  TextButton(onPressed: _pickAll, child: const Text('Chọn tất cả')),
+                  TextButton(onPressed: () => setState(_picked.clear), child: const Text('Bỏ chọn')),
+                  TextButton(onPressed: _cancelPick, child: const Text('Hủy')),
+                ]),
+              ),
+            if (_replyTo case final rt?)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 4),
+                child: Row(children: [
+                  Expanded(child: Text('↪ Trả lời: ${quoteText(rt)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.mutedColor))),
+                  IconButton(icon: const Icon(Icons.close, size: 18), tooltip: 'Bỏ trả lời', onPressed: () => setState(() => _replyTo = null)),
+                ]),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _picked.isNotEmpty && _selecting
+                    ? FilledButton(onPressed: _onAction, child: const Text('Tính toán'))
+                    : OutlinedButton(onPressed: _onAction, child: const Text('Nhập số liệu')),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -270,6 +512,7 @@ class _ChatPageState extends State<ChatPage> {
                 Expanded(
                   child: TextField(
                     controller: _text,
+                    focusNode: _input,
                     minLines: 1,
                     maxLines: 5,
                     textCapitalization: TextCapitalization.sentences,
@@ -299,7 +542,7 @@ class _ChatPageState extends State<ChatPage> {
       itemBuilder: (context, i) {
         final it = rev[i];
         return switch (it) {
-          _Msg m => _bubble(context, m.m),
+          _Msg m => KeyedSubtree(key: _keys.putIfAbsent(m.m.id, GlobalKey.new), child: _bubble(context, m.m)),
           _Call c => _callLine(context, c.c),
         };
       },
@@ -334,26 +577,39 @@ class _ChatPageState extends State<ChatPage> {
       return Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Center(child: Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: failed ? context.badColor : context.mutedColor))));
     }
     final mine = m.mine;
+    final q = quoteOf(m.text);
     final bg = mine ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest;
     final fg = mine ? Colors.white : theme.colorScheme.onSurface;
-    return Align(
+    final pinned = _pins.contains(m.id);
+    final tick = _selecting && m.text.isNotEmpty;
+    final bubble = Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: Column(crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
-            Container(
+            GestureDetector(
+              onLongPress: _selecting ? null : () => _menu(m),
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                if (pinned) Text('📌', style: TextStyle(fontSize: 11, color: fg)),
+                if (q.quote.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.only(left: 8),
+                    decoration: BoxDecoration(border: Border(left: BorderSide(color: fg.withValues(alpha: 0.6), width: 3))),
+                    child: Text(q.quote, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.8))),
+                  ),
                 if (m.att != null) _attachment(context, m.att!),
-                if (m.att != null && m.text.isNotEmpty) const SizedBox(height: 6),
-                if (m.text.isNotEmpty) SelectableText(m.text, style: TextStyle(color: fg)),
+                if (m.att != null && q.body.isNotEmpty) const SizedBox(height: 6),
+                if (q.body.isNotEmpty) Text(q.body, style: TextStyle(color: fg)),
                 const SizedBox(height: 2),
                 Text(DateFormat('HH:mm dd/MM').format(DateTime.fromMillisecondsSinceEpoch(m.createdAt)), style: TextStyle(fontSize: 10, color: fg.withValues(alpha: 0.7))),
               ]),
-            ),
+            )),
             if (mine && m.status == MsgStatus.failed)
               Row(mainAxisSize: MainAxisSize.min, children: [
                 Flexible(child: Text(reasonText(m.reason), style: TextStyle(fontSize: 12, color: context.badColor))),
@@ -364,6 +620,16 @@ class _ChatPageState extends State<ChatPage> {
           ]),
         ),
       ),
+    );
+    if (!tick) return bubble;
+    final on = _picked.contains(m.id);
+    void toggle() => setState(() => on ? _picked.remove(m.id) : _picked.add(m.id));
+    return InkWell(
+      onTap: toggle,
+      child: Row(children: [
+        Checkbox(value: on, onChanged: (_) => toggle()),
+        Expanded(child: IgnorePointer(child: bubble)),
+      ]),
     );
   }
 
@@ -488,6 +754,63 @@ class _RetentionSheetState extends State<_RetentionSheet> {
           Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.badColor), onPressed: () => Navigator.pop(context, (rule: RetentionRule(_ttl, _scope) as RetentionRule?, changed: true)), child: const Text('Áp dụng'))),
         ]),
       ]),
+    );
+  }
+}
+
+/// ⚙ sheet (web: settings overlay): own display name (saved only on this device) and the conversation tools.
+class _SettingsSheet extends StatefulWidget {
+  const _SettingsSheet({required this.friend, required this.alias, required this.hasPeerInfo, required this.hasRule, required this.onSaveAlias});
+  final Friend friend;
+  final String alias;
+  final bool hasPeerInfo;
+  final bool hasRule;
+  final Future<void> Function(String alias) onSaveAlias;
+  @override
+  State<_SettingsSheet> createState() => _SettingsSheetState();
+}
+
+class _SettingsSheetState extends State<_SettingsSheet> {
+  late final _alias = TextEditingController(text: widget.alias);
+  @override
+  void dispose() {
+    _alias.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.friend;
+    final shown = _alias.text.trim().isEmpty ? f.name : _alias.text.trim();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(child: CircleAvatar(radius: 32, child: Text(initialOf(shown), style: const TextStyle(fontSize: 26)))),
+          const SizedBox(height: 6),
+          Center(child: Text(shown, style: const TextStyle(fontWeight: FontWeight.w700))),
+          const SizedBox(height: 12),
+          TextField(controller: _alias, maxLength: 40, onChanged: (_) => setState(() {}), decoration: InputDecoration(labelText: 'Tên hiển thị', hintText: f.name)),
+          Text('Chỉ đổi cách hiển thị trên máy này, người kia không thấy.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.mutedColor)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, children: [
+            if (widget.hasPeerInfo) TextButton(onPressed: () => Navigator.pop(context, 'security'), child: const Text('Mã bảo mật')),
+            if (!f.isAdmin) TextButton(onPressed: () => Navigator.pop(context, 'retention'), child: const Text('Cài đặt tự xoá')),
+            if (widget.hasRule) TextButton(onPressed: () => Navigator.pop(context, 'retention-off'), child: const Text('Tắt tự xoá')),
+            TextButton(onPressed: () => Navigator.pop(context, 'remove'), child: Text('Xoá khỏi bạn bè', style: TextStyle(color: context.badColor))),
+          ]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
+            FilledButton(
+              onPressed: () async {
+                await widget.onSaveAlias(_alias.text);
+                if (context.mounted) Navigator.pop(context, 'saved');
+              },
+              child: const Text('Lưu'),
+            ),
+          ]),
+        ]),
+      ),
     );
   }
 }

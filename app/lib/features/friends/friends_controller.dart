@@ -464,6 +464,9 @@ class FriendsController extends ChangeNotifier {
     return friends.where((f) => foldVi(f.name).contains(q) || foldVi(f.username).contains(q) || byId.contains(f.id)).toList();
   }
 
+  /// Name shown for [f]: the own display name set on this device, else the real name.
+  String nameOf(Friend f) => chat?.displayName(f.id, f.name) ?? f.name;
+
   List<SearchResult> get newPeople => results.where((r) => !r.isFriend).toList();
 
   void setSearch(String q) {

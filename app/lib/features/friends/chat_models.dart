@@ -79,6 +79,36 @@ class ChatMessage {
   String get preview => sys != null ? '📷 Chụp màn hình cuộc trò chuyện' : (text.isNotEmpty ? text : (att != null ? '[Đính kèm] ${att!.name}' : ''));
 }
 
+// ---- reply quotes (FriendsView.vue: REPLY_MARK / quoteOf / quoteText) -------------------------------------------
+// A reply travels as plain text inside the encrypted message: `↪ <quote>\n<body>`. No extra field, so web and app (and
+// old messages) understand each other.
+
+const replyMark = '↪ ';
+
+/// Splits a message into its quoted line and the real text (web `quoteOf`). No quote line => quote is empty.
+({String quote, String body}) quoteOf(String? content) {
+  final text = content ?? '';
+  final lines = text.split('\n');
+  final first = lines.first;
+  if (!first.startsWith(replyMark) || lines.length < 2) return (quote: '', body: text);
+  return (quote: first.substring(replyMark.length), body: lines.sublist(1).join('\n'));
+}
+
+/// Short text shown when quoting [m] (web `quoteText`): its text without quote lines, or "[Ảnh]", at most 60 characters.
+String quoteText(ChatMessage m) {
+  final raw = m.text.isNotEmpty ? m.text : (m.att != null ? '[Ảnh]' : '');
+  var s = raw.split('\n').where((l) => !l.startsWith(replyMark)).join(' ');
+  if (s.length > 60) {
+    var end = 60;
+    if (s.codeUnitAt(end - 1) >= 0xD800 && s.codeUnitAt(end - 1) <= 0xDBFF) end--; // do not cut a surrogate pair
+    s = s.substring(0, end);
+  }
+  return s;
+}
+
+/// The text to send when answering [replyTo] with [content] (web `sendMessage`).
+String composeReply(ChatMessage? replyTo, String content) => replyTo == null ? content : '$replyMark${quoteText(replyTo)}\n$content';
+
 /// The last public key we saw for a friend, its fingerprint and whether it changed since we last accepted it.
 class PeerRecord {
   const PeerRecord({required this.id, required this.jwk, required this.fingerprint, required this.changed});

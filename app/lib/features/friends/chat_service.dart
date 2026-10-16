@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -107,6 +108,7 @@ class ChatService extends ChangeNotifier {
         await api.put('/me/e2ee-key', {'publicKey': id.publicJwk});
       }
       await _restoreUnread();
+      await restorePrefs();
       ready = true;
       error = '';
       await loadFriendKeys();
@@ -400,6 +402,89 @@ class ChatService extends ChangeNotifier {
     for (final k in (await store.metaWithPrefix('retention:')).keys) {
       await applyRetention(k.substring(10));
     }
+  }
+
+  // ---- per-device notes: pins, own display names, archive (never uploaded; web keeps the same things locally) ------------
+
+  /// friendId -> own display name for that conversation (shown on this device only).
+  final Map<String, String> aliases = {};
+
+  /// Conversations hidden from the Tin nhắn list ("Lưu trữ").
+  final Set<String> archived = {};
+
+  /// Loads aliases and the archive from the local store. Called by [init].
+  Future<void> restorePrefs() async {
+    aliases
+      ..clear()
+      ..addEntries([for (final e in (await store.metaWithPrefix('alias:')).entries) if (e.value.isNotEmpty) MapEntry(e.key.substring(6), e.value)]);
+    archived
+      ..clear()
+      ..addAll(_decodeList(await store.meta('archive')));
+  }
+
+  static List<String> _decodeList(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      return [for (final x in (jsonDecode(raw) as List)) if (x is String) x];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String displayName(String friendId, String realName) => aliases[friendId] ?? realName;
+
+  /// Saves (or clears, when empty or equal to the real name) the own display name; only this device sees it.
+  Future<void> setAlias(String friendId, String alias, String realName) async {
+    final a = alias.trim();
+    if (a.isEmpty || a == realName) {
+      aliases.remove(friendId);
+      await store.setMeta('alias:$friendId', null);
+    } else {
+      aliases[friendId] = a;
+      await store.setMeta('alias:$friendId', a);
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Archives ([on]) or restores the conversations; they stay on the device, only hidden from the list.
+  Future<void> setArchived(Iterable<String> ids, bool on) async {
+    if (on) {
+      archived.addAll(ids);
+    } else {
+      archived.removeAll(ids.toSet());
+    }
+    await store.setMeta('archive', archived.isEmpty ? null : jsonEncode(archived.toList()));
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Ids of the messages pinned in this conversation (oldest pin first).
+  Future<List<String>> pinsOf(String friendId) async => _decodeList(await store.meta('pin:$friendId'));
+
+  /// Pins the message, or unpins it when it was pinned. Returns the new list.
+  Future<List<String>> togglePin(String friendId, String messageId) async {
+    final pins = [...await pinsOf(friendId)];
+    pins.contains(messageId) ? pins.remove(messageId) : pins.add(messageId);
+    await store.setMeta('pin:$friendId', pins.isEmpty ? null : jsonEncode(pins));
+    return pins;
+  }
+
+  /// Deletes one message from THIS device only (the friend keeps theirs), with its pin and decoding notes.
+  Future<void> deleteMessage(String friendId, String id) async {
+    await store.deleteMessage(id);
+    await store.setMeta('decode:$id', null);
+    final pins = await pinsOf(friendId);
+    if (pins.contains(id)) await store.setMeta('pin:$friendId', pins.length == 1 ? null : jsonEncode(pins.where((x) => x != id).toList()));
+    _bump();
+  }
+
+  /// Deletes the whole conversation from THIS device only. The friend stays in the contact list.
+  Future<void> deleteConversation(String friendId) async {
+    for (final m in await store.messagesOf(friendId)) {
+      await store.deleteMessage(m.id);
+      await store.setMeta('decode:${m.id}', null);
+    }
+    await store.setMeta('pin:$friendId', null);
+    _bump();
   }
 
   @override
