@@ -245,7 +245,7 @@ textarea {
   color: var(--success-text);
 }
 
-/* chip-brand = non-status highlight (role badge, unread count...) in violet */
+/* chip-brand = non-status highlight (role badge, unread count...) in the primary (green) colour */
 .chip-brand {
   background: var(--primary-soft);
   color: var(--link);

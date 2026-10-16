@@ -1,6 +1,6 @@
 <!--
   Cấu hình tính điểm mặc định (account-wide). The editor itself lives in components/ScoringConfigEditor.vue (it is also
-  used per customer in Khách hàng > Xem chi tiết). Shown in a dialog on the Khách hàng page; `embedded` is kept for that.
+  used per customer in Khách hàng > Xem chi tiết). A page of its own (menu "Cấu hình tính điểm"); `embedded` = the same editor inside the dialog opened from Khách hàng.
 -->
 <script setup>
 import ScoringConfigEditor from '../components/ScoringConfigEditor.vue'

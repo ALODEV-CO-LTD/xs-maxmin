@@ -38,7 +38,7 @@ import MaskedValue from '../components/MaskedValue.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import DeleteDataDialog from '../components/DeleteDataDialog.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
-import { effectiveConfig, DEFAULT_RATES } from '../scoringConfig'
+import { effectiveConfig, DEFAULT_RATES, isTableKind } from '../scoringConfig'
 import { entryDetail, summarize } from '../scoringSummary'
 import { entryStations, loadStations, regionOf, stationLabel } from '../lotteryStations'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
@@ -208,7 +208,7 @@ const allDays = computed(() => {
 // `onlyMissing` = only days that have no lottery result yet.
 const days = computed(() => (onlyMissing.value ? allDays.value.filter((d) => d.lottery === 'no') : allDays.value))
 // Money view of each day (see scoringSummary.js): lô, tiền gửi, tiền trúng, còn lại.
-const dayMoney = computed(() => Object.fromEntries(days.value.map((d) => [d.date, summarize([d], rates.value, customerRates.value, getResult)])))
+const dayMoney = computed(() => Object.fromEntries(days.value.map((d) => [d.date, summarize([d], rates.value, customerRates.value, getResult, { customerRegion: customerRegion.value })])))
 const moneyFmt = new Intl.NumberFormat('vi-VN')
 const money = (n) => `${moneyFmt.format(Math.round(n))} đ`
 const visibleDays = computed(() => days.value.slice(0, shownDays.value))
@@ -256,6 +256,7 @@ const rates = ref({ ...DEFAULT_RATES })
 // the account-wide config is the fallback.
 const customerRates = computed(() => customers.value.find((c) => c.name === selectedCustomer.value)?.scoringRates || null)
 
+const customerRegion = computed(() => customers.value.find((c) => c.name === selectedCustomer.value)?.homeRegion || null)
 async function loadRates() {
   try {
     const { rates: r } = await api.get('/me/scoring-settings')
@@ -275,6 +276,12 @@ function rateFor(betType, station) {
 }
 
 function digitsFor(betType, station) {
+// "Giá tiền/điểm → giá trúng/điểm" of the row an entry is scored with (older rows: "× tỉ lệ").
+function rateChip(betType, station) {
+  const c = configFor(betType, station)
+  if (c?.price != null) return `${moneyFmt.format(c.price)} → ${moneyFmt.format(c.payout)} đ/điểm`
+  return `× ${rateFor(betType, station)}`
+}
   return configFor(betType, station)?.digits ?? 2
 }
 
@@ -294,7 +301,7 @@ async function fetchLotteryFor(date, station = 'mb') {
 // Points out for one entry over every given result (one per station it counts for): the sum.
 function scoreEntryAll(entry, resultsByStation) {
   let out = 0
-  for (const [station, lr] of resultsByStation) out += entryDetail(entry, lr, configFor(entry.betType, station)).out
+  for (const [station, lr] of resultsByStation) out += entryDetail(entry, lr, configFor(entry.betType, station), { region: regionOf(station).id, customerRegion: customerRegion.value }).out
   return out
 }
 
@@ -506,6 +513,7 @@ onMounted(async () => {
             : rangeEntries.length === 0 && entries.some((e) => e.customerName === selectedCustomer)
               ? 'Không có số liệu nào trong khoảng ngày này. Chọn "Tất cả" để xem lịch sử.'
               : 'Khách hàng này chưa có số liệu nào.'
+        :customer-region="customerRegion"
         }}
       </div>
 
@@ -571,8 +579,8 @@ onMounted(async () => {
             <div v-if="isOpen(day.date)" :id="`day-${day.date}`" class="result-list">
               <div v-for="entry in day.entries" :key="entry.id" class="result-row">
                 <div class="result-row-top">
-                  <span class="chip">{{ betTypeLabel(entry.betType || 'de') }} × {{ rateFor(entry.betType, entry.station) }}</span>
-                  <span class="chip">{{ digitsFor(entry.betType, entry.station) }} số cuối</span>
+                  <span class="chip">{{ betTypeLabel(entry.betType || 'de') }} · {{ rateChip(entry.betType, entry.station) }}</span>
+                  <span v-if="!isTableKind(configFor(entry.betType, entry.station)?.kind) || configFor(entry.betType, entry.station)?.kind === 'custom'" class="chip">{{ digitsFor(entry.betType, entry.station) }} số cuối</span>
                   <span v-if="entry.station && entry.station !== 'mb'" class="chip">{{ stationLabel(entry.station) }}</span>
                   <span
                     v-if="resultStatus[entry.id]?.state === 'saved' && !masked"

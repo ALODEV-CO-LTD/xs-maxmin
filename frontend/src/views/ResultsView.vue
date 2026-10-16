@@ -127,11 +127,12 @@ function toNumber(str) {
 // Points out of one entry over the results of the stations it counts for (sum); null when none of them has a result yet.
 function computeScoreFromResults(entry, byStation) {
   // The customer's own config if they have one, else the account-wide one.
-  const own = customers.value.find((c) => c.name === entry.customerName)?.scoringRates
+  const cust = customers.value.find((c) => c.name === entry.customerName)
+  const own = cust?.scoringRates
   const done = entryStations(entry).filter((st) => byStation[st])
   if (!done.length) return null
   // Rates are per region: each station is scored with the config of its own region.
-  return done.reduce((sum, st) => sum + entryDetail(entry, byStation[st], effectiveConfig(rates.value, own, entry.betType, regionOf(st).id)).out, 0)
+  return done.reduce((sum, st) => sum + entryDetail(entry, byStation[st], effectiveConfig(rates.value, own, entry.betType, regionOf(st).id), { region: regionOf(st).id, customerRegion: cust?.homeRegion || null }).out, 0)
 }
 
 const dayResults = ref({}) // station id -> saved result of the selected day

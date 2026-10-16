@@ -17,10 +17,11 @@ const props = defineProps({
   days: { type: Array, required: true },
   accountRates: { type: Object, required: true },
   customerRates: { type: Object, default: null },
+  customerRegion: { type: String, default: null }, // 'mb' | 'mn' | null: the customer's own region (Đầu on a Miền Bắc result)
   getResult: { type: Function, required: true }, // (date, station) -> result | null | undefined
 })
 
-const s = computed(() => summarize(props.days, props.accountRates, props.customerRates, props.getResult))
+const s = computed(() => summarize(props.days, props.accountRates, props.customerRates, props.getResult, { customerRegion: props.customerRegion }))
 const showWon = ref(false)
 const nf = new Intl.NumberFormat('vi-VN')
 const money = (n) => `${nf.format(Math.round(n))} đ`

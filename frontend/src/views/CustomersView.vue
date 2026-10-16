@@ -80,6 +80,10 @@ async function loadAccountRates() {
   }
 }
 const defaultConfigOpen = ref(route.query.config === 'default')
+function closeDefaultConfig() {
+  defaultConfigOpen.value = false
+  loadAccountRates()
+}
 const rosterRow = computed(() => roster.value.find((r) => r.id === detail.value?.rosterId) || null)
 // The lottery this customer plays by default: what Nhập số starts from for them.
 const stationSaving = ref(false)
@@ -97,6 +101,25 @@ async function saveDefaultStation(code) {
     stationMsg.value = err instanceof ApiError ? err.message : 'Không lưu được đài'
   } finally {
     stationSaving.value = false
+  }
+}
+// The customer's own region: decides how "Đầu" is scored on a Miền Bắc result (Bắc 1 lô = 1 điểm, Nam/Trung ×4 giải bảy).
+const regionMsg = ref('')
+const REGION_OPTIONS = [
+  { value: '', label: 'Chưa chọn (tính như khách Bắc)' },
+  { value: 'mb', label: 'Khách Miền Bắc' },
+  { value: 'mn', label: 'Khách Miền Nam / Miền Trung' },
+]
+async function saveHomeRegion(v) {
+  const row = rosterRow.value
+  if (!row) return
+  regionMsg.value = ''
+  try {
+    const res = await api.patch(`/me/customers/${row.id}`, { homeRegion: v })
+    row.homeRegion = res.homeRegion
+    regionMsg.value = 'Đã lưu miền của khách'
+  } catch (err) {
+    regionMsg.value = err instanceof ApiError ? err.message : 'Không lưu được miền của khách'
   }
 }
 onMounted(loadStations)
@@ -376,7 +399,7 @@ async function savePhone() {
       </div>
     </template>
 
-    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" xwide back @close="defaultConfigOpen = false; loadAccountRates()">
+    <ModalDialog :open="defaultConfigOpen" title="Cấu hình tính điểm mặc định" xwide back @close="closeDefaultConfig">
       <ScoringSettingsView embedded @saved="loadAccountRates" />
     </ModalDialog>
 
@@ -439,6 +462,15 @@ async function savePhone() {
                 <option v-for="o in allStationOptions()" :key="o.value" :value="o.value">{{ o.label }}</option>
               </AppSelect>
               <span v-if="stationMsg" class="muted-note" role="status">{{ stationMsg }}</span>
+            </div>
+          </section>
+          <section v-if="detail.rosterId && rosterRow" class="cd-station" aria-label="Miền của khách">
+            <label class="cd-station-label">Khách thuộc miền nào (để tính Đầu ở đài Miền Bắc)</label>
+            <div class="cd-station-row">
+              <AppSelect :model-value="rosterRow.homeRegion || ''" aria-label="Miền của khách" @update:model-value="saveHomeRegion">
+                <option v-for="o in REGION_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </AppSelect>
+              <span v-if="regionMsg" class="muted-note" role="status">{{ regionMsg }}</span>
             </div>
           </section>
           </div>

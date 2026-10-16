@@ -1,5 +1,5 @@
 /*
-  XOSO design tokens - Neutral/Slate + Violet.
+  XOSO design tokens - Trắng + xanh lá mảnh (cùng bảng màu với trang Bạn bè/chat: nền trắng, chữ đen, viền xanh mảnh, không gradient).
 
   Layers:
     1. Palette tokens   (--background, --card, --primary ...) - the source of truth,
@@ -31,25 +31,25 @@
   --danger: #ef4444;
 
   /* ---- LIGHT (default) ---- */
-  --background: #f8fafc;
+  --background: #ffffff;
   --sidebar: #ffffff;
   --header: #ffffff;
   --card: #ffffff;
-  --surface: #f1f5f9;
-  --border: #e2e8f0;
-  --text-primary: #18181b;
-  --text-secondary: #64748b;
-  --primary: #7c3aed;
-  --primary-hover: #6d28d9;
+  --surface: #f6faf7; /* chỉ phủ xanh rất nhạt để vùng hover/tiêu đề bảng còn phân biệt được */
+  --border: #d9e8dd;
+  --text-primary: #000000;
+  --text-secondary: #6b716c;
+  --primary: #16a34a;
+  --primary-hover: #15803d;
   --on-primary: #ffffff;
   --on-primary-hover: #ffffff;
 
   /* derived */
-  --link: #6d28d9;
-  --primary-soft: #ede9fe;
-  --input-border: #7c889b; /* >= 3:1 against card (WCAG 1.4.11) */
-  --input-border-hover: #5b6678;
-  --overlay: rgba(15, 23, 42, 0.55);
+  --link: #15803d;
+  --primary-soft: #f0fdf4;
+  --input-border: #16a34a;
+  --input-border-hover: #15803d;
+  --overlay: rgba(0, 0, 0, 0.25);
 
   --success-text: #15803d;
   --success-soft: #dcfce7;
@@ -60,9 +60,9 @@
   --danger-strong: #dc2626; /* filled destructive buttons, white text 4.8:1 */
   --danger-hover: #b91c1c;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
+  --shadow-sm: none;
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 
   color-scheme: light;
 }
@@ -78,15 +78,15 @@
     --border: #343438;
     --text-primary: #fafafa;
     --text-secondary: #a1a1aa;
-    --primary: #8b5cf6;
-    --primary-hover: #a78bfa;
-    --on-primary: #ffffff;
-    --on-primary-hover: #09090b; /* white on #a78bfa is only 2.7:1 */
+    --primary: #22c55e;
+    --primary-hover: #4ade80;
+    --on-primary: #052e16;
+    --on-primary-hover: #052e16;
 
-    --link: #a78bfa;
-    --primary-soft: #2a2145;
-    --input-border: #71717a;
-    --input-border-hover: #a1a1aa;
+    --link: #4ade80;
+    --primary-soft: #11301f;
+    --input-border: #22c55e;
+    --input-border-hover: #4ade80;
     --overlay: rgba(0, 0, 0, 0.65);
 
     --success-text: #4ade80;
@@ -114,15 +114,15 @@
   --border: #343438;
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
-  --primary: #8b5cf6;
-  --primary-hover: #a78bfa;
-  --on-primary: #ffffff;
-  --on-primary-hover: #09090b;
+  --primary: #22c55e;
+  --primary-hover: #4ade80;
+  --on-primary: #052e16;
+  --on-primary-hover: #052e16;
 
-  --link: #a78bfa;
-  --primary-soft: #2a2145;
-  --input-border: #71717a;
-  --input-border-hover: #a1a1aa;
+  --link: #4ade80;
+  --primary-soft: #11301f;
+  --input-border: #22c55e;
+  --input-border-hover: #4ade80;
   --overlay: rgba(0, 0, 0, 0.65);
 
   --success-text: #4ade80;

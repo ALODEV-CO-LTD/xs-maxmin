@@ -59,6 +59,7 @@ const userLinks = [
   { name: 'results', label: 'Nhập kết quả', icon: 'pencil-line' },
   { name: 'scoring', label: 'Tính điểm', icon: 'calculator' },
   { name: 'customers', label: 'Khách hàng', icon: 'users' },
+  { name: 'scoring-settings', label: 'Cấu hình tính điểm', icon: 'settings' },
   { name: 'friends', label: 'Bạn bè', icon: 'message-circle-more' },
   { name: 'account', label: 'Tài khoản', icon: 'user' },
 ]

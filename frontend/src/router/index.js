@@ -29,6 +29,7 @@ import RegisterView from '../views/RegisterView.vue'
 import EntriesView from '../views/EntriesView.vue'
 import ResultsView from '../views/ResultsView.vue'
 import ScoringView from '../views/ScoringView.vue'
+import ScoringSettingsView from '../views/ScoringSettingsView.vue'
 import CustomersView from '../views/CustomersView.vue'
 import FriendsView from '../views/FriendsView.vue'
 import { useNotifyStore } from '../stores/notify'
@@ -49,8 +50,8 @@ const routes = [
   { path: '/entries', name: 'entries', component: EntriesView, meta: { userOnly: true, title: 'Nhập số' } },
   { path: '/results', name: 'results', component: ResultsView, meta: { userOnly: true, title: 'Nhập kết quả' } },
   { path: '/scoring', name: 'scoring', component: ScoringView, meta: { userOnly: true, title: 'Tính điểm' } },
-  // Cấu hình tính điểm now lives in Khách hàng (per customer in Xem chi tiết + the account default).
-  { path: '/scoring-settings', name: 'scoring-settings', redirect: { name: 'customers', query: { config: 'default' } } },
+  // Cấu hình tính điểm: một tab riêng ở menu (cấu hình mặc định của tài khoản); cấu hình riêng từng khách vẫn ở nút trong danh sách Khách hàng.
+  { path: '/scoring-settings', name: 'scoring-settings', component: ScoringSettingsView, meta: { userOnly: true, title: 'Cấu hình tính điểm' } },
   { path: '/customers', name: 'customers', component: CustomersView, meta: { userOnly: true, title: 'Khách hàng' } },
   { path: '/friends', name: 'friends', component: FriendsView, meta: { userOnly: true, title: 'Bạn bè & tin nhắn' } },
   {

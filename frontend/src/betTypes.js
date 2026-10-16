@@ -2,7 +2,7 @@
 // the right payout rate/tiers per entry) and ScoringSettingsView (manage
 // the type -> {rate, tiers} map). Known keys get a Vietnamese label; a
 // user-added custom key just displays as typed.
-export const KNOWN_LABELS = { de: 'Đề', lo: 'Lô' }
+export const KNOWN_LABELS = { de: 'Đề', lo: 'Lô', lo3: 'Bao lô 3 số', lo4: 'Bao lô 4 số', truot4: 'Trượt xiên 4', truot8: 'Trượt xiên 8', truot10: 'Trượt xiên 10', tai_xiu: 'Tài/Xỉu', chan_le: 'Chẵn/Lẻ', dau: 'Đầu', duoi: 'Đuôi', cang3: '3 càng', cang4: '4 càng', xien2: 'Xiên 2', xien3: 'Xiên 3', xien4: 'Xiên 4' }
 
 export function betTypeLabel(key) {
   if (!key) return ''

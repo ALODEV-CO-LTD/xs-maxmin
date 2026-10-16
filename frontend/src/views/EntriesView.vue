@@ -26,7 +26,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { betTypeLabel } from '../betTypes'
-import { customerBetTypes, typesOf } from '../scoringConfig'
+import { customerBetTypes, kindSymbolsFor, typesOf } from '../scoringConfig'
 import { isRegionCode, loadStations, regionOf, stationLabel, stationName, stationOptions } from '../lotteryStations'
 import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { today } from '../dates'
@@ -677,7 +677,9 @@ function draftConfig() {
 
 function analyzeMessage() {
   pasteError.value = ''
-  const { rows: parsed, ignored } = parseMessage(pasteText.value, { betTypes: betTypes.value, template: draftConfig() })
+  const own = customers.value.find((c) => c.name === form.customerName)?.scoringRates
+  const kindSymbols = kindSymbolsFor(accountRates.value, own, regionOf(form.station).id)
+  const { rows: parsed, ignored } = parseMessage(pasteText.value, { betTypes: betTypes.value, template: draftConfig(), kindSymbols })
   previewIgnored.value = ignored
   previewRows.value = parsed.map((r) => ({ ...r, uid: ++rowSeq, selected: !r.uncertain }))
   if (!parsed.length) pasteError.value = 'Không tìm thấy số nào trong tin nhắn.'
