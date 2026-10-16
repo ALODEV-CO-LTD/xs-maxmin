@@ -29,6 +29,9 @@ Future<Response> onRequest(RequestContext context) async {
   };
 }
 
+/// How many numbers a group may have beyond the region's usual count.
+const _maxExtraNumbers = 20;
+
 Map<String, dynamic> _rowToJson(Row r) => {
       'drawDate': r['draw_date'],
       'station': r['station'],
@@ -91,8 +94,11 @@ Future<Response> _upsert(RequestContext context, String userId) async {
   for (final prize in region.structure) {
     final raw = body[prize.tier];
     final values = raw is List ? raw.map((v) => (v?.toString() ?? '').trim()).toList() : [raw?.toString().trim() ?? ''];
-    if (values.length != prize.count || values.any((v) => v.isEmpty)) {
-      return Response.json(statusCode: 400, body: {'error': '${prize.label} phải có đủ ${prize.count} số'});
+    // The count of the region is the minimum; a draw may have more numbers in a group (extra boxes added by the user).
+    final single = prize.tier == 'dacBiet' || prize.tier == 'giaiNhat';
+    final most = single ? prize.count : prize.count + _maxExtraNumbers;
+    if (values.length < prize.count || values.length > most || values.any((v) => v.isEmpty)) {
+      return Response.json(statusCode: 400, body: {'error': '${prize.label} phải có ít nhất ${prize.count} số${single ? '' : ' (tối đa $most)'}'});
     }
     final bad = values.where((v) => !RegExp('^\\d{${prize.digits}}\$').hasMatch(v));
     if (bad.isNotEmpty) {
