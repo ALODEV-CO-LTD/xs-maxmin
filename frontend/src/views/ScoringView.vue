@@ -255,8 +255,8 @@ const rates = ref({ ...DEFAULT_RATES })
 // Each customer may have their own payout config (stored on the customer, edited in Khách hàng);
 // the account-wide config is the fallback.
 const customerRates = computed(() => customers.value.find((c) => c.name === selectedCustomer.value)?.scoringRates || null)
-
 const customerRegion = computed(() => customers.value.find((c) => c.name === selectedCustomer.value)?.homeRegion || null)
+
 async function loadRates() {
   try {
     const { rates: r } = await api.get('/me/scoring-settings')
@@ -275,13 +275,13 @@ function rateFor(betType, station) {
   return configFor(betType, station)?.rate ?? 70
 }
 
-function digitsFor(betType, station) {
 // "Giá tiền/điểm → giá trúng/điểm" of the row an entry is scored with (older rows: "× tỉ lệ").
 function rateChip(betType, station) {
   const c = configFor(betType, station)
   if (c?.price != null) return `${moneyFmt.format(c.price)} → ${moneyFmt.format(c.payout)} đ/điểm`
   return `× ${rateFor(betType, station)}`
 }
+function digitsFor(betType, station) {
   return configFor(betType, station)?.digits ?? 2
 }
 
@@ -499,6 +499,7 @@ onMounted(async () => {
         :days="days"
         :account-rates="rates"
         :customer-rates="customerRates"
+        :customer-region="customerRegion"
         :get-result="getResult"
       />
 
@@ -513,7 +514,6 @@ onMounted(async () => {
             : rangeEntries.length === 0 && entries.some((e) => e.customerName === selectedCustomer)
               ? 'Không có số liệu nào trong khoảng ngày này. Chọn "Tất cả" để xem lịch sử.'
               : 'Khách hàng này chưa có số liệu nào.'
-        :customer-region="customerRegion"
         }}
       </div>
 
