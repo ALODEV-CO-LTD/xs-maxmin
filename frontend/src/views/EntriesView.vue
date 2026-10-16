@@ -89,7 +89,12 @@ const form = reactive({
 })
 const stationChoices = computed(() => stationOptions(form.entryDate))
 const customerDefaultStation = computed(() => customers.value.find((c) => c.name === form.customerName)?.defaultStation || 'mb')
-watch(customerDefaultStation, (v) => (form.station = v), { immediate: true })
+let forcedStation = null
+let fromChat = false // số liệu đến từ khung chat (Tính toán > Dùng cho Nhập số)
+watch(customerDefaultStation, (v) => {
+  form.station = forcedStation || v
+  forcedStation = null
+}, { immediate: true })
 onMounted(loadStations)
 // Manual entry: a flat list of rows, each = (hạng mục, số, điểm vào). Every
 // filled-in row becomes its own data_entries row on submit (value=<số>,
@@ -363,6 +368,28 @@ async function loadAll() {
 }
 
 onMounted(loadAll)
+// Từ khung chat: "Tính toán" > "Dùng cho Nhập số" gửi nội dung đã đối chiếu sang đây (sessionStorage, đọc một lần).
+onMounted(async () => {
+  let pre = null
+  try {
+    pre = JSON.parse(sessionStorage.getItem('entries-prefill') || 'null')
+    sessionStorage.removeItem('entries-prefill')
+  } catch { /* private mode / old format */ }
+  const text = pre?.text || ''
+  if (!text) return
+  fromChat = true // sau khi lưu xong sẽ chuyển sang Tính điểm
+  await loadBetTypes()
+  await loadStations()
+  if (pre.customer) form.customerName = pre.customer // khách đã chọn ở màn đối chiếu trong chat
+  if (pre.date) form.entryDate = pre.date
+  if (pre.station) {
+    form.station = pre.station
+    forcedStation = pre.station // the next customer pick must not overwrite the đài chosen in the chat
+  }
+  await nextTick()
+  pasteText.value = text
+  analyzeMessage()
+})
 onMounted(loadBetTypes)
 onMounted(loadTemplates)
 // after the offline queue synced / a conflict was resolved: reload the list
@@ -761,6 +788,11 @@ async function savePreview() {
   if (failed.length) pasteError.value = failed.join(' · ')
   if (queued) notice.value = `Đang offline: ${queued} số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.`
   if (!previewRows.value.length) pasteText.value = ''
+  // Luồng tin nhắn → nhập số liệu → tính điểm: lưu hết thì chuyển sang Tính điểm, mở sẵn đúng khách và ngày vừa nhập.
+  if (fromChat && savedCount && !failed.length && !previewRows.value.length) {
+    fromChat = false
+    router.push({ name: 'scoring', query: { customer: form.customerName.trim(), date: form.entryDate, added: String(savedCount) } })
+  }
 }
 
 async function saveTemplate() {

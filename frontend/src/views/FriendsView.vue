@@ -17,9 +17,13 @@
 <script setup>
 import { showConfirm } from '../confirm'
 import { fold } from '../messageParser'
+import { kindSymbolsFor, typesOf } from '../scoringConfig'
 import AppIcon from '../components/AppIcon.vue'
 import ChatAttachButtons from '../components/ChatAttachButtons.vue'
 import AttachmentPreview from '../components/AttachmentPreview.vue'
+import ChatCalcDialog from '../components/ChatCalcDialog.vue'
+import ChatDecodeDialog from '../components/ChatDecodeDialog.vue'
+import ChatKeyboard from '../components/ChatKeyboard.vue'
 import ChatRetentionPanel from '../components/ChatRetentionPanel.vue'
 import MessageAttachment from '../components/MessageAttachment.vue'
 import { useChatStore } from '../e2ee/chat'
@@ -177,6 +181,248 @@ const selectedFriendId = computed(() => route.params.friendId || null)
 const selectedFriend = computed(() =>
   friends.value.find((f) => f.id === selectedFriendId.value) || null,
 )
+// Sửa: hiện nút Xoá trên từng dòng. Chọn tin: "Nhập số liệu" bật hộp chọn, nút thành "Tính toán" khi chọn ≥1 tin.
+const editMode = ref(false)
+const selecting = ref(false)
+const pickedIds = ref([])
+const calcNotice = ref(false)
+const decodeOpen = ref(false)
+const calcOpen = ref(false)
+const calcText = ref('')
+const calcDate = ref('')
+const calcCustomer = ref('')
+function startCalc(text, date, customer) {
+  calcText.value = text
+  calcDate.value = date
+  calcCustomer.value = customer
+  decodeOpen.value = false
+  calcOpen.value = true
+}
+function calcBack() {
+  calcOpen.value = false
+  decodeOpen.value = true
+}
+const actionLabel = computed(() => (selecting.value && pickedIds.value.length ? 'Tính toán' : 'Nhập số liệu'))
+function onAction() {
+  if (!selecting.value) { selecting.value = true; return }
+  if (pickedIds.value.length) openDecode()
+}
+function togglePick(id) {
+  const i = pickedIds.value.indexOf(id)
+  if (i >= 0) pickedIds.value.splice(i, 1)
+  else pickedIds.value.push(id)
+}
+function pickAll() {
+  pickedIds.value = timeline.value.filter((t) => t.kind === 'msg' && !t.m.system && t.m.content).map((t) => t.m.id)
+}
+function cancelPick() { selecting.value = false; pickedIds.value = []; calcNotice.value = false }
+
+// Tính toán: màn hình đối chiếu tin gốc và nội dung giải mã của các tin đã chọn (theo thứ tự trong cuộc trò chuyện).
+const decodeRates = ref({})
+const decodeMessages = computed(() =>
+  timeline.value.filter((t) => t.kind === 'msg' && !t.m.system && pickedIds.value.includes(t.m.id)).map((t) => ({ id: t.m.id, content: t.m.content })),
+)
+const decodeTypes = computed(() => {
+  const list = typesOf(decodeRates.value)
+  return list.length ? list : ['de', 'lo']
+})
+const decodeSymbols = computed(() => kindSymbolsFor(decodeRates.value, null, 'mb'))
+async function openDecode() {
+  try {
+    const { rates } = await api.get('/me/scoring-settings')
+    if (rates && Object.keys(rates).length) decodeRates.value = rates
+  } catch { /* giải mã với loại mặc định */ }
+  decodeOpen.value = true
+}
+function useDecoded(text, where = {}) {
+  try { sessionStorage.setItem('entries-prefill', JSON.stringify({ text, ...where })) } catch { /* private mode */ }
+  decodeOpen.value = false
+  router.push({ name: 'entries' })
+}
+
+// ---- Nhấn giữ / chuột phải một tin nhắn: Trả lời, Sao chép, Ghim, Chuyển tiếp, Xoá, Chọn ----------------------------------
+const menu = ref(null) // { m, x, y }
+let pressTimer = null
+function openMenu(m, e) {
+  if (selecting.value || m.system) return
+  const r = e.currentTarget.getBoundingClientRect()
+  menu.value = { m, x: Math.min(Math.max(8, r.left), window.innerWidth - 200), y: Math.min(r.bottom + 4, window.innerHeight - 280) }
+}
+function pressStart(m, e) {
+  clearTimeout(pressTimer)
+  const el = e.currentTarget
+  pressTimer = setTimeout(() => openMenu(m, { currentTarget: el }), 450)
+}
+function pressEnd() { clearTimeout(pressTimer) }
+
+const replyTo = ref(null) // tin đang trả lời
+const REPLY_MARK = '↪ '
+function quoteOf(content) {
+  const [first, ...rest] = String(content || '').split('\n')
+  if (!first.startsWith(REPLY_MARK) || !rest.length) return { quote: '', body: content }
+  return { quote: first.slice(REPLY_MARK.length), body: rest.join('\n') }
+}
+const quoteText = (m) => (m.content || (m.attachment ? '[Ảnh]' : '')).split('\n').filter((l) => !l.startsWith(REPLY_MARK)).join(' ').slice(0, 60)
+function menuReply() { replyTo.value = menu.value.m; menu.value = null; focusInput() }
+async function menuCopy() {
+  const m = menu.value.m
+  menu.value = null
+  try { await navigator.clipboard.writeText(quoteOf(m.content).body || m.content || '') } catch { messagesError.value = 'Không sao chép được' }
+}
+const pins = ref([]) // id các tin đã ghim của cuộc trò chuyện đang mở (lưu trên máy)
+async function loadPins() { pins.value = (selectedFriendId.value && (await chat.metaGet(`pin:${selectedFriendId.value}`))) || [] }
+watch(selectedFriendId, loadPins, { immediate: true })
+const isPinned = (id) => pins.value.includes(id)
+async function menuPin() {
+  const id = menu.value.m.id
+  menu.value = null
+  pins.value = isPinned(id) ? pins.value.filter((x) => x !== id) : [...pins.value, id]
+  await chat.metaSet(`pin:${selectedFriendId.value}`, pins.value.length ? pins.value : null)
+}
+const pinnedMsg = computed(() => {
+  for (let i = pins.value.length - 1; i >= 0; i--) {
+    const t = timeline.value.find((x) => x.kind === 'msg' && x.m.id === pins.value[i])
+    if (t) return t.m
+  }
+  return null
+})
+const forwardOf = ref(null)
+function menuForward() { forwardOf.value = menu.value.m; menu.value = null }
+async function doForward(f) {
+  const m = forwardOf.value
+  forwardOf.value = null
+  try {
+    const body = quoteOf(m.content).body || ''
+    const file = m.attachment?.blob ? new File([m.attachment.blob], m.attachment.name || 'anh.jpg', { type: m.attachment.type }) : null
+    await chat.send(f, body, file)
+    messagesError.value = ''
+    openFriend(f)
+  } catch (err) {
+    messagesError.value = err.message || 'Không chuyển tiếp được'
+  }
+}
+async function menuDelete() {
+  const m = menu.value.m
+  menu.value = null
+  if (!(await showConfirm({ title: 'Xoá tin nhắn', message: 'Xoá tin nhắn này khỏi máy này? Người kia vẫn giữ bản của họ.', confirmText: 'Xoá', danger: true }))) return
+  await chat.deleteMessage(m.id)
+  if (isPinned(m.id)) pins.value = pins.value.filter((x) => x !== m.id)
+  await loadMessages(selectedFriendId.value, { quiet: true })
+}
+function menuSelect() {
+  const m = menu.value.m
+  menu.value = null
+  selecting.value = true
+  if (m.content && !pickedIds.value.includes(m.id)) pickedIds.value.push(m.id)
+}
+
+// ---- Thanh dưới cùng: Danh bạ | Cuộc gọi | Tin nhắn | Cài đặt ----------------------------------------------------------
+// Thanh dưới cùng (Danh bạ | Cuộc gọi | Tin nhắn | Cài đặt) hiện chỉ dành cho app: web ẩn đi (đổi true để hiện lại).
+const SHOW_BOTTOM_NAV = false
+const tab = ref('chats') // 'contacts' | 'calls' | 'chats' | 'settings'
+const searchInput = ref(null)
+
+// Lưu trữ cuộc trò chuyện: ẩn khỏi danh sách Tin nhắn, chỉ lưu trên máy này (theo tài khoản).
+const archiveKey = () => `chat-archive:${auth.user?.id || ''}`
+function readArchive() { try { return JSON.parse(localStorage.getItem(archiveKey()) || '[]') } catch { return [] } }
+const archived = ref(readArchive())
+function saveArchive() { try { localStorage.setItem(archiveKey(), JSON.stringify(archived.value)) } catch { /* private mode */ } }
+const showArchived = ref(false)
+const archivedCount = computed(() => friends.value.filter((f) => archived.value.includes(f.id)).length)
+
+// Tin nhắn = những người đã có tin (hoặc đang mở), mới nhất trên; Danh bạ = mọi bạn bè theo tên.
+const chatList = computed(() =>
+  filteredFriends.value.filter(
+    (f) => (archived.value.includes(f.id) === showArchived.value) && (!SHOW_BOTTOM_NAV || f.lastMessageAt || notify.unread[`friend:${f.id}`] || f.id === selectedFriendId.value || showArchived.value),
+  ),
+)
+const contactList = computed(() => [...filteredFriends.value].sort((a, b) => displayName(a).localeCompare(displayName(b), 'vi')))
+
+// Sửa (tab Tin nhắn): chọn nhiều cuộc trò chuyện để lưu trữ hoặc xoá.
+const editPicked = ref([])
+function toggleEditPick(id) {
+  const i = editPicked.value.indexOf(id)
+  if (i >= 0) editPicked.value.splice(i, 1)
+  else editPicked.value.push(id)
+}
+function toggleEdit() { editMode.value = !editMode.value; editPicked.value = [] }
+function archiveSelected() {
+  const ids = editPicked.value
+  if (showArchived.value) archived.value = archived.value.filter((id) => !ids.includes(id))
+  else archived.value = [...new Set([...archived.value, ...ids])]
+  saveArchive()
+  if (ids.includes(selectedFriendId.value)) backToList()
+  toggleEdit()
+}
+async function deleteSelected() {
+  const ids = [...editPicked.value]
+  if (!ids.length) return
+  if (!(await showConfirm({
+    title: 'Xoá cuộc trò chuyện',
+    message: `Xoá ${ids.length} cuộc trò chuyện khỏi máy này? Tin nhắn và ảnh trong đó sẽ mất trên máy này (người kia vẫn giữ bản của họ). Bạn bè vẫn còn trong danh bạ.`,
+    confirmText: 'Xoá',
+    danger: true,
+  }))) return
+  for (const id of ids) await chat.deleteConversation(id)
+  if (ids.includes(selectedFriendId.value)) backToList()
+  await loadFriends({ quiet: true })
+  toggleEdit()
+}
+
+// Cuộc gọi: lịch sử gần đây với mọi bạn bè.
+const callRows = ref([])
+const callsLoading = ref(false)
+async function loadAllCalls() {
+  callsLoading.value = true
+  try {
+    const res = await api.get('/me/calls?limit=60')
+    callRows.value = res.calls
+  } catch {
+    callRows.value = []
+  } finally {
+    callsLoading.value = false
+  }
+}
+watch(tab, (t) => { if (t === 'calls') loadAllCalls(); editMode.value = false; editPicked.value = [] })
+const friendOf = (id) => friends.value.find((f) => f.id === id) || null
+function callTime(iso) {
+  const d = new Date(iso)
+  return isNaN(d) ? '' : d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+}
+
+// Thêm: Tin nhắn mới / Nhóm mới / Danh bạ mới.
+const newOpen = ref(false)
+const newMsgOpen = ref(false)
+function pickNew(kind) {
+  newOpen.value = false
+  if (kind === 'message') newMsgOpen.value = true
+  else if (kind === 'group') groupOpen.value = true
+  else {
+    if (SHOW_BOTTOM_NAV) tab.value = 'contacts'
+    nextTick(() => searchInput.value?.focus())
+  }
+}
+function startChat(f) { newMsgOpen.value = false; tab.value = 'chats'; openFriend(f) }
+
+// Tên hiển thị riêng cho từng cuộc trò chuyện (lưu trên máy này, theo tài khoản).
+const prefsKey = () => `chat-prefs:${auth.user?.id || ''}`
+function readPrefs() { try { return JSON.parse(localStorage.getItem(prefsKey()) || '{}') } catch { return {} } }
+const prefs = ref(readPrefs())
+const displayName = (f) => (f ? prefs.value[f.id]?.alias || f.name : '')
+const initial = (name) => (name || '?').trim().charAt(0).toUpperCase()
+const settingsOpen = ref(false)
+const aliasDraft = ref('')
+function openSettings() { aliasDraft.value = prefs.value[selectedFriendId.value]?.alias || ''; settingsOpen.value = true }
+function saveSettings() {
+  const alias = aliasDraft.value.trim()
+  const next = { ...prefs.value }
+  if (alias && alias !== selectedFriend.value?.name) next[selectedFriendId.value] = { alias }
+  else delete next[selectedFriendId.value]
+  prefs.value = next
+  try { localStorage.setItem(prefsKey(), JSON.stringify(next)) } catch { /* không lưu được: dùng tạm */ }
+  settingsOpen.value = false
+}
+
 // Calls exist only between customers: nobody can call Admin and Admin calls
 // nobody (chat with Admin is unaffected). The server enforces this too -
 // hiding the buttons just avoids offering something that would be refused.
@@ -280,6 +526,18 @@ watch(
   },
 )
 
+// The local store opens a moment after the page (a reload on /friends/<id> asked for the messages too early): read them again once it is ready.
+watch(
+  () => chat.ready,
+  (ok) => {
+    if (!ok) return
+    if (selectedFriendId.value) loadMessages(selectedFriendId.value, { quiet: true })
+    loadFriends({ quiet: true })
+    loadPins()
+  },
+  { immediate: true },
+)
+
 // Local chat store changed (incoming message, delivery status, auto-delete).
 watch(
   () => chat.tick,
@@ -316,6 +574,8 @@ watch(
 watch(
   selectedFriendId,
   (id) => {
+    cancelPick()
+    settingsOpen.value = false
     if (id) {
       notify.clear(`friend:${id}`)
       loadMessages(id)
@@ -358,7 +618,9 @@ async function sendMessage() {
   sending.value = true
   messagesError.value = ''
   try {
-    await chat.send(selectedFriend.value, content, attachment.value)
+    const text = replyTo.value ? `${REPLY_MARK}${quoteText(replyTo.value)}\n${content}` : content
+    await chat.send(selectedFriend.value, text, attachment.value)
+    replyTo.value = null
     newMessage.value = ''
     attachment.value = null
     await loadMessages(selectedFriendId.value, { quiet: true })
@@ -382,6 +644,23 @@ const stopShotWatch = onScreenshotAttempt(() => {
 onBeforeUnmount(stopShotWatch)
 
 const peerInfo = computed(() => chat.peerInfo[selectedFriendId.value] || null)
+// Thêm: tạo nhóm. Giao diện đã có; nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.
+// Mở cuộc trò chuyện: ô nhập CHƯA được chọn, không con trỏ, không bàn phím (cả bàn phím ảo của app lẫn bàn phím hệ thống), nội dung
+// tin nhắn chiếm hết chỗ. Chạm vào ô nhập thì bàn phím hệ thống hiện như thường lệ; nút ⌨ mới bật bàn phím ảo của app (mặc định tắt).
+const msgInput = ref(null)
+const kbOpen = ref(false)
+function focusInput() { nextTick(() => msgInput.value?.focus({ preventScroll: true })) }
+function toggleKeyboard() { kbOpen.value = !kbOpen.value; if (kbOpen.value) focusInput() }
+
+const groupOpen = ref(false)
+const groupName = ref('')
+const groupMembers = ref([])
+function toggleMember(id) {
+  const i = groupMembers.value.indexOf(id)
+  if (i >= 0) groupMembers.value.splice(i, 1)
+  else groupMembers.value.push(id)
+}
+
 const showSecurity = ref(false)
 // Top-bar buttons control the auto-delete panel (ChatRetentionPanel) below the header.
 const retentionOpen = ref(false)
@@ -415,10 +694,11 @@ async function acceptKey() {
     <div class="split" :class="{ 'show-thread': !!selectedFriendId }">
       <div class="list-pane">
         <div class="card search-form">
-          <label for="searchQuery" style="font-size: 14px; font-weight: 700; color: var(--muted)">
-            Tìm kiếm
-          </label>
-          <input id="searchQuery" v-model="searchQuery" type="text" placeholder="Tên, tài khoản hoặc mã ID..." autocomplete="off" style="margin-top: 6px" />
+          <div class="search-row">
+            <button v-if="tab === 'chats'" type="button" class="tb-link" :aria-pressed="editMode" @click="toggleEdit">{{ editMode ? 'Xong' : 'Sửa' }}</button>
+            <input id="searchQuery" ref="searchInput" v-model="searchQuery" type="search" aria-label="Tìm kiếm" placeholder="Tìm kiếm" autocomplete="off" />
+            <button type="button" class="tb-link strong" @click="newOpen = true">Mới</button>
+          </div>
           <p class="search-sub">Lọc bạn bè của bạn và tìm người mới để kết bạn.</p>
           <div v-if="searchError" class="alert alert-error" style="margin: 8px 0 0">{{ searchError }}</div>
 
@@ -442,49 +722,96 @@ async function acceptKey() {
         <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
         <template v-else>
           <div v-if="searchQuery.trim() && filteredFriends.length > 0" class="search-group list-group">Bạn bè</div>
-          <div v-if="friends.length === 0" class="card">Chưa có bạn bè nào.</div>
-          <div v-else-if="filteredFriends.length === 0 && searchQuery.trim()">
-            <div v-if="!searching && newPeople.length === 0" class="card">
-              Không tìm thấy ai khớp với "{{ searchQuery.trim() }}". Nếu là mã ID, hãy kiểm tra lại các chữ số.
-            </div>
-          </div>
-          <div v-else class="friend-list">
-            <div
-              v-for="f in filteredFriends"
-              :key="f.id"
-              class="card friend-item"
-              :class="{ active: f.id === selectedFriendId }"
-              @click="openFriend(f)"
-            >
-              <div class="friend-info">
-                <strong>
-                  {{ f.name }}
-                  <span v-if="notify.unread[`friend:${f.id}`]" class="unread-badge" title="Tin nhắn chưa đọc">
-                    {{ notify.unread[`friend:${f.id}`] > 99 ? '99+' : notify.unread[`friend:${f.id}`] }}
-                  </span>
-                  <span v-if="unseenMissed[f.id]" class="missed-badge" title="Cuộc gọi nhỡ">
-                    <AppIcon name="phone" /> {{ unseenMissed[f.id] }}
-                  </span>
-                </strong>
-                <span class="friend-last" :class="{ 'has-unread': notify.unread[`friend:${f.id}`] }">{{ f.lastMessage || 'Chưa có tin nhắn' }}</span>
+
+          <!-- Tin nhắn / Danh bạ -->
+          <template v-if="tab === 'chats' || tab === 'contacts'">
+            <div v-if="friends.length === 0" class="card">Chưa có bạn bè nào. Bấm Mới &gt; Danh bạ mới để tìm và kết bạn.</div>
+            <div v-else-if="(tab === 'chats' ? chatList : contactList).length === 0">
+              <div v-if="searchQuery.trim() && !searching && newPeople.length === 0" class="card">
+                Không tìm thấy ai khớp với "{{ searchQuery.trim() }}". Nếu là mã ID, hãy kiểm tra lại các chữ số.
               </div>
-              <button class="btn btn-ghost btn-sm" @click.stop="removeFriend(f)">Xoá</button>
+              <div v-else-if="!searchQuery.trim()" class="card">
+                {{ showArchived ? 'Chưa lưu trữ cuộc trò chuyện nào.' : 'Chưa có cuộc trò chuyện nào. Bấm Mới > Tin nhắn mới để bắt đầu.' }}
+              </div>
             </div>
-          </div>
+            <div v-else class="friend-list">
+              <div
+                v-for="f in (tab === 'chats' ? chatList : contactList)"
+                :key="f.id"
+                class="card friend-item"
+                :class="{ active: f.id === selectedFriendId }"
+                @click="editMode && tab === 'chats' ? toggleEditPick(f.id) : openFriend(f)"
+              >
+                <input v-if="editMode && tab === 'chats'" type="checkbox" class="pick" :checked="editPicked.includes(f.id)" aria-label="Chọn cuộc trò chuyện" @click.stop="toggleEditPick(f.id)" />
+                <span class="avatar">{{ initial(displayName(f)) }}</span>
+                <div class="friend-info">
+                  <strong>
+                    {{ displayName(f) }}
+                    <span v-if="notify.unread[`friend:${f.id}`]" class="unread-badge" title="Tin nhắn chưa đọc">
+                      {{ notify.unread[`friend:${f.id}`] > 99 ? '99+' : notify.unread[`friend:${f.id}`] }}
+                    </span>
+                    <span v-if="unseenMissed[f.id]" class="missed-badge" title="Cuộc gọi nhỡ">
+                      <AppIcon name="phone" /> {{ unseenMissed[f.id] }}
+                    </span>
+                  </strong>
+                  <span class="friend-last" :class="{ 'has-unread': notify.unread[`friend:${f.id}`] }">{{ tab === 'contacts' ? '@' + f.username : f.lastMessage || 'Chưa có tin nhắn' }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="tab === 'chats' && editMode" class="edit-bar">
+              <button type="button" class="tb-link" :disabled="!editPicked.length" @click="archiveSelected">{{ showArchived ? 'Bỏ lưu trữ' : 'Lưu trữ' }}{{ editPicked.length ? ` (${editPicked.length})` : '' }}</button>
+              <button type="button" class="tb-link danger" :disabled="!editPicked.length" @click="deleteSelected">Xoá{{ editPicked.length ? ` (${editPicked.length})` : '' }}</button>
+            </div>
+            <button v-if="tab === 'chats' && !editMode && (archivedCount || showArchived)" type="button" class="tb-link archive-link" @click="showArchived = !showArchived">
+              {{ showArchived ? '← Về tin nhắn' : `Đã lưu trữ (${archivedCount})` }}
+            </button>
+          </template>
+
+          <!-- Cuộc gọi -->
+          <template v-else-if="tab === 'calls'">
+            <div v-if="callsLoading" class="card">Đang tải...</div>
+            <div v-else-if="callRows.length === 0" class="card">Chưa có cuộc gọi nào.</div>
+            <div v-else class="friend-list">
+              <div v-for="c in callRows" :key="c.id" class="card friend-item" @click="friendOf(c.peerId) && openFriend(friendOf(c.peerId))">
+                <span class="avatar">{{ initial(friendOf(c.peerId) ? displayName(friendOf(c.peerId)) : c.peerName) }}</span>
+                <div class="friend-info">
+                  <strong :class="{ 'missed-name': isMissedCall(c) }">{{ friendOf(c.peerId) ? displayName(friendOf(c.peerId)) : c.peerName }}</strong>
+                  <span class="friend-last">{{ callLine(c) }} · {{ callTime(c.createdAt) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Cài đặt -->
+          <template v-else>
+            <div class="card chat-settings">
+              <strong>Cài đặt tin nhắn</strong>
+              <p class="search-sub">Tin nhắn mã hoá hai đầu, chỉ lưu trên máy này. Tên hiển thị riêng, mã bảo mật và tự xoá chỉnh ở nút ⚙ trong từng cuộc trò chuyện.</p>
+              <button type="button" class="tb-link" @click="tab = 'chats'; showArchived = true">Cuộc trò chuyện đã lưu trữ ({{ archivedCount }})</button>
+              <router-link class="tb-link" to="/account?tab=security">Bảo mật tài khoản</router-link>
+              <p v-if="myCode" class="search-sub">ID của bạn: <strong>{{ myCode }}</strong></p>
+            </div>
+          </template>
         </template>
+
+        <nav v-if="SHOW_BOTTOM_NAV" class="bottom-nav" aria-label="Điều hướng tin nhắn">
+          <button type="button" :class="{ on: tab === 'contacts' }" @click="tab = 'contacts'"><AppIcon name="users" /><span>Danh bạ</span></button>
+          <button type="button" :class="{ on: tab === 'calls' }" @click="tab = 'calls'"><AppIcon name="phone" /><span>Cuộc gọi</span></button>
+          <button type="button" :class="{ on: tab === 'chats' }" @click="tab = 'chats'; showArchived = false"><AppIcon name="message-circle-more" /><span>Tin nhắn</span></button>
+          <button type="button" :class="{ on: tab === 'settings' }" @click="tab = 'settings'"><AppIcon name="settings" /><span>Cài đặt</span></button>
+        </nav>
       </div>
 
       <div class="thread-pane">
         <div v-if="!selectedFriendId" class="card empty-thread">Chọn một người bạn để xem tin nhắn.</div>
         <template v-else>
           <div class="thread-header">
-            <button class="btn btn-ghost btn-sm back-btn" @click="backToList"><AppIcon name="arrow-left" /> Danh sách</button>
-            <strong class="thread-title">{{ selectedFriend?.name || '...' }}</strong>
-            <div class="thread-tools">
-              <button v-if="peerInfo" type="button" class="btn btn-ghost btn-sm" :aria-pressed="showSecurity" @click="showSecurity = !showSecurity">Mã bảo mật</button>
-              <button v-if="!selectedFriend?.isAdmin" type="button" class="btn btn-ghost btn-sm" :aria-pressed="retentionOpen" @click="retentionOpen = !retentionOpen">Cài đặt tự xoá</button>
-              <button v-if="retentionRule" type="button" class="btn btn-ghost btn-sm" title="Tắt tự xoá tin nhắn" @click="retentionPanel?.cancel()">Tắt</button>
-            </div>
+            <button class="back-btn" aria-label="Quay lại danh sách" title="Quay lại" @click="backToList"><AppIcon name="arrow-left" /></button>
+            <button type="button" class="who" title="Thông tin người trò chuyện" @click="openSettings">
+              <span class="avatar sm">{{ initial(displayName(selectedFriend)) }}</span>
+              <strong class="thread-title">{{ displayName(selectedFriend) || '...' }}</strong>
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm gear" aria-label="Cài đặt cuộc trò chuyện" title="Cài đặt cuộc trò chuyện" @click="openSettings"><AppIcon name="settings" /></button>
             <div v-if="canCall" class="call-buttons">
               <button
                 class="btn btn-ghost btn-sm"
@@ -521,6 +848,10 @@ async function acceptKey() {
             @rule="(r) => (retentionRule = r)"
             @applied="loadMessages(selectedFriendId)"
           />
+          <div v-if="pinnedMsg" class="pin-bar">
+            <span>📌 {{ quoteText(pinnedMsg) }}</span>
+            <button type="button" class="tb-link" aria-label="Bỏ ghim" @click="menu = { m: pinnedMsg }; menuPin()">✕</button>
+          </div>
           <div v-if="messagesError" class="alert alert-error">{{ messagesError }}</div>
           <div ref="threadBody" class="card thread-body">
             <div v-if="messagesLoading">Đang tải tin nhắn...</div>
@@ -535,10 +866,27 @@ async function acceptKey() {
                 <div
                   v-else-if="item.kind === 'msg'"
                   class="msg"
-                  :class="{ mine: item.m.mine }"
+                  :class="{ mine: item.m.mine, picking: selecting }"
                 >
-                  <div class="msg-bubble">
-                    <span v-if="item.m.content">{{ item.m.content }}</span>
+                  <input
+                    v-if="selecting && item.m.content"
+                    type="checkbox"
+                    class="pick"
+                    aria-label="Chọn tin nhắn"
+                    :checked="pickedIds.includes(item.m.id)"
+                    @change="togglePick(item.m.id)"
+                  />
+                  <div
+                    class="msg-bubble"
+                    @contextmenu.prevent="openMenu(item.m, $event)"
+                    @touchstart.passive="pressStart(item.m, $event)"
+                    @touchend="pressEnd"
+                    @touchmove="pressEnd"
+                    @touchcancel="pressEnd"
+                  >
+                    <span v-if="isPinned(item.m.id)" class="pin-mark" title="Đã ghim">📌</span>
+                    <div v-if="quoteOf(item.m.content).quote" class="quote">{{ quoteOf(item.m.content).quote }}</div>
+                    <span v-if="item.m.content">{{ quoteOf(item.m.content).body }}</span>
                     <MessageAttachment
                       v-if="item.m.attachment"
                       :att="item.m.attachment"
@@ -567,18 +915,159 @@ async function acceptKey() {
             </div>
           </div>
           <AttachmentPreview v-if="attachment" :file="attachment" @remove="attachment = null" />
+          <div v-if="selecting" class="selbar">
+            <span>Đã chọn {{ pickedIds.length }}</span>
+            <button type="button" class="tb-link" @click="pickAll">Chọn tất cả</button>
+            <button type="button" class="tb-link" @click="pickedIds = []">Bỏ chọn</button>
+            <button type="button" class="tb-link" @click="cancelPick">Hủy</button>
+          </div>
+          <div v-if="replyTo" class="reply-bar">
+            <span>↪ Trả lời: {{ quoteText(replyTo) }}</span>
+            <button type="button" class="tb-link" aria-label="Bỏ trả lời" @click="replyTo = null">✕</button>
+          </div>
+          <div class="send-tools">
+            <button type="button" class="calc-btn" :class="{ ready: selecting && pickedIds.length }" @click="onAction">{{ actionLabel }}</button>
+            <button type="button" class="kb-toggle" :aria-pressed="kbOpen" :title="kbOpen ? 'Ẩn bàn phím' : 'Hiện bàn phím'" @click="toggleKeyboard">⌨</button>
+          </div>
           <form class="send-row" @submit.prevent="sendMessage">
-            <ChatAttachButtons :disabled="sending" @pick="(f) => { attachment = f; messagesError = '' }" @error="(m) => (messagesError = m)" />
-            <input v-model="newMessage" type="text" placeholder="Nhập tin nhắn..." />
+            <ChatAttachButtons icon="paperclip" :disabled="sending" @pick="(f) => { attachment = f; messagesError = '' }" @error="(m) => (messagesError = m)" />
+            <input ref="msgInput" v-model="newMessage" type="text" placeholder="Nhập tin nhắn..." :inputmode="kbOpen ? 'none' : 'text'" autocomplete="off" />
             <button type="submit" class="btn btn-primary" :disabled="sending || (!newMessage.trim() && !attachment)">Gửi</button>
           </form>
+          <ChatKeyboard v-if="kbOpen" v-model="newMessage" :can-send="!sending && (!!newMessage.trim() || !!attachment)" @enter="sendMessage" />
         </template>
+      </div>
+    </div>
+
+    <div v-if="settingsOpen && selectedFriend" class="group-overlay" @click.self="settingsOpen = false">
+      <div class="card group-sheet" role="dialog" aria-label="Cài đặt cuộc trò chuyện">
+        <div class="set-head">
+          <span class="avatar big">{{ initial(aliasDraft.trim() || selectedFriend.name) }}</span>
+          <strong>{{ aliasDraft.trim() || selectedFriend.name }}</strong>
+        </div>
+        <label class="set-field">Tên hiển thị
+          <input v-model="aliasDraft" type="text" :placeholder="selectedFriend.name" maxlength="40" />
+        </label>
+        <p class="search-sub">Chỉ đổi cách hiển thị trên máy này, người kia không thấy.</p>
+        <div class="set-tools">
+          <button v-if="peerInfo" type="button" class="tb-link" @click="showSecurity = !showSecurity; settingsOpen = false">Mã bảo mật</button>
+          <button v-if="!selectedFriend.isAdmin" type="button" class="tb-link" @click="retentionOpen = !retentionOpen; settingsOpen = false">Cài đặt tự xoá</button>
+          <button v-if="retentionRule" type="button" class="tb-link" @click="retentionPanel?.cancel(); settingsOpen = false">Tắt tự xoá</button>
+          <button type="button" class="tb-link danger" @click="settingsOpen = false; removeFriend(selectedFriend)">Xoá khỏi bạn bè</button>
+        </div>
+        <div class="group-actions">
+          <button type="button" class="tb-link" @click="settingsOpen = false">Đóng</button>
+          <button type="button" class="tb-link strong" @click="saveSettings">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- menu nhấn giữ tin nhắn -->
+    <div v-if="menu" class="msg-menu-overlay" @click="menu = null" @contextmenu.prevent="menu = null">
+      <div class="card msg-menu" role="menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
+        <button type="button" role="menuitem" class="tb-link" @click="menuReply">Trả lời</button>
+        <button v-if="menu.m.content" type="button" role="menuitem" class="tb-link" @click="menuCopy">Sao chép</button>
+        <button type="button" role="menuitem" class="tb-link" @click="menuPin">{{ isPinned(menu.m.id) ? 'Bỏ ghim' : 'Ghim' }}</button>
+        <button type="button" role="menuitem" class="tb-link" @click="menuForward">Chuyển tiếp</button>
+        <button type="button" role="menuitem" class="tb-link danger" @click="menuDelete">Xoá</button>
+        <button v-if="menu.m.content" type="button" role="menuitem" class="tb-link" @click="menuSelect">Chọn</button>
+      </div>
+    </div>
+
+    <div v-if="forwardOf" class="group-overlay" @click.self="forwardOf = null">
+      <div class="card group-sheet" role="dialog" aria-label="Chuyển tiếp">
+        <strong>Chuyển tiếp tới</strong>
+        <ul class="group-members">
+          <li v-for="f in friends.filter((x) => !x.isAdmin)" :key="f.id"><button type="button" class="tb-link new-opt" @click="doForward(f)">{{ displayName(f) }}</button></li>
+          <li v-if="!friends.length" class="search-hint">Chưa có bạn bè.</li>
+        </ul>
+        <div class="group-actions"><button type="button" class="tb-link" @click="forwardOf = null">Đóng</button></div>
+      </div>
+    </div>
+
+    <ChatDecodeDialog :open="decodeOpen" :messages="decodeMessages" :bet-types="decodeTypes" :kind-symbols="decodeSymbols" @close="decodeOpen = false" @use="useDecoded" @calc="startCalc" />
+    <ChatCalcDialog :open="calcOpen" :text="calcText" :date="calcDate" :customer-id="calcCustomer" :friends="friends.filter((f) => !f.isAdmin)" @close="calcOpen = false" @back="calcBack" />
+
+    <div v-if="newOpen" class="group-overlay" @click.self="newOpen = false">
+      <div class="card group-sheet" role="dialog" aria-label="Tạo mới">
+        <strong>Tạo mới</strong>
+        <button type="button" class="tb-link new-opt" @click="pickNew('message')">Tin nhắn mới</button>
+        <button type="button" class="tb-link new-opt" @click="pickNew('group')">Nhóm mới</button>
+        <button type="button" class="tb-link new-opt" @click="pickNew('contact')">Danh bạ mới</button>
+        <div class="group-actions"><button type="button" class="tb-link" @click="newOpen = false">Đóng</button></div>
+      </div>
+    </div>
+
+    <div v-if="newMsgOpen" class="group-overlay" @click.self="newMsgOpen = false">
+      <div class="card group-sheet" role="dialog" aria-label="Tin nhắn mới">
+        <strong>Tin nhắn mới</strong>
+        <ul class="group-members">
+          <li v-for="f in contactList" :key="f.id"><button type="button" class="tb-link new-opt" @click="startChat(f)">{{ displayName(f) }}</button></li>
+          <li v-if="!friends.length" class="search-hint">Chưa có bạn bè. Chọn Danh bạ mới để tìm người và kết bạn.</li>
+        </ul>
+        <div class="group-actions"><button type="button" class="tb-link" @click="newMsgOpen = false">Đóng</button></div>
+      </div>
+    </div>
+
+    <div v-if="groupOpen" class="group-overlay" @click.self="groupOpen = false">
+      <div class="card group-sheet" role="dialog" aria-label="Tạo nhóm">
+        <strong>Tạo nhóm</strong>
+        <input v-model="groupName" type="text" placeholder="Tên nhóm" />
+        <ul class="group-members">
+          <li v-for="f in friends" :key="f.id">
+            <label><input type="checkbox" :checked="groupMembers.includes(f.id)" @change="toggleMember(f.id)" /> {{ f.name }}</label>
+          </li>
+          <li v-if="!friends.length" class="search-hint">Chưa có bạn bè nào để thêm vào nhóm.</li>
+        </ul>
+        <p class="search-sub">Nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.</p>
+        <div class="group-actions">
+          <button type="button" class="btn btn-ghost btn-sm" @click="groupOpen = false">Đóng</button>
+          <button type="button" class="btn btn-primary btn-sm" disabled>Tạo nhóm</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* Giao diện sáng theo yêu cầu khách: nền trắng, viền xanh mảnh, chữ đen, phụ xám nhạt; không nền tối, không xanh dương, không gradient. */
+.friends-page {
+  --background: #fff; --card: #fff; --surface: #fff; --surface-2: #fff; --bg: #fff;
+  --text: #000; --text-primary: #000; --text-secondary: #8a8f8a; --muted: #8a8f8a;
+  --border: #d9e8dd; --input-border: #16a34a; --input-border-hover: #15803d;
+  --primary: #16a34a; --primary-hover: #15803d; --on-primary: #fff; --on-primary-hover: #fff;
+  --primary-soft: #f0fdf4; --accent: #16a34a; --accent-strong: #16a34a; --accent-soft: #f0fdf4; --link: #16a34a;
+  --shadow-sm: none; --shadow-md: none; --shadow-lg: none; --overlay: rgba(0, 0, 0, 0.25);
+  background: #fff; color: #000; color-scheme: light; border-radius: 10px; padding: 12px;
+}
+.friends-page :deep(.btn-primary) { background: #16a34a; border-color: #16a34a; color: #fff; background-image: none; }
+.search-row { display: flex; align-items: center; gap: 8px; }
+.search-row input { flex: 1; border: 1px solid #16a34a !important; border-radius: 18px !important; padding: 7px 12px !important; background: #fff !important; color: #000 !important; }
+.tb-link { background: none; border: 0; color: #000; font-size: 15px; cursor: pointer; padding: 4px; }
+.tb-link.strong { color: #16a34a; font-weight: 600; }
+.tb-link:disabled { color: #8a8f8a; cursor: default; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; border: 1px solid #16a34a; color: #16a34a; display: grid; place-items: center; font-weight: 600; flex: none; background: #fff; }
+.avatar.sm { width: 28px; height: 28px; font-size: 13px; }
+.avatar.big { width: 64px; height: 64px; font-size: 26px; }
+.friend-item { gap: 10px; }
+.friend-item .friend-info { flex: 1; }
+.pick { accent-color: #16a34a; width: 18px; height: 18px; margin-right: 8px; align-self: center; }
+.msg.picking { display: flex; align-items: flex-start; }
+.msg.picking.mine { flex-direction: row-reverse; }
+.selbar { display: flex; align-items: center; gap: 10px; padding: 6px 4px; font-size: 13px; }
+.selbar span { flex: 1; color: #8a8f8a; }
+.calc-note { color: #8a8f8a; font-size: 13px; margin: 2px 4px; }
+.calc-btn { padding: 7px 12px; border: 1px solid #16a34a; border-radius: 16px; background: #fff; color: #16a34a; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.calc-btn.ready { background: #16a34a; color: #fff; }
+.set-head { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.set-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #8a8f8a; }
+.set-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.group-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: grid; place-items: center; z-index: 50; }
+.group-sheet { width: min(380px, 92vw); display: flex; flex-direction: column; gap: 10px; }
+.group-sheet input[type='text'] { width: 100%; box-sizing: border-box; }
+.group-members { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.group-members label { display: flex; gap: 8px; padding: 5px 0; }
+.group-actions { display: flex; justify-content: space-between; }
 .my-id-label {
   font-size: 14px;
   font-weight: 700;
@@ -632,6 +1121,15 @@ async function acceptKey() {
   border-radius: var(--radius-md);
   background: var(--surface-2);
 }
+.bottom-nav { position: sticky; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 12px; background: #fff; border-top: 1px solid #d9e8dd; }
+.bottom-nav button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; background: none; border: 0; color: #8a8f8a; font-size: 12px; cursor: pointer; }
+.bottom-nav button.on { color: #16a34a; font-weight: 600; }
+.edit-bar { display: flex; justify-content: space-between; padding: 10px 4px; border-top: 1px solid #d9e8dd; }
+.tb-link.danger { color: #b91c1c; }
+.archive-link { display: block; margin: 8px auto 0; color: #16a34a; }
+.new-opt { display: block; width: 100%; text-align: left; padding: 10px 4px; }
+.chat-settings { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.missed-name { color: #b91c1c; }
 .friend-list {
   display: flex;
   flex-direction: column;
@@ -717,8 +1215,30 @@ async function acceptKey() {
   gap: 4px;
 }
 .back-btn {
-  display: none;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #000;
+  background: #fff;
+  border: 1px solid #16a34a;
+  border-radius: 50%;
+  cursor: pointer;
 }
+.who { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; }
+.msg-menu-overlay { position: fixed; inset: 0; z-index: 80; }
+.msg-menu { position: fixed; min-width: 170px; padding: 6px; display: flex; flex-direction: column; background: #fff; border: 1px solid #d9e8dd; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.msg-menu .tb-link { text-align: left; padding: 10px 12px; font-size: 15px; }
+.quote { margin-bottom: 4px; padding: 3px 8px; font-size: 13px; color: #6b716c; border-left: 3px solid #16a34a; background: #f6faf7; border-radius: 4px; }
+.pin-mark { margin-right: 4px; font-size: 12px; }
+.pin-bar, .reply-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 6px; padding: 4px 10px; font-size: 13.5px; background: #f0fdf4; border-left: 3px solid #16a34a; border-radius: 6px; }
+.pin-bar span, .reply-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.send-tools { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.kb-toggle { flex: none; width: 40px; height: 40px; font-size: 20px; background: #fff; color: #16a34a; border: 1px solid #d9e8dd; border-radius: 10px; cursor: pointer; }
+.kb-toggle[aria-pressed='true'] { background: #f0fdf4; border-color: #16a34a; }
 .thread-body {
   flex: 1;
   min-height: 300px;
@@ -870,11 +1390,22 @@ async function acceptKey() {
   .split.show-thread .list-pane {
     display: none;
   }
+  /* Điện thoại: màn hình trò chuyện chiếm trọn màn hình, tin nhắn cuộn ở giữa, ô nhập và bàn phím sát đáy */
   .split.show-thread .thread-pane {
     display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    height: 100dvh;
+    padding: 10px 10px env(safe-area-inset-bottom);
+    background: #fff;
+    border: 0;
+    border-radius: 0;
   }
-  .back-btn {
-    display: inline-flex;
+  .split.show-thread .thread-pane .thread-body {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
   }
 }
 /* ---- One unified left panel (ID, search, add by ID, friend list) ---- */
@@ -1069,6 +1600,8 @@ async function acceptKey() {
 .msg-bubble {
   font-size: 15px;
   background: var(--surface);
+  white-space: pre-wrap; /* giữ xuống dòng của tin (vd. báo cáo kết quả) */
+  overflow-wrap: anywhere;
 }
 .msg.mine .msg-bubble {
   background: var(--primary-soft);
@@ -1105,7 +1638,8 @@ async function acceptKey() {
 }
 
 /* call buttons: icons the same 20px as the rest of the app's icons */
-.call-buttons .btn {
+.call-buttons .btn,
+.thread-header .gear {
   width: 44px;
   height: 44px;
   min-height: 44px;
@@ -1114,7 +1648,8 @@ async function acceptKey() {
   color: var(--text-secondary);
   border-radius: 10px;
 }
-.call-buttons .btn:hover:not(:disabled) {
+.call-buttons .btn:hover:not(:disabled),
+.thread-header .gear:hover {
   color: var(--text-primary);
   background: var(--surface);
 }

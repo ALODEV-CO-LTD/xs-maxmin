@@ -9,7 +9,7 @@ import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { ALLOWED_IMAGE_TYPES, IMAGE_ONLY_MESSAGE, MAX_ATTACHMENT_BYTES } from '../attachments'
 
-defineProps({ disabled: { type: Boolean, default: false } })
+defineProps({ disabled: { type: Boolean, default: false }, icon: { type: String, default: 'image' } })
 const emit = defineEmits(['pick', 'error'])
 
 const imageInput = ref(null)
@@ -29,7 +29,7 @@ function onChange(e) {
   <div class="attach-buttons">
     <input ref="imageInput" type="file" accept="image/jpeg,image/png,image/webp" class="attach-input" @change="onChange" />
     <button type="button" class="attach-btn" :disabled="disabled" aria-label="Gửi ảnh" title="Gửi ảnh (JPG, PNG, WebP)" @click="imageInput.click()">
-      <AppIcon name="image" />
+      <AppIcon :name="icon" />
     </button>
   </div>
 </template>

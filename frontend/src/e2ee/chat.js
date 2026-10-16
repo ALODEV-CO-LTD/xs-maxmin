@@ -355,6 +355,28 @@ export const useChatStore = defineStore('e2ee-chat', {
       }
       if (changed) this.tick++
     },
+    // Per-device notes kept next to the messages (pins, edited decodings). Never uploaded.
+    async metaGet(key) {
+      return db ? (await get(db, 'meta', key))?.value ?? null : null
+    },
+    async metaSet(key, value) {
+      if (!db) return
+      if (value == null) await del(db, 'meta', key)
+      else await put(db, 'meta', { id: key, value })
+    },
+    // Deletes one message from THIS device (the friend keeps theirs).
+    async deleteMessage(id) {
+      if (!db) return
+      await del(db, 'messages', id)
+      await del(db, 'meta', `decode:${id}`)
+      this.tick++
+    },
+    // Deletes the whole conversation with this friend from THIS device (the friend keeps theirs).
+    async deleteConversation(friendId) {
+      if (!db) return
+      for (const m of await messagesOf(db, friendId)) await del(db, 'messages', m.id)
+      this.tick++
+    },
     async applyRetentionAll() {
       for (const m of await getAll(db, 'meta')) if (m.id.startsWith('retention:')) await this.applyRetention(m.id.slice(10))
     },

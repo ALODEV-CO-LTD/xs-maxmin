@@ -10,6 +10,15 @@
 //   lô 45,78 con 3           -> two "Lô" rows, 3 điểm each
 //   12=50                    -> one row (type = sticky/default type, flagged if unknown)
 //   de: / lo                 -> a line holding only a hạng mục sets the type for the lines below
+// Compact ("liền") notation from docs "Cấu hình tính toán" - number + symbol + điểm, no spaces:
+//   20lo100 70lo500   -> Lô 20 @100, Lô 70 @500       (symbols l, lo, lô, x)
+//   20dau10 20c10     -> Đầu 20 @10, Đuôi 20 @10       (d, dau, đầu / c, cuoi, cuối)
+//   20d10c20          -> Đầu 20 @10 AND Đuôi 20 @20
+//   123x100 5000x100  -> 3 càng / 4 càng (by number of digits)
+//   20x02lo10         -> Xiên 2 (20 + 02 @10); dotted "20.02x10" only when the account has a Xiên type
+// Rows whose bet type the account does not have are flagged (and left unticked), never silently
+// saved. `decodeMessage` shows each compact token in its canonical spelling ("20lo100" -> "20lô100")
+// for the side-by-side check; it never changes a number.
 // Per-customer template (`config`, saved only when the user confirms it):
 //   { defaultType: 'de', typeAliases: { dd: 'de', l: 'lo' }, stakeMarkers: ['x', 'con'] }
 
@@ -47,8 +56,114 @@ export function textToAliases(text, validTypes) {
   return out
 }
 
-export function parseMessage(text, { betTypes = ['de', 'lo'], template = null } = {}) {
-  const cfg = { ...emptyTemplate(), ...(template || {}) }
+// ---- Compact notation ---------------------------------------------------------------------
+const POINTS_RE = '(\\d+(?:[.,]\\d+)?)'
+const BARE_X = ['x', '×'] // as a symbol = bao lô; the legacy parser reads it as "× điểm" with the customer's type
+const TYPE_LABEL = { lo: 'Lô', dau: 'Đầu', duoi: 'Đuôi', cang3: '3 càng', cang4: '4 càng', xien2: 'Xiên 2', xien3: 'Xiên 3', xien4: 'Xiên 4' }
+const CANON_SYMBOL = { lo: 'lô', dau: 'đầu', duoi: 'đuôi', cang: 'càng', xien: 'xiên' }
+export const typeLabel = (t) => TYPE_LABEL[t] || t
+
+// folded symbol -> { kind, type? }. Built-ins first, then spelled bet types ("de", custom keys), then the
+// customer's own aliases (they win, like everywhere else in this file).
+function compactSymbols(aliasMap, cfg) {
+  const m = new Map()
+  for (const s of ['lo', 'l', 'x', '×']) m.set(s, { kind: 'lo' })
+  for (const s of ['d', 'dau']) m.set(s, { kind: 'dau' })
+  for (const s of ['c', 'cuoi', 'duoi']) m.set(s, { kind: 'duoi' })
+  // Ký hiệu the customer set in the bảng cấu hình (Cấu hình tính điểm): they add to the built-in spellings.
+  for (const [kind, list] of Object.entries(cfg.kindSymbols || {})) {
+    for (const sym of list || []) {
+      const k = fold(sym)
+      if (/^[a-z×]+$/.test(k)) m.set(k, { kind })
+    }
+  }
+  m.set('cang', { kind: 'cang' })
+  m.set('xien', { kind: 'xien' })
+  for (const [a, t] of Object.entries(aliasMap)) if (/^[a-z]+$/.test(a) && !m.has(a)) m.set(a, { kind: 'custom', type: t })
+  for (const [a, t] of Object.entries(cfg.typeAliases || {})) {
+    const k = fold(a)
+    if (/^[a-z×]+$/.test(k)) m.set(k, t === 'lo' ? { kind: 'lo' } : { kind: 'custom', type: t })
+  }
+  return m
+}
+
+// Returns compact(token, ctxType) -> { rows, canon } | null for one FOLDED whitespace-free token.
+// null = "not compact notation": the caller falls back to the legacy parser, so nothing that worked before changes.
+function makeCompactParser(symbols, betTypes) {
+  const alt = (pred) =>
+    [...symbols.entries()].filter(([, v]) => pred(v)).map(([k]) => k).sort((a, b) => b.length - a.length).map(escapeRe).join('|')
+  const all = alt(() => true)
+  const lo = alt((v) => v.kind === 'lo')
+  const reXien = lo ? new RegExp(`^(\\d{2}(?:(?:[.,]|${lo})\\d{2}){1,3})(${lo}|xien)${POINTS_RE}$`) : null
+  const reDouble = new RegExp(`^(\\d+)(${all})${POINTS_RE}(${all})${POINTS_RE}$`)
+  const reSingle = new RegExp(`^(\\d+)(${all})${POINTS_RE}$`)
+  const has = (t) => betTypes.includes(t)
+
+  // One "number + symbol + điểm" instruction -> row + canonical text, or null.
+  const one = (value, sym, points, ctxType) => {
+    const info = symbols.get(sym)
+    const digits = value.length
+    let type
+    let canonSym
+    if (info.kind === 'lo') {
+      if (BARE_X.includes(sym) && digits === 2 && ctxType) { type = ctxType; canonSym = sym } // legacy meaning kept
+      else if (digits === 3) { type = 'cang3'; canonSym = CANON_SYMBOL.cang }
+      else if (digits === 4) { type = 'cang4'; canonSym = CANON_SYMBOL.cang }
+      else { type = 'lo'; canonSym = CANON_SYMBOL.lo }
+    } else if (info.kind === 'dau') { type = 'dau'; canonSym = CANON_SYMBOL.dau }
+    else if (info.kind === 'duoi') {
+      // "Đuôi" = the last two digits of the special prize, which is exactly what the account's Đề already is.
+      type = has('duoi') ? 'duoi' : has('de') ? 'de' : 'duoi'
+      canonSym = CANON_SYMBOL.duoi
+    } else if (info.kind === 'cang') {
+      type = digits === 4 ? 'cang4' : 'cang3'
+      canonSym = CANON_SYMBOL.cang
+    } else if (info.kind === 'xien') return null // a single number cannot be a xiên
+    else { type = info.type; canonSym = sym }
+
+    const reasons = []
+    if (!has(type)) reasons.push(`Loại "${typeLabel(type)}" chưa có trong cấu hình`)
+    const want = type === 'cang3' ? 3 : type === 'cang4' ? 4 : 2
+    if (digits !== want) reasons.push(`Số không phải ${want} chữ số`)
+    return { row: { type, value, score: points.replace(',', '.'), reasons }, canon: `${value}${canonSym}${points}` }
+  }
+
+  return (tok, ctxType = '') => {
+    let m = reXien && tok.match(reXien)
+    if (m) {
+      const nums = m[1].match(/\d{2}/g)
+      const dotsOnly = !/[a-z×]/.test(m[1])
+      const type = `xien${nums.length}`
+      // "20.02x10" is also how some customers list several plain numbers, so it only means xiên when the
+      // account has that Xiên type; "20x02lo10" / "20.02xiên10" cannot mean anything else.
+      if (!(dotsOnly && m[2] !== 'xien' && !has(type))) {
+        const reasons = [
+          'Xiên: cách tính điểm chưa được hỗ trợ, hãy kiểm tra thủ công',
+          ...(has(type) ? [] : [`Loại "${typeLabel(type)}" chưa có trong cấu hình`]),
+        ]
+        return {
+          rows: [{ type, value: nums.join(' '), score: m[3].replace(',', '.'), reasons }],
+          canon: `${nums.join('.')}${CANON_SYMBOL.xien}${m[3]}`,
+        }
+      }
+    }
+    m = tok.match(reDouble)
+    if (m) {
+      const a = one(m[1], m[2], m[3], ctxType)
+      const b = one(m[1], m[4], m[5], ctxType)
+      if (a && b) return { rows: [a.row, b.row], canon: `${a.canon} ${b.canon}` }
+    }
+    m = tok.match(reSingle)
+    if (m) {
+      const a = one(m[1], m[2], m[3], ctxType)
+      if (a) return { rows: [a.row], canon: a.canon }
+    }
+    return null
+  }
+}
+
+export function parseMessage(text, { betTypes = ['de', 'lo'], template = null, kindSymbols = null } = {}) {
+  const cfg = { ...emptyTemplate(), ...(template || {}), kindSymbols }
   const markers = (cfg.stakeMarkers?.length ? cfg.stakeMarkers : DEFAULT_STAKE_MARKERS).map(fold)
 
   // alias (folded) -> type key; later sources win: built-in < bet types < template
@@ -62,6 +177,7 @@ export function parseMessage(text, { betTypes = ['de', 'lo'], template = null } 
   const rows = []
   const ignored = []
   let stickyType = ''
+  const compact = makeCompactParser(compactSymbols(aliasMap, cfg), betTypes)
 
   const push = (type, assumed, value, score, raw, extra = []) => {
     const reasons = [...extra]
@@ -75,6 +191,16 @@ export function parseMessage(text, { betTypes = ['de', 'lo'], template = null } 
     const line = rawLine.trim()
     if (!line) continue
     const f = fold(line)
+
+    // Compact notation: only when EVERY space-separated token of the line is one ("20lo100 70lo500 54lo300").
+    // A line that mixes in anything else goes through the legacy path below, exactly as before.
+    const toks = f.split(/\s+/).filter(Boolean)
+    const ctxType = stickyType || cfg.defaultType
+    const parsed = toks.map((t) => compact(t, ctxType))
+    if (toks.length && parsed.every(Boolean)) {
+      for (const p of parsed) for (const r of p.rows) rows.push({ ...r, raw: line, uncertain: r.reasons.length > 0 })
+      continue
+    }
 
     // split the line into [type, text] segments at every hạng mục keyword
     const segments = []
@@ -125,4 +251,30 @@ export function parseMessage(text, { betTypes = ['de', 'lo'], template = null } 
     if (!produced) ignored.push(line)
   }
   return { rows, ignored }
+}
+
+// Side-by-side check ("Đối chiếu"): for every line, each compact token in its canonical spelling next to the
+// original. Never changes a number, never guesses: a token that is not compact notation is kept exactly as typed
+// and reported as `plain`/`unknown` so the user checks it. Pure function; whitespace is preserved.
+export function decodeMessage(text, { betTypes = ['de', 'lo'], template = null, kindSymbols = null } = {}) {
+  const cfg = { ...emptyTemplate(), ...(template || {}), kindSymbols }
+  const aliasMap = { ...BUILTIN_ALIASES }
+  for (const t of betTypes) aliasMap[fold(t)] = t
+  for (const [a, t] of Object.entries(cfg.typeAliases || {})) aliasMap[fold(a)] = t
+  const compact = makeCompactParser(compactSymbols(aliasMap, cfg), betTypes)
+  return String(text || '').split(/\r?\n/).map((original) => {
+    const parts = original.split(/(\s+)/).filter((p) => p !== '').map((tok) => {
+      if (/^\s+$/.test(tok)) return { text: tok, decoded: tok, status: 'space' }
+      const p = compact(fold(tok), cfg.defaultType)
+      if (!p) return { text: tok, decoded: tok, status: /\d/.test(tok) ? 'unknown' : 'plain' }
+      return { text: tok, decoded: p.canon, status: p.canon === tok ? 'same' : 'changed' }
+    })
+    return {
+      original,
+      decoded: parts.map((x) => x.decoded).join(''),
+      parts,
+      changed: parts.some((x) => x.status === 'changed'),
+      unknown: parts.some((x) => x.status === 'unknown'),
+    }
+  })
 }

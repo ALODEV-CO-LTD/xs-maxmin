@@ -42,6 +42,7 @@ import { effectiveConfig, DEFAULT_RATES, isTableKind } from '../scoringConfig'
 import { entryDetail, summarize } from '../scoringSummary'
 import { entryStations, loadStations, regionOf, stationLabel } from '../lotteryStations'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { loadAllEntries } from '../offline'
 import { betTypeLabel } from '../betTypes'
@@ -413,8 +414,21 @@ async function onDeleted(n) {
   await load()
 }
 
+const route = useRoute()
+const router = useRouter()
 onMounted(async () => {
   await Promise.all([load(), loadRates(), loadCustomers(), loadStations()])
+  // Từ Nhập số (luồng tin nhắn): mở sẵn đúng khách và đúng ngày vừa nhập, rồi bỏ tham số khỏi địa chỉ.
+  const { customer, date, added } = route.query
+  if (customer && customers.value.some((c) => c.name === customer)) {
+    selectedCustomer.value = String(customer)
+    if (date) {
+      dateFrom.value = dateTo.value = String(date)
+      preset.value = ''
+    }
+    if (added) notice.value = `Đã thêm ${added} số liệu cho ${customer}${date ? ` ngày ${String(date).split('-').reverse().join('/')}` : ''}. Điểm ra được tính theo kết quả xổ số đã nhập.`
+  }
+  if (route.query.customer || route.query.date || route.query.added) router.replace({ name: 'scoring' })
 })
 </script>
 
