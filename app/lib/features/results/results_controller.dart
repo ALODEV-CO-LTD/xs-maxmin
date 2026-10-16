@@ -21,7 +21,7 @@ typedef ResultForm = Map<String, List<String>>;
 const singleTiers = ['dacBiet', 'giaiNhat']; // stored by the API as one string, every other group is a list
 
 /// An empty form for [structure].
-ResultForm blankForm(List<Prize> structure) => {for (final p in structure) p.tier: List<String>.filled(p.count, '')};
+ResultForm blankForm(List<Prize> structure) => {for (final p in structure) p.tier: List<String>.filled(p.count, '', growable: true)};
 
 /// A form for [structure] filled from a saved result / recognised column where the shapes fit.
 ResultForm shapeForm(List<Prize> structure, Map<String, dynamic>? values) {
@@ -29,7 +29,8 @@ ResultForm shapeForm(List<Prize> structure, Map<String, dynamic>? values) {
   if (values == null) return out;
   for (final p in structure) {
     final v = values[p.tier];
-    if (v is List && v.length == p.count) {
+    // a group may hold more numbers than the region's usual count (extra boxes): keep them all
+    if (v is List && v.length >= p.count) {
       out[p.tier] = [for (final x in v) '$x'];
     } else if (v is String && p.count == 1) {
       out[p.tier] = [v];
@@ -40,11 +41,29 @@ ResultForm shapeForm(List<Prize> structure, Map<String, dynamic>? values) {
 
 int filledCount(ResultForm f) => f.values.expand((l) => l).where((v) => v.trim().isNotEmpty).length;
 
+/// How many boxes a group may have beyond the region's usual count (same limit as the API).
+const maxExtraCells = 20;
+
+/// The region's usual count of every group must be filled; boxes added beyond it are optional (empty ones are dropped on save).
+bool requiredFilled(List<Prize> structure, ResultForm? f) {
+  if (f == null) return false;
+  return structure.every((p) {
+    final v = f[p.tier];
+    return v != null && v.length >= p.count && v.take(p.count).every((x) => x.trim().isNotEmpty);
+  });
+}
+
+/// Numbers to save for [p]: the usual boxes plus the extra boxes that were filled in.
+List<String> valuesOf(Prize p, List<String> v) => [
+      for (var i = 0; i < v.length; i++)
+        if (i < p.count || v[i].trim().isNotEmpty) v[i].trim(),
+    ];
+
 /// Request body of POST /lottery-results.
 Map<String, dynamic> resultBody(String date, String station, List<Prize> structure, ResultForm f) {
   final body = <String, dynamic>{'drawDate': date, 'station': station};
   for (final p in structure) {
-    final v = [for (final x in f[p.tier]!) x.trim()];
+    final v = valuesOf(p, f[p.tier]!);
     body[p.tier] = singleTiers.contains(p.tier) ? v.first : v;
   }
   return body;
@@ -91,14 +110,18 @@ class ResultsController extends ChangeNotifier {
   bool mbSaved = false;
   bool mbLocked = false;
 
-  // Miền Trung / Miền Nam: one column per station drawing that day
+  // Miền Trung / Miền Nam: one form per station (the stations drawing that day, plus the ones added by hand); one is shown at a time
   final Map<String, ResultForm> board = {};
+  List<String> extraStations = []; // not on the day's schedule: saved earlier that day, or added with "+ Đài khác"
+  String activeStation = '';
+  bool gridOpen = false; // the prize grid is folded behind "Nhập tay các giải" until there is something in it
   final Set<String> boardSaved = {};
   final Set<String> boardRead = {}; // filled from a photo: empty cells are flagged
   final Set<String> boardEdit = {}; // saved / read column that was unlocked
 
   // photo
   bool ocrRunning = false;
+  String? photoPath; // the picture that was read (shown as a preview)
   String? ocrError;
   String? ocrNote;
   List<String> ocrWarnings = [];
@@ -108,7 +131,30 @@ class ResultsController extends ChangeNotifier {
 
   List<Prize> get structure => stations.regionOf(region).structure;
   int get totalBoxes => structure.fold(0, (n, p) => n + p.count);
-  List<String> get boardStations => region == 'mb' ? const [] : stations.stationsOn(region, date);
+  List<String> get scheduledStations => region == 'mb' ? const [] : stations.stationsOn(region, date);
+  List<String> get boardStations => region == 'mb' ? const [] : [...scheduledStations, ...extraStations.where((id) => !scheduledStations.contains(id))];
+
+  /// Every other station of the region (the whole catalogue), to add with "+ Đài khác".
+  List<({String value, String label})> get otherStations => region == 'mb'
+      ? const []
+      : [
+          for (final id in stations.regionOf(region).stations.keys)
+            if (!boardStations.contains(id)) (value: id, label: stations.stationName(id)),
+        ];
+
+  /// The station shown in the form ('mb' for Miền Bắc, '' when the region has none that day).
+  String get curStation {
+    if (region == 'mb') return 'mb';
+    final all = boardStations;
+    return all.contains(activeStation) ? activeStation : (all.isEmpty ? '' : all.first);
+  }
+
+  /// The form of [station] (null or 'mb' = the Miền Bắc form).
+  ResultForm? formOf(String? station) => (station == null || station == 'mb') ? mbForm : board[station];
+
+  bool lockedOf(String? station) => (station == null || station == 'mb') ? mbLocked : boardLocked(station);
+  bool savedOf(String? station) => (station == null || station == 'mb') ? mbSaved : boardSaved.contains(station);
+  int filledOf(String? station) => filledCount(formOf(station) ?? const {});
   String get regionName => stations.regionOf(region).name;
 
   @override
@@ -193,11 +239,58 @@ class ResultsController extends ChangeNotifier {
       mbSaved = saved != null;
       mbLocked = saved != null;
     } else {
+      // stations of this region with a saved result that day but not on the schedule (added by hand earlier)
+      extraStations = [
+        for (final id in dayResults.keys)
+          if (id != 'mb' && stations.regionOf(id).id == region && !scheduledStations.contains(id)) id,
+      ];
       for (final st in boardStations) {
         board[st] = shapeForm(structure, dayResults[st]);
         if (dayResults[st] != null) boardSaved.add(st);
       }
     }
+    _autoOpenGrid();
+  }
+
+  /// The grid opens by itself as soon as there is anything in it (a saved result, a photo, typing).
+  void _autoOpenGrid() {
+    if (filledOf(curStation) > 0) gridOpen = true;
+  }
+
+  void toggleGrid() {
+    gridOpen = !gridOpen;
+    notifyListeners();
+  }
+
+  void selectStation(String st) {
+    activeStation = st;
+    _autoOpenGrid();
+    notifyListeners();
+  }
+
+  /// "+ Đài khác": an out-of-schedule station of the region becomes one more choice and is selected.
+  void addStation(String id) {
+    if (id.isEmpty || region == 'mb') return;
+    if (!extraStations.contains(id) && !scheduledStations.contains(id)) extraStations = [...extraStations, id];
+    board[id] ??= blankForm(structure);
+    activeStation = id;
+    notifyListeners();
+  }
+
+  /// Adds one box to a group that has more numbers than usual ([station] null = Miền Bắc). Never beyond what the API accepts.
+  void addCell(String? station, Prize p) {
+    final list = formOf(station)?[p.tier];
+    if (list == null || singleTiers.contains(p.tier) || list.length >= p.count + maxExtraCells) return;
+    list.add('');
+    notifyListeners();
+  }
+
+  /// Removes the last box added beyond the usual count.
+  void removeCell(String? station, Prize p) {
+    final list = formOf(station)?[p.tier];
+    if (list == null || list.length <= p.count) return;
+    list.removeLast();
+    notifyListeners();
   }
 
   Future<void> setDate(String iso) async {
@@ -205,6 +298,8 @@ class ResultsController extends ChangeNotifier {
     date = iso;
     ocrNote = null;
     ocrWarnings = [];
+    photoPath = null;
+    gridOpen = false;
     mbForm = blankForm(structure);
     notifyListeners();
     await loadDay();
@@ -218,6 +313,10 @@ class ResultsController extends ChangeNotifier {
     ocrNote = null;
     ocrWarnings = [];
     ocrError = null;
+    photoPath = null;
+    gridOpen = false;
+    extraStations = [];
+    activeStation = '';
     mbForm = blankForm(structure);
     notifyListeners();
     await loadDay();
@@ -235,9 +334,10 @@ class ResultsController extends ChangeNotifier {
   int boardFilled(String st) => filledCount(board[st] ?? const {});
 
   /// A cell is wrong when it has digits of the wrong length, or is empty in a column read from a photo.
-  bool cellBad(String st, Prize p, String v) {
+  /// (An extra box beyond the usual count may stay empty.)
+  bool cellBad(String st, Prize p, String v, [int index = 0]) {
     final t = v.trim();
-    return t.isNotEmpty ? t.length != p.digits : boardRead.contains(st);
+    return t.isNotEmpty ? t.length != p.digits : (boardRead.contains(st) && index < p.count);
   }
 
   /// [station] null = the Miền Bắc form.
@@ -246,6 +346,7 @@ class ResultsController extends ChangeNotifier {
     final list = form?[p.tier];
     if (list == null || index >= list.length) return;
     list[index] = _digits(value, p.digits);
+    _autoOpenGrid();
     notifyListeners();
   }
 
@@ -276,6 +377,7 @@ class ResultsController extends ChangeNotifier {
       mbForm = blankForm(structure);
       mbLocked = false;
     }
+    photoPath = null;
     ocrError = null;
     ocrNote = null;
     notifyListeners();
@@ -288,7 +390,7 @@ class ResultsController extends ChangeNotifier {
   Future<void> _saveMb() async {
     error = null;
     saveMsg = null;
-    if (filledCount(mbForm) < totalBoxes) {
+    if (!requiredFilled(structure, mbForm)) {
       error = 'Vui lòng nhập đủ $totalBoxes số trước khi lưu.';
       notifyListeners();
       return;
@@ -320,7 +422,7 @@ class ResultsController extends ChangeNotifier {
       return;
     }
     final total = totalBoxes;
-    final partial = todo.where((st) => boardFilled(st) < total).toList();
+    final partial = todo.where((st) => !requiredFilled(structure, board[st])).toList();
     if (partial.isNotEmpty) {
       error = '${partial.map(stations.stationName).join(', ')}: chưa nhập đủ $total số. Điền đủ hoặc xoá hết cột đó rồi lưu lại.';
       notifyListeners();
@@ -543,6 +645,7 @@ class ResultsController extends ChangeNotifier {
     }
     if (path == null) return;
     ocrRunning = true;
+    photoPath = path;
     notifyListeners();
     try {
       final res = await _ocr.read(path);
@@ -555,6 +658,7 @@ class ResultsController extends ChangeNotifier {
       ocrError = describeOcrError(e);
     }
     ocrRunning = false;
+    gridOpen = true; // show what was read
     notifyListeners();
   }
 
@@ -588,6 +692,7 @@ class ResultsController extends ChangeNotifier {
     }
     await loadDay(keepMessages: true);
     // Every recognised column goes straight into the table under its station.
+    var firstSet = false;
     for (final c in parsed.columns) {
       final st = c.station;
       if (st == null || !board.containsKey(st)) {
@@ -595,6 +700,10 @@ class ResultsController extends ChangeNotifier {
         continue;
       }
       board[st] = shapeForm(structure, c.values);
+      if (!firstSet) {
+        activeStation = st;
+        firstSet = true;
+      }
       boardRead.add(st);
       boardEdit.remove(st);
       if (!c.complete) ocrWarnings.add('${stations.stationName(st)}: ${c.issues.join('; ')}');

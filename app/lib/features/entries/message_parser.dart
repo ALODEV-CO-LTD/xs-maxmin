@@ -103,11 +103,153 @@ class ParseResult {
   final List<String> ignored;
 }
 
-ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo'], SyntaxTemplate? template}) {
-  final cfg = template ?? SyntaxTemplate();
-  final markers = (cfg.stakeMarkers.isNotEmpty ? cfg.stakeMarkers : defaultStakeMarkers).map(foldText).toList();
+// ---- Compact ("liền") notation: number + symbol + điểm, no spaces ------------------------------
+const _pointsRe = r'(\d+(?:[.,]\d+)?)';
+const _bareX = ['x', '×']; // as a symbol = bao lô; the legacy parser reads it as "× điểm" with the customer's type
+const _typeLabel = {'lo': 'Lô', 'dau': 'Đầu', 'duoi': 'Đuôi', 'cang3': '3 càng', 'cang4': '4 càng', 'xien2': 'Xiên 2', 'xien3': 'Xiên 3', 'xien4': 'Xiên 4'};
+const _canonSymbol = {'lo': 'lô', 'dau': 'đầu', 'duoi': 'đuôi', 'cang': 'càng', 'xien': 'xiên'};
+String typeLabel(String t) => _typeLabel[t] ?? t;
 
-  // alias (folded) -> type key; later sources win: built-in < bet types < template
+class _Sym {
+  const _Sym(this.kind, [this.type]);
+  final String kind;
+  final String? type;
+}
+
+class _Compact {
+  _Compact(this.rows, this.canon);
+  final List<ParsedRow> rows;
+  final String canon;
+}
+
+/// folded symbol -> kind. Built-ins first, then the customer's ký hiệu from the bảng cấu hình, then spelled bet types, then
+/// the customer's own aliases (they win, like everywhere else in this file).
+Map<String, _Sym> _compactSymbols(Map<String, String> aliasMap, SyntaxTemplate cfg, Map<String, List<String>>? kindSymbols) {
+  final m = <String, _Sym>{};
+  for (final s in const ['lo', 'l', 'x', '×']) {
+    m[s] = const _Sym('lo');
+  }
+  for (final s in const ['d', 'dau']) {
+    m[s] = const _Sym('dau');
+  }
+  for (final s in const ['c', 'cuoi', 'duoi']) {
+    m[s] = const _Sym('duoi');
+  }
+  final plain = RegExp(r'^[a-z×]+$');
+  for (final e in (kindSymbols ?? const <String, List<String>>{}).entries) {
+    for (final sym in e.value) {
+      final k = foldText(sym);
+      if (plain.hasMatch(k)) m[k] = _Sym(e.key);
+    }
+  }
+  m['cang'] = const _Sym('cang');
+  m['xien'] = const _Sym('xien');
+  final az = RegExp(r'^[a-z]+$');
+  for (final e in aliasMap.entries) {
+    if (az.hasMatch(e.key) && !m.containsKey(e.key)) m[e.key] = _Sym('custom', e.value);
+  }
+  for (final e in cfg.typeAliases.entries) {
+    final k = foldText(e.key);
+    if (plain.hasMatch(k)) m[k] = e.value == 'lo' ? const _Sym('lo') : _Sym('custom', e.value);
+  }
+  return m;
+}
+
+/// Returns compact(token, ctxType) for one FOLDED whitespace-free token; null = "not compact notation" (the caller falls back to
+/// the legacy parser, so nothing that worked before changes).
+_Compact? Function(String, [String]) _makeCompactParser(Map<String, _Sym> symbols, List<String> betTypes) {
+  String alt(bool Function(_Sym) pred) {
+    final keys = [for (final e in symbols.entries) if (pred(e.value)) e.key]..sort((a, b) => b.length.compareTo(a.length));
+    return keys.map(_escapeRe).join('|');
+  }
+
+  final all = alt((_) => true);
+  final lo = alt((v) => v.kind == 'lo');
+  final reXien = lo.isNotEmpty ? RegExp('^(\\d{2}(?:(?:[.,]|$lo)\\d{2}){1,3})($lo|xien)$_pointsRe\$') : null;
+  final reDouble = RegExp('^(\\d+)($all)$_pointsRe($all)$_pointsRe\$');
+  final reSingle = RegExp('^(\\d+)($all)$_pointsRe\$');
+  bool has(String t) => betTypes.contains(t);
+
+  ({ParsedRow row, String canon})? one(String value, String sym, String points, String ctxType) {
+    final info = symbols[sym]!;
+    final digits = value.length;
+    String type;
+    String canonSym;
+    switch (info.kind) {
+      case 'lo':
+        if (_bareX.contains(sym) && digits == 2 && ctxType.isNotEmpty) {
+          type = ctxType;
+          canonSym = sym;
+        } else if (digits == 3) {
+          type = 'cang3';
+          canonSym = _canonSymbol['cang']!;
+        } else if (digits == 4) {
+          type = 'cang4';
+          canonSym = _canonSymbol['cang']!;
+        } else {
+          type = 'lo';
+          canonSym = _canonSymbol['lo']!;
+        }
+      case 'dau':
+        type = 'dau';
+        canonSym = _canonSymbol['dau']!;
+      case 'duoi':
+        // "Đuôi" = the last two digits of the special prize, which is exactly what the account's Đề already is.
+        type = has('duoi') ? 'duoi' : (has('de') ? 'de' : 'duoi');
+        canonSym = _canonSymbol['duoi']!;
+      case 'cang':
+        type = digits == 4 ? 'cang4' : 'cang3';
+        canonSym = _canonSymbol['cang']!;
+      case 'xien':
+        return null; // a single number cannot be a xiên
+      default:
+        type = info.type!;
+        canonSym = sym;
+    }
+    final reasons = <String>[];
+    if (!has(type)) reasons.add('Loại "${typeLabel(type)}" chưa có trong cấu hình');
+    final want = type == 'cang3' ? 3 : (type == 'cang4' ? 4 : 2);
+    if (digits != want) reasons.add('Số không phải $want chữ số');
+    return (row: ParsedRow(type: type, value: value, score: points.replaceFirst(',', '.'), raw: '', reasons: reasons), canon: '$value$canonSym$points');
+  }
+
+  return (String tok, [String ctxType = '']) {
+    var m = reXien?.firstMatch(tok);
+    if (m != null) {
+      final nums = RegExp(r'\d{2}').allMatches(m.group(1)!).map((x) => x.group(0)!).toList();
+      final dotsOnly = !RegExp(r'[a-z×]').hasMatch(m.group(1)!);
+      final type = 'xien${nums.length}';
+      // "20.02x10" is also how some customers list several plain numbers, so it only means xiên when the account has that
+      // Xiên type; "20x02lo10" / "20.02xiên10" cannot mean anything else.
+      if (!(dotsOnly && m.group(2) != 'xien' && !has(type))) {
+        final reasons = [
+          'Xiên: cách tính điểm chưa được hỗ trợ, hãy kiểm tra thủ công',
+          if (!has(type)) 'Loại "${typeLabel(type)}" chưa có trong cấu hình',
+        ];
+        return _Compact(
+          [ParsedRow(type: type, value: nums.join(' '), score: m.group(3)!.replaceFirst(',', '.'), raw: '', reasons: reasons)],
+          '${nums.join('.')}${_canonSymbol['xien']}${m.group(3)}',
+        );
+      }
+    }
+    m = reDouble.firstMatch(tok);
+    if (m != null) {
+      final a = one(m.group(1)!, m.group(2)!, m.group(3)!, ctxType);
+      final b = one(m.group(1)!, m.group(4)!, m.group(5)!, ctxType);
+      if (a != null && b != null) return _Compact([a.row, b.row], '${a.canon} ${b.canon}');
+    }
+    m = reSingle.firstMatch(tok);
+    if (m != null) {
+      final a = one(m.group(1)!, m.group(2)!, m.group(3)!, ctxType);
+      if (a != null) return _Compact([a.row], a.canon);
+    }
+    return null;
+  };
+}
+
+ParsedRow _withRaw(ParsedRow r, String raw) => ParsedRow(type: r.type, value: r.value, score: r.score, raw: raw, reasons: r.reasons);
+
+Map<String, String> _aliasMapFor(List<String> betTypes, SyntaxTemplate cfg) {
   final aliasMap = <String, String>{..._builtinAliases};
   for (final t in betTypes) {
     aliasMap[foldText(t)] = t;
@@ -115,6 +257,57 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
   for (final e in cfg.typeAliases.entries) {
     aliasMap[foldText(e.key)] = e.value;
   }
+  return aliasMap;
+}
+
+class DecodedPart {
+  DecodedPart(this.text, this.decoded, this.status);
+  final String text;
+  final String decoded;
+  /// space | plain | unknown | same | changed
+  final String status;
+}
+
+class DecodedLine {
+  DecodedLine(this.original, this.parts);
+  final String original;
+  final List<DecodedPart> parts;
+  String get decoded => parts.map((p) => p.decoded).join();
+  bool get changed => parts.any((p) => p.status == 'changed');
+  bool get unknown => parts.any((p) => p.status == 'unknown');
+}
+
+/// Side-by-side check ("Đối chiếu"): each compact token in its canonical spelling next to the original. Never changes a
+/// number, never guesses: a token that is not compact notation is kept exactly as typed. Whitespace is preserved.
+List<DecodedLine> decodeMessage(String? text, {List<String> betTypes = const ['de', 'lo'], SyntaxTemplate? template, Map<String, List<String>>? kindSymbols}) {
+  final cfg = template ?? SyntaxTemplate();
+  final compact = _makeCompactParser(_compactSymbols(_aliasMapFor(betTypes, cfg), cfg, kindSymbols), betTypes);
+  return (text ?? '').split(RegExp(r'\r?\n')).map((original) {
+    // split(/(\s+)/) keeps the separators; JS `\s` ~ Dart `\s` plus a few unicode spaces, close enough for chat text
+    final pieces = <String>[];
+    var last = 0;
+    for (final m in RegExp(r'\s+').allMatches(original)) {
+      if (m.start > last) pieces.add(original.substring(last, m.start));
+      pieces.add(m.group(0)!);
+      last = m.end;
+    }
+    if (last < original.length) pieces.add(original.substring(last));
+    final parts = pieces.map((tok) {
+      if (RegExp(r'^\s+$').hasMatch(tok)) return DecodedPart(tok, tok, 'space');
+      final p = compact(foldText(tok), cfg.defaultType);
+      if (p == null) return DecodedPart(tok, tok, RegExp(r'\d').hasMatch(tok) ? 'unknown' : 'plain');
+      return DecodedPart(tok, p.canon, p.canon == tok ? 'same' : 'changed');
+    }).toList();
+    return DecodedLine(original, parts);
+  }).toList();
+}
+
+ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo'], SyntaxTemplate? template, Map<String, List<String>>? kindSymbols}) {
+  final cfg = template ?? SyntaxTemplate();
+  final markers = (cfg.stakeMarkers.isNotEmpty ? cfg.stakeMarkers : defaultStakeMarkers).map(foldText).toList();
+
+  // alias (folded) -> type key; later sources win: built-in < bet types < template
+  final aliasMap = _aliasMapFor(betTypes, cfg);
   final aliasKeys = aliasMap.keys.where((k) => k.isNotEmpty).toList()..sort((a, b) => b.length.compareTo(a.length));
   final aliasRe = aliasKeys.isEmpty ? null : RegExp('(?<![a-z0-9])(${aliasKeys.map(_escapeRe).join('|')})(?![a-z0-9])');
   final stakeRe = RegExp('^(.*?)(?:${markers.map(_escapeRe).join('|')})\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:diem|d)?\\s*\$');
@@ -122,6 +315,7 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
   final rows = <ParsedRow>[];
   final ignored = <String>[];
   var stickyType = '';
+  final compact = _makeCompactParser(_compactSymbols(aliasMap, cfg, kindSymbols), betTypes);
 
   void push(String type, bool assumed, String value, String score, String raw, [List<String> extra = const []]) {
     final reasons = [...extra];
@@ -135,6 +329,20 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
     final line = rawLine.trim();
     if (line.isEmpty) continue;
     final f = foldText(line);
+
+    // Compact notation: only when EVERY space-separated token of the line is one ("20lo100 70lo500 54lo300").
+    // A line that mixes in anything else goes through the legacy path below, exactly as before.
+    final toks = f.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    final ctxType = stickyType.isNotEmpty ? stickyType : cfg.defaultType;
+    final parsed = [for (final t in toks) compact(t, ctxType)];
+    if (toks.isNotEmpty && parsed.every((p) => p != null)) {
+      for (final p in parsed) {
+        for (final r in p!.rows) {
+          rows.add(_withRaw(r, line));
+        }
+      }
+      continue;
+    }
 
     // split the line into [type, text] segments at every hạng mục keyword
     final segments = <({String? type, String text})>[];

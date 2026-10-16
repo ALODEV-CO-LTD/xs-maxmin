@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -14,7 +16,7 @@ import '../scoring/scoring_logic.dart';
 import '../entries/dialogs.dart';
 import 'results_controller.dart';
 
-/// Nhập kết quả: lottery results per day (Miền Bắc form, Miền Trung / Miền Nam table), reading them from a photo, and the
+/// Nhập kết quả: lottery results per day (one form for every region, station chosen by chip), reading them from a photo, and the
 /// calculated "Điểm ra" list of the chosen day (frontend/src/views/ResultsView.vue).
 class ResultsScreen extends StatefulWidget {
   const ResultsScreen({super.key});
@@ -169,7 +171,7 @@ class _ResultCard extends StatelessWidget {
             if (c.error != null) _Msg(c.error!, error: true),
             if (c.saveMsg != null) _Msg(c.saveMsg!, error: false),
             const SizedBox(height: 12),
-            if (c.region == 'mb') const _NorthForm() else const _Board(),
+            const _ResultForm(),
           ],
         ]),
       ),
@@ -216,6 +218,14 @@ class _PhotoBox extends StatelessWidget {
               : 'Chụp hoặc chọn ảnh bảng kết quả Miền Nam / Miền Trung (mỗi đài một cột). Kết quả chỉ là gợi ý để bạn kiểm tra, chưa lưu cho tới khi bạn bấm "Lưu kết quả".',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.mutedColor),
         ),
+        if (c.photoPath != null && !c.ocrRunning)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(File(c.photoPath!), height: 150, width: double.infinity, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+            ),
+          ),
         if (c.ocrError != null) _Msg(c.ocrError!, error: true),
         if (c.ocrNote != null) _Msg(c.ocrNote!, error: false),
         if (c.ocrWarnings.isNotEmpty)
@@ -230,49 +240,131 @@ class _PhotoBox extends StatelessWidget {
   }
 }
 
-// ---- Miền Bắc ---------------------------------------------------------------------------------------------------
+// ---- The form of one result: Miền Bắc, or the chosen station of Miền Trung / Miền Nam --------------------------------
 
-class _NorthForm extends StatelessWidget {
-  const _NorthForm();
+class _ResultForm extends StatelessWidget {
+  const _ResultForm();
   @override
   Widget build(BuildContext context) {
     final c = context.watch<ResultsController>();
+    final st = context.watch<LotteryStations>();
+    final north = c.region == 'mb';
+    final cur = c.curStation;
+    final children = <Widget>[];
+    if (!north) {
+      children.add(_StationChips(c, st));
+      if (cur.isEmpty) {
+        children.add(Padding(padding: const EdgeInsets.only(top: 10), child: Text('Ngày này không có đài nào của miền này.', style: TextStyle(color: context.mutedColor))));
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: children);
+      }
+      children.add(const SizedBox(height: 10));
+    }
+    final name = north ? 'Miền Bắc' : st.stationName(cur);
+    final locked = c.lockedOf(cur);
+    final form = c.formOf(cur) ?? const <String, List<String>>{};
     final t = Theme.of(context).textTheme;
-    final filled = filledCount(c.mbForm);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Các giải ($filled/${c.totalBoxes} ô)', style: t.labelLarge),
-      const SizedBox(height: 8),
-      for (final p in c.structure) ...[
-        Padding(
+    children.add(InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: c.toggleGrid,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outlineVariant), borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          Expanded(child: Text(north ? 'Nhập tay các giải' : 'Nhập tay các giải · $name', style: t.labelLarge, overflow: TextOverflow.ellipsis)),
+          Text('${c.filledOf(cur)}/${c.totalBoxes}', style: TextStyle(color: context.mutedColor, fontSize: 13)),
+          const SizedBox(width: 6),
+          Icon(c.gridOpen ? Icons.expand_less : Icons.expand_more, size: 22),
+        ]),
+      ),
+    ));
+    if (c.gridOpen) {
+      children.add(const SizedBox(height: 10));
+      for (final p in c.structure) {
+        final cells = form[p.tier] ?? const <String>[];
+        final single = singleTiers.contains(p.tier);
+        children.add(Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: Text.rich(TextSpan(children: [
-            TextSpan(text: p.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            TextSpan(text: p.label.replaceAll(' (MN, MT)', ''), style: const TextStyle(fontWeight: FontWeight.w600)),
             TextSpan(text: '  ${p.count} ô · ${p.digits} số', style: t.bodySmall?.copyWith(color: context.mutedColor)),
           ])),
-        ),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          for (var k = 0; k < p.count; k++)
+        ));
+        children.add(Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          for (var k = 0; k < cells.length; k++)
             DigitCell(
-              value: c.mbForm[p.tier]![k],
+              key: ValueKey('$cur-${p.tier}-$k'),
+              value: cells[k],
               digits: p.digits,
-              readOnly: c.mbLocked,
-              onChanged: (v) => c.setCell(null, p, k, v),
-              semantic: '${p.label} số ${k + 1}',
+              readOnly: locked,
+              bad: north ? (cells[k].trim().isNotEmpty && cells[k].trim().length != p.digits) : c.cellBad(cur, p, cells[k], k),
+              big: p.tier == 'dacBiet',
+              onChanged: (v) => c.setCell(north ? null : cur, p, k, v),
+              semantic: '${p.label} $name số ${k + 1}',
             ),
-        ]),
-        const SizedBox(height: 10),
-      ],
-      Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.end, children: [
-        if (c.mbSaved)
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(foregroundColor: context.badColor, minimumSize: const Size(0, 44)),
-            onPressed: c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, 'mb'),
-            child: Text(c.deleting == 'mb' ? 'Đang xoá...' : 'Xoá kết quả này'),
-          ),
-        OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: c.mbLocked ? c.unlockMb : null, child: const Text('Sửa')),
-        TextButton(onPressed: c.clearForm, child: const Text('Xoá form')),
-        _SaveButton(c),
-      ]),
+          if (!locked && !single) ...[
+            _CellButton(icon: Icons.add, tooltip: 'Thêm ô ${p.label}', onPressed: cells.length >= p.count + maxExtraCells ? null : () => c.addCell(north ? null : cur, p)),
+            if (cells.length > p.count) _CellButton(icon: Icons.remove, tooltip: 'Bớt ô ${p.label}', onPressed: () => c.removeCell(north ? null : cur, p)),
+          ],
+        ]));
+        children.add(const SizedBox(height: 10));
+      }
+    }
+    children.add(const SizedBox(height: 12));
+    children.add(Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.end, children: [
+      if (c.savedOf(cur))
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(foregroundColor: context.badColor, minimumSize: const Size(0, 44)),
+          onPressed: c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, cur),
+          child: Text(c.deleting == cur ? 'Đang xoá...' : 'Xoá kết quả này'),
+        ),
+      OutlinedButton(
+        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+        onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null,
+        child: const Text('Sửa'),
+      ),
+      TextButton(onPressed: c.clearForm, child: const Text('Xoá form')),
+      _SaveButton(c),
+    ]));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+  }
+}
+
+class _CellButton extends StatelessWidget {
+  const _CellButton({required this.icon, required this.tooltip, required this.onPressed});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 40,
+        height: 40,
+        child: IconButton.outlined(tooltip: tooltip, padding: EdgeInsets.zero, iconSize: 20, icon: Icon(icon), onPressed: onPressed),
+      );
+}
+
+/// One chip per station of the day (the schedule plus the ones added), and "+ Đài khác (N)" for the rest of the region.
+class _StationChips extends StatelessWidget {
+  const _StationChips(this.c, this.st);
+  final ResultsController c;
+  final LotteryStations st;
+  @override
+  Widget build(BuildContext context) {
+    final others = c.otherStations;
+    return Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+      for (final s in c.boardStations)
+        ChoiceChip(
+          selected: c.curStation == s,
+          showCheckmark: false,
+          label: Text('${st.stationName(s)}${c.boardSaved.contains(s) ? ' ✓' : ''}'),
+          onSelected: (_) => c.selectStation(s),
+        ),
+      if (others.isNotEmpty)
+        PopupMenuButton<String>(
+          tooltip: 'Thêm đài khác',
+          onSelected: c.addStation,
+          itemBuilder: (_) => [for (final o in others) PopupMenuItem(value: o.value, child: Text(o.label))],
+          child: IgnorePointer(child: ActionChip(label: Text('+ Đài khác (${others.length})'), onPressed: () {})),
+        ),
     ]);
   }
 }
@@ -363,99 +455,6 @@ class _DigitCellState extends State<DigitCell> {
         ),
       ),
     );
-  }
-}
-
-// ---- Miền Trung / Miền Nam --------------------------------------------------------------------------------------
-
-class _Board extends StatelessWidget {
-  const _Board();
-  @override
-  Widget build(BuildContext context) {
-    final c = context.watch<ResultsController>();
-    final st = context.watch<LotteryStations>();
-    final cols = c.boardStations;
-    if (cols.isEmpty) return Text('Ngày này không có đài nào của miền này.', style: TextStyle(color: context.mutedColor));
-    final tiers = c.structure.reversed.toList(); // Giải tám at the top, Đặc biệt at the bottom
-    const labelW = 56.0;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      LayoutBuilder(builder: (context, box) {
-        // The columns share the screen width (no sideways scrolling for up to 4 stations on a phone).
-        final colW = ((box.maxWidth - labelW) / cols.length).clamp(64.0, 220.0);
-        final border = BorderSide(color: Theme.of(context).colorScheme.outlineVariant);
-        Widget cell(Widget child, {double? w, Color? bg, bool top = false}) => Container(
-              width: w ?? colW,
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-              decoration: BoxDecoration(color: bg, border: Border(bottom: border, left: border, top: top ? border : BorderSide.none)),
-              child: child,
-            );
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Column(children: [
-            IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              cell(const Text('Giải', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)), w: labelW, top: true),
-              for (final s in cols)
-                cell(
-                  Column(children: [
-                    Text(st.stationName(s), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                    if (c.boardSaved.contains(s)) Text('đã lưu', style: TextStyle(fontSize: 11, color: context.okColor, fontWeight: FontWeight.w600)),
-                  ]),
-                  bg: c.boardSaved.contains(s) ? context.okColor.withValues(alpha: 0.08) : null,
-                  top: true,
-                ),
-            ])),
-            for (final p in tiers)
-              IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                cell(Text(p.label.replaceAll(' (MN, MT)', ''), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)), w: labelW),
-                for (final s in cols)
-                  cell(
-                    Column(mainAxisSize: MainAxisSize.min, children: [
-                      for (var k = 0; k < p.count; k++)
-                        Padding(
-                          padding: EdgeInsets.only(top: k == 0 ? 0 : 4),
-                          child: DigitCell(
-                            value: c.board[s]?[p.tier]?[k] ?? '',
-                            digits: p.digits,
-                            readOnly: c.boardLocked(s),
-                            bad: c.cellBad(s, p, c.board[s]?[p.tier]?[k] ?? ''),
-                            big: p.tier == 'dacBiet',
-                            maxWidth: colW - 6,
-                            semantic: '${p.label} ${st.stationName(s)} số ${k + 1}',
-                            onChanged: (v) => c.setCell(s, p, k, v),
-                          ),
-                        ),
-                    ]),
-                  ),
-              ])),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              cell(const SizedBox.shrink(), w: labelW),
-              for (final s in cols)
-                cell(
-                  Column(mainAxisSize: MainAxisSize.min, children: [
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 38), padding: EdgeInsets.zero),
-                      onPressed: c.boardLocked(s) ? () => c.unlockColumn(s) : null,
-                      child: const Text('Sửa'),
-                    ),
-                    if (c.boardSaved.contains(s))
-                      TextButton(
-                        style: TextButton.styleFrom(foregroundColor: context.badColor, minimumSize: const Size(double.infinity, 38), padding: EdgeInsets.zero),
-                        onPressed: c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, s),
-                        child: Text(c.deleting == s ? 'Đang xoá...' : 'Xoá kết quả', style: const TextStyle(fontSize: 12.5)),
-                      ),
-                  ]),
-                ),
-            ]),
-          ]),
-        );
-      }),
-      const SizedBox(height: 12),
-      Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.end, children: [
-        OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: cols.any(c.boardLocked) ? c.unlockAllColumns : null, child: const Text('Sửa')),
-        TextButton(onPressed: c.clearForm, child: const Text('Xoá form')),
-        _SaveButton(c),
-      ]),
-    ]);
   }
 }
 

@@ -61,7 +61,10 @@ void main() {
     await tester.tap(find.text('An').last);
     await tester.pumpAndSettle();
     // (with the heading gone the summary and the first day are already on screen)
-    expect(find.text('Còn lại = gửi − trúng', skipOffstage: false), findsWidgets);
+    expect(find.text('(1) Tiền khách gửi', skipOffstage: false), findsWidgets);
+    expect(find.text('(2) Tiền khách trúng', skipOffstage: false), findsWidgets);
+    expect(find.text('(3) Còn lại = (1) − (2)', skipOffstage: false), findsWidgets);
+    expect(find.text('Tất cả các miền', skipOffstage: false), findsWidgets);
     await tester.scrollUntilVisible(find.text('Số lô'), 200, scrollable: find.byType(Scrollable).first);
     expect(tester.takeException(), isNull);
   });
