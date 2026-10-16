@@ -134,6 +134,17 @@ class _MessagingHostState extends State<MessagingHost> with WidgetsBindingObserv
     if (payload != null) WidgetsBinding.instance.addPostFrameCallback((_) => _onNoticeTap(payload));
   }
 
+  /// A chat page is pushed above the tabs; any other route is a tab and is switched to.
+  void _open(String route) {
+    final r = widget.router;
+    if (r == null) return;
+    if (route.startsWith('/friends/chat/')) {
+      r.push(route);
+    } else {
+      r.go(route);
+    }
+  }
+
   void _onNoticeTap(String? payload) {
     final hub = _hub;
     final t = parseNoticePayload(payload);
@@ -141,7 +152,7 @@ class _MessagingHostState extends State<MessagingHost> with WidgetsBindingObserv
     final route = routeForTarget(t);
     if (route == null) return;
     if (t.friendId != null && hub.chat?.openPeer == t.friendId) return; // already looking at it
-    widget.router?.push(route);
+    _open(route);
   }
 
   void _onHub() {
@@ -183,7 +194,7 @@ class _MessagingHostState extends State<MessagingHost> with WidgetsBindingObserv
   void _openBanner(AppBanner b) {
     setState(() => _banner = null);
     _bannerTimer?.cancel();
-    if (b.route != null) widget.router?.push(b.route!);
+    if (b.route != null) _open(b.route!);
   }
 
   @override

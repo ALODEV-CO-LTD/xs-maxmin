@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/api_client.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/scoring_config.dart';
+import '../../core/scoring_config_bus.dart';
 import '../../core/theme.dart';
 import 'customer_model.dart';
 import 'customers_controller.dart';
@@ -100,18 +101,21 @@ class _CustomerConfigScreenState extends State<CustomerConfigScreen> {
   }
 }
 
-/// The account-wide default config (GET/PUT /me/scoring-settings).
+/// Cấu hình: the account-wide default scoring config (GET/PUT /me/scoring-settings), a tab of the bottom bar.
 class DefaultConfigScreen extends StatelessWidget {
   const DefaultConfigScreen({super.key, this.onSaved});
   final void Function(RatesMap saved)? onSaved;
   @override
   Widget build(BuildContext context) {
+    final bus = Provider.of<ScoringConfigBus?>(context, listen: false);
     return Scaffold(
-      appBar: AppBar(title: const Text('Cấu hình tính điểm mặc định')),
+      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Cấu hình tính điểm mặc định')),
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.all(16), children: [
           ScoringConfigEditor(onSaved: (m) {
-            if (m != null) onSaved?.call(m);
+            if (m == null) return;
+            bus?.publish(m);
+            onSaved?.call(m);
           }),
         ]),
       ),

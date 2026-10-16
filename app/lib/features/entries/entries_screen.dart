@@ -202,8 +202,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
 
   Widget _header(BuildContext context, EntriesController c, bool masked, List<Entry> shown) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text('Nhập số', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
       const Align(alignment: Alignment.centerLeft, child: MaskBar()),
       const SizedBox(height: 10),
       if (c.packageActive == false) const InfoBox('Gói của bạn đã hết hạn. Vui lòng gia hạn ở mục Gói dịch vụ để tiếp tục nhập số liệu.', kind: InfoKind.warning),

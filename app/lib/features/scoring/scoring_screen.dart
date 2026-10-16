@@ -10,6 +10,7 @@ import '../../core/lottery_stations.dart';
 import '../../core/mask_store.dart';
 import '../../core/scoring_config.dart';
 import '../../core/theme.dart';
+import '../calc/calc_screen.dart';
 import '../../core/widgets/masked_text.dart';
 import 'date_field.dart';
 import 'delete_data_dialog.dart';
@@ -76,8 +77,6 @@ class _Body extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Text('Tính điểm', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 4),
         Text(
           'Điểm ra được máy tự động tính và lưu theo kết quả xổ số đã nhập ở màn Nhập kết quả. Tỉ lệ ăn của từng khách chỉnh ở màn Khách hàng.',
           style: t.bodySmall?.copyWith(color: context.mutedColor),
@@ -455,7 +454,7 @@ class _DayCard extends StatelessWidget {
               'no' => _StateChip('Chưa có kết quả xổ số', Brand.warning),
               _ => _StateChip('Đang kiểm tra...', context.mutedColor),
             },
-            if (day.lottery == 'partial' || day.lottery == 'no') TextButton(onPressed: () => context.go('/results?date=${day.date}'), child: const Text('Nhập kết quả')),
+            if (day.lottery == 'partial' || day.lottery == 'no') TextButton(onPressed: () => context.go(calcLocation('results', date: day.date)), child: const Text('Nhập kết quả')),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: context.badColor),
               onPressed: () async {

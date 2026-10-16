@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// MAMBA colours (frontend/src/styles/tokens.css): dark by default, with the light variant.
+/// MAMBA colours (frontend/src/styles/tokens.css): white background, black text, thin green borders, green accent, no
+/// gradients (the customer's design). The app shows the light theme; the dark variant keeps the same green accent.
 class Brand {
-  static const primaryDark = Color(0xFF8B5CF6);
-  static const primaryLight = Color(0xFF7C3AED);
+  static const primaryDark = Color(0xFF22C55E);
+  static const primaryLight = Color(0xFF16A34A);
   static const gold = Color(0xFFD4AF37);
   static const success = Color(0xFF4ADE80);
   static const successLight = Color(0xFF15803D);
@@ -15,15 +16,15 @@ class Brand {
 ThemeData _build(Brightness b) {
   final dark = b == Brightness.dark;
   final primary = dark ? Brand.primaryDark : Brand.primaryLight;
-  final bg = dark ? const Color(0xFF09090B) : const Color(0xFFF8FAFC);
+  final bg = dark ? const Color(0xFF09090B) : Colors.white;
   final card = dark ? const Color(0xFF18181B) : Colors.white;
-  final surface = dark ? const Color(0xFF232326) : const Color(0xFFF1F5F9);
-  final border = dark ? const Color(0xFF343438) : const Color(0xFFE2E8F0);
-  final inputBorder = dark ? const Color(0xFF71717A) : const Color(0xFF7C889B);
-  final text = dark ? const Color(0xFFFAFAFA) : const Color(0xFF18181B);
+  final surface = dark ? const Color(0xFF232326) : const Color(0xFFF6FAF7);
+  final border = dark ? const Color(0xFF343438) : const Color(0xFFD9E8DD);
+  final inputBorder = primary; // thin green outline on every field and outlined button
+  final text = dark ? const Color(0xFFFAFAFA) : Colors.black;
   final scheme = ColorScheme.fromSeed(seedColor: primary, brightness: b).copyWith(
     primary: primary,
-    onPrimary: Colors.white,
+    onPrimary: dark ? const Color(0xFF052E16) : Colors.white,
     surface: card,
     onSurface: text,
     surfaceContainerHighest: surface,
@@ -41,7 +42,7 @@ ThemeData _build(Brightness b) {
     appBarTheme: AppBarTheme(backgroundColor: card, foregroundColor: text, elevation: 0, scrolledUnderElevation: 0),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: surface,
+      fillColor: dark ? surface : card,
       border: ob(inputBorder),
       enabledBorder: ob(inputBorder),
       focusedBorder: ob(primary, 2),
@@ -51,7 +52,7 @@ ThemeData _build(Brightness b) {
     filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
     outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48), side: BorderSide(color: inputBorder), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
     chipTheme: ChipThemeData(shape: const StadiumBorder(), side: BorderSide(color: border)),
-    navigationBarTheme: NavigationBarThemeData(backgroundColor: card, indicatorColor: primary.withValues(alpha: 0.2)),
+    navigationBarTheme: NavigationBarThemeData(backgroundColor: card, indicatorColor: primary.withValues(alpha: dark ? 0.2 : 0.14)),
     dividerTheme: DividerThemeData(color: border),
   );
 }

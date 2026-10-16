@@ -9,7 +9,8 @@ import 'package:mamba_app/features/friends/call_service.dart';
 import 'package:mamba_app/features/friends/friends_controller.dart';
 import 'package:mamba_app/features/friends/messaging_host.dart';
 import 'package:mamba_app/features/friends/realtime_socket.dart';
-import 'package:mamba_app/features/shell/more_screen.dart';
+import 'package:mamba_app/features/shell/app_shell.dart';
+import 'package:go_router/go_router.dart';
 
 class _Auth extends AuthStore {
   _Auth() {
@@ -163,12 +164,25 @@ void main() {
     expect(find.text('riêng tư'), findsNothing); // nothing leaks over the lock screen
   });
 
-  testWidgets('Bạn bè entry on the Thêm tab shows the unread total', (tester) async {
+  testWidgets('the Bạn bè tab of the bottom bar shows the unread total', (tester) async {
     final auth = _Auth();
     late SpyHub hub;
-    await tester.pumpWidget(MaterialApp(
-      home: MessagingHost(auth: auth, api: _api(auth), factory: (a, b) => hub = SpyHub(a, b), child: const Scaffold(body: MoreScreen())),
+    final router = GoRouter(
+      initialLocation: '/overview',
+      routes: [
+        StatefulShellRoute.indexedStack(
+          builder: (_, _, shell) => AppShell(shell: shell),
+          branches: [
+            for (final p in ['/overview', '/calc', '/friends', '/config', '/account']) StatefulShellBranch(routes: [GoRoute(path: p, builder: (_, _) => Text(p))]),
+          ],
+        ),
+      ],
+    );
+    await tester.pumpWidget(MaterialApp.router(
+      routerConfig: router,
+      builder: (context, child) => Overlay(initialEntries: [OverlayEntry(builder: (_) => MessagingHost(auth: auth, api: _api(auth), factory: (a, b) => hub = SpyHub(a, b), child: child!))]),
     ));
+    await tester.pumpAndSettle();
     expect(find.byType(Badge), findsNothing);
     auth.signIn('user');
     await tester.pump();

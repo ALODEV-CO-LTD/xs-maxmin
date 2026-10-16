@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/format.dart';
 import '../../core/mask_store.dart';
+import '../../core/scoring_config_bus.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/masked_text.dart';
 import '../entries/dialogs.dart';
@@ -34,6 +35,28 @@ class _CustomersBody extends StatefulWidget {
 class _CustomersBodyState extends State<_CustomersBody> {
   String _message = '';
   String? _busyId;
+  ScoringConfigBus? _bus;
+
+  @override
+  void initState() {
+    super.initState();
+    // The default config is edited in the Cấu hình tab: take the saved one.
+    _bus = Provider.of<ScoringConfigBus?>(context, listen: false)?..addListener(_onConfigSaved);
+  }
+
+  void _onConfigSaved() {
+    final rates = _bus?.rates;
+    if (rates == null || !mounted) return;
+    final c = context.read<CustomersController>();
+    c.accountRates = rates;
+    c.invalidate();
+  }
+
+  @override
+  void dispose() {
+    _bus?.removeListener(_onConfigSaved);
+    super.dispose();
+  }
 
   Future<void> _add(CustomersController c) async {
     final created = await showAddCustomerDialog(context);
@@ -108,8 +131,6 @@ class _CustomersBodyState extends State<_CustomersBody> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            Text('Khách hàng', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
             Text('Số liệu vào/ra được tổng hợp từ các lượt nhập.', style: TextStyle(fontSize: 13, color: context.mutedColor)),
             const SizedBox(height: 10),
             if (c.fromCache) const InfoBox('Đang offline: hiển thị số liệu đã lưu trên máy. Thêm/xoá khách hàng cần có mạng.', kind: InfoKind.warning),
@@ -123,11 +144,6 @@ class _CustomersBodyState extends State<_CustomersBody> {
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 FilledButton.icon(onPressed: () => _add(c), icon: const Icon(Icons.add), label: const Text('Thêm khách hàng')),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DefaultConfigScreen(onSaved: (m) { c.accountRates = m; c.invalidate(); }))),
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Cấu hình tính điểm mặc định'),
-                ),
               ]),
               const SizedBox(height: 10),
               TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: Icon(Icons.search)), onChanged: c.setQuery),

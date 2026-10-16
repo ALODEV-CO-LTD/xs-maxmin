@@ -111,7 +111,7 @@ class _AdminShellState extends State<AdminShell> {
             const Divider(height: 1),
             ListTile(leading: const Icon(Icons.person_outline), title: const Text('Tài khoản'), onTap: () {
               Navigator.pop(context);
-              context.push('/account');
+              context.push('/admin/account');
             }),
             ListTile(
               leading: const Icon(Icons.info_outline),

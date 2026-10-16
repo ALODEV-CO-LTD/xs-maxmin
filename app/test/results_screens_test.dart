@@ -33,7 +33,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(host(FakeServer(), const ResultsScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('Nhập kết quả'), findsOneWidget);
+    expect(find.textContaining('Nhập kết quả xổ số rồi bấm'), findsOneWidget); // (the heading is the Kết quả tab of Tính toán)
     expect(find.text('Lưu kết quả', skipOffstage: false), findsOneWidget);
     await tester.drag(find.byType(ListView).first, const Offset(0, -1500));
     await tester.pumpAndSettle();
@@ -54,14 +54,15 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(host(FakeServer(), const ScoringScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('Tính điểm'), findsOneWidget);
+    expect(find.textContaining('Điểm ra được máy tự động tính'), findsOneWidget); // (the heading is the Tính điểm tab of Tính toán)
     expect(find.text('Chọn khách hàng ở trên để xem điểm ra của họ.', skipOffstage: false), findsOneWidget);
     await tester.tap(find.text('-- Chọn khách hàng --'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('An').last);
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Còn lại = gửi − trúng'), 200);
-    await tester.scrollUntilVisible(find.text('Số lô'), 200);
+    // (with the heading gone the summary and the first day are already on screen)
+    expect(find.text('Còn lại = gửi − trúng', skipOffstage: false), findsWidgets);
+    await tester.scrollUntilVisible(find.text('Số lô'), 200, scrollable: find.byType(Scrollable).first);
     expect(tester.takeException(), isNull);
   });
 }

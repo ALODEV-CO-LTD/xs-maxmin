@@ -99,8 +99,6 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Nhập kết quả', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 4),
       Text(
         'Nhập kết quả xổ số rồi bấm "Lưu kết quả": điểm ra của khách hàng tự được tính và lưu. Kết quả đã lưu chỉ hiển thị; bấm "Sửa" để chỉnh.',
         style: t.bodySmall?.copyWith(color: context.mutedColor),

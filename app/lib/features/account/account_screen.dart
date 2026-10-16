@@ -10,31 +10,31 @@ import 'account_data_tab.dart';
 import 'account_devices_tab.dart';
 import 'account_packages_tab.dart';
 import 'account_profile_tab.dart';
-import 'account_stats_tab.dart';
 import 'account_widgets.dart';
 
-enum AccountTab { stats, profile, devices, packages, data }
+enum AccountTab { profile, devices, packages, data }
 
 const _tabLabels = {
-  AccountTab.stats: 'Thống kê',
   AccountTab.profile: 'Hồ sơ',
   AccountTab.devices: 'Thiết bị & riêng tư',
   AccountTab.packages: 'Gói & Thanh toán',
   AccountTab.data: 'Dữ liệu',
 };
 
-/// Tài khoản: tabs shown as separate pill buttons (Thống kê, Hồ sơ, Thiết bị & riêng tư, Gói & Thanh toán, Dữ liệu).
-/// Thống kê and Gói & Thanh toán are for customer accounts only, like the web.
+/// Tài khoản: tabs shown as separate pill buttons (Hồ sơ, Thiết bị & riêng tư, Gói & Thanh toán, Dữ liệu). The statistics are
+/// the Tổng quan tab of the app. Gói & Thanh toán is for customer accounts only, like the web.
+/// [embedded]: the body of the customer's bottom-bar tab (no back arrow); otherwise a page the Admin opens (back arrow).
 class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key, this.initialTab});
+  const AccountScreen({super.key, this.initialTab, this.embedded = false});
   final AccountTab? initialTab;
+  final bool embedded;
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
 
 class _AccountScreenState extends State<AccountScreen> {
   late final AccountController _ctl = AccountController(context.read<ApiClient>());
-  late AccountTab _tab = widget.initialTab ?? AccountTab.stats;
+  late AccountTab _tab = widget.initialTab ?? AccountTab.profile;
   final _scroll = ScrollController();
   final _keys = {for (final t in AccountTab.values) t: GlobalKey()};
 
@@ -53,7 +53,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
   List<AccountTab> get _tabs => [
         for (final t in AccountTab.values)
-          if (!(context.read<AuthStore>().isAdmin && (t == AccountTab.stats || t == AccountTab.packages))) t,
+          if (!(context.read<AuthStore>().isAdmin && t == AccountTab.packages)) t,
       ];
 
   void _select(AccountTab t) {
@@ -72,7 +72,8 @@ class _AccountScreenState extends State<AccountScreen> {
       appBar: AppBar(
         title: const Text('Tài khoản'),
         actions: [IconButton(icon: const Icon(Icons.logout), tooltip: 'Đăng xuất', onPressed: () => confirmLogout(context))],
-        leading: context.canPop() ? null : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/more')),
+        automaticallyImplyLeading: !widget.embedded,
+        leading: widget.embedded || context.canPop() ? null : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/admin')),
       ),
       body: ListenableBuilder(
         listenable: _ctl,
@@ -115,7 +116,6 @@ class _AccountScreenState extends State<AccountScreen> {
       );
     }
     final tab = switch (_tab) {
-      AccountTab.stats => const AccountStatsTab(),
       AccountTab.profile => AccountProfileTab(ctl: _ctl),
       AccountTab.devices => const AccountDevicesTab(),
       AccountTab.packages => AccountPackagesTab(ctl: _ctl),

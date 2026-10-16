@@ -8,6 +8,7 @@ import 'core/api_client.dart';
 import 'core/auth_store.dart';
 import 'core/lottery_stations.dart';
 import 'core/mask_store.dart';
+import 'core/scoring_config_bus.dart';
 import 'core/theme.dart';
 import 'features/account/account_screen.dart';
 import 'features/account/privacy/privacy_gate.dart';
@@ -15,8 +16,8 @@ import 'features/account/privacy/privacy_store.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/recover_screen.dart';
 import 'features/auth/register_screen.dart';
-import 'features/customers/customers_screen.dart';
-import 'features/entries/entries_screen.dart';
+import 'features/calc/calc_screen.dart';
+import 'features/customers/customer_config_screen.dart';
 import 'features/friends/call_ringer.dart';
 import 'features/friends/chat_route.dart';
 import 'features/friends/friends_screen.dart';
@@ -24,24 +25,43 @@ import 'features/friends/keep_alive.dart';
 import 'features/friends/messaging_host.dart';
 import 'features/friends/notifications.dart';
 import 'features/friends/push_registrar.dart';
-import 'features/results/results_screen.dart';
-import 'features/scoring/scoring_screen.dart';
+import 'features/overview/overview_screen.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/shell/app_shell.dart';
 import 'features/shell/update_gate.dart';
-import 'features/shell/more_screen.dart';
 
 const _authRoutes = {'/login', '/register', '/recover'};
 
+/// The home tab of a customer.
+const homeRoute = '/overview';
+
+// Paths of the older navigation (Nhập số / Kết quả / Tính điểm / Khách hàng were bottom tabs, Thêm held the rest) still work:
+// they open the matching sub-tab of Tính toán.
+const _legacyCalc = {'/entries': 'entries', '/results': 'results', '/scoring': 'scoring', '/customers': 'customers'};
+
+/// Opens an in-app route: a chat page goes on top of the tabs (push), a tab is switched to (go) so it is not stacked twice.
+void openAppRoute(GoRouter router, String route) {
+  if (route.startsWith('/friends/chat/')) {
+    router.push(route);
+  } else {
+    router.go(route);
+  }
+}
+
 GoRouter buildRouter(AuthStore auth) => GoRouter(
-      initialLocation: '/entries',
+      initialLocation: homeRoute,
       refreshListenable: auth,
       redirect: (context, state) {
         if (!auth.ready) return null;
         final loc = state.matchedLocation;
         if (!auth.signedIn) return _authRoutes.contains(loc) ? null : '/login';
-        if (auth.isAdmin) return (loc == '/admin' || loc == '/account') ? null : '/admin';
-        if (_authRoutes.contains(loc) || loc == '/admin' || loc == '/') return '/entries';
+        if (auth.isAdmin) return (loc == '/admin' || loc == '/admin/account') ? null : '/admin';
+        if (_authRoutes.contains(loc) || loc == '/admin' || loc == '/admin/account' || loc == '/' || loc == '/more') return homeRoute;
+        final legacy = _legacyCalc[loc];
+        if (legacy != null) {
+          final q = state.uri.queryParameters;
+          return '/calc?tab=$legacy${q['date'] == null ? '' : '&date=${q['date']}'}';
+        }
         return null;
       },
       routes: [
@@ -49,17 +69,18 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
         GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
         GoRoute(path: '/recover', builder: (_, _) => const RecoverScreen()),
         GoRoute(path: '/admin', builder: (_, _) => const AdminShell()),
-        GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
+        // The Admin opens the account screen from the drawer (a pushed page with a back arrow, no customer tab bar).
+        GoRoute(path: '/admin/account', builder: (_, _) => const AccountScreen()),
         GoRoute(path: '/friends/chat/:id', builder: (_, state) => ChatRoutePage(friendId: state.pathParameters['id'] ?? '')),
-        GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
+        for (final p in [..._legacyCalc.keys, '/more']) GoRoute(path: p, builder: (_, _) => const SizedBox.shrink()),
         StatefulShellRoute.indexedStack(
           builder: (_, _, shell) => AppShell(shell: shell),
           branches: [
-            StatefulShellBranch(routes: [GoRoute(path: '/entries', builder: (_, _) => const EntriesScreen())]),
-            StatefulShellBranch(routes: [GoRoute(path: '/results', builder: (_, _) => const ResultsScreen())]),
-            StatefulShellBranch(routes: [GoRoute(path: '/scoring', builder: (_, _) => const ScoringScreen())]),
-            StatefulShellBranch(routes: [GoRoute(path: '/customers', builder: (_, _) => const CustomersScreen())]),
-            StatefulShellBranch(routes: [GoRoute(path: '/more', builder: (_, _) => const MoreScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/overview', builder: (_, _) => const OverviewScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/calc', builder: (_, _) => const CalcScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/config', builder: (_, _) => const DefaultConfigScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/account', builder: (_, _) => const AccountScreen(embedded: true))]),
           ],
         ),
       ],
@@ -79,6 +100,7 @@ class _MambaAppState extends State<MambaApp> {
   final MaskStore _mask = MaskStore()..load();
   final AdminSession _admin = AdminSession();
   final PrivacyStore _privacy = PrivacyStore();
+  final ScoringConfigBus _configBus = ScoringConfigBus();
   late final GoRouter _router = buildRouter(_auth);
   // Messaging pieces that live as long as the app (the hub itself is per signed-in customer, see MessagingHost).
   final LocalNotifier _notifier = LocalNotifier();
@@ -88,7 +110,7 @@ class _MambaAppState extends State<MambaApp> {
   late final PushRegistrar _push = PushRegistrar(
     auth: _auth,
     api: _api,
-    openRoute: (r) => _router.push(r),
+    openRoute: (r) => openAppRoute(_router, r),
     explain: _explainPush,
   );
 
@@ -131,13 +153,14 @@ class _MambaAppState extends State<MambaApp> {
         ChangeNotifierProvider<MaskStore>.value(value: _mask),
         ChangeNotifierProvider<AdminSession>.value(value: _admin),
         ChangeNotifierProvider<PrivacyStore>.value(value: _privacy),
+        ChangeNotifierProvider<ScoringConfigBus>.value(value: _configBus),
       ],
       child: MaterialApp.router(
         title: 'MAMBA',
         debugShowCheckedModeBanner: false,
         theme: lightTheme,
-        darkTheme: darkTheme,
-        themeMode: ThemeMode.dark,
+        // Always the light theme (white, green accents): the customer's design has no dark mode.
+        themeMode: ThemeMode.light,
         routerConfig: _router,
         builder: (context, child) => MessagingHost(
           auth: _auth,
