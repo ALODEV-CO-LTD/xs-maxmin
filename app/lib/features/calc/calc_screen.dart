@@ -18,7 +18,11 @@ int _nonce = 0;
 
 /// Where to go to open a sub-tab of Tính toán. The `n` makes every link a new location, so opening the same tab twice still
 /// moves to it after the user switched tabs by hand.
-String calcLocation(String tab, {String? date}) => '/calc?tab=$tab${date == null ? '' : '&date=$date'}&n=${++_nonce}';
+///
+/// Tính điểm can also be opened on one [customer] and [date] with a note "Đã thêm [added] số liệu" (after the numbers of a
+/// chat were saved in Nhập số).
+String calcLocation(String tab, {String? date, String? customer, int? added}) =>
+    '/calc?tab=$tab${date == null ? '' : '&date=$date'}${customer == null ? '' : '&customer=${Uri.encodeQueryComponent(customer)}'}${added == null ? '' : '&added=$added'}&n=${++_nonce}';
 
 /// Tính toán: Nhập số | Kết quả | Tính điểm | Khách hàng as tabs; each keeps its state while another is shown.
 class CalcScreen extends StatefulWidget {

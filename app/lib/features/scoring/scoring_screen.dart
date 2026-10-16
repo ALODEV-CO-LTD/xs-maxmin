@@ -33,12 +33,32 @@ class ScoringScreen extends StatefulWidget {
 
 class _ScoringScreenState extends State<ScoringScreen> {
   late final ScoringController _c;
+  Future<void>? _loaded;
+  String? _linkKey;
 
   @override
   void initState() {
     super.initState();
     _c = ScoringController(context.read<ApiClient>(), context.read<LotteryStations>());
-    _c.load();
+    _loaded = _c.load();
+  }
+
+  // A link such as /calc?tab=scoring&customer=An&date=...&added=3 (after the numbers of a chat were saved in Nhập số):
+  // open that customer and day, with a note.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    Uri? uri;
+    try {
+      uri = GoRouterState.of(context).uri;
+    } catch (_) {/* not under a router (tests) */}
+    final q = uri?.queryParameters;
+    if (uri == null || q == null || q['tab'] != 'scoring' || (q['customer'] ?? '').isEmpty || uri.toString() == _linkKey) return;
+    _linkKey = uri.toString();
+    final customer = q['customer']!, date = q['date'] ?? '', added = int.tryParse(q['added'] ?? '') ?? 0;
+    _loaded?.then((_) {
+      if (mounted) _c.focusOn(customer: customer, date: date, added: added);
+    });
   }
 
   @override

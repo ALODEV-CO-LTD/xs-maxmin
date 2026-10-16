@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/bet_types.dart';
 import '../../core/scoring_config.dart';
 import '../../core/theme.dart';
+import '../calc/calc_screen.dart';
 import 'dialogs.dart';
 import 'entries_controller.dart';
 import 'message_parser.dart';
@@ -21,8 +23,11 @@ Future<String?> _pickImagePath(ImageSource source) async => (await ImagePicker()
 /// (uncertain lines highlighted and unticked) -> the user edits, ticks and confirms -> only then is anything stored.
 /// Nothing is ever saved automatically.
 class QuickEntryBox extends StatefulWidget {
-  const QuickEntryBox({super.key, required this.controller, this.recognize = recognizeImageText, this.pickPath = _pickImagePath});
+  const QuickEntryBox({super.key, required this.controller, this.recognize = recognizeImageText, this.pickPath = _pickImagePath, this.goToScoring});
   final EntriesController controller;
+
+  /// After numbers that came from a chat are all saved: open Tính điểm on [customer] and [date] (default: the router).
+  final void Function(BuildContext context, String customer, String date, int added)? goToScoring;
   final Future<String> Function(String path) recognize;
   final PickImagePath pickPath;
   @override
@@ -53,6 +58,15 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
     super.initState();
     _loadDraft();
     c.addListener(_onController);
+    _takeChatText();
+  }
+
+  // Text handed over from the chat ("Dùng cho Nhập số"): into the box, then analysed like a pasted message.
+  void _takeChatText() {
+    final t = c.takeBoxPrefill();
+    if (t == null) return;
+    _text.text = t;
+    _analyze();
   }
 
   // The customer was changed: the template of the new one fills the template fields and a preview made for the old
@@ -69,6 +83,7 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
         _templateMsg = '';
       });
     }
+    if (mounted) _takeChatText();
   }
 
   @override
@@ -196,6 +211,7 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
       d.dispose();
     });
     if (!mounted) return;
+    final savedCount = picked.where((d) => !_drafts.contains(d)).length;
     setState(() {
       _saving = false;
       _error = err;
@@ -205,6 +221,16 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
         _photoPath = null;
       }
     });
+    // Numbers that came from a chat: once they are all saved, go to Tính điểm on that customer and day (web: fromChat).
+    if (c.fromChat && savedCount > 0 && err.isEmpty && _drafts.isEmpty) {
+      c.fromChat = false;
+      final go = widget.goToScoring ?? _goToScoring;
+      go(context, c.selectedName.trim(), c.entryDate, savedCount);
+    }
+  }
+
+  static void _goToScoring(BuildContext context, String customer, String date, int added) {
+    GoRouter.maybeOf(context)?.go(calcLocation('scoring', customer: customer, date: date, added: added));
   }
 
   void _toForm() {

@@ -10,6 +10,7 @@ import '../../core/lottery_stations.dart';
 import '../../core/mask_store.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/masked_text.dart';
+import '../chat_calc/chat_prefill.dart';
 import '../customers/add_customer_dialog.dart';
 import 'dialogs.dart';
 import 'edit_entry_sheet.dart';
@@ -46,7 +47,22 @@ class _EntriesBodyState extends State<_EntriesBody> {
   bool _bulkBusy = false;
 
   @override
+  void initState() {
+    super.initState();
+    ChatPrefillHub.instance.addListener(_takePrefill);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takePrefill());
+  }
+
+  /// "Dùng cho Nhập số" from the chat: hand the text, customer, date and đài to the form.
+  void _takePrefill() {
+    final p = ChatPrefillHub.instance.take();
+    if (p == null || !mounted) return;
+    context.read<EntriesController>().applyChatPrefill(p);
+  }
+
+  @override
   void dispose() {
+    ChatPrefillHub.instance.removeListener(_takePrefill);
     _search.dispose();
     super.dispose();
   }

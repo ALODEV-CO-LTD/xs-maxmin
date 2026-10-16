@@ -127,6 +127,22 @@ class ScoringController extends ChangeNotifier {
     _filtersChanged();
   }
 
+  /// Opened from the chat flow: the customer and the day just entered in Nhập số, with the note "Đã thêm N số liệu".
+  /// Does nothing when that customer is not in the list. Returns whether it was applied.
+  bool focusOn({required String customer, String date = '', int added = 0}) {
+    if (customer.isEmpty || !customers.any((c) => c.name == customer)) return false;
+    selectedCustomer = customer;
+    if (date.isNotEmpty) {
+      dateFrom = dateTo = date;
+      preset = 'custom';
+    }
+    if (added > 0) {
+      notice = 'Đã thêm $added số liệu cho $customer${date.isEmpty ? '' : ' ngày ${viDate(date)}'}. Điểm ra được tính theo kết quả xổ số đã nhập.';
+    }
+    _filtersChanged();
+    return true;
+  }
+
   void setRegionFilter(String r) {
     regionFilter = r;
     _filtersChanged();

@@ -10,6 +10,7 @@ import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/scoring_config.dart';
 import '../customers/customer_model.dart';
+import '../chat_calc/chat_prefill.dart';
 import 'entry_model.dart';
 import 'message_parser.dart';
 import 'offline_store.dart';
@@ -86,6 +87,13 @@ class EntriesController extends ChangeNotifier {
   bool submitting = false;
   String formError = '';
 
+  // ---- from the chat (Tính toán > Dùng cho Nhập số) ----
+  /// Numbers came from a chat: when they are all saved the app moves on to Tính điểm (web: `fromChat`).
+  bool fromChat = false;
+  String? _boxPrefill;
+  String? _forcedStation;
+  final Completer<void> _ready = Completer<void>();
+
   // ---- list ----
   final EntryFilter filter = EntryFilter();
   bool confirmCopy = false;
@@ -100,6 +108,7 @@ class EntriesController extends ChangeNotifier {
       if (pending > 0) sync();
     });
     await reload();
+    if (!_ready.isCompleted) _ready.complete();
     // the lottery catalog drives the station picker; it is cached by LotteryStations
     unawaited(stations.load(api).then((_) => _notify()));
   }
@@ -115,6 +124,7 @@ class EntriesController extends ChangeNotifier {
     _disposed = true;
     _timer?.cancel();
     _addedTimer?.cancel();
+    if (!_ready.isCompleted) _ready.complete();
     note.dispose();
     for (final r in rows) {
       r.dispose();
@@ -269,8 +279,31 @@ class EntriesController extends ChangeNotifier {
   }
 
   void _applyDefaultStation() {
-    station = customer?.stationCode ?? 'mb';
+    // the đài chosen in the chat wins over the customer's default, once (web: forcedStation)
+    station = _forcedStation ?? customer?.stationCode ?? 'mb';
+    _forcedStation = null;
     _fixRowTypes();
+  }
+
+  /// "Dùng cho Nhập số" from the chat: customer, date and đài as chosen there, the text goes into the quick box (which
+  /// analyses it). Waits for the first load so the customer list and the account's types are known.
+  Future<void> applyChatPrefill(ChatPrefill p) async {
+    await _ready.future;
+    if (_disposed) return;
+    fromChat = true;
+    if (p.customer.isNotEmpty) selectedName = p.customer;
+    if (p.date.isNotEmpty) entryDate = p.date;
+    _forcedStation = p.station.isNotEmpty ? p.station : null;
+    _applyDefaultStation();
+    _boxPrefill = p.text;
+    _notify();
+  }
+
+  /// The text waiting for the quick box (once).
+  String? takeBoxPrefill() {
+    final t = _boxPrefill;
+    _boxPrefill = null;
+    return t;
   }
 
   void setStation(String s) {
