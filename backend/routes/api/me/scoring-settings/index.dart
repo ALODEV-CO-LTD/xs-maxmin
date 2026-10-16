@@ -23,14 +23,9 @@ import 'package:sqlite3/sqlite3.dart';
 /// used to hold only rates, see below).
 ///
 /// GET  -> { rates: {typeKey: {rate, tiers, digits}} }  (falls back to the
-///          built-in default if the user never saved an override)
+///          "bảng cấu hình" default, defaultTableRates(), if the user never saved an override)
 /// PUT  { rates: {typeKey: {rate, tiers, digits}} } -> saves it as this
 ///      user's own
-final Map<String, dynamic> _defaultRates = {
-  'de': {'rate': 70, 'tiers': ['dacBiet'], 'digits': 2},
-  'lo': {'rate': 20, 'tiers': List<String>.from(validTiers), 'digits': 2},
-};
-
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
@@ -47,17 +42,15 @@ Response _get(RequestContext context, String userId) {
   if (self == null) return unauthorized('Tài khoản không tồn tại');
 
   final raw = self['scoring_rates'] as String?;
-  Map<String, dynamic> rates = _defaultRates;
+  Map<String, dynamic> rates = defaultTableRates();
   if (raw != null) {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map && decoded.isNotEmpty) {
-        final normalized = <String, dynamic>{};
-        for (final entry in decoded.entries) {
-          final n = normalizeRateEntry(entry.value);
-          if (n != null) normalized[entry.key as String] = n;
-        }
-        if (normalized.isNotEmpty) rates = normalized;
+        // Rows the account removed from its table are kept as {disabled: true} markers.
+        final (normalized, _) = normalizeRatesMap(decoded, allowEmpty: true, allowDisabled: true);
+        if (normalized != null && normalized.isNotEmpty) rates = normalized;
+
       }
     } catch (_) {
       // Malformed row - fall back to the built-in defaults.
@@ -76,25 +69,10 @@ Future<Response> _put(RequestContext context, String userId) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
-  final rates = body['rates'];
-  if (rates is! Map || rates.isEmpty) {
+  final (normalized, error) = normalizeRatesMap(body['rates'], allowDisabled: true);
+  if (normalized == null) return Response.json(statusCode: 400, body: {'error': error});
+  if (normalized.values.every((v) => v is Map && v['disabled'] == true)) {
     return Response.json(statusCode: 400, body: {'error': 'Cần ít nhất một loại đánh'});
-  }
-
-  final normalized = <String, dynamic>{};
-  for (final entry in rates.entries) {
-    final key = entry.key;
-    if (key is! String || key.trim().isEmpty) {
-      return Response.json(statusCode: 400, body: {'error': 'Mã loại đánh không hợp lệ'});
-    }
-    final n = normalizeRateEntry(entry.value);
-    if (n == null) {
-      return Response.json(
-        statusCode: 400,
-        body: {'error': 'Cấu hình của "$key" không hợp lệ (cần tỉ lệ > 0 và ít nhất 1 giải)'},
-      );
-    }
-    normalized[key] = n;
   }
 
   final db = context.read<Database>();

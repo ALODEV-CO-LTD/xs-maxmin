@@ -46,7 +46,7 @@ Response _list(RequestContext context, String userId) {
     body: {
       'customers': [
         for (final r in rows)
-          {'id': r['id'], 'name': r['name'], 'phone': r['phone'] ?? '', 'scoringRates': _rates(r['scoring_rates']), 'defaultStation': r['default_station'], 'createdAt': r['created_at']},
+          {'id': r['id'], 'name': r['name'], 'phone': r['phone'] ?? '', 'scoringRates': _rates(r['scoring_rates']), 'defaultStation': r['default_station'], 'homeRegion': r['home_region'], 'createdAt': r['created_at']},
       ],
     },
   );

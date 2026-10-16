@@ -75,6 +75,9 @@ void _migrateSchema(Database db) {
   // Which lottery this customer plays by default (Nhập số): 'mb', 'mt', 'mn' (all stations of that
   // region drawing that day) or one station id. NULL = Miền Bắc.
   _ensureColumn(db, 'customers', 'default_station', 'TEXT');
+  // Which region the customer belongs to: 'mb' (Miền Bắc) or 'mn' (Miền Nam / Trung); NULL = not set (treated as Miền Bắc).
+  // It decides how "Đầu" is scored on a Miền Bắc result (docs: khách Bắc 1 lô = 1 điểm, khách Nam/Trung ×4 giải bảy).
+  _ensureColumn(db, 'customers', 'home_region', 'TEXT');
   // Station (đài) of an entry: 'mb' / region code / station id; NULL = Miền Bắc (older entries).
   _ensureColumn(db, 'data_entries', 'station', 'TEXT');
   _migrateLotteryResults(db);

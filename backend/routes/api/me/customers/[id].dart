@@ -12,7 +12,7 @@ import 'package:sqlite3/sqlite3.dart';
 /// store the name as plain text, not a foreign key) are untouched and
 /// still show up everywhere as before.
 ///
-/// PATCH { phone?, scoringRates?, defaultStation? } -> sets (or clears, with '' / null) the customer's phone
+/// PATCH { phone?, scoringRates?, defaultStation?, homeRegion? } -> sets (or clears, with '' / null) the customer's phone
 /// number and/or their own scoring config.
 Future<Response> onRequest(RequestContext context, String id) async {
   final method = context.request.method;
@@ -57,6 +57,16 @@ Future<Response> onRequest(RequestContext context, String id) async {
       }
       db.execute('UPDATE customers SET default_station = ? WHERE id = ? AND user_id = ?', [code.isEmpty || code == 'mb' ? null : code, id, auth.userId]);
       reply['defaultStation'] = code.isEmpty || code == 'mb' ? null : code;
+    }
+    // Customer's own region ('mb' | 'mn'); null / '' = not set.
+    if (body.containsKey('homeRegion')) {
+      final raw = body['homeRegion'];
+      final v = raw is String ? raw.trim() : '';
+      if (v.isNotEmpty && v != 'mb' && v != 'mn') {
+        return Response.json(statusCode: 400, body: {'error': 'Miền của khách không hợp lệ'});
+      }
+      db.execute('UPDATE customers SET home_region = ? WHERE id = ? AND user_id = ?', [v.isEmpty ? null : v, id, auth.userId]);
+      reply['homeRegion'] = v.isEmpty ? null : v;
     }
     if (body.containsKey('scoringRates')) {
       // null / {} = follow the account's settings again; otherwise this customer's own overrides.
