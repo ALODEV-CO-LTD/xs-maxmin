@@ -3,34 +3,36 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_dialog.dart';
 import 'account_controller.dart';
 import 'account_widgets.dart';
+import '../scoring/deletion_schedules_page.dart' show DeletionSchedules;
 import 'auth_flows.dart' show errorText;
 
 /// Must match backend/lib/src/data_wipe.dart (the single definition of the wipe scope).
 const wipeDeletes = 'số liệu đã nhập, danh sách khách hàng, mẫu cú pháp, lịch xoá tự động, nhật ký cuộc gọi, tin nhắn phản hồi với Admin, lịch sử giao dịch và các yêu cầu thanh toán chưa duyệt';
 const wipeKeeps = 'Tài khoản, gói dịch vụ, danh sách bạn bè, tin nhắn trò chuyện với bạn bè, Mã ID và cấu hình tính điểm được giữ nguyên.';
 
-/// Dữ liệu: recovery code (create / replace, password re-checked) and "delete all my data".
+/// Dữ liệu: scheduled deletion (Lịch xoá dữ liệu) and "delete all my data". The recovery code is in Thiết bị & riêng tư, like the web.
 class AccountDataTab extends StatelessWidget {
   const AccountDataTab({super.key, required this.ctl});
   final AccountController ctl;
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (ctl.me?.isAdmin != true) _RecoveryCodeCard(ctl: ctl),
-        if (ctl.me?.isAdmin != true) const SizedBox(height: 14),
+        SectionCard(title: 'Lịch xoá dữ liệu', children: [DeletionSchedules(api: context.read<ApiClient>())]),
+        const SizedBox(height: 14),
         const _DeleteDataCard(),
       ]);
 }
 
-class _RecoveryCodeCard extends StatefulWidget {
-  const _RecoveryCodeCard({required this.ctl});
+class RecoveryCodeCard extends StatefulWidget {
+  const RecoveryCodeCard({super.key, required this.ctl});
   final AccountController ctl;
   @override
-  State<_RecoveryCodeCard> createState() => _RecoveryCodeCardState();
+  State<RecoveryCodeCard> createState() => RecoveryCodeCardState();
 }
 
-class _RecoveryCodeCardState extends State<_RecoveryCodeCard> {
+class RecoveryCodeCardState extends State<RecoveryCodeCard> {
   final _password = TextEditingController();
   String? _error;
   bool _busy = false;
@@ -149,9 +151,9 @@ class _PasswordPromptState extends State<_PasswordPrompt> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Xác nhận xoá dữ liệu'),
-        content: PasswordField(controller: _c, label: 'Mật khẩu đăng nhập', autofocus: true, onSubmitted: (v) => Navigator.pop(context, v)),
+  Widget build(BuildContext context) => AppDialog(
+        title: 'Xác nhận xoá dữ liệu',
+        body: PasswordField(controller: _c, label: 'Mật khẩu đăng nhập', autofocus: true, onSubmitted: (v) => Navigator.pop(context, v)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
           FilledButton(onPressed: () => Navigator.pop(context, _c.text), child: const Text('Xoá dữ liệu')),

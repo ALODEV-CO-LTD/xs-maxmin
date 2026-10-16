@@ -26,6 +26,7 @@ import 'features/friends/messaging_host.dart';
 import 'features/friends/notifications.dart';
 import 'features/friends/push_registrar.dart';
 import 'features/overview/overview_screen.dart';
+import 'features/support/support_page.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/shell/app_shell.dart';
 import 'features/shell/update_gate.dart';
@@ -41,7 +42,7 @@ const _legacyCalc = {'/entries': 'entries', '/results': 'results', '/scoring': '
 
 /// Opens an in-app route: a chat page goes on top of the tabs (push), a tab is switched to (go) so it is not stacked twice.
 void openAppRoute(GoRouter router, String route) {
-  if (route.startsWith('/friends/chat/')) {
+  if (route.startsWith('/friends/chat/') || route == '/support') {
     router.push(route);
   } else {
     router.go(route);
@@ -71,6 +72,7 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
         GoRoute(path: '/admin', builder: (_, _) => const AdminShell()),
         // The Admin opens the account screen from the drawer (a pushed page with a back arrow, no customer tab bar).
         GoRoute(path: '/admin/account', builder: (_, _) => const AccountScreen()),
+        GoRoute(path: '/support', builder: (_, _) => const SupportPage()),
         GoRoute(path: '/friends/chat/:id', builder: (_, state) => ChatRoutePage(friendId: state.pathParameters['id'] ?? '')),
         for (final p in [..._legacyCalc.keys, '/more']) GoRoute(path: p, builder: (_, _) => const SizedBox.shrink()),
         StatefulShellRoute.indexedStack(

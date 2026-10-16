@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_dialog.dart';
 
 /// Card with an optional title row (+ trailing widget) and a column of children.
 class SectionCard extends StatelessWidget {
@@ -210,11 +211,11 @@ class _SecretFormDialogState extends State<SecretFormDialog> {
   @override
   Widget build(BuildContext context) {
     final done = _success != null;
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (widget.description != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(widget.description!, style: TextStyle(color: context.mutedColor, fontSize: 13.5))),
+    return AppDialog(
+      title: widget.title,
+      closeEnabled: !_busy,
+      description: widget.description,
+      body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (_error != null) NoticeBox(_error!),
           if (_success != null) NoticeBox(_success!, kind: NoticeKind.success),
           if (!done)
@@ -229,8 +230,7 @@ class _SecretFormDialogState extends State<SecretFormDialog> {
                 onSubmitted: i == _c.length - 1 ? (_) => _go() : null,
               ),
             ],
-        ]),
-      ),
+      ]),
       actions: [
         TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: Text(done ? 'Đóng' : 'Huỷ')),
         if (!done) FilledButton(onPressed: _busy ? null : _go, child: Text(_busy ? 'Đang lưu...' : widget.submitLabel)),

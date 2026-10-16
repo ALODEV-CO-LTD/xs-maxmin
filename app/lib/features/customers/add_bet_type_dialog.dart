@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/scoring_config.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/theme.dart';
 
 /// What the user typed in "Kiểu đánh khác".
@@ -71,10 +72,9 @@ class _AddBetTypeDialogState extends State<_AddBetTypeDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Thêm vào "${widget.groupLabel}" (${widget.regionName})'),
-      scrollable: true,
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return AppDialog(
+      title: 'Thêm vào "${widget.groupLabel}" (${widget.regionName})',
+      body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.restorable.isNotEmpty) ...[
           DropdownButtonFormField<String>(
             initialValue: _pick,

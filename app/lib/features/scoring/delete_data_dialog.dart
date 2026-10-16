@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_dialog.dart';
 import 'date_field.dart';
 
 /// "Xóa số liệu": delete saved entries now - one customer or everyone, an optional date range, optionally keeping the
@@ -132,10 +133,10 @@ class _DeleteDataDialogState extends State<DeleteDataDialog> {
   @override
   Widget build(BuildContext context) {
     final single = widget.singleDay;
-    return AlertDialog(
-      title: const Text('Xóa số liệu'),
-      scrollable: true,
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return AppDialog(
+      title: 'Xóa số liệu',
+      closeEnabled: !_busy,
+      body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Chọn phạm vi cần xóa. Số liệu đã xóa không thể khôi phục.', style: TextStyle(color: context.mutedColor, fontSize: 13)),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(

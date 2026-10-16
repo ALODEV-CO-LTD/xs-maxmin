@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/config.dart';
-import '../../core/theme.dart';
 
 enum _Stage { credentials, secondPassword, wipeConfirm, wipeDone }
 
@@ -121,7 +120,12 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('MAMBA', textAlign: TextAlign.center, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 4, color: Brand.gold)),
+                  Image.asset(
+                    'assets/images/logo-full.png',
+                    height: 120,
+                    semanticLabel: 'MAMBA',
+                    errorBuilder: (_, _, _) => Text('MAMBA', textAlign: TextAlign.center, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 4, color: cs.onSurface)),
+                  ),
                   const SizedBox(height: 28),
                   if (_error != null)
                     Container(

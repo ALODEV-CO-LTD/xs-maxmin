@@ -12,6 +12,7 @@ import 'auth_flows.dart' show errorText;
 import 'me_profile.dart';
 import 'password_rules.dart';
 import '../shell/version_card.dart';
+import '../support/support_page.dart';
 
 /// Hồ sơ: personal info (edit), package info, password dialogs, Mã ID kết bạn, logout.
 class AccountProfileTab extends StatelessWidget {
@@ -19,6 +20,7 @@ class AccountProfileTab extends StatelessWidget {
   final AccountController ctl;
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (!context.read<AuthStore>().isAdmin) ...[const SupportEntryCard(), const SizedBox(height: 14)],
         _ProfileCard(ctl: ctl),
         const SizedBox(height: 14),
         const _CustomerCodesCard(),

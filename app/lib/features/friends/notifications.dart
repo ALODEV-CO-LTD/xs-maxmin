@@ -100,7 +100,7 @@ NoticeTarget? parseNoticePayload(String? payload) {
 /// overlay that sits above every screen).
 String? routeForTarget(NoticeTarget t) => switch (t.kind) {
       NoticeKind.message || NoticeKind.missedCall => '/friends/chat/${Uri.encodeComponent(t.friendId ?? '')}',
-      NoticeKind.support => '/friends',
+      NoticeKind.support => '/support',
       NoticeKind.incomingCall => null,
     };
 

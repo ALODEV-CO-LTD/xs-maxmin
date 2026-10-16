@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 class Brand {
   static const primaryDark = Color(0xFF22C55E);
   static const primaryLight = Color(0xFF16A34A);
-  static const gold = Color(0xFFD4AF37);
   static const success = Color(0xFF4ADE80);
   static const successLight = Color(0xFF15803D);
   static const danger = Color(0xFFF87171);

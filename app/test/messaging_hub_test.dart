@@ -355,7 +355,7 @@ void main() {
     test('payloads parse and map to go_router locations', () {
       expect(routeForTarget(parseNoticePayload('chat:abc')!), '/friends/chat/abc');
       expect(routeForTarget(parseNoticePayload('missed:abc')!), '/friends/chat/abc');
-      expect(routeForTarget(parseNoticePayload('support')!), '/friends');
+      expect(routeForTarget(parseNoticePayload('support')!), '/support');
       expect(routeForTarget(parseNoticePayload('call:abc')!), isNull);
       expect(parseNoticePayload(null), isNull);
       expect(parseNoticePayload('chat:'), isNull);

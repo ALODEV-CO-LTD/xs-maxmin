@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/bet_types.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/masked_text.dart';
 import 'dialogs.dart';
 import 'entries_controller.dart';
@@ -10,13 +11,7 @@ import 'entry_model.dart';
 
 /// "Chỉnh sửa số liệu": customer / hạng mục / ngày are read-only info; số, điểm vào and ghi chú can change.
 Future<void> showEditEntry(BuildContext context, EntriesController c, Entry entry) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (_) => _EditEntry(controller: c, entry: entry),
-  );
+  return showDialog<void>(context: context, builder: (_) => _EditEntry(controller: c, entry: entry));
 }
 
 class _EditEntry extends StatefulWidget {
@@ -62,11 +57,10 @@ class _EditEntryState extends State<_EditEntry> {
   @override
   Widget build(BuildContext context) {
     final e = widget.entry;
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 20), children: [
-        Text('Chỉnh sửa số liệu', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
+    return AppDialog(
+      title: 'Chỉnh sửa số liệu',
+      closeEnabled: !_busy,
+      body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
           Text(e.customerName, style: const TextStyle(fontWeight: FontWeight.w700)),
           Chip(label: Text(betTypeLabel(e.type)), visualDensity: VisualDensity.compact),
@@ -88,13 +82,11 @@ class _EditEntryState extends State<_EditEntry> {
           ),
         const SizedBox(height: 12),
         TextField(controller: _note, enabled: !_busy, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Ghi chú')),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: OutlinedButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Huỷ'))),
-          const SizedBox(width: 8),
-          Expanded(child: FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Đang lưu...' : 'Lưu thay đổi'))),
-        ]),
       ]),
+      actions: [
+        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Huỷ')),
+        FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Đang lưu...' : 'Lưu thay đổi')),
+      ],
     );
   }
 }

@@ -108,6 +108,9 @@ class FriendsController extends ChangeNotifier {
   bool noMyCode = false;
   Map<String, int> unseenMissed = {};
   int supportUnread = 0;
+
+  /// The "Hỗ trợ từ Admin" page is on screen (web: notify.supportVisible): anything new there counts as read at once.
+  bool supportVisible = false;
   String searchQuery = '';
   List<SearchResult> results = [];
   bool searching = false;
@@ -215,8 +218,9 @@ class FriendsController extends ChangeNotifier {
   void _onPush(Map<String, dynamic> m) {
     unawaited(pollUnread());
     if (m['source'] != 'support') return;
+    if (supportVisible) return;
     if (foreground) {
-      _banner(AppBanner(title: 'Admin', body: (m['preview'] as String?) ?? 'Có phản hồi mới từ Admin', route: '/friends'));
+      _banner(AppBanner(title: 'Admin', body: (m['preview'] as String?) ?? 'Có phản hồi mới từ Admin', route: '/support'));
     } else {
       unawaited(notifier.show(supportNotice()));
     }
@@ -434,9 +438,21 @@ class FriendsController extends ChangeNotifier {
   Future<void> pollUnread() async {
     try {
       final res = await api.get('/me/unread') as Map;
-      supportUnread = (res['support'] as num?)?.toInt() ?? 0;
+      supportUnread = supportVisible ? 0 : (res['support'] as num?)?.toInt() ?? 0;
+      if (supportVisible && ((res['support'] as num?)?.toInt() ?? 0) > 0) unawaited(markSupportRead());
       _changed();
     } catch (_) {/* badges are a nicety */}
+  }
+
+  /// The Admin thread is being read: drop its badge and tell the server so it stays read (web: notify.clear('support')).
+  Future<void> markSupportRead() async {
+    if (supportUnread != 0) {
+      supportUnread = 0;
+      _changed();
+    }
+    try {
+      await api.post('/me/unread/read', {'peerId': 'support'});
+    } catch (_) {/* a nicety: the next poll corrects it */}
   }
 
   // ---- search / add / remove -------------------------------------------------------------------------------------------

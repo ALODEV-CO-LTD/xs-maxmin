@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../friends/friends_controller.dart';
 import '../friends/messaging_host.dart';
+import 'announcement_banner.dart';
 
 /// Bottom navigation around the five main tabs (go_router StatefulShellRoute keeps each tab's state):
 /// Tổng quan | Tính toán | Bạn bè | Cấu hình | Tài khoản.
@@ -15,7 +16,8 @@ class AppShell extends StatelessWidget {
     final hub = MessagingScope.maybeOf(context);
     return Scaffold(
       // Each tab draws its own heading (or tab bar), so the shell has no AppBar.
-      body: SafeArea(bottom: false, child: shell),
+      // Admin notices sit above the tabs (they take their own height, the tab keeps the rest).
+      body: SafeArea(bottom: false, child: Column(children: [const AnnouncementBanner(), Expanded(child: shell)])),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),

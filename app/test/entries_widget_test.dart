@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mamba_app/core/widgets/app_dialog.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
@@ -81,17 +82,15 @@ void main() {
 
     expect(find.text('Thêm số liệu mới'), findsOneWidget);
     expect(find.text('Thêm số liệu'), findsOneWidget);
-    // paste importer: parse -> preview (nothing is saved)
-    await tester.tap(find.text('Từ tin nhắn'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Nội dung tin nhắn'), 'de 12 34 x 10\n56 x 3\n77');
+    // quick-entry box (message or photo): parse -> preview (nothing is saved)
+    expect(find.text('Chọn ảnh'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Nhập nhanh: tin nhắn hoặc ảnh của khách'), 'de 12 34 x 10\n56 x 3\n77');
     await tester.pump();
+    await tester.ensureVisible(find.text('Phân tích'));
     await tester.tap(find.text('Phân tích'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Đã chọn 3/4 dòng'), findsOneWidget); // the line without a score is unticked
     expect(find.textContaining('chưa chắc chắn (tô vàng)'), findsOneWidget);
-    tester.state<NavigatorState>(find.byType(Navigator)).pop(); // close the sheet
-    await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Thống kê: An'), 400, scrollable: find.byType(Scrollable).first);
     expect(find.text('Thống kê: An'), findsOneWidget);
@@ -159,8 +158,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-de')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Thêm vào "Đề"'), findsOneWidget);
-    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextField, 'Tên')), 'Đề 3 số');
-    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextField, 'Ký hiệu')), 'd3');
+    await tester.enterText(find.descendant(of: find.byType(AppDialog), matching: find.widgetWithText(TextField, 'Tên')), 'Đề 3 số');
+    await tester.enterText(find.descendant(of: find.byType(AppDialog), matching: find.widgetWithText(TextField, 'Ký hiệu')), 'd3');
     await tester.tap(find.text('Thêm'));
     await tester.pumpAndSettle();
     expect(find.textContaining('5 cách đánh'), findsOneWidget); // Đề: 4 standard + the new one

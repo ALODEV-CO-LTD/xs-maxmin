@@ -11,12 +11,29 @@ import 'entry_model.dart';
 /// GET/POST /me/deletion-schedules, DELETE /me/deletion-schedules/:id, GET /me/customers. POST without `confirm` only
 /// answers a preview ({scopeText, willDeleteNow, runAt}) that is shown first; with `confirm: true` and the account
 /// `password` it creates the schedule (403 wrong password). A repeating schedule never carries dateFrom / dateTo.
-class DeletionSchedulesPage extends StatefulWidget {
+class DeletionSchedulesPage extends StatelessWidget {
   const DeletionSchedulesPage({super.key, required this.api, this.customerName = ''});
   final ApiClient api;
   final String customerName;
   @override
-  State<DeletionSchedulesPage> createState() => _DeletionSchedulesPageState();
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Đặt lịch xóa')),
+        body: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          child: DeletionSchedules(api: api, customerName: customerName),
+        ),
+      );
+}
+
+/// The schedule form and the list of schedules (web: components/DeletionSchedules.vue). Shown in the Đặt lịch xóa page
+/// of Tính điểm and in the Dữ liệu tab of Tài khoản.
+class DeletionSchedules extends StatefulWidget {
+  const DeletionSchedules({super.key, required this.api, this.customerName = ''});
+  final ApiClient api;
+  final String customerName;
+  @override
+  State<DeletionSchedules> createState() => _DeletionSchedulesState();
 }
 
 const _unitText = {'day': 'ngày', 'week': 'tuần', 'month': 'tháng'};
@@ -53,7 +70,7 @@ String scheduleStatus(Map<String, dynamic> s) {
   return 'Sẽ xoá lúc ${_fmtTime(s['runAt'] as String?)}';
 }
 
-class _DeletionSchedulesPageState extends State<DeletionSchedulesPage> {
+class _DeletionSchedulesState extends State<DeletionSchedules> {
   List<Map<String, dynamic>> _schedules = [];
   List<CustomerRec> _customers = [];
   bool _loading = true;
@@ -230,14 +247,7 @@ class _DeletionSchedulesPageState extends State<DeletionSchedulesPage> {
     final t = Theme.of(context).textTheme;
     final names = _customers.map((c) => c.name).toList();
     if (_customer.isNotEmpty && !names.contains(_customer)) names.add(_customer);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Đặt lịch xóa')),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('Hệ thống tự xóa số liệu theo lịch, một lần hoặc lặp lại. Dữ liệu đã xóa không thể khôi phục. Bạn sẽ thấy cảnh báo về phạm vi xóa và thời điểm trước khi xác nhận.', style: t.bodySmall?.copyWith(color: context.mutedColor)),
             if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_error, style: TextStyle(color: context.badColor))),
             if (_success.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_success, style: TextStyle(color: context.okColor))),
@@ -341,9 +351,6 @@ class _DeletionSchedulesPageState extends State<DeletionSchedulesPage> {
                     trailing: s['status'] == 'pending' ? IconButton(tooltip: 'Huỷ lịch', icon: Icon(Icons.close, color: context.badColor), onPressed: () => _cancel(s)) : null,
                   ),
                 ),
-          ],
-        ),
-      ),
-    );
+    ]);
   }
 }

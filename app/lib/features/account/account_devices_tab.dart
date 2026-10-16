@@ -3,18 +3,23 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import 'account_controller.dart';
+import 'account_data_tab.dart' show RecoveryCodeCard;
 import 'account_widgets.dart';
 import 'me_profile.dart';
 import 'privacy/privacy_store.dart';
 
-/// Thiết bị & riêng tư: signed-in devices (revoke) + the privacy settings of this device.
+/// Thiết bị & riêng tư: signed-in devices (revoke), the recovery code and the privacy settings of this device.
 class AccountDevicesTab extends StatelessWidget {
-  const AccountDevicesTab({super.key});
+  const AccountDevicesTab({super.key, required this.ctl});
+  final AccountController ctl;
   @override
-  Widget build(BuildContext context) => const Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _SessionsCard(),
-        SizedBox(height: 14),
-        PrivacySettingsCard(),
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _SessionsCard(),
+        const SizedBox(height: 14),
+        // Admin accounts have no recovery code (like the web).
+        if (ctl.me?.isAdmin != true) ...[RecoveryCodeCard(ctl: ctl), const SizedBox(height: 14)],
+        const PrivacySettingsCard(),
       ]);
 }
 

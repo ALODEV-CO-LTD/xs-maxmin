@@ -7,9 +7,9 @@ import '../../core/lottery_stations.dart';
 import '../../core/theme.dart';
 import 'dialogs.dart';
 import 'entries_controller.dart';
-import 'import_sheets.dart';
+import 'quick_entry_box.dart';
 
-/// "Thêm số liệu mới": đài, ngày, importers, several rows (hạng mục / số / điểm vào) and a note.
+/// "Thêm số liệu mới": đài, ngày, the quick-entry box (message or photo), several rows (hạng mục / số / điểm vào) and a note.
 class EntryFormCard extends StatefulWidget {
   const EntryFormCard({super.key, required this.controller});
   final EntriesController controller;
@@ -90,11 +90,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
             ),
           ]),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: OutlinedButton.icon(onPressed: () => showImportSheet(context, c, ImportMode.photo), icon: const Icon(Icons.photo_camera_outlined, size: 20), label: const Text('Nhập từ ảnh'))),
-            const SizedBox(width: 8),
-            Expanded(child: OutlinedButton.icon(onPressed: () => showImportSheet(context, c, ImportMode.paste), icon: const Icon(Icons.content_paste, size: 20), label: const Text('Từ tin nhắn'))),
-          ]),
+          QuickEntryBox(controller: c),
           const SizedBox(height: 14),
           _rowsHeader(context),
           if (c.selectedRowCount > 0) _bulkBar(types),
@@ -105,6 +101,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
           const SizedBox(height: 12),
           if (_deleteAllError.isNotEmpty) InfoBox(_deleteAllError),
           if (!c.canAdd) const InfoBox('Gói của bạn đã hết hạn. Vui lòng gia hạn để tiếp tục nhập số liệu.', kind: InfoKind.warning),
+          if (c.addedMessage.isNotEmpty) InfoBox(c.addedMessage, kind: InfoKind.success),
           FilledButton(onPressed: c.submitting || !c.canAdd ? null : c.submit, child: Text(c.submitting ? 'Đang thêm...' : 'Thêm số liệu')),
           const SizedBox(height: 8),
           OutlinedButton(

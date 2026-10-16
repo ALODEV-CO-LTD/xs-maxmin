@@ -117,7 +117,7 @@ class _AccountScreenState extends State<AccountScreen> {
     }
     final tab = switch (_tab) {
       AccountTab.profile => AccountProfileTab(ctl: _ctl),
-      AccountTab.devices => const AccountDevicesTab(),
+      AccountTab.devices => AccountDevicesTab(ctl: _ctl),
       AccountTab.packages => AccountPackagesTab(ctl: _ctl),
       AccountTab.data => AccountDataTab(ctl: _ctl),
     };

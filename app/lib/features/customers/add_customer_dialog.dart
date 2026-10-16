@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
 import '../../core/lottery_stations.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../entries/dialogs.dart';
 import 'customer_model.dart';
 
@@ -80,10 +81,10 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
   @override
   Widget build(BuildContext context) {
     final options = context.watch<LotteryStations>().allStationOptions();
-    return AlertDialog(
-      title: const Text('Thêm khách hàng'),
-      content: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return AppDialog(
+      title: 'Thêm khách hàng',
+      closeEnabled: !_busy,
+      body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           TextField(controller: _name, autofocus: true, enabled: !_busy, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Tên khách hàng')),
           const SizedBox(height: 12),
           TextField(controller: _phone, enabled: !_busy, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại', hintText: 'Không bắt buộc')),
@@ -98,8 +99,7 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
           const SizedBox(height: 8),
           const Text('Cấu hình tính điểm của khách đặt sau, ở nút "Cấu hình tính điểm" trong danh sách.', style: TextStyle(fontSize: 12.5)),
           if (_error.isNotEmpty) ...[const SizedBox(height: 10), InfoBox(_error)],
-        ]),
-      ),
+      ]),
       actions: [
         TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Huỷ')),
         FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Đang thêm...' : 'Thêm khách hàng')),

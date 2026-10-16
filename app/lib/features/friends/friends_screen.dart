@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import 'chat_page.dart';
@@ -149,7 +150,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Chưa có ID. Tạo ID trong Tài khoản.', style: theme.textTheme.bodyMedium))),
           if (c.supportUnread > 0) ...[
             const SizedBox(height: 8),
-            Card(child: ListTile(leading: const Icon(Icons.support_agent), title: Text('Có ${c.supportUnread} phản hồi mới từ Admin'), subtitle: const Text('Xem ở mục Phản hồi'))),
+            Card(child: ListTile(leading: const Icon(Icons.support_agent), title: Text('Có ${c.supportUnread} phản hồi mới từ Admin'), subtitle: const Text('Chạm để xem Hỗ trợ từ Admin'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/support'))),
           ],
           const SizedBox(height: 12),
           TextField(

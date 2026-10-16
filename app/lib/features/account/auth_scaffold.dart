@@ -22,7 +22,12 @@ class AuthScaffold extends StatelessWidget {
           tooltip: 'Quay lại',
           onPressed: onBack ?? () => context.canPop() ? context.pop() : context.go('/login'),
         ),
-        title: const Text('MAMBA', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 3, color: Brand.gold)),
+        title: Image.asset(
+          'assets/images/logo-word.png',
+          height: 20,
+          semanticLabel: 'MAMBA',
+          errorBuilder: (_, _, _) => const Text('MAMBA', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 3)),
+        ),
         centerTitle: true,
       ),
       body: SafeArea(

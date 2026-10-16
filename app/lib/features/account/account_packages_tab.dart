@@ -173,7 +173,7 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${plan['label']}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text(formatVnd(plan['priceVnd'] as num), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Brand.gold)),
+                    Text(formatVnd(plan['priceVnd'] as num), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                     Text('${plan['durationDays']} ngày', style: TextStyle(color: context.mutedColor, fontSize: 13)),
                   ]),
                 ),

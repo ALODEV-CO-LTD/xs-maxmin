@@ -69,6 +69,11 @@ class EntriesController extends ChangeNotifier {
   bool fromCache = false;
   int pending = 0;
   String notice = '';
+
+  /// "Đã thêm N số liệu cho (tên khách)" shown right above the add button for [addedMessageDuration] (web: flashAdded).
+  String addedMessage = '';
+  Timer? _addedTimer;
+  static const addedMessageDuration = Duration(seconds: 7);
   final List<SyncConflict> conflicts = [];
   final List<SyncFailure> failures = [];
 
@@ -109,6 +114,7 @@ class EntriesController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    _addedTimer?.cancel();
     note.dispose();
     for (final r in rows) {
       r.dispose();
@@ -208,6 +214,24 @@ class EntriesController extends ChangeNotifier {
 
   void dismissFailure(SyncFailure f) {
     failures.remove(f);
+    _notify();
+  }
+
+  /// Confirms [count] new entries for the selected customer; [queued] of them are waiting for the network.
+  void flashAdded(int count, {int queued = 0}) {
+    if (count <= 0) return;
+    addedMessage = 'Đã thêm $count số liệu cho ${selectedName.trim()}${queued > 0 ? ' (đang offline, sẽ tự đồng bộ)' : ''}.';
+    _addedTimer?.cancel();
+    _addedTimer = Timer(addedMessageDuration, () {
+      addedMessage = '';
+      _notify();
+    });
+    _notify();
+  }
+
+  void clearAdded() {
+    _addedTimer?.cancel();
+    addedMessage = '';
     _notify();
   }
 
@@ -364,13 +388,13 @@ class EntriesController extends ChangeNotifier {
     _notify();
     final failed = <String>[];
     var queued = 0;
-    var ok = false;
+    var saved = 0;
     for (final r in started) {
       try {
         final res = await store.createEntry(_payload(r.type, r.value.text, r.score.text));
         entries.insert(0, res.entry);
         if (res.queued) queued++;
-        ok = true;
+        saved++;
         rows.remove(r);
         r.dispose();
       } on ApiError catch (e) {
@@ -382,7 +406,8 @@ class EntriesController extends ChangeNotifier {
     if (rows.isEmpty) rows.add(blankRow());
     if (failed.isNotEmpty) formError = failed.join(' · ');
     if (queued > 0) notice = 'Đang offline: $queued số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.';
-    if (ok) note.clear();
+    if (saved > 0) note.clear();
+    flashAdded(saved, queued: queued);
     pending = await store.pendingCount();
     submitting = false;
     _notify();
@@ -392,11 +417,13 @@ class EntriesController extends ChangeNotifier {
   Future<String> saveDrafts(List<RowDraft> picked, {required void Function(RowDraft) onSaved}) async {
     final failed = <String>[];
     var queued = 0;
+    var saved = 0;
     for (final r in picked) {
       try {
         final res = await store.createEntry(_payload(r.type, r.value.text, r.score.text));
         entries.insert(0, res.entry);
         if (res.queued) queued++;
+        saved++;
         onSaved(r);
       } on ApiError catch (e) {
         failed.add('${betTypeLabel(r.type)} "${r.value.text}": ${e.message}');
@@ -405,6 +432,7 @@ class EntriesController extends ChangeNotifier {
       }
     }
     if (queued > 0) notice = 'Đang offline: $queued số liệu đã lưu trên máy, sẽ tự đồng bộ khi có mạng.';
+    flashAdded(saved, queued: queued);
     pending = await store.pendingCount();
     _notify();
     return failed.join(' · ');

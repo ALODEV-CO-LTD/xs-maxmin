@@ -218,7 +218,7 @@ class _Filters extends StatelessWidget {
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Xổ số'),
                 items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Tất cả')),
+                  DropdownMenuItem(value: 'all', child: Text('Tất cả các miền')),
                   DropdownMenuItem(value: 'mb', child: Text('Miền Bắc')),
                   DropdownMenuItem(value: 'mt', child: Text('Miền Trung')),
                   DropdownMenuItem(value: 'mn', child: Text('Miền Nam')),
@@ -283,13 +283,13 @@ class _SummaryCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: _Tile(label: 'Tiền khách gửi', value: _money(s.sentMoney), sub: '${formatNumber(s.sentLots)} lô${s.sentPoints > 0 ? ' · ${formatNumber(s.sentPoints)} điểm' : ''}')),
+            Expanded(child: _Tile(label: '(1) Tiền khách gửi', value: _money(s.sentMoney), sub: '${formatNumber(s.sentLots)} lô${s.sentPoints > 0 ? ' · ${formatNumber(s.sentPoints)} điểm' : ''}')),
             const SizedBox(width: 8),
-            Expanded(child: _Tile(label: 'Lô trúng', value: _money(s.wonMoney), sub: '${formatNumber(s.wonLots)} lô trúng${s.wonHits != s.wonLots ? ' · ${formatNumber(s.wonHits)} lần' : ''}')),
+            Expanded(child: _Tile(label: '(2) Tiền khách trúng', value: _money(s.wonMoney), sub: '${formatNumber(s.wonLots)} lô trúng${s.wonHits != s.wonLots ? ' · ${formatNumber(s.wonHits)} lần' : ''}')),
           ]),
           const SizedBox(height: 8),
           _Tile(
-            label: 'Còn lại = gửi − trúng',
+            label: '(3) Còn lại = (1) − (2)',
             value: _signed(s.remaining),
             sub: s.remaining > 0 ? 'Còn lại sau khi trả khách' : (s.remaining < 0 ? 'Phải trả khách thêm' : ''),
             color: tone(s.remaining),

@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/mask_store.dart';
 import '../../core/scoring_config_bus.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/masked_text.dart';
 import '../entries/dialogs.dart';
 import 'add_customer_dialog.dart';
@@ -70,9 +71,10 @@ class _CustomersBodyState extends State<_CustomersBody> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: Text('Sửa ${cu.name}'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+        builder: (ctx, setS) => AppDialog(
+          title: 'Sửa ${cu.name}',
+          closeEnabled: !busy,
+          body: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(controller: ctrl, autofocus: true, enabled: !busy, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại', hintText: 'Chưa có')),
             if (error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(error)),
           ]),
