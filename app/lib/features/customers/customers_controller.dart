@@ -146,6 +146,19 @@ class CustomersController extends ChangeNotifier {
     }
   }
 
+  /// Sets the customer's own region ('mb' | 'mn' | null = not chosen). Returns an error text or ''.
+  Future<String> saveHomeRegion(Customer c, String? region) async {
+    try {
+      final res = await api.patch('/me/customers/${c.id}', {'homeRegion': region ?? ''}) as Map;
+      final v = res['homeRegion'];
+      c.homeRegion = v == 'mb' || v == 'mn' ? v as String : null;
+      invalidate();
+      return '';
+    } on ApiError catch (e) {
+      return e.status == 0 ? 'Đang offline: sửa khách hàng cần có mạng, vui lòng thử lại khi kết nối lại.' : e.message;
+    }
+  }
+
   void customerConfigSaved(Customer c, RatesMap? map) {
     c.scoringRates = map;
     invalidate();

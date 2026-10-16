@@ -2,7 +2,7 @@ import '../../core/scoring_config.dart';
 
 /// One row of `GET /me/customers`.
 class Customer {
-  Customer({required this.id, required this.name, this.phone = '', this.scoringRates, this.defaultStation, this.createdAt});
+  Customer({required this.id, required this.name, this.phone = '', this.scoringRates, this.defaultStation, this.homeRegion, this.createdAt});
 
   final String id;
   String name;
@@ -13,6 +13,9 @@ class Customer {
 
   /// 'mt' / 'mn' / a station id; null = Miền Bắc.
   String? defaultStation;
+
+  /// The customer's own region, 'mb' | 'mn' (Nam/Trung); null = not chosen. Decides how "Đầu" is scored on a Miền Bắc result.
+  String? homeRegion;
   String? createdAt;
 
   factory Customer.fromJson(Map<String, dynamic> j) => Customer(
@@ -21,6 +24,7 @@ class Customer {
         phone: (j['phone'] as String?) ?? '',
         scoringRates: j['scoringRates'] is Map ? Map<String, dynamic>.from(j['scoringRates'] as Map) : null,
         defaultStation: j['defaultStation'] is String && (j['defaultStation'] as String).isNotEmpty ? j['defaultStation'] as String : null,
+        homeRegion: j['homeRegion'] == 'mb' || j['homeRegion'] == 'mn' ? j['homeRegion'] as String : null,
         createdAt: j['createdAt'] as String?,
       );
 

@@ -116,10 +116,75 @@ void main() {
 
     await tester.tap(find.text('Cấu hình tính điểm'));
     await tester.pumpAndSettle();
-    expect(find.text('Tỉ lệ ăn'), findsWidgets);
+    expect(find.textContaining('Khách thuộc miền nào'), findsOneWidget);
+    expect(find.text('Chưa chọn (tính như khách Bắc)'), findsOneWidget);
+    expect(find.text('Giá tiền / 1 điểm'), findsWidgets);
+    expect(find.text('Giá trúng / 1 điểm'), findsWidgets);
+    expect(find.text('Bao lô 2 số'), findsOneWidget);
+    expect(find.text('Lấy số: 2 số cuối của cả 27 lô'), findsOneWidget);
+    expect(find.textContaining('Đề'), findsWidgets);
+    expect(find.textContaining('4 cách đánh'), findsOneWidget); // the Đề group
+    expect(find.textContaining('3 cách đánh'), findsNWidgets(3)); // Lô, Xiên, Lô trượt
+    expect(find.textContaining('2 cách đánh'), findsOneWidget); // Thần tài
+    // view mode: text only (✓ for a row the customer uses), a "Sửa" button and no footer
+    expect(find.byType(Switch), findsNothing);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('23.000'), findsWidgets); // bao lô of the account's older Lô entry (23.000 đ/điểm), vi-VN thousands
+    expect(find.text('L, l, lo, lô, x, X'), findsOneWidget);
+    expect(find.text('✓'), findsWidgets);
+    expect(find.text('Kiểu đánh khác'), findsNothing);
+    expect(find.text('Huỷ'), findsNothing);
     expect(find.text('Miền Nam'), findsOneWidget);
     await tester.tap(find.text('Miền Nam'));
     await tester.pumpAndSettle();
+    expect(find.text('460.000'), findsWidgets);
+
+    // edit mode
+    await tester.tap(find.text('Sửa'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Switch), findsWidgets); // "Dùng"
+    expect(find.byType(TextFormField), findsWidgets);
+    expect(find.byKey(const ValueKey('group-other')), findsOneWidget); // empty groups show while editing
+    expect(find.text('+ Thêm cách đánh'), findsWidgets);
+    expect(find.byKey(const ValueKey('add-de')), findsOneWidget);
+    expect(find.text('Bỏ cấu hình riêng'), findsOneWidget);
+    expect(find.text('Lưu cấu hình khách này'), findsOneWidget);
+    final price = find.widgetWithText(TextFormField, 'Giá tiền / 1 điểm').first;
+    await tester.enterText(price, '15000');
+    await tester.pumpAndSettle();
+
+    // + Thêm cách đánh in the Đề group: a new custom row, shown inside that group
+    await tester.ensureVisible(find.byKey(const ValueKey('add-de')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-de')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Thêm vào "Đề"'), findsOneWidget);
+    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextField, 'Tên')), 'Đề 3 số');
+    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextField, 'Ký hiệu')), 'd3');
+    await tester.tap(find.text('Thêm'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('5 cách đánh'), findsOneWidget); // Đề: 4 standard + the new one
+    expect(find.text('Xoá'), findsNWidgets(2)); // only the custom rows (the older Đề and the new one) can be removed by a customer
+
+    // "Chỉnh lấy số" of Bao lô 2 số: the panel with the prizes of Miền Nam
+    final srcBtn = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('srcbtn-') && (w.key! as ValueKey<String>).value.endsWith('-lo'));
+    await tester.ensureVisible(srcBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(srcBtn);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Giải tám (1 lô × 2 số)'), findsOneWidget);
+    expect(find.textContaining('Đang lấy: 2 số cuối của cả 18 lô'), findsOneWidget);
+    expect(find.text('Về mặc định'), findsOneWidget);
+
+    // Huỷ: back to the view with the saved value
+    await tester.ensureVisible(find.text('Huỷ'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Huỷ'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Sửa'), findsOneWidget);
+    expect(find.text('15.000'), findsNothing);
+    expect(find.text('Huỷ'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

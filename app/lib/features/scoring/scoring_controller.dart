@@ -174,6 +174,14 @@ class ScoringController extends ChangeNotifier {
     return null;
   }
 
+  /// The selected customer's own region ('mb' | 'mn' | null).
+  String? get customerRegion {
+    for (final c in customers) {
+      if (c.name == selectedCustomer) return c.homeRegion;
+    }
+    return null;
+  }
+
   LotteryResult? getResult(String date, String station) => lotteryCache[lotteryKey(date, station)];
 
   List<DayView> get allDays => _allDaysMemo ??= selectedCustomer.isEmpty
@@ -193,11 +201,11 @@ class ScoringController extends ChangeNotifier {
   ScoreSummary daySummary(String date) {
     return _daySummaries.putIfAbsent(date, () {
       final d = days.firstWhere((x) => x.date == date, orElse: () => DayView(date, const [], null));
-      return summarize([DayEntries(d.date, d.entries)], rates, customerRates, getResult, stations);
+      return summarize([DayEntries(d.date, d.entries)], rates, customerRates, getResult, stations, customerRegion: customerRegion);
     });
   }
 
-  ScoreSummary get total => _totalSummary ??= summarize([for (final d in days) DayEntries(d.date, d.entries)], rates, customerRates, getResult, stations);
+  ScoreSummary get total => _totalSummary ??= summarize([for (final d in days) DayEntries(d.date, d.entries)], rates, customerRates, getResult, stations, customerRegion: customerRegion);
 
   bool isOpen(String date) {
     if (_open.containsKey(date)) return _open[date]!;
@@ -298,7 +306,7 @@ class ScoringController extends ChangeNotifier {
       return;
     }
     var value = 0.0;
-    results.forEach((st, lr) => value += entryDetail(entry, lr, configFor(entry.betType, st)).out);
+    results.forEach((st, lr) => value += entryDetail(entry, lr, configFor(entry.betType, st), ScoreCtx(region: stations.regionOf(st).id, customerRegion: customerRegion)).out);
     // Already saved with the same figure -> nothing to write.
     final stored = entry.result;
     if (stored != null && stored.isNotEmpty && toNumber(stored) == value) {

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mamba_app/features/customers/add_bet_type_dialog.dart';
 import 'package:mamba_app/features/customers/customer_model.dart';
 import 'package:mamba_app/features/customers/customers_controller.dart';
 import 'package:mamba_app/features/entries/entry_model.dart';
@@ -8,8 +7,6 @@ Entry e(String id, String customer, String date, {String? score, String? result,
     Entry(id: id, customerName: customer, entryDate: date, value: value, score: score, result: result, betType: type, note: note);
 
 void main() {
-  test('betTypeKeyOf', () => expect(betTypeKeyOf(' Xiên  2 '), 'xiên-2'));
-
   test('toNumber / fmtPoints follow the web conventions', () {
     expect(toNumber('1.500'), 1.5); // the dot is a decimal point in the stored text
     expect(toNumber('5 điểm'), 5);
@@ -48,14 +45,18 @@ void main() {
   test('parseCustomers reads the API shape', () {
     final l = parseCustomers({
       'customers': [
-        {'id': 'x', 'name': 'An', 'phone': '', 'scoringRates': {'de': {'rate': 1}}, 'defaultStation': 'mn-tphcm', 'createdAt': 't'},
+        {'id': 'x', 'name': 'An', 'phone': '', 'scoringRates': {'de': {'rate': 1}}, 'defaultStation': 'mn-tphcm', 'homeRegion': 'mn', 'createdAt': 't'},
         {'id': 'y', 'name': 'Bo', 'phone': null, 'scoringRates': null, 'defaultStation': null},
+        {'id': 'z', 'name': 'Chi', 'homeRegion': 'xx'},
       ],
     });
     expect(l[0].stationCode, 'mn-tphcm');
     expect(l[0].scoringRates, isNotNull);
     expect(l[1].stationCode, 'mb');
     expect(l[1].phone, '');
+    expect(l[0].homeRegion, 'mn');
+    expect(l[1].homeRegion, isNull);
+    expect(l[2].homeRegion, isNull); // only 'mb' / 'mn' are known
   });
 
   group('entry list helpers', () {

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
-import '../../core/bet_types.dart';
 import '../../core/scoring_config.dart';
+import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../entries/dialogs.dart';
 import 'add_bet_type_dialog.dart';
@@ -30,6 +30,9 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
   late final ScoringEditorModel _m = ScoringEditorModel(isCustomer: widget.customer != null, accountRates: widget.accountRates);
   bool _loading = true;
   bool _saving = false;
+
+  /// false = the table is only shown; "Sửa" opens the inputs.
+  bool _editing = false;
   String _error = '';
   String _notice = '';
 
@@ -71,33 +74,47 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
     });
   }
 
+  /// "Huỷ": drop what was not saved, load the saved config again and go back to the view.
+  Future<void> _cancelEdit() async {
+    setState(() {
+      _editing = false;
+      _error = '';
+      _notice = '';
+    });
+    await _init();
+  }
+
   void _switchRegion(String id) {
     final problem = _m.switchRegion(id);
     setState(() => _error = problem);
   }
 
   Future<void> _remove(EditorRow r) async {
-    final name = betTypeLabel(r.type);
-    final cust = _isCustomer ? widget.customer!.name : '';
     final regionName = regionNames[_m.region]!;
-    final kind = _m.removeKind(r);
-    final message = switch (kind) {
-      RemoveKind.regionType =>
-        'Xoá loại "$name" của $regionName${_isCustomer ? ' ($cust)' : ''}? Số liệu đã nhập với loại này vẫn được giữ và tính theo cấu hình mặc định. Bấm Lưu để áp dụng.',
-      RemoveKind.everywhere =>
-        'Xoá loại "$name"${_isCustomer ? ' của $cust' : ' khỏi mọi miền'}? Số liệu đã nhập với loại này vẫn được giữ và tính theo cấu hình mặc định. Bấm Lưu để áp dụng.',
-      RemoveKind.thisRegionOnly =>
-        'Bỏ loại "$name" của $cust ở $regionName? Các miền khác và các khách khác vẫn giữ; bạn có thể khôi phục lại ở đây. Bấm Lưu để áp dụng.',
-    };
-    final ok = await confirmDialog(context, title: 'Xoá loại đánh', message: message, confirmText: kind == RemoveKind.thisRegionOnly ? 'Bỏ' : 'Xoá', danger: true);
+    final message = 'Xoá "${r.label}" khỏi bảng $regionName${_isCustomer ? ' của ${widget.customer!.name}' : ''}? '
+        'Số liệu đã nhập với cách này vẫn được giữ và tính theo cấu hình mặc định. Bạn có thể thêm lại bằng "+ Thêm cách đánh". Bấm Lưu để áp dụng.';
+    final ok = await confirmDialog(context, title: 'Xoá cách đánh', message: message, confirmText: 'Xoá', danger: true);
     if (!ok || !mounted) return;
     setState(() => _m.removeRow(r));
   }
 
-  Future<void> _add() async {
-    final p = await showAddBetTypeDialog(context, existingKeys: _m.typeKeys, regionName: regionNames[_m.region]!);
-    if (p == null || !mounted) return;
-    setState(() => _m.addType(key: p.key, rate: p.rate, tiers: p.tiers, digits: p.digits, unit: p.unit, pointValue: p.pointValue));
+  Future<void> _add(TableGroup g) async {
+    await showAddBetTypeDialog(
+      context,
+      groupLabel: g.label,
+      regionName: regionNames[_m.region]!,
+      restorable: _m.restorable(g.id),
+      onSubmit: (p) {
+        final err = p.restore != null
+            ? (() {
+                _m.restoreKind(p.restore!);
+                return '';
+              })()
+            : _m.addCustom(group: g.id, name: p.name, symbol: p.symbol, allTiers: p.allTiers, digits: p.digits, price: p.price, payout: p.payout);
+        if (err.isEmpty) setState(() {});
+        return err;
+      },
+    );
   }
 
   Future<void> _save() async {
@@ -111,7 +128,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
     }
     final map = _m.resultMap();
     if (!_isCustomer && map.isEmpty) {
-      setState(() => _error = 'Cần ít nhất một loại đánh');
+      setState(() => _error = 'Cần ít nhất một kiểu đánh');
       return;
     }
     final api = context.read<ApiClient>();
@@ -135,6 +152,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
         widget.onSaved?.call(saved);
       }
       _m.buildRows();
+      _editing = false;
     } on ApiError catch (e) {
       _error = e.status == 0 ? 'Mất kết nối tới máy chủ, chưa lưu được.' : e.message;
     } catch (_) {
@@ -149,130 +167,248 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
     final muted = TextStyle(fontSize: 13, color: context.mutedColor);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(
-        '${_isCustomer ? 'Cấu hình dùng để tính điểm cho ${widget.customer!.name}. Dòng nào không đổi sẽ theo cấu hình mặc định.' : 'Cấu hình mặc định dùng cho mọi khách chưa có cấu hình riêng.'} '
-        'Mỗi miền có thể có tỉ lệ khác nhau: chọn miền rồi sửa. Loại đánh thêm ở tab nào chỉ dùng cho miền đó.',
+        '${_isCustomer ? 'Tính điểm cho ${widget.customer!.name}: đánh kiểu gì, ở đài nào, giá tiền và giá trúng bao nhiêu. Dòng nào không đổi sẽ theo cấu hình mặc định.' : 'Cấu hình mặc định dùng cho mọi khách chưa có cấu hình riêng: mỗi miền một bảng giá.'} '
+        'Tiền xác = điểm × giá tiền; tiền trúng = số lần trúng × điểm × giá trúng.',
         style: muted,
       ),
       const SizedBox(height: 10),
       if (_error.isNotEmpty) InfoBox(_error),
       if (_notice.isNotEmpty) InfoBox(_notice, kind: InfoKind.success),
-      Wrap(spacing: 8, runSpacing: 4, children: [
+      Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
         for (final id in editorRegions)
           ChoiceChip(
             label: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(regionNames[id]!),
-              if (_m.regionHasOverride(id)) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.primary)),
+              if (_isCustomer && _m.regionHasOverride(id)) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.primary)),
             ]),
             selected: _m.region == id,
             onSelected: (_) => _switchRegion(id),
           ),
+        if (!_editing)
+          FilledButton.tonal(onPressed: () => setState(() {
+                _editing = true;
+                _notice = '';
+              }), child: const Text('Sửa')),
       ]),
       const SizedBox(height: 8),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: FilledButton.tonalIcon(onPressed: _add, icon: const Icon(Icons.add, size: 18), label: Text('Thêm loại đánh (${regionNames[_m.region]})')),
-      ),
-      const SizedBox(height: 8),
-      for (final r in _m.rows) _rowCard(context, r),
-      const SizedBox(height: 8),
-      Text(_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : (_isCustomer ? 'Đang dùng cấu hình mặc định' : 'Chưa có cấu hình riêng theo miền'), style: muted),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(child: OutlinedButton(onPressed: _saving ? null : () => setState(_m.resetAll), child: Text(_isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định'))),
-        const SizedBox(width: 8),
-        Expanded(child: FilledButton(onPressed: _saving || !_m.dirty ? null : _save, child: Text(_saving ? 'Đang lưu...' : (_isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình')))),
-      ]),
+      for (final g in _m.groupsOf(all: _editing)) ...[
+        Container(
+          key: ValueKey('group-${g.group.id}'),
+          margin: const EdgeInsets.only(top: 6, bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8)),
+          child: Row(children: [
+            Expanded(
+              child: Text.rich(TextSpan(children: [
+                TextSpan(text: g.group.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
+                TextSpan(text: ' · ${g.rows.length} cách đánh', style: TextStyle(color: context.mutedColor, fontSize: 13)),
+              ])),
+            ),
+            if (_editing) TextButton(key: ValueKey('add-${g.group.id}'), onPressed: () => _add(g.group), child: const Text('+ Thêm cách đánh')),
+          ]),
+        ),
+        for (final r in g.rows) Padding(padding: const EdgeInsets.only(left: 14), child: _rowCard(context, r)),
+      ],
+      if (_editing) ...[
+        const SizedBox(height: 8),
+        Text(!_isCustomer ? '' : (_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định'), style: muted),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: OutlinedButton(onPressed: _saving ? null : () => setState(_m.resetAll), child: Text(_isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định'))),
+          const SizedBox(width: 8),
+          OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Huỷ')),
+          const SizedBox(width: 8),
+          Expanded(child: FilledButton(onPressed: _saving || !_m.dirty ? null : _save, child: Text(_saving ? 'Đang lưu...' : (_isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình')))),
+        ]),
+      ] else if (_isCustomer)
+        Padding(padding: const EdgeInsets.only(top: 4), child: Text(_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định', style: muted)),
     ]);
   }
 
+  String _fmt(String s) {
+    final n = parseNum(s);
+    return n == null ? s : formatNumber(n);
+  }
+
+  /// One kiểu đánh. View: text only (customer: ✓ / –). Edit: the inputs, the "Dùng" switch, "Theo chung" / "Xoá".
   Widget _rowCard(BuildContext context, EditorRow r) {
-    final own = _m.isRegionOnly(r);
+    final own = _isCustomer && _m.hasOwn(r);
     final scheme = Theme.of(context).colorScheme;
     final tag = _m.tag(r);
+    final notSet = _m.notSet(r);
+    final k = '${_m.version}-${r.type}';
+    final warn = TextStyle(color: context.badColor, fontWeight: FontWeight.w600);
+    Widget value(String label, String text, {bool bad = false}) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: TextStyle(fontSize: 11.5, color: context.mutedColor)),
+            Text(r.off ? '-' : text, style: bad ? warn : const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+            if (bad && !r.off) Text('Chưa nhập', style: TextStyle(fontSize: 11.5, color: context.badColor)),
+          ]),
+        );
     return Card(
-      key: ValueKey('${_m.version}-${r.type}'),
+      key: ValueKey('row-$k'),
       margin: const EdgeInsets.only(bottom: 8),
       color: r.off ? scheme.surfaceContainerHighest.withValues(alpha: 0.5) : null,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Wrap(spacing: 6, runSpacing: 0, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Text(betTypeLabel(r.type), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-            Text('(${r.type})', style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-              decoration: BoxDecoration(color: (own ? scheme.primary : scheme.outline).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(20)),
-              child: Text(tag, style: TextStyle(fontSize: 12, color: own ? scheme.primary : context.mutedColor)),
+          Row(children: [
+            if (_isCustomer && _editing)
+              Switch(key: ValueKey('use-$k'), value: !r.off, onChanged: (_) => setState(() => _m.toggleOff(r)))
+            else if (_isCustomer)
+              Padding(padding: const EdgeInsets.only(right: 10, top: 8, bottom: 8), child: Text(r.off ? '–' : '✓', style: const TextStyle(fontSize: 16))),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  if (_editing && r.extra)
+                    SizedBox(
+                      width: 180,
+                      child: TextFormField(
+                        key: ValueKey('name-$k'),
+                        initialValue: r.name,
+                        maxLength: 30,
+                        decoration: const InputDecoration(labelText: 'Tên', isDense: true, counterText: ''),
+                        onChanged: (v) => r.name = v,
+                      ),
+                    )
+                  else
+                    Text(r.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  if (tag.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                      decoration: BoxDecoration(color: (own ? scheme.primary : scheme.outline).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(20)),
+                      child: Text(tag, style: TextStyle(fontSize: 12, color: own ? scheme.primary : context.mutedColor)),
+                    ),
+                ]),
+                if (!(_editing && r.editable && !r.off)) Text(r.symbolText, style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
+                Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  Text('Lấy số: ${_m.srcCaption(r)}', key: ValueKey('src-$k'), style: TextStyle(color: context.mutedColor, fontSize: 11.5)),
+                  if (_editing && !r.off)
+                    TextButton(
+                      key: ValueKey('srcbtn-$k'),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: const Size(0, 28)),
+                      onPressed: () => setState(() => r.srcOpen = !r.srcOpen),
+                      child: Text(r.srcOpen ? 'Đóng' : 'Chỉnh lấy số', style: const TextStyle(fontSize: 12)),
+                    ),
+                ]),
+              ]),
             ),
+            if (_editing && own) TextButton(onPressed: () => setState(() => _m.resetRow(r)), child: const Text('Theo chung')),
+            if (_editing && (r.extra || !_isCustomer)) TextButton(style: TextButton.styleFrom(foregroundColor: context.badColor), onPressed: () => _remove(r), child: const Text('Xoá')),
           ]),
-          Wrap(children: [
-            if (r.off) TextButton(onPressed: () => setState(() => _m.restoreRow(r)), child: const Text('Khôi phục')),
-            if (own) TextButton(onPressed: () => setState(() => _m.resetRow(r)), child: const Text('Theo chung')),
-            if (!r.off) TextButton(style: TextButton.styleFrom(foregroundColor: context.badColor), onPressed: () => _remove(r), child: const Text('Xoá')),
-          ]),
-          if (!r.off) ...[
-            const SizedBox(height: 4),
+          if (_editing && r.editable && !r.off)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, right: 4),
+              child: TextFormField(
+                key: ValueKey('sym-$k'),
+                initialValue: r.symbolsInput,
+                decoration: const InputDecoration(labelText: 'Ký hiệu', hintText: 'Cách nhau bằng dấu phẩy', isDense: true),
+                onChanged: (v) => setState(() => r.symbolsInput = v),
+              ),
+            ),
+          if (_editing && r.srcOpen && !r.off) _srcPanel(context, r, k),
+          const SizedBox(height: 6),
+          if (!_editing)
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              value('Giá tiền / 1 điểm', _fmt(r.price)),
+              value('Giá trúng / 1 điểm', _fmt(r.payout), bad: notSet),
+            ])
+          else if (!r.off)
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
                 child: TextFormField(
-                  key: ValueKey('rate-${_m.version}-${r.type}'),
-                  initialValue: r.rate,
+                  key: ValueKey('price-$k'),
+                  initialValue: r.price,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Tỉ lệ ăn', isDense: true),
-                  onChanged: (v) => setState(() => r.rate = v),
+                  decoration: const InputDecoration(labelText: 'Giá tiền / 1 điểm', isDense: true),
+                  onChanged: (v) => setState(() => r.price = v),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: DropdownButtonFormField<int>(
-                  key: ValueKey('digits-${_m.version}-${r.type}'),
-                  initialValue: r.digits,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'So khớp', isDense: true),
-                  items: [for (final d in digitOptions) DropdownMenuItem(value: d, child: Text('$d số cuối'))],
-                  onChanged: (v) => setState(() => r.digits = v ?? 2),
+                child: TextFormField(
+                  key: ValueKey('payout-$k'),
+                  initialValue: r.payout,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: 'Giá trúng / 1 điểm', isDense: true, errorText: notSet ? 'Chưa nhập' : null),
+                  onChanged: (v) => setState(() => r.payout = v),
                 ),
               ),
             ]),
-            const SizedBox(height: 10),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('unit-${_m.version}-${r.type}'),
-                  initialValue: r.unit,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Tính theo', isDense: true),
-                  items: const [DropdownMenuItem(value: 'point', child: Text('Điểm')), DropdownMenuItem(value: 'money', child: Text('Tiền'))],
-                  onChanged: (v) => setState(() => r.unit = v ?? 'money'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: r.unit == 'point'
-                    ? TextFormField(
-                        key: ValueKey('pv-${_m.version}-${r.type}'),
-                        initialValue: r.pointValue,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: '1 điểm = (đồng)', isDense: true),
-                        onChanged: (v) => setState(() => r.pointValue = v),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            Wrap(spacing: 6, runSpacing: 0, children: [
-              for (final t in prizeTiers)
-                if (!(t.key == 'giaiTam' && _m.region == 'mb'))
-                  FilterChip(
-                    label: Text(t.key == 'giaiTam' ? 'Giải tám' : t.label),
-                    selected: r.tiers.contains(t.key),
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (_) => setState(() => r.toggleTier(t.key)),
-                  ),
-            ]),
-          ],
         ]),
       ),
+    );
+  }
+
+  /// "Chỉnh lấy số": which prizes, đầu / cuối, how many digits, which lô of each prize.
+  Widget _srcPanel(BuildContext context, EditorRow r, String k) {
+    final f = _m.fieldsOf(r);
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (f.tiers) ...[
+          const Text('Giải (dãy giải lấy số)', style: TextStyle(fontWeight: FontWeight.w700)),
+          Wrap(spacing: 6, runSpacing: 0, children: [
+            for (final p in prizeInfo(_m.region))
+              FilterChip(
+                key: ValueKey('tier-$k-${p.tier}'),
+                label: Text('${p.label} (${p.count} lô × ${p.digits} số)', style: const TextStyle(fontSize: 12)),
+                selected: r.srcTiers.contains(p.tier),
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) => setState(() => _m.toggleTier(r, p.tier)),
+              ),
+          ]),
+        ],
+        const SizedBox(height: 6),
+        Wrap(spacing: 10, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.end, children: [
+          if (f.position)
+            SizedBox(
+              width: 150,
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('pos-$k'),
+                initialValue: r.srcPos,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Vị trí', isDense: true),
+                items: const [DropdownMenuItem(value: 'last', child: Text('Cuối (đuôi)')), DropdownMenuItem(value: 'first', child: Text('Đầu'))],
+                onChanged: (v) => setState(() => r.srcPos = v ?? 'last'),
+              ),
+            ),
+          if (f.digits)
+            SizedBox(
+              width: 120,
+              child: DropdownButtonFormField<int>(
+                key: ValueKey('dig-$k'),
+                initialValue: r.srcDigits,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Bao nhiêu số', isDense: true),
+                items: [for (var n = 1; n <= 6; n++) DropdownMenuItem(value: n, child: Text('$n số'))],
+                onChanged: (v) => setState(() => r.srcDigits = v ?? 2),
+              ),
+            ),
+          if (f.pick)
+            SizedBox(
+              width: 170,
+              child: TextFormField(
+                key: ValueKey('pick-$k'),
+                initialValue: r.srcPick,
+                decoration: const InputDecoration(labelText: 'Lô thứ (trống = mọi lô)', hintText: 'Ví dụ: 1, 2', isDense: true),
+                onChanged: (v) => setState(() => r.srcPick = v),
+              ),
+            ),
+          TextButton(
+            key: ValueKey('srcreset-$k'),
+            onPressed: () => setState(() {
+              _m.resetSrc(r);
+              _m.version++; // new keys: the inputs are rebuilt with the default values
+            }),
+            child: const Text('Về mặc định'),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        Text('Đang lấy: ${describeSource(_m.srcOf(r), _m.region)}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
+      ]),
     );
   }
 }

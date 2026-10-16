@@ -49,15 +49,19 @@ class Entry {
 
 /// A row of the customer roster (`GET /me/customers`); [scoringRates] is the customer's own payout config or null.
 class CustomerRec {
-  const CustomerRec({required this.id, required this.name, this.scoringRates});
+  const CustomerRec({required this.id, required this.name, this.scoringRates, this.homeRegion});
   final String id;
   final String name;
   final Map<String, dynamic>? scoringRates;
+
+  /// 'mb' | 'mn' | null: the customer's own region (how "Đầu" is scored on a Miền Bắc result).
+  final String? homeRegion;
 
   factory CustomerRec.fromJson(Map<String, dynamic> j) => CustomerRec(
         id: '${j['id']}',
         name: (j['name'] as String?) ?? '',
         scoringRates: j['scoringRates'] is Map ? Map<String, dynamic>.from(j['scoringRates'] as Map) : null,
+        homeRegion: j['homeRegion'] == 'mb' || j['homeRegion'] == 'mn' ? j['homeRegion'] as String : null,
       );
 }
 

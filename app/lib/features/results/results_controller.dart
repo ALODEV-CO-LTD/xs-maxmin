@@ -401,12 +401,20 @@ class ResultsController extends ChangeNotifier {
     return null;
   }
 
+  String? _customerRegion(String name) {
+    for (final c in customers) {
+      if (c.name == name) return c.homeRegion;
+    }
+    return null;
+  }
+
   /// Calculated "Điểm ra" of an entry (null = the day has no result for any of its stations yet).
   double? scoreOf(Entry e) => entryOutTotal(
         entry: e,
         stations: stations,
         accountRates: rates,
         customerRates: _customerRates(e.customerName),
+        customerRegion: _customerRegion(e.customerName),
         resultOf: (st) => dayResults[st],
       );
 

@@ -8,6 +8,7 @@ import '../../core/bet_types.dart';
 import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/mask_store.dart';
+import '../../core/scoring_config.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/masked_text.dart';
 import 'date_field.dart';
@@ -498,6 +499,9 @@ class _EntryRow extends StatelessWidget {
     final cfg = c.configFor(e.betType, e.station);
     final rate = cfg['rate'];
     final digits = (cfg['digits'] as num?) ?? 2;
+    // "Giá tiền → giá trúng" of the row the entry is scored with (older rows: "× tỉ lệ").
+    final rateText = hasMoneyModel(cfg) ? '${formatNumber(numOf(cfg['price']))} → ${formatNumber(numOf(cfg['payout']))} đ/điểm' : '× ${rate is num ? numToString(rate) : '?'}';
+    final fixedKind = isTableKind(cfg['kind']);
     final key = (e.betType == null || e.betType!.isEmpty) ? 'de' : e.betType!;
     Widget out;
     switch (status?.state) {
@@ -518,8 +522,8 @@ class _EntryRow extends StatelessWidget {
       decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6)))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Wrap(spacing: 6, runSpacing: 4, children: [
-          _MiniChip('${betTypeLabel(key)} × ${rate is num ? numToString(rate) : '?'}'),
-          _MiniChip('${digits.toInt()} số cuối'),
+          _MiniChip('${betTypeLabel(key)} · $rateText'),
+          if (!fixedKind) _MiniChip('${digits.toInt()} số cuối'),
           if (e.station != null && e.station!.isNotEmpty && e.station != 'mb') _MiniChip(st.stationLabel(e.station)),
           if (won) _MiniChip((status!.value ?? 0) > 0 ? 'Trúng' : 'Không trúng', color: (status.value ?? 0) > 0 ? context.okColor : null),
         ]),

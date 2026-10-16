@@ -9,6 +9,9 @@ import 'customer_model.dart';
 import 'customers_controller.dart';
 import 'scoring_config_editor.dart';
 
+/// The customer's own region: decides how "Đầu" is scored on a Miền Bắc result (Bắc 1 lô = 1 điểm, Nam/Trung ×4 giải bảy).
+const homeRegionOptions = {'': 'Chưa chọn (tính như khách Bắc)', 'mb': 'Khách Miền Bắc', 'mn': 'Khách Miền Nam / Miền Trung'};
+
 /// One customer: the default đài used by Nhập số, and the customer's own "Cấu hình tính điểm".
 class CustomerConfigScreen extends StatefulWidget {
   const CustomerConfigScreen({super.key, required this.controller, required this.customer});
@@ -42,6 +45,20 @@ class _CustomerConfigScreenState extends State<CustomerConfigScreen> {
     }
   }
 
+  Future<void> _saveHomeRegion(String? region) async {
+    setState(() {
+      _saving = true;
+      _msg = '';
+    });
+    final err = await widget.controller.saveHomeRegion(widget.customer, region);
+    if (mounted) {
+      setState(() {
+        _saving = false;
+        _msg = err.isEmpty ? 'Đã lưu miền của khách' : err;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cu = widget.customer;
@@ -58,6 +75,15 @@ class _CustomerConfigScreenState extends State<CustomerConfigScreen> {
             decoration: const InputDecoration(labelText: 'Đài xổ số mặc định khi nhập số cho khách này'),
             items: [for (final o in options) DropdownMenuItem(value: o.value, child: Text(o.label.trim(), overflow: TextOverflow.ellipsis))],
             onChanged: _saving ? null : (v) => v == null ? null : _saveStation(v),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            key: ValueKey('region-${cu.homeRegion}'),
+            initialValue: cu.homeRegion ?? '',
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Khách thuộc miền nào (để tính Đầu ở đài Miền Bắc)'),
+            items: [for (final o in homeRegionOptions.entries) DropdownMenuItem(value: o.key, child: Text(o.value, overflow: TextOverflow.ellipsis))],
+            onChanged: _saving ? null : (v) => _saveHomeRegion(v == null || v.isEmpty ? null : v),
           ),
           if (_msg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_msg, style: TextStyle(fontSize: 13, color: context.mutedColor))),
           const Divider(height: 32),
