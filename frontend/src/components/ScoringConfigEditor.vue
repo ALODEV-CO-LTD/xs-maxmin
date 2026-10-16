@@ -387,12 +387,6 @@ const regions = REGION_IDS
   <div class="sce">
     <div v-if="loading" class="sce-note">Đang tải...</div>
     <template v-else>
-      <p class="sce-hint">
-        <template v-if="isCustomer">Tính điểm cho <strong>{{ customer.name }}</strong>: đánh kiểu gì, ở đài nào, giá tiền và giá trúng bao nhiêu. Dòng nào không đổi sẽ theo cấu hình mặc định.</template>
-        <template v-else>Cấu hình mặc định dùng cho mọi khách chưa có cấu hình riêng: mỗi miền một bảng giá.</template>
-        Tiền xác = điểm × giá tiền; tiền trúng = số lần trúng × điểm × giá trúng.
-      </p>
-
       <div v-if="error" class="alert alert-error">{{ error }}</div>
       <div v-if="notice" class="alert alert-success">{{ notice }}</div>
 
@@ -555,11 +549,6 @@ const regions = REGION_IDS
 <style scoped>
 .sce {
   font-size: 14.5px;
-}
-.sce-hint {
-  margin: 0 0 12px;
-  font-size: 14px;
-  color: var(--muted);
 }
 .sce-note {
   color: var(--muted);

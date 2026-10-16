@@ -166,12 +166,6 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
     if (_loading) return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
     final muted = TextStyle(fontSize: 13, color: context.mutedColor);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(
-        '${_isCustomer ? 'Tính điểm cho ${widget.customer!.name}: đánh kiểu gì, ở đài nào, giá tiền và giá trúng bao nhiêu. Dòng nào không đổi sẽ theo cấu hình mặc định.' : 'Cấu hình mặc định dùng cho mọi khách chưa có cấu hình riêng: mỗi miền một bảng giá.'} '
-        'Tiền xác = điểm × giá tiền; tiền trúng = số lần trúng × điểm × giá trúng.',
-        style: muted,
-      ),
-      const SizedBox(height: 10),
       if (_error.isNotEmpty) InfoBox(_error),
       if (_notice.isNotEmpty) InfoBox(_notice, kind: InfoKind.success),
       Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
