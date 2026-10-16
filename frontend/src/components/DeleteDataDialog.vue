@@ -11,6 +11,7 @@
 import { computed, ref, watch } from 'vue'
 import { api } from '../api'
 import ModalDialog from './ModalDialog.vue'
+import AppButton from './AppButton.vue'
 import PasswordInput from './PasswordInput.vue'
 import AppSelect from './AppSelect.vue'
 import AppDatePicker from './AppDatePicker.vue'
@@ -161,10 +162,8 @@ async function submit() {
       <div v-if="error" class="alert alert-error" role="alert" style="margin: 0">{{ error }}</div>
     </form>
     <template #footer>
-      <button type="button" class="btn btn-secondary" :disabled="busy" @click="emit('close')">Huỷ</button>
-      <button type="submit" form="del-data-form" class="btn btn-danger" :disabled="busy || count === 0">
-        {{ busy ? 'Đang xóa...' : 'Xóa' }}
-      </button>
+      <AppButton variant="ghost" :disabled="busy" @click="emit('close')">Huỷ</AppButton>
+      <AppButton variant="danger" type="submit" form="del-data-form" :loading="busy" :disabled="count === 0">{{ busy ? 'Đang xóa...' : 'Xóa' }}</AppButton>
     </template>
   </ModalDialog>
 </template>

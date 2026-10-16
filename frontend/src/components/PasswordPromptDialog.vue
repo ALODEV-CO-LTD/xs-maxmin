@@ -7,6 +7,7 @@
 import { ref, watch } from 'vue'
 import { api } from '../api'
 import ModalDialog from './ModalDialog.vue'
+import AppButton from './AppButton.vue'
 import PasswordInput from './PasswordInput.vue'
 
 const props = defineProps({
@@ -68,10 +69,8 @@ async function submit() {
       <div v-if="error" class="alert alert-error" role="alert" style="margin: 12px 0 0">{{ error }}</div>
     </form>
     <template #footer>
-      <button type="button" class="btn btn-secondary" :disabled="busy" @click="emit('close')">Huỷ</button>
-      <button type="submit" form="pwd-prompt-form" class="btn btn-primary" :disabled="busy">
-        {{ busy ? 'Đang kiểm tra...' : confirmText }}
-      </button>
+      <AppButton variant="ghost" :disabled="busy" @click="emit('close')">Huỷ</AppButton>
+      <AppButton variant="primary" type="submit" form="pwd-prompt-form" :loading="busy">{{ busy ? 'Đang kiểm tra...' : confirmText }}</AppButton>
     </template>
   </ModalDialog>
 </template>

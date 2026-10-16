@@ -27,6 +27,8 @@ import AppIcon from '../components/AppIcon.vue'
 import MaskBar from '../components/MaskBar.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import ScoringConfigEditor from '../components/ScoringConfigEditor.vue'
+import AppButton from '../components/AppButton.vue'
+import ActionBar from '../components/ActionBar.vue'
 import ScoringSettingsView from './ScoringSettingsView.vue'
 import { DEFAULT_RATES } from '../scoringConfig'
 import { allStationOptions, loadStations } from '../lotteryStations'
@@ -425,12 +427,10 @@ async function savePhone() {
         </div>
         <p class="page-subtitle" style="margin: 0 0 12px">Cấu hình tính điểm của khách đặt sau, ở nút "Cấu hình tính điểm" trong danh sách.</p>
         <div v-if="addError" class="alert alert-error add-customer-error">{{ addError }}</div>
-        <div class="add-customer-actions">
-          <button type="button" class="btn btn-ghost" :disabled="addingCustomer" @click="addOpen = false">Huỷ</button>
-          <button type="submit" class="btn btn-primary" :disabled="addingCustomer || !newCustomerName.trim()">
-            {{ addingCustomer ? 'Đang thêm...' : 'Thêm khách hàng' }}
-          </button>
-        </div>
+        <ActionBar align="end">
+          <AppButton variant="ghost" :disabled="addingCustomer" @click="addOpen = false">Huỷ</AppButton>
+          <AppButton variant="primary" type="submit" :loading="addingCustomer" :disabled="!newCustomerName.trim()">{{ addingCustomer ? 'Đang thêm...' : 'Thêm khách hàng' }}</AppButton>
+        </ActionBar>
       </form>
     </ModalDialog>
 

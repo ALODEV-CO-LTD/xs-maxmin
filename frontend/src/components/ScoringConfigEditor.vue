@@ -21,6 +21,8 @@ import { showConfirm } from '../confirm'
 import { betTypeLabel } from '../betTypes'
 import { baseKey, defaultRow, defaultSource, defaultSymbols, DEFAULT_RATES, describeSource, effectiveSource, kindSource, normalizeSource, prizeInfo, sameSource, sourceFields, makeRow, parseSymbols, regionKey, sameConfig, symbolsText, TABLE_GROUPS, TABLE_KINDS, TABLE_KIND_KEYS, toTableRow, typesIn } from '../scoringConfig'
 import { REGION_IDS } from '../lotteryStations'
+import AppButton from './AppButton.vue'
+import ActionBar from './ActionBar.vue'
 
 const props = defineProps({
   scope: { type: String, default: 'default' }, // 'default' | 'customer'
@@ -536,14 +538,16 @@ const regions = REGION_IDS
         </table>
       </div>
 
-      <div class="sce-foot">
-        <span class="sce-muted">{{ !isCustomer ? '' : overrideCount ? `${overrideCount} mục riêng` : 'Đang dùng cấu hình mặc định' }}</span>
-        <template v-if="editing">
-          <button type="button" class="btn btn-ghost btn-sm" :disabled="saving" @click="resetAll">{{ isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định' }}</button>
-          <button type="button" class="btn btn-ghost" :disabled="saving" @click="cancelEdit">Huỷ</button>
-          <button type="button" class="btn btn-primary" :disabled="saving || !dirty" @click="save">{{ saving ? 'Đang lưu...' : isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình' }}</button>
+      <ActionBar :sticky="editing" align="between">
+        <template v-if="editing" #start>
+          <AppButton variant="ghost" size="sm" :disabled="saving" @click="resetAll">{{ isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định' }}</AppButton>
         </template>
-      </div>
+        <template #note>{{ !isCustomer ? '' : overrideCount ? `${overrideCount} mục riêng` : 'Đang dùng cấu hình mặc định' }}</template>
+        <template v-if="editing">
+          <AppButton variant="ghost" :disabled="saving" @click="cancelEdit">Huỷ</AppButton>
+          <AppButton variant="primary" :loading="saving" :disabled="!dirty" @click="save">{{ saving ? 'Đang lưu...' : isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình' }}</AppButton>
+        </template>
+      </ActionBar>
     </template>
   </div>
 </template>
@@ -870,22 +874,6 @@ const regions = REGION_IDS
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-.sce-foot {
-  position: sticky; /* the table is long: Lưu / Huỷ stay in reach at the bottom of the screen */
-  bottom: 0;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px 12px;
-  margin-top: 12px;
-  padding: 10px 0;
-  background: var(--card);
-}
-.sce-foot .sce-muted {
-  margin-right: auto;
 }
 
 @media (max-width: 720px) {
