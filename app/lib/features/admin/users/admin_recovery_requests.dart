@@ -4,6 +4,7 @@ import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import 'admin_users_logic.dart';
 import 'admin_users_widgets.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Queue of "nhờ Admin hỗ trợ khôi phục" requests (port of AdminRecoveryRequests.vue). Needs users.recovery.
 class AdminRecoveryRequestsPage extends StatefulWidget {
@@ -107,7 +108,7 @@ class _State extends State<AdminRecoveryRequestsPage> {
           'Hạn dùng đến ${fmtDateTime(i.expiresAt)}, dùng một lần. Gửi cho khách qua kênh riêng ngay bây giờ vì mã không xem lại được. Khách vào Đăng nhập, Quên mật khẩu, "Tôi đã có mã hỗ trợ từ Admin".',
           style: TextStyle(fontSize: 12, color: context.mutedColor),
         ),
-        Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => setState(() => _issued = null), child: const Text('Đã gửi, ẩn mã'))),
+        Align(alignment: Alignment.centerRight, child: AppButton(label: 'Đã gửi, ẩn mã', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _issued = null))),
       ]),
     );
   }
@@ -132,9 +133,9 @@ class _State extends State<AdminRecoveryRequestsPage> {
           if (r.note.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Ghi chú của khách: ${r.note}', style: TextStyle(fontSize: 13, color: context.mutedColor))),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: FilledButton(onPressed: busy ? null : () => _act(r, 'approve'), child: Text(r.isPending ? 'Duyệt, cấp mã' : 'Cấp lại mã'))),
+            Expanded(child: AppButton(label: r.isPending ? 'Duyệt, cấp mã' : 'Cấp lại mã', variant: AppButtonVariant.primary, onPressed: busy ? null : () => _act(r, 'approve'))),
             const SizedBox(width: 8),
-            TextButton(style: TextButton.styleFrom(foregroundColor: context.badColor), onPressed: busy ? null : () => _act(r, 'reject'), child: const Text('Từ chối')),
+            AppButton(label: 'Từ chối', variant: AppButtonVariant.danger, onPressed: busy ? null : () => _act(r, 'reject')),
           ]),
         ]),
       ),

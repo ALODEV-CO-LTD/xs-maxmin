@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'action_bar.dart';
+
 /// Shared shell of the input dialogs (web: components/ModalDialog.vue): a fixed title row with the ✕ close button in
 /// the right corner (or a ← back button on the left for [back], used by the big forms), an optional description, a body
 /// that scrolls, and a fixed footer for the buttons. [onClose] defaults to closing the dialog with no result (the same
@@ -53,8 +55,8 @@ class AppDialog extends StatelessWidget {
           ),
           if (actions.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-              child: Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8, children: actions),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              child: ActionBar(children: actions),
             ),
         ]),
       ),

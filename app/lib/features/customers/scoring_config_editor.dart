@@ -9,6 +9,8 @@ import '../entries/dialogs.dart';
 import 'add_bet_type_dialog.dart';
 import 'customer_model.dart';
 import 'scoring_editor_model.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/action_bar.dart';
 
 /// Cấu hình tính điểm, one editor for both places:
 ///  - [customer] == null: the account-wide default (GET/PUT /me/scoring-settings);
@@ -179,10 +181,10 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
             onSelected: (_) => _switchRegion(id),
           ),
         if (!_editing)
-          FilledButton.tonal(onPressed: () => setState(() {
+          AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: () => setState(() {
                 _editing = true;
                 _notice = '';
-              }), child: const Text('Sửa')),
+              })),
       ]),
       const SizedBox(height: 8),
       for (final g in _m.groupsOf(all: _editing)) ...[
@@ -198,7 +200,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                 TextSpan(text: ' · ${g.rows.length} cách đánh', style: TextStyle(color: context.mutedColor, fontSize: 13)),
               ])),
             ),
-            if (_editing) TextButton(key: ValueKey('add-${g.group.id}'), onPressed: () => _add(g.group), child: const Text('+ Thêm cách đánh')),
+            if (_editing) AppButton(key: ValueKey('add-${g.group.id}'), label: '+ Thêm cách đánh', variant: AppButtonVariant.ghost, onPressed: () => _add(g.group)),
           ]),
         ),
         for (final r in g.rows) Padding(padding: const EdgeInsets.only(left: 14), child: _rowCard(context, r)),
@@ -207,13 +209,13 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
         const SizedBox(height: 8),
         Text(!_isCustomer ? '' : (_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định'), style: muted),
         const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: OutlinedButton(onPressed: _saving ? null : () => setState(_m.resetAll), child: Text(_isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định'))),
-          const SizedBox(width: 8),
-          OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Huỷ')),
-          const SizedBox(width: 8),
-          Expanded(child: FilledButton(onPressed: _saving || !_m.dirty ? null : _save, child: Text(_saving ? 'Đang lưu...' : (_isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình')))),
-        ]),
+        ActionBar(
+          start: [AppButton(label: _isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định', variant: AppButtonVariant.secondary, onPressed: _saving ? null : () => setState(_m.resetAll))],
+          children: [
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _saving ? null : _cancelEdit),
+            AppButton(label: (_isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình'), variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !_m.dirty ? null : _save),
+          ],
+        ),
       ] else if (_isCustomer)
         Padding(padding: const EdgeInsets.only(top: 4), child: Text(_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định', style: muted)),
     ]);
@@ -287,7 +289,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                 ]),
               ]),
             ),
-            if (_editing && own) TextButton(onPressed: () => setState(() => _m.resetRow(r)), child: const Text('Theo chung')),
+            if (_editing && own) AppButton(label: 'Theo chung', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _m.resetRow(r))),
             if (_editing && (r.extra || !_isCustomer)) TextButton(style: TextButton.styleFrom(foregroundColor: context.badColor), onPressed: () => _remove(r), child: const Text('Xoá')),
           ]),
           if (_editing && r.editable && !r.off)
@@ -391,14 +393,10 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                 onChanged: (v) => setState(() => r.srcPick = v),
               ),
             ),
-          TextButton(
-            key: ValueKey('srcreset-$k'),
-            onPressed: () => setState(() {
+          AppButton(key: ValueKey('srcreset-$k'), label: 'Về mặc định', variant: AppButtonVariant.ghost, onPressed: () => setState(() {
               _m.resetSrc(r);
               _m.version++; // new keys: the inputs are rebuilt with the default values
-            }),
-            child: const Text('Về mặc định'),
-          ),
+            })),
         ]),
         const SizedBox(height: 4),
         Text('Đang lấy: ${describeSource(_m.srcOf(r), _m.region)}', style: TextStyle(fontSize: 12, color: context.mutedColor)),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/app_dialog.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Card with an optional title row (+ trailing widget) and a column of children.
 class SectionCard extends StatelessWidget {
@@ -129,19 +130,14 @@ class _PasswordFieldState extends State<PasswordField> {
 }
 
 Future<bool> confirmDialog(BuildContext context, {required String title, required String message, String confirmText = 'Xác nhận', bool danger = false}) async {
-  final cs = Theme.of(context).colorScheme;
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
       content: SingleChildScrollView(child: Text(message)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-        FilledButton(
-          style: danger ? FilledButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError) : null,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(confirmText),
-        ),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+        AppButton(label: confirmText, variant: danger ? AppButtonVariant.danger : AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
       ],
     ),
   );
@@ -232,8 +228,8 @@ class _SecretFormDialogState extends State<SecretFormDialog> {
             ],
       ]),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: Text(done ? 'Đóng' : 'Huỷ')),
-        if (!done) FilledButton(onPressed: _busy ? null : _go, child: Text(_busy ? 'Đang lưu...' : widget.submitLabel)),
+        AppButton(label: done ? 'Đóng' : 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
+        if (!done) AppButton(label: widget.submitLabel, variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _go),
       ],
     );
   }
@@ -266,9 +262,9 @@ class _RecoveryCodeDisplayState extends State<RecoveryCodeDisplay> {
         child: SelectableText(widget.code, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'monospace', fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
       ),
       const SizedBox(height: 12),
-      OutlinedButton.icon(
-        icon: Icon(_copied ? Icons.check : Icons.copy, size: 18),
-        label: Text(_copied ? 'Đã sao chép' : 'Sao chép mã'),
+      AppButton(
+        icon: _copied ? Icons.check : Icons.copy,
+        label: _copied ? 'Đã sao chép' : 'Sao chép mã',
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: widget.code));
           if (mounted) setState(() => _copied = true);
@@ -281,7 +277,7 @@ class _RecoveryCodeDisplayState extends State<RecoveryCodeDisplay> {
         onChanged: (v) => setState(() => _saved = v ?? false),
         title: const Text('Tôi đã lưu mã khôi phục ở nơi an toàn.'),
       ),
-      FilledButton(onPressed: _saved ? widget.onConfirmed : null, child: Text(widget.continueText)),
+      AppButton(label: widget.continueText, variant: AppButtonVariant.primary, block: true, onPressed: _saved ? widget.onConfirmed : null),
     ]);
   }
 }

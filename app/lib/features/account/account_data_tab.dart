@@ -8,6 +8,7 @@ import 'account_controller.dart';
 import 'account_widgets.dart';
 import '../scoring/deletion_schedules_page.dart' show DeletionSchedules;
 import 'auth_flows.dart' show errorText;
+import '../../core/widgets/app_button.dart';
 
 /// Must match backend/lib/src/data_wipe.dart (the single definition of the wipe scope).
 const wipeDeletes = 'số liệu đã nhập, danh sách khách hàng, mẫu cú pháp, lịch xoá tự động, nhật ký cuộc gọi, tin nhắn phản hồi với Admin, lịch sử giao dịch và các yêu cầu thanh toán chưa duyệt';
@@ -82,7 +83,7 @@ class RecoveryCodeCardState extends State<RecoveryCodeCard> {
         if (_error != null) NoticeBox(_error!),
         PasswordField(controller: _password, label: 'Mật khẩu hiện tại', enabled: !_busy, onSubmitted: (_) => _submit()),
         const SizedBox(height: 12),
-        FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Đang tạo...' : has ? 'Đổi mã khôi phục' : 'Tạo mã khôi phục')),
+        AppButton(label: has ? 'Đổi mã khôi phục' : 'Tạo mã khôi phục', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submit),
       ],
     ]);
   }
@@ -127,11 +128,7 @@ class _DeleteDataCardState extends State<_DeleteDataCard> {
       const SizedBox(height: 12),
       if (_error != null) NoticeBox(_error!),
       if (_success != null) NoticeBox(_success!, kind: NoticeKind.success),
-      FilledButton(
-        style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Theme.of(context).colorScheme.onError),
-        onPressed: _busy ? null : _delete,
-        child: Text(_busy ? 'Đang xoá...' : 'Xoá toàn bộ dữ liệu'),
-      ),
+      AppButton(label: 'Xoá toàn bộ dữ liệu', variant: AppButtonVariant.danger, loading: _busy, block: true, onPressed: _busy ? null : _delete),
     ]);
   }
 }
@@ -155,8 +152,8 @@ class _PasswordPromptState extends State<_PasswordPrompt> {
         title: 'Xác nhận xoá dữ liệu',
         body: PasswordField(controller: _c, label: 'Mật khẩu đăng nhập', autofocus: true, onSubmitted: (v) => Navigator.pop(context, v)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
-          FilledButton(onPressed: () => Navigator.pop(context, _c.text), child: const Text('Xoá dữ liệu')),
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
+          AppButton(label: 'Xoá dữ liệu', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, _c.text)),
         ],
       );
 }

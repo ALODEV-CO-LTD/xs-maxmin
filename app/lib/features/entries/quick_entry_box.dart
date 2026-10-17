@@ -12,6 +12,7 @@ import 'dialogs.dart';
 import 'entries_controller.dart';
 import 'message_parser.dart';
 import 'ocr_service.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Picks a picture and returns its path (null = cancelled). Replaceable in tests.
 typedef PickImagePath = Future<String?> Function(ImageSource source);
@@ -286,27 +287,10 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
         if (_photoPath != null) _photoRow(context),
         const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: _text.text.trim().isEmpty || _reading ? null : _analyze,
-            child: const Text('Phân tích'),
-          ),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: _reading ? null : () => _pick(ImageSource.gallery),
-            icon: const Icon(Icons.photo_library_outlined, size: 18),
-            label: Text(_reading ? 'Đang đọc ảnh...' : 'Chọn ảnh'),
-          ),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: _reading ? null : () => _pick(ImageSource.camera),
-            icon: const Icon(Icons.photo_camera_outlined, size: 18),
-            label: const Text('Chụp ảnh'),
-          ),
-          TextButton(
-            onPressed: () => setState(() => _templateOpen = !_templateOpen),
-            child: Text('Mẫu cú pháp của khách này ${c.savedTemplate != null ? '(đã lưu)' : '(chưa lưu)'}'),
-          ),
+          AppButton(label: 'Phân tích', variant: AppButtonVariant.primary, onPressed: _text.text.trim().isEmpty || _reading ? null : _analyze),
+          AppButton(label: 'Chọn ảnh', variant: AppButtonVariant.secondary, icon: Icons.photo_library_outlined, loading: _reading, onPressed: _reading ? null : () => _pick(ImageSource.gallery)),
+          AppButton(label: 'Chụp ảnh', variant: AppButtonVariant.secondary, icon: Icons.photo_camera_outlined, onPressed: _reading ? null : () => _pick(ImageSource.camera)),
+          AppButton(label: 'Mẫu cú pháp của khách này ${c.savedTemplate != null ? '(đã lưu)' : '(chưa lưu)'}', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _templateOpen = !_templateOpen)),
         ]),
         if (_reading) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
         if (_templateOpen) _templateBox(types),
@@ -336,8 +320,8 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_reading ? 'Đang đọc ảnh...' : 'Văn bản đọc từ ảnh đã đưa vào ô trên.', style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
               Wrap(children: [
-                TextButton(onPressed: _zoomPhoto, child: const Text('Xem ảnh')),
-                TextButton(onPressed: _reading ? null : _clearPhoto, child: const Text('Xoá ảnh')),
+                AppButton(label: 'Xem ảnh', variant: AppButtonVariant.ghost, onPressed: _zoomPhoto),
+                AppButton(label: 'Xoá ảnh', variant: AppButtonVariant.ghost, onPressed: _reading ? null : _clearPhoto),
               ]),
             ]),
           ),
@@ -368,15 +352,12 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
         TextField(controller: _markers, decoration: const InputDecoration(labelText: 'Dấu ngăn điểm', hintText: 'vd: x, con, =')),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          OutlinedButton(onPressed: c.selectedName.isEmpty ? null : _saveTemplate, child: Text('Lưu mẫu cho ${c.selectedName}')),
+          AppButton(label: 'Lưu mẫu cho ${c.selectedName}', variant: AppButtonVariant.secondary, onPressed: c.selectedName.isEmpty ? null : _saveTemplate),
           if (c.savedTemplate != null)
-            TextButton(
-              onPressed: () async {
+            AppButton(label: 'Xoá mẫu', variant: AppButtonVariant.ghost, onPressed: () async {
                 final msg = await c.deleteTemplate();
                 if (mounted) setState(() => _templateMsg = msg);
-              },
-              child: const Text('Xoá mẫu'),
-            ),
+              }),
         ]),
         if (_templateMsg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_templateMsg, style: const TextStyle(fontSize: 13))),
       ]),
@@ -396,16 +377,13 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
       if (_ignored.isNotEmpty) Text('Bỏ qua ${_ignored.length} dòng không có số: ${_ignored.join(' / ')}', style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
-        FilledButton(onPressed: _saving || !c.canAdd || _picked.isEmpty ? null : _save, child: Text(_saving ? 'Đang lưu...' : 'Xác nhận và lưu ${_picked.length} dòng')),
-        OutlinedButton(onPressed: _picked.isEmpty ? null : _toForm, child: const Text('Đưa vào bảng nhập để sửa')),
-        TextButton(
-          onPressed: () => setState(() {
+        AppButton(label: 'Xác nhận và lưu ${_picked.length} dòng', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !c.canAdd || _picked.isEmpty ? null : _save),
+        AppButton(label: 'Đưa vào bảng nhập để sửa', variant: AppButtonVariant.secondary, onPressed: _picked.isEmpty ? null : _toForm),
+        AppButton(label: 'Bỏ xem trước', variant: AppButtonVariant.ghost, onPressed: () => setState(() {
             _setDrafts(const []);
             _ignored = [];
             _error = '';
-          }),
-          child: const Text('Bỏ xem trước'),
-        ),
+          })),
       ]),
     ];
   }

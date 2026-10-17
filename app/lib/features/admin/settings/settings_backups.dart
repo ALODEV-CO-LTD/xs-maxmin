@@ -6,6 +6,7 @@ import '../../../core/theme.dart';
 import '../payments/payments_logic.dart' show viDateTime;
 import 'settings_logic.dart';
 import 'settings_ui.dart';
+import '../../../core/widgets/app_button.dart';
 
 class BackupItem {
   const BackupItem(this.name, this.size, this.createdAt);
@@ -103,7 +104,7 @@ class _BackupsSectionState extends State<BackupsSection> {
         const SizedBox(height: 10),
         if (_error != null) Banner2(_error!),
         if (_message != null) Banner2(_message!, error: false),
-        FilledButton(onPressed: _creating ? null : _create, child: Text(_creating ? 'Đang tạo...' : 'Tạo bản sao lưu mới')),
+        AppButton(label: 'Tạo bản sao lưu mới', variant: AppButtonVariant.primary, loading: _creating, onPressed: _creating ? null : _create),
         const SizedBox(height: 12),
         if (_loading)
           const Placeholder2('', busy: true)

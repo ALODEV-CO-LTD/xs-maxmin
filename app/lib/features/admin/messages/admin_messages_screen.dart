@@ -8,6 +8,7 @@ import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import 'admin_messages_logic.dart';
 import 'admin_thread_page.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Admin - Phản hồi: the support inbox (web: views/admin/MessagesView.vue). Body only; the admin shell draws the
 /// AppBar and drawer. Tapping a customer pushes [AdminThreadPage].
@@ -147,7 +148,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> with WidgetsB
             padding: const EdgeInsets.all(40),
             child: Column(children: [
               Text(text, textAlign: TextAlign.center, style: TextStyle(color: retry ? cs.error : cs.onSurface.withValues(alpha: 0.6))),
-              if (retry) TextButton(onPressed: _load, child: const Text('Thử lại')),
+              if (retry) AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: _load),
             ]),
           ),
         ]);

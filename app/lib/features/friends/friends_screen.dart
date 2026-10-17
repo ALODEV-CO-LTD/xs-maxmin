@@ -7,6 +7,7 @@ import 'chat_page.dart';
 import 'friends_controller.dart';
 import 'messaging_host.dart';
 import 'messaging_settings.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Bạn bè: friend list (unread / missed-call badges), search and add by name or Mã ID, and the E2EE chat + voice
 /// calls (FriendsView.vue). The WebSocket, chat and call services are the APP-level ones (see MessagingHost): this
@@ -50,8 +51,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
         title: const Text('Bật thông báo?'),
         content: const Text('Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ, nên chỉ nhận được khi ứng dụng đang chạy. Bật thông báo để biết khi có tin nhắn hoặc cuộc gọi đến. Thông báo chỉ ghi "Tin nhắn mới từ <tên>", không hiện nội dung.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Để sau')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Bật thông báo')),
+          AppButton(label: 'Để sau', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+          AppButton(label: 'Bật thông báo', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -90,8 +91,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
         title: const Text('Xoá cuộc trò chuyện'),
         content: Text('Xoá ${ids.length} cuộc trò chuyện khỏi máy này? Tin nhắn và ảnh trong đó sẽ mất trên máy này (người kia vẫn giữ bản của họ). Bạn bè vẫn còn trong danh bạ.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Xoá', style: TextStyle(color: ctx.badColor))),
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+          AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -193,7 +194,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                       Text(c.myCode, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 3, color: theme.colorScheme.primary)),
                     ]),
                   ),
-                  OutlinedButton(onPressed: () => _copyCode(c.myCode), child: Text(_copied ? 'Đã chép' : 'Sao chép')),
+                  AppButton(label: _copied ? 'Đã chép' : 'Sao chép', variant: AppButtonVariant.secondary, onPressed: () => _copyCode(c.myCode)),
                 ]),
               ),
             )
@@ -205,7 +206,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
           ],
           const SizedBox(height: 12),
           Row(children: [
-            TextButton(onPressed: _toggleEdit, child: Text(_edit ? 'Xong' : 'Sửa')),
+            AppButton(label: _edit ? 'Xong' : 'Sửa', variant: AppButtonVariant.ghost, onPressed: _toggleEdit),
             const SizedBox(width: 4),
             Expanded(
               child: TextField(
@@ -235,7 +236,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 child: ListTile(
                   title: Text(r.name),
                   subtitle: Text('@${r.username}'),
-                  trailing: FilledButton.tonal(onPressed: c.addingId == r.id ? null : () => c.addFriend(r), child: Text(c.addingId == r.id ? '…' : 'Kết bạn')),
+                  trailing: AppButton(label: c.addingId == r.id ? '…' : 'Kết bạn', variant: AppButtonVariant.secondary, onPressed: c.addingId == r.id ? null : () => c.addFriend(r)),
                 ),
               ),
           ],
@@ -243,7 +244,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
           if (c.loading)
             const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
           else if (c.loadError.isNotEmpty)
-            Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [Text(c.loadError, style: TextStyle(color: context.badColor)), TextButton(onPressed: c.refreshFriendList, child: const Text('Thử lại'))])))
+            Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [Text(c.loadError, style: TextStyle(color: context.badColor)), AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: c.refreshFriendList)])))
           else ...[
             if (q.isNotEmpty && friends.isNotEmpty) Text('Bạn bè', style: theme.textTheme.titleSmall),
             if (c.friends.isEmpty)
@@ -259,11 +260,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
               for (final f in friends) _friendTile(context, c, f),
             if (_edit)
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                TextButton(onPressed: _picked.isEmpty ? null : () => _archivePicked(c), child: Text('${_showArchived ? 'Bỏ lưu trữ' : 'Lưu trữ'}${_picked.isEmpty ? '' : ' (${_picked.length})'}')),
+                AppButton(label: '${_showArchived ? 'Bỏ lưu trữ' : 'Lưu trữ'}${_picked.isEmpty ? '' : ' (${_picked.length})'}', variant: AppButtonVariant.ghost, onPressed: _picked.isEmpty ? null : () => _archivePicked(c)),
                 TextButton(onPressed: _picked.isEmpty ? null : () => _deletePicked(c), child: Text('Xoá${_picked.isEmpty ? '' : ' (${_picked.length})'}', style: TextStyle(color: _picked.isEmpty ? null : context.badColor))),
               ])
             else if (archivedCount > 0 || _showArchived)
-              Center(child: TextButton(onPressed: () => setState(() => _showArchived = !_showArchived), child: Text(_showArchived ? '← Về tin nhắn' : 'Đã lưu trữ ($archivedCount)'))),
+              Center(child: AppButton(label: _showArchived ? '← Về tin nhắn' : 'Đã lưu trữ ($archivedCount)', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _showArchived = !_showArchived))),
           ],
         ],
       ),
@@ -335,8 +336,8 @@ class _GroupDialogState extends State<_GroupDialog> {
           ]),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
-          const FilledButton(onPressed: null, child: Text('Tạo nhóm')),
+          AppButton(label: 'Đóng', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
+          const AppButton(label: 'Tạo nhóm', variant: AppButtonVariant.primary, onPressed: null),
         ],
       );
 }

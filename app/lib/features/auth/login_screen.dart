@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/config.dart';
+import '../../core/widgets/app_button.dart';
 
 enum _Stage { credentials, secondPassword, wipeConfirm, wipeDone }
 
@@ -166,11 +167,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          FilledButton(onPressed: _busy ? null : _submitCredentials, child: Text(_busy ? 'Đang đăng nhập...' : 'Đăng nhập')),
+          AppButton(label: 'Đăng nhập', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submitCredentials),
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            TextButton(onPressed: () => context.push('/recover'), child: const Text('Quên mật khẩu?')),
-            TextButton(onPressed: () => context.push('/register'), child: const Text('Tạo tài khoản')),
+            AppButton(label: 'Quên mật khẩu?', variant: AppButtonVariant.ghost, onPressed: () => context.push('/recover')),
+            AppButton(label: 'Tạo tài khoản', variant: AppButtonVariant.ghost, onPressed: () => context.push('/register')),
           ]),
         ];
       case _Stage.secondPassword:
@@ -181,8 +182,8 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 14),
           TextField(controller: _second, enabled: !_busy, obscureText: true, autofocus: true, onSubmitted: (_) => _submitSecond(), decoration: const InputDecoration(labelText: 'Mật khẩu lớp hai')),
           const SizedBox(height: 18),
-          FilledButton(onPressed: _busy ? null : _submitSecond, child: Text(_busy ? 'Đang xác nhận...' : 'Xác nhận')),
-          TextButton(onPressed: _busy ? null : () => setState(() => _stage = _Stage.credentials), child: const Text('Quay lại')),
+          AppButton(label: 'Xác nhận', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submitSecond),
+          AppButton(label: 'Quay lại', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => setState(() => _stage = _Stage.credentials)),
         ];
       case _Stage.wipeConfirm:
         return [
@@ -190,12 +191,8 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 8),
           const Text('Bạn vừa nhập mật khẩu xoá dữ liệu. Nếu tiếp tục, số liệu, khách hàng và các dữ liệu liên quan của tài khoản sẽ bị xoá và không thể khôi phục.'),
           CheckboxListTile(contentPadding: EdgeInsets.zero, value: _wipeAck, onChanged: (v) => setState(() => _wipeAck = v ?? false), title: const Text('Tôi hiểu và muốn xoá dữ liệu')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: _busy || !_wipeAck ? null : _confirmWipe,
-            child: Text(_busy ? 'Đang xoá...' : 'Xoá dữ liệu'),
-          ),
-          TextButton(onPressed: _busy ? null : () => setState(() => _stage = _Stage.credentials), child: const Text('Huỷ')),
+          AppButton(label: 'Xoá dữ liệu', variant: AppButtonVariant.danger, loading: _busy, onPressed: _busy || !_wipeAck ? null : _confirmWipe),
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => setState(() => _stage = _Stage.credentials)),
         ];
       case _Stage.wipeDone:
         return [
@@ -203,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 8),
           const Text('Dữ liệu của tài khoản đã được xoá. Bạn có thể đăng nhập lại bằng mật khẩu thường.'),
           const SizedBox(height: 14),
-          FilledButton(onPressed: () => setState(() => _stage = _Stage.credentials), child: const Text('Về đăng nhập')),
+          AppButton(label: 'Về đăng nhập', variant: AppButtonVariant.primary, onPressed: () => setState(() => _stage = _Stage.credentials)),
         ];
     }
   }

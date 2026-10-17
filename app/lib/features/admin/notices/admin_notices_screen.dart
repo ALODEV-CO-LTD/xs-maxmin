@@ -7,6 +7,7 @@ import '../../../core/theme.dart';
 import '../payments/payments_logic.dart' show viDateTime;
 import '../settings/settings_ui.dart';
 import 'notices_logic.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Admin - Thông báo & bảo trì (rights announcements.manage / maintenance.manage). Body only (the shell draws the AppBar).
 class AdminNoticesScreen extends StatefulWidget {
@@ -201,15 +202,11 @@ class _AdminNoticesScreenState extends State<AdminNoticesScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton(onPressed: () => _toggle(a), child: Text(a.active ? 'Ẩn' : 'Hiện lại')),
+                          child: AppButton(label: a.active ? 'Ẩn' : 'Hiện lại', variant: AppButtonVariant.secondary, onPressed: () => _toggle(a)),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(foregroundColor: context.badColor),
-                            onPressed: () => _remove(a),
-                            child: const Text('Xoá'),
-                          ),
+                          child: AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => _remove(a)),
                         ),
                       ],
                     ),
@@ -250,7 +247,7 @@ class _AdminNoticesScreenState extends State<AdminNoticesScreen> {
       const SizedBox(height: 12),
       SizedBox(
         width: double.infinity,
-        child: FilledButton(onPressed: _posting || _title.text.trim().isEmpty ? null : _post, child: Text(_posting ? 'Đang gửi...' : 'Gửi thông báo')),
+        child: AppButton(label: 'Gửi thông báo', variant: AppButtonVariant.primary, loading: _posting, onPressed: _posting || _title.text.trim().isEmpty ? null : _post),
       ),
     ],
   );
@@ -279,7 +276,7 @@ class _AdminNoticesScreenState extends State<AdminNoticesScreen> {
       if (_mtSaved) const Banner2('Đã lưu.', error: false),
       SizedBox(
         width: double.infinity,
-        child: FilledButton(onPressed: _mtSaving ? null : _saveMaintenance, child: Text(_mtSaving ? 'Đang lưu...' : 'Lưu cấu hình bảo trì')),
+        child: AppButton(label: 'Lưu cấu hình bảo trì', variant: AppButtonVariant.primary, loading: _mtSaving, onPressed: _mtSaving ? null : _saveMaintenance),
       ),
     ],
   );

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api_client.dart';
 import '../../core/app_version.dart';
 import '../../core/config.dart';
+import '../../core/widgets/app_button.dart';
 
 /// App version management (A17): asks the public `GET /app-version` when the app starts and every time it comes back to
 /// the foreground (at most once an hour), then
@@ -114,8 +115,8 @@ class _OptionalCard extends StatelessWidget {
             if (info.notes.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(info.notes)),
             const SizedBox(height: 10),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-              TextButton(onPressed: onLater, child: const Text('Để sau')),
-              if (info.downloadUrl.isNotEmpty) FilledButton(onPressed: onUpdate, child: const Text('Cập nhật')),
+              AppButton(label: 'Để sau', variant: AppButtonVariant.ghost, onPressed: onLater),
+              if (info.downloadUrl.isNotEmpty) AppButton(label: 'Cập nhật', variant: AppButtonVariant.primary, onPressed: onUpdate),
             ]),
           ]),
         ),
@@ -143,8 +144,8 @@ class _RequiredScreen extends StatelessWidget {
                 Text('Bạn đang dùng phiên bản $current, đã quá cũ. Hãy cập nhật lên phiên bản ${info.latest.isEmpty ? info.min : info.latest} để tiếp tục.', textAlign: TextAlign.center),
                 if (info.notes.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(info.notes, textAlign: TextAlign.center)),
                 const SizedBox(height: 18),
-                if (info.downloadUrl.isNotEmpty) FilledButton.icon(onPressed: onUpdate, icon: const Icon(Icons.download), label: const Text('Tải bản mới')) else const Text('Liên hệ quản trị viên để nhận bản mới.', textAlign: TextAlign.center),
-                TextButton(onPressed: busy ? null : onRetry, child: Text(busy ? 'Đang kiểm tra...' : 'Kiểm tra lại')),
+                if (info.downloadUrl.isNotEmpty) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, icon: Icons.download, onPressed: onUpdate) else const Text('Liên hệ quản trị viên để nhận bản mới.', textAlign: TextAlign.center),
+                AppButton(label: 'Kiểm tra lại', variant: AppButtonVariant.ghost, loading: busy, onPressed: busy ? null : onRetry),
               ]),
             ),
           ),

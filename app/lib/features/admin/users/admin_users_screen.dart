@@ -10,6 +10,7 @@ import 'admin_recovery_requests.dart';
 import 'admin_user_detail.dart';
 import 'admin_users_logic.dart';
 import 'admin_users_widgets.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Admin - Khách hàng: searchable, paged customer list + recovery-request queue. Body only (the shell draws the AppBar).
 class AdminUsersScreen extends StatelessWidget {
@@ -148,7 +149,7 @@ class _UsersListBodyState extends State<UsersListBody> {
           else ...[
             for (final s in _pager.visible) _tile(context, s),
             if (_pager.hasMore)
-              OutlinedButton(onPressed: () => setState(_pager.loadMore), child: Text('Xem thêm (${_pager.all.length - _pager.shown})')),
+              AppButton(label: 'Xem thêm (${_pager.all.length - _pager.shown})', variant: AppButtonVariant.secondary, onPressed: () => setState(_pager.loadMore)),
           ],
         ],
       ),

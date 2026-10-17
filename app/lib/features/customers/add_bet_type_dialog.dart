@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/scoring_config.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_button.dart';
 
 /// What the user typed in "Kiểu đánh khác".
 class NewBetType {
@@ -92,8 +93,8 @@ class _AddBetTypeDialogState extends State<_AddBetTypeDialog> {
         if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: TextStyle(color: context.badColor, fontSize: 12.5))),
       ]),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
-        FilledButton(onPressed: _submit, child: Text(_pick == 'new' ? 'Thêm' : 'Khôi phục')),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
+        AppButton(label: _pick == 'new' ? 'Thêm' : 'Khôi phục', variant: AppButtonVariant.primary, onPressed: _submit),
       ],
     );
   }

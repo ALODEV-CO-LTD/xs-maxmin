@@ -14,6 +14,7 @@ import 'friends_controller.dart';
 import 'friends_screen.dart' show initialOf;
 import 'image_scrub.dart';
 import 'realtime_socket.dart';
+import '../../core/widgets/app_button.dart';
 
 sealed class _Item {
   _Item(this.at);
@@ -260,8 +261,8 @@ class _ChatPageState extends State<ChatPage> {
         title: const Text('Xoá tin nhắn'),
         content: const Text('Xoá tin nhắn này khỏi máy này? Người kia vẫn giữ bản của họ.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Xoá', style: TextStyle(color: ctx.badColor))),
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+          AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -367,8 +368,8 @@ class _ChatPageState extends State<ChatPage> {
             title: const Text('Xoá bạn bè'),
             content: Text('Xoá bạn bè "${_f.name}"? Cuộc trò chuyện sẽ không còn hiển thị.'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Xoá', style: TextStyle(color: ctx.badColor))),
+              AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+              AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
             ],
           ),
         );
@@ -417,7 +418,7 @@ class _ChatPageState extends State<ChatPage> {
                 color: Brand.warning,
                 child: Row(children: [
                   Expanded(child: Text('Khoá bảo mật của ${_f.name} đã thay đổi (họ đổi máy hoặc xoá dữ liệu ứng dụng). Hãy xác minh mã bảo mật mới với họ qua kênh khác rồi bấm Đã hiểu.')),
-                  TextButton(onPressed: () => _chat.acceptKeyChange(_f.id), child: const Text('Đã hiểu')),
+                  AppButton(label: 'Đã hiểu', variant: AppButtonVariant.ghost, onPressed: () => _chat.acceptKeyChange(_f.id)),
                 ]),
               ),
             if (!hasKey) _Banner(color: Brand.warning, child: Text('${_f.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.')),
@@ -483,9 +484,9 @@ class _ChatPageState extends State<ChatPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(children: [
                   Expanded(child: Text('Đã chọn ${_picked.length}', style: TextStyle(color: context.mutedColor))),
-                  TextButton(onPressed: _pickAll, child: const Text('Chọn tất cả')),
-                  TextButton(onPressed: () => setState(_picked.clear), child: const Text('Bỏ chọn')),
-                  TextButton(onPressed: _cancelPick, child: const Text('Hủy')),
+                  AppButton(label: 'Chọn tất cả', variant: AppButtonVariant.ghost, onPressed: _pickAll),
+                  AppButton(label: 'Bỏ chọn', variant: AppButtonVariant.ghost, onPressed: () => setState(_picked.clear)),
+                  AppButton(label: 'Hủy', variant: AppButtonVariant.ghost, onPressed: _cancelPick),
                 ]),
               ),
             if (_replyTo case final rt?)
@@ -501,8 +502,8 @@ class _ChatPageState extends State<ChatPage> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: _picked.isNotEmpty && _selecting
-                    ? FilledButton(onPressed: _onAction, child: const Text('Tính toán'))
-                    : OutlinedButton(onPressed: _onAction, child: const Text('Nhập số liệu')),
+                    ? AppButton(label: 'Tính toán', variant: AppButtonVariant.primary, onPressed: _onAction)
+                    : AppButton(label: 'Nhập số liệu', variant: AppButtonVariant.secondary, onPressed: _onAction),
               ),
             ),
             Padding(
@@ -521,7 +522,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                FilledButton(onPressed: _sending || !hasKey || (_text.text.trim().isEmpty && _pending == null) ? null : _send, child: const Text('Gửi')),
+                AppButton(label: 'Gửi', variant: AppButtonVariant.primary, onPressed: _sending || !hasKey || (_text.text.trim().isEmpty && _pending == null) ? null : _send),
               ]),
             ),
           ]),
@@ -560,7 +561,7 @@ class _ChatPageState extends State<ChatPage> {
         Icon(Icons.call, size: 16, color: color),
         const SizedBox(width: 6),
         Flexible(child: Text(callLine(c), style: TextStyle(color: color, fontSize: 13))),
-        if (canRedial) TextButton(onPressed: call.busy ? null : () => call.startCall(_f.id, _f.name), child: const Text('Gọi lại')),
+        if (canRedial) AppButton(label: 'Gọi lại', variant: AppButtonVariant.ghost, onPressed: call.busy ? null : () => call.startCall(_f.id, _f.name)),
       ]),
     );
   }
@@ -613,7 +614,7 @@ class _ChatPageState extends State<ChatPage> {
             if (mine && m.status == MsgStatus.failed)
               Row(mainAxisSize: MainAxisSize.min, children: [
                 Flexible(child: Text(reasonText(m.reason), style: TextStyle(fontSize: 12, color: context.badColor))),
-                TextButton(onPressed: () => _chat.retry(m.id), child: const Text('Gửi lại')),
+                AppButton(label: 'Gửi lại', variant: AppButtonVariant.ghost, onPressed: () => _chat.retry(m.id)),
               ])
             else if (mine && m.status != MsgStatus.delivered)
               Text(m.status == MsgStatus.sending ? 'Đang gửi...' : 'Đã gửi, chờ xác nhận...', style: TextStyle(fontSize: 12, color: context.mutedColor)),
@@ -749,9 +750,9 @@ class _RetentionSheetState extends State<_RetentionSheet> {
         ),
         const SizedBox(height: 16),
         Row(children: [
-          if (widget.current != null) Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, (rule: null as RetentionRule?, changed: true)), child: const Text('Tắt tự xoá'))),
+          if (widget.current != null) Expanded(child: AppButton(label: 'Tắt tự xoá', variant: AppButtonVariant.secondary, onPressed: () => Navigator.pop(context, (rule: null as RetentionRule?, changed: true)))),
           if (widget.current != null) const SizedBox(width: 12),
-          Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.badColor), onPressed: () => Navigator.pop(context, (rule: RetentionRule(_ttl, _scope) as RetentionRule?, changed: true)), child: const Text('Áp dụng'))),
+          Expanded(child: AppButton(label: 'Áp dụng', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, (rule: RetentionRule(_ttl, _scope) as RetentionRule?, changed: true)))),
         ]),
       ]),
     );
@@ -794,20 +795,17 @@ class _SettingsSheetState extends State<_SettingsSheet> {
           Text('Chỉ đổi cách hiển thị trên máy này, người kia không thấy.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.mutedColor)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, children: [
-            if (widget.hasPeerInfo) TextButton(onPressed: () => Navigator.pop(context, 'security'), child: const Text('Mã bảo mật')),
-            if (!f.isAdmin) TextButton(onPressed: () => Navigator.pop(context, 'retention'), child: const Text('Cài đặt tự xoá')),
-            if (widget.hasRule) TextButton(onPressed: () => Navigator.pop(context, 'retention-off'), child: const Text('Tắt tự xoá')),
-            TextButton(onPressed: () => Navigator.pop(context, 'remove'), child: Text('Xoá khỏi bạn bè', style: TextStyle(color: context.badColor))),
+            if (widget.hasPeerInfo) AppButton(label: 'Mã bảo mật', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'security')),
+            if (!f.isAdmin) AppButton(label: 'Cài đặt tự xoá', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'retention')),
+            if (widget.hasRule) AppButton(label: 'Tắt tự xoá', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'retention-off')),
+            AppButton(label: 'Xoá khỏi bạn bè', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, 'remove')),
           ]),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
-            FilledButton(
-              onPressed: () async {
+            AppButton(label: 'Đóng', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
+            AppButton(label: 'Lưu', variant: AppButtonVariant.primary, onPressed: () async {
                 await widget.onSaveAlias(_alias.text);
                 if (context.mounted) Navigator.pop(context, 'saved');
-              },
-              child: const Text('Lưu'),
-            ),
+              }),
           ]),
         ]),
       ),

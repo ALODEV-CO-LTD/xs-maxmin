@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../core/app_version.dart';
 import '../../core/config.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_button.dart';
 
 /// "Phiên bản ứng dụng" card: the installed version (e.g. `1.4.5 (11)`), whether a newer one exists (compared with the
 /// Admin's setting from the public `GET /app-version`, see A17), a manual "Kiểm tra cập nhật" button and the download
@@ -102,8 +103,8 @@ class _VersionCardState extends State<VersionCard> {
           if (_checkedAt != null && _phase != _Phase.checking) Padding(padding: const EdgeInsets.only(top: 4, left: 26), child: Text('Kiểm tra lúc ${_hhmm(_checkedAt!)}', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)))),
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 4, children: [
-            OutlinedButton.icon(onPressed: _phase == _Phase.checking ? null : _check, icon: const Icon(Icons.refresh, size: 18), label: const Text('Kiểm tra cập nhật')),
-            if (canDownload) FilledButton.icon(onPressed: _download, icon: const Icon(Icons.download, size: 18), label: const Text('Tải bản mới')),
+            AppButton(label: 'Kiểm tra cập nhật', variant: AppButtonVariant.secondary, icon: Icons.refresh, onPressed: _phase == _Phase.checking ? null : _check),
+            if (canDownload) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, icon: Icons.download, onPressed: _download),
           ]),
         ]),
       ),
@@ -116,6 +117,6 @@ Future<void> showVersionDialog(BuildContext context) => showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(child: Padding(padding: const EdgeInsets.all(8), child: Column(mainAxisSize: MainAxisSize.min, children: [
         const VersionCard(),
-        Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng'))),
+        Align(alignment: Alignment.centerRight, child: AppButton(label: 'Đóng', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx))),
       ]))),
     );

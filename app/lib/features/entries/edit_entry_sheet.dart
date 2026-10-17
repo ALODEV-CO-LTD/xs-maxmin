@@ -8,6 +8,7 @@ import '../../core/widgets/masked_text.dart';
 import 'dialogs.dart';
 import 'entries_controller.dart';
 import 'entry_model.dart';
+import '../../core/widgets/app_button.dart';
 
 /// "Chỉnh sửa số liệu": customer / hạng mục / ngày are read-only info; số, điểm vào and ghi chú can change.
 Future<void> showEditEntry(BuildContext context, EntriesController c, Entry entry) {
@@ -84,8 +85,8 @@ class _EditEntryState extends State<_EditEntry> {
         TextField(controller: _note, enabled: !_busy, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Ghi chú')),
       ]),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Huỷ')),
-        FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Đang lưu...' : 'Lưu thay đổi')),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
+        AppButton(label: 'Lưu thay đổi', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _save),
       ],
     );
   }

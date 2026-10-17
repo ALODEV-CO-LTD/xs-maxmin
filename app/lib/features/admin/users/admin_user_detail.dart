@@ -4,6 +4,7 @@ import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import 'admin_users_logic.dart';
 import 'admin_users_widgets.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Customer detail page: profile, devices, lock/unlock, reset password, recovery code, clear lockouts, delete.
 class AdminUserDetailPage extends StatefulWidget {
@@ -176,12 +177,8 @@ class _State extends State<AdminUserDetailPage> {
             TextField(controller: typed, autofocus: true, autocorrect: false, onChanged: (_) => set(() {})),
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: c.badColor, foregroundColor: Colors.white),
-              onPressed: deleteConfirmed(typed.text, u.username) ? () => Navigator.pop(c, true) : null,
-              child: const Text('Xoá'),
-            ),
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(c, false)),
+            AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: deleteConfirmed(typed.text, u.username) ? () => Navigator.pop(c, true) : null),
           ],
         ),
       ),
@@ -243,7 +240,7 @@ class _State extends State<AdminUserDetailPage> {
               'Gửi cho khách hàng qua kênh riêng ngay bây giờ: các giá trị này không xem lại được. Mọi thiết bị của khách đã bị đăng xuất và mã khôi phục cũ không còn dùng được.',
               style: TextStyle(fontSize: 12, color: context.mutedColor),
             ),
-            Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => setState(() => _lastPassword = _lastCode = null), child: const Text('Đã gửi, ẩn'))),
+            Align(alignment: Alignment.centerRight, child: AppButton(label: 'Đã gửi, ẩn', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _lastPassword = _lastCode = null))),
           ]),
         ),
       if (_resetOpen)
@@ -256,9 +253,9 @@ class _State extends State<AdminUserDetailPage> {
               TextField(controller: _pw, autocorrect: false, enableSuggestions: false, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'Mật khẩu mới')),
               const SizedBox(height: 8),
               Wrap(spacing: 8, children: [
-                OutlinedButton(onPressed: _busy ? null : () => setState(() => _pw.text = generatePassword()), child: const Text('Tạo ngẫu nhiên')),
-                FilledButton(onPressed: _busy || _pw.text.trim().isEmpty ? null : _resetPassword, child: const Text('Lưu')),
-                TextButton(onPressed: _busy ? null : () => setState(() {_resetOpen = false; _pw.clear();}), child: const Text('Huỷ')),
+                AppButton(label: 'Tạo ngẫu nhiên', variant: AppButtonVariant.secondary, onPressed: _busy ? null : () => setState(() => _pw.text = generatePassword())),
+                AppButton(label: 'Lưu', variant: AppButtonVariant.primary, onPressed: _busy || _pw.text.trim().isEmpty ? null : _resetPassword),
+                AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => setState(() {_resetOpen = false; _pw.clear();})),
               ]),
             ]),
           ),
@@ -272,12 +269,12 @@ class _State extends State<AdminUserDetailPage> {
       if (r.delete)
         Padding(
           padding: const EdgeInsets.only(top: 12),
-          child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.badColor, foregroundColor: Colors.white), onPressed: _busy ? null : _delete, child: const Text('Xoá tài khoản')),
+          child: AppButton(label: 'Xoá tài khoản', variant: AppButtonVariant.danger, onPressed: _busy ? null : _delete),
         ),
     ];
   }
 
-  Widget _btn(String t, VoidCallback f) => Padding(padding: const EdgeInsets.only(bottom: 8), child: OutlinedButton(onPressed: _busy ? null : f, child: Text(t)));
+  Widget _btn(String t, VoidCallback f) => Padding(padding: const EdgeInsets.only(bottom: 8), child: AppButton(label: t, variant: AppButtonVariant.secondary, onPressed: _busy ? null : f));
 
   Widget _row(String k, String v) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -293,7 +290,7 @@ class _State extends State<AdminUserDetailPage> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text('Thiết bị đang đăng nhập (${_sessions.length})', style: const TextStyle(fontWeight: FontWeight.w600))),
-              if (_sessions.isNotEmpty) TextButton(onPressed: () => _revoke(null), child: const Text('Thu hồi tất cả')),
+              if (_sessions.isNotEmpty) AppButton(label: 'Thu hồi tất cả', variant: AppButtonVariant.ghost, onPressed: () => _revoke(null)),
             ]),
             if (_sessionsError != null) AdminBanner(_sessionsError!),
             if (_sessions.isEmpty && _sessionsError == null) Text('Không có phiên nào', style: TextStyle(color: context.mutedColor)),
@@ -307,7 +304,7 @@ class _State extends State<AdminUserDetailPage> {
                       Text('Gần nhất: ${fmtDateTime(s.lastSeen)}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
                     ]),
                   ),
-                  TextButton(onPressed: () => _revoke(s.id), child: const Text('Thu hồi')),
+                  AppButton(label: 'Thu hồi', variant: AppButtonVariant.ghost, onPressed: () => _revoke(s.id)),
                 ]),
               ),
           ]),

@@ -13,6 +13,8 @@ import 'me_profile.dart';
 import 'password_rules.dart';
 import '../shell/version_card.dart';
 import '../support/support_page.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/action_bar.dart';
 
 /// Hồ sơ: personal info (edit), package info, password dialogs, Mã ID kết bạn, logout.
 class AccountProfileTab extends StatelessWidget {
@@ -113,7 +115,7 @@ class _ProfileCardState extends State<_ProfileCard> {
     final ok = context.okColor, bad = context.badColor;
     return SectionCard(
       title: 'Thông tin cá nhân',
-      trailing: _editing ? null : OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)), onPressed: _startEdit, child: const Text('Sửa')),
+      trailing: _editing ? null : AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, size: AppButtonSize.small, onPressed: _startEdit),
       children: [
         if (_success != null) NoticeBox(_success!, kind: NoticeKind.success),
         if (_editing) ...[
@@ -126,10 +128,9 @@ class _ProfileCardState extends State<_ProfileCard> {
             PasswordField(controller: _current, label: 'Mật khẩu hiện tại', enabled: !_saving),
           ],
           const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Đang lưu...' : 'Lưu'))),
-            const SizedBox(width: 10),
-            Expanded(child: OutlinedButton(onPressed: _saving ? null : () => setState(() { _editing = false; _error = null; }), child: const Text('Huỷ'))),
+          ActionBar(children: [
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _saving ? null : () => setState(() { _editing = false; _error = null; })),
+            AppButton(label: 'Lưu', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving ? null : _save),
           ]),
         ] else ...[
           InfoRow('Tên', value: me.name),
@@ -146,15 +147,15 @@ class _ProfileCardState extends State<_ProfileCard> {
         InfoRow('Mật khẩu lớp hai', child: StatusChip(me.hasSecondPassword ? 'Đã bật' : 'Chưa đặt', color: me.hasSecondPassword ? ok : null)),
         InfoRow('Mật khẩu xoá dữ liệu', child: StatusChip(me.hasWipePassword ? 'Đã bật' : 'Chưa đặt', color: me.hasWipePassword ? ok : null)),
         const SizedBox(height: 10),
-        OutlinedButton.icon(icon: const Icon(Icons.key, size: 18), label: const Text('Đổi mật khẩu'), onPressed: () => _dialog(_passwordDialog(api))),
+        AppButton(label: 'Đổi mật khẩu', variant: AppButtonVariant.secondary, icon: Icons.key, onPressed: () => _dialog(_passwordDialog(api))),
         const SizedBox(height: 8),
-        OutlinedButton.icon(icon: const Icon(Icons.shield_outlined, size: 18), label: Text(me.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai'), onPressed: () => _dialog(_secondDialog(api, me))),
+        AppButton(label: me.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai', variant: AppButtonVariant.secondary, icon: Icons.shield_outlined, onPressed: () => _dialog(_secondDialog(api, me))),
         const SizedBox(height: 8),
-        OutlinedButton.icon(icon: const Icon(Icons.delete_sweep_outlined, size: 18), label: Text(me.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu'), onPressed: () => _wipeFlow(api, me)),
+        AppButton(label: me.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu', variant: AppButtonVariant.secondary, icon: Icons.delete_sweep_outlined, onPressed: () => _wipeFlow(api, me)),
         const SizedBox(height: 14),
         const VersionCard(),
         const SizedBox(height: 10),
-        FilledButton.tonalIcon(icon: const Icon(Icons.logout, size: 18), label: const Text('Đăng xuất'), onPressed: _logout),
+        AppButton(label: 'Đăng xuất', variant: AppButtonVariant.secondary, icon: Icons.logout, onPressed: _logout),
       ],
     );
   }
@@ -326,7 +327,7 @@ class _CustomerCodesCardState extends State<_CustomerCodesCard> {
       const SizedBox(height: 10),
       TextField(controller: _label, enabled: !_creating, maxLength: 40, decoration: const InputDecoration(labelText: 'Nhãn (tuỳ chọn)', counterText: '')),
       const SizedBox(height: 10),
-      FilledButton.tonalIcon(icon: const Icon(Icons.add, size: 18), onPressed: _creating || atLimit ? null : _create, label: Text(_creating ? 'Đang tạo...' : 'Tạo mã mới')),
+      AppButton(label: 'Tạo mã mới', variant: AppButtonVariant.secondary, icon: Icons.add, loading: _creating, onPressed: _creating || atLimit ? null : _create),
       if (atLimit) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Đã đạt giới hạn, hãy xoá bớt một mã để tạo mã mới.', style: TextStyle(color: context.mutedColor, fontSize: 13))),
       const SizedBox(height: 8),
       if (_loading)
@@ -363,7 +364,7 @@ class _CustomerCodesCardState extends State<_CustomerCodesCard> {
             child: Row(children: [
               Expanded(child: TextField(controller: _labelDraft, autofocus: true, maxLength: 40, decoration: const InputDecoration(hintText: 'Nhãn (để trống để xoá)', counterText: ''))),
               const SizedBox(width: 8),
-              FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => _saveLabel(c), child: const Text('Lưu')),
+              AppButton(label: 'Lưu', variant: AppButtonVariant.primary, onPressed: () => _saveLabel(c)),
               IconButton(onPressed: () => setState(() => _editingId = null), icon: const Icon(Icons.close)),
             ]),
           ),

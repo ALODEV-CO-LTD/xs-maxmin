@@ -8,6 +8,7 @@ import 'account_data_tab.dart' show RecoveryCodeCard;
 import 'account_widgets.dart';
 import 'me_profile.dart';
 import 'privacy/privacy_store.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Thiết bị & riêng tư: signed-in devices (revoke), the recovery code and the privacy settings of this device.
 class AccountDevicesTab extends StatelessWidget {
@@ -81,7 +82,7 @@ class _SessionsCardState extends State<_SessionsCard> {
   Widget build(BuildContext context) {
     return SectionCard(
       title: 'Thiết bị đang đăng nhập',
-      trailing: _sessions.length > 1 ? TextButton(onPressed: _revokeOthers, child: const Text('Đăng xuất thiết bị khác')) : null,
+      trailing: _sessions.length > 1 ? AppButton(label: 'Đăng xuất thiết bị khác', variant: AppButtonVariant.ghost, onPressed: _revokeOthers) : null,
       children: [
         if (_error != null) NoticeBox(_error!),
         if (_loading)
@@ -105,7 +106,7 @@ class _SessionsCardState extends State<_SessionsCard> {
                     Text('Hoạt động gần nhất: ${viDateTimeLocal(s['lastSeen'] as String?, withTime: true)} · IP ${s['ip'] ?? '-'}', style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
                   ]),
                 ),
-                if (s['current'] != true) TextButton(onPressed: () => _revoke(s), child: const Text('Đăng xuất')),
+                if (s['current'] != true) AppButton(label: 'Đăng xuất', variant: AppButtonVariant.ghost, onPressed: () => _revoke(s)),
               ]),
             ),
       ],

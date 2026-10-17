@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api_client.dart';
 import 'admin_messages_logic.dart';
 import 'thread_widgets.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// One customer's support thread (web: components/AdminChatPane.vue). Oldest on top, newest at the bottom.
 class AdminThreadPage extends StatefulWidget {
@@ -159,7 +160,7 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
       ),
       body: SafeArea(
         child: Column(children: [
-          if (_error != null) Container(width: double.infinity, color: cs.error.withValues(alpha: 0.15), padding: const EdgeInsets.all(8), child: Row(children: [Expanded(child: Text(_error!, style: TextStyle(color: cs.error))), TextButton(onPressed: _load, child: const Text('Thử lại'))])),
+          if (_error != null) Container(width: double.infinity, color: cs.error.withValues(alpha: 0.15), padding: const EdgeInsets.all(8), child: Row(children: [Expanded(child: Text(_error!, style: TextStyle(color: cs.error))), AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: _load)])),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())

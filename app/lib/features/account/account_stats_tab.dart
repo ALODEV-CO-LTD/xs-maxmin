@@ -9,6 +9,7 @@ import '../../core/widgets/masked_text.dart';
 import 'account_widgets.dart';
 import 'stats_chart.dart';
 import 'stats_logic.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Thống kê: customers, plays, points in/out, profit (all masked by "Ẩn số liệu") and a bar chart by day/month/year.
 class AccountStatsTab extends StatefulWidget {
@@ -71,7 +72,7 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
   Widget build(BuildContext context) {
     if (_loading) return const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()));
     if (_error != null) {
-      return Column(children: [NoticeBox(_error!), OutlinedButton(onPressed: _load, child: const Text('Thử lại'))]);
+      return Column(children: [NoticeBox(_error!), AppButton(label: 'Thử lại', variant: AppButtonVariant.secondary, onPressed: _load)]);
     }
     final totals = computeTotals(_roster, _entries);
     final now = DateTime.now().toUtc().add(const Duration(hours: 7)); // Vietnam date, like the rest of the app

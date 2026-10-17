@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Yes/no confirmation. Resolves true only when the user presses the confirm button.
 Future<bool> confirmDialog(
@@ -16,12 +17,8 @@ Future<bool> confirmDialog(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-        FilledButton(
-          style: danger ? FilledButton.styleFrom(backgroundColor: ctx.badColor, foregroundColor: Colors.white) : null,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(confirmText),
-        ),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+        AppButton(label: confirmText, variant: danger ? AppButtonVariant.danger : AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
       ],
     ),
   );

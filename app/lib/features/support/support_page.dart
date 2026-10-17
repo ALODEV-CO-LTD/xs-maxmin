@@ -11,6 +11,7 @@ import '../admin/messages/admin_messages_logic.dart';
 import '../admin/messages/thread_widgets.dart';
 import '../friends/friends_controller.dart';
 import '../friends/messaging_host.dart';
+import '../../core/widgets/app_button.dart';
 
 /// "Hỗ trợ từ Admin" (web: components/SupportChat.vue): the customer's thread with Admin. Oldest on top, newest at the
 /// bottom, the list sticks to the end. Opening it marks the replies as read; while it is open anything new counts as read.
@@ -161,7 +162,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
               width: double.infinity,
               color: cs.error.withValues(alpha: 0.15),
               padding: const EdgeInsets.all(8),
-              child: Row(children: [Expanded(child: Text(_error!, style: TextStyle(color: cs.error))), TextButton(onPressed: _load, child: const Text('Thử lại'))]),
+              child: Row(children: [Expanded(child: Text(_error!, style: TextStyle(color: cs.error))), AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: _load)]),
             ),
           Expanded(
             child: _loading

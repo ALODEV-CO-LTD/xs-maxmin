@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import 'dialogs.dart';
 import 'entries_controller.dart';
 import 'quick_entry_box.dart';
+import '../../core/widgets/app_button.dart';
 
 /// "Thêm số liệu mới": đài, ngày, the quick-entry box (message or photo), several rows (hạng mục / số / điểm vào) and a note.
 class EntryFormCard extends StatefulWidget {
@@ -95,20 +96,16 @@ class _EntryFormCardState extends State<EntryFormCard> {
           _rowsHeader(context),
           if (c.selectedRowCount > 0) _bulkBar(types),
           for (var i = 0; i < c.rows.length; i++) _rowTile(context, i, types),
-          Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: c.addRow, icon: const Icon(Icons.add), label: const Text('Thêm số'))),
+          Align(alignment: Alignment.centerLeft, child: AppButton(label: 'Thêm số', variant: AppButtonVariant.ghost, icon: Icons.add, onPressed: c.addRow)),
           const SizedBox(height: 4),
           TextField(controller: c.note, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Ghi chú', hintText: 'Tuỳ chọn')),
           const SizedBox(height: 12),
           if (_deleteAllError.isNotEmpty) InfoBox(_deleteAllError),
           if (!c.canAdd) const InfoBox('Gói của bạn đã hết hạn. Vui lòng gia hạn để tiếp tục nhập số liệu.', kind: InfoKind.warning),
           if (c.addedMessage.isNotEmpty) InfoBox(c.addedMessage, kind: InfoKind.success),
-          FilledButton(onPressed: c.submitting || !c.canAdd ? null : c.submit, child: Text(c.submitting ? 'Đang thêm...' : 'Thêm số liệu')),
+          AppButton(label: 'Thêm số liệu', variant: AppButtonVariant.primary, loading: c.submitting, onPressed: c.submitting || !c.canAdd ? null : c.submit),
           const SizedBox(height: 8),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(foregroundColor: context.badColor, side: BorderSide(color: context.badColor.withValues(alpha: 0.7))),
-            onPressed: _deletingAll || c.customerEntries.isEmpty ? null : _deleteAll,
-            child: Text(_deletingAll ? 'Đang xoá...' : 'Xoá tất cả số liệu của khách này'),
-          ),
+          AppButton(label: 'Xoá tất cả số liệu của khách này', variant: AppButtonVariant.danger, loading: _deletingAll, onPressed: _deletingAll || c.customerEntries.isEmpty ? null : _deleteAll),
         ]),
       ),
     );
@@ -142,9 +139,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
           ),
         ),
         SizedBox(width: 110, child: TextField(controller: _bulkScore, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(isDense: true, hintText: 'Đổi điểm vào'), onChanged: (_) => setState(() {}))),
-        FilledButton.tonal(
-          style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-          onPressed: _bulkType.isEmpty && _bulkScore.text.trim().isEmpty
+        AppButton(label: 'Áp dụng', variant: AppButtonVariant.secondary, onPressed: _bulkType.isEmpty && _bulkScore.text.trim().isEmpty
               ? null
               : () {
                   c.applyBulk(type: _bulkType, score: _bulkScore.text);
@@ -152,10 +147,8 @@ class _EntryFormCardState extends State<EntryFormCard> {
                     _bulkType = '';
                     _bulkScore.clear();
                   });
-                },
-          child: const Text('Áp dụng'),
-        ),
-        TextButton(style: TextButton.styleFrom(foregroundColor: context.badColor), onPressed: c.deleteSelectedRows, child: Text('Xoá ${c.selectedRowCount} dòng')),
+                }),
+        AppButton(label: 'Xoá ${c.selectedRowCount} dòng', variant: AppButtonVariant.danger, size: AppButtonSize.small, onPressed: c.deleteSelectedRows),
       ]),
     );
   }

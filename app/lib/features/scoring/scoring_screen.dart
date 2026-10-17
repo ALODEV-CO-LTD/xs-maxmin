@@ -19,6 +19,7 @@ import 'entry_model.dart';
 import 'scoring_controller.dart';
 import 'scoring_days.dart';
 import 'scoring_logic.dart';
+import '../../core/widgets/app_button.dart';
 
 String _money(num n) => '${formatNumber(n.round())} đ';
 String _signed(num n) => '${n > 0 ? '+' : ''}${_money(n)}';
@@ -112,7 +113,7 @@ class _Body extends StatelessWidget {
         else if (c.loadError != null)
           Column(children: [
             _Banner(c.loadError!, error: true),
-            TextButton.icon(onPressed: c.load, icon: const Icon(Icons.refresh), label: const Text('Thử lại')),
+            AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: c.load),
           ])
         else ...[
           const _Filters(),
@@ -130,7 +131,7 @@ class _Body extends StatelessWidget {
           else ...[
             for (final d in c.visibleDays) _DayCard(d),
             if (c.hiddenDayCount > 0)
-              OutlinedButton(onPressed: c.showMoreDays, child: Text('Xem thêm ngày cũ (${c.hiddenDayCount < ScoringController.pageDays ? c.hiddenDayCount : ScoringController.pageDays} / còn ${c.hiddenDayCount} ngày)')),
+              AppButton(label: 'Xem thêm ngày cũ (${c.hiddenDayCount < ScoringController.pageDays ? c.hiddenDayCount : ScoringController.pageDays} / còn ${c.hiddenDayCount} ngày)', variant: AppButtonVariant.secondary, onPressed: c.showMoreDays),
           ],
         ],
       ],
@@ -187,21 +188,11 @@ class _Toolbar extends StatelessWidget {
           const MaskBar(),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text('Xóa số liệu'),
-              onPressed: () async {
+            AppButton(label: 'Xóa số liệu', variant: AppButtonVariant.secondary, icon: Icons.delete_outline, onPressed: () async {
                 final n = await showDeleteDataDialog(context, api: api, customerName: c.selectedCustomer, dateFrom: c.dateFrom, dateTo: c.dateTo);
                 if (n != null) await c.afterDeleted(n);
-              },
-            ),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-              icon: const Icon(Icons.event_repeat, size: 18),
-              label: const Text('Đặt lịch xóa'),
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DeletionSchedulesPage(api: api, customerName: c.selectedCustomer))),
-            ),
+              }),
+            AppButton(label: 'Đặt lịch xóa', variant: AppButtonVariant.secondary, icon: Icons.event_repeat, onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DeletionSchedulesPage(api: api, customerName: c.selectedCustomer)))),
           ]),
         ]),
       ),
@@ -274,12 +265,7 @@ class _Filters extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-              onPressed: c.autoCalcRunning > 0 || c.selectedCustomer.isEmpty ? null : c.recalc,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: Text(c.autoCalcRunning > 0 ? 'Đang tính...' : 'Tính lại'),
-            ),
+            child: AppButton(label: 'Tính lại', variant: AppButtonVariant.secondary, icon: Icons.refresh, loading: c.autoCalcRunning > 0, onPressed: c.autoCalcRunning > 0 || c.selectedCustomer.isEmpty ? null : c.recalc),
           ),
         ]),
       ),
@@ -474,14 +460,14 @@ class _DayCard extends StatelessWidget {
               'no' => _StateChip('Chưa có kết quả xổ số', Brand.warning),
               _ => _StateChip('Đang kiểm tra...', context.mutedColor),
             },
-            if (day.lottery == 'partial' || day.lottery == 'no') TextButton(onPressed: () => context.go(calcLocation('results', date: day.date)), child: const Text('Nhập kết quả')),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: context.badColor),
+            if (day.lottery == 'partial' || day.lottery == 'no') AppButton(label: 'Nhập kết quả', variant: AppButtonVariant.ghost, onPressed: () => context.go(calcLocation('results', date: day.date))),
+            AppButton(
+              label: 'Xóa ngày này',
+              variant: AppButtonVariant.danger,
               onPressed: () async {
                 final n = await showDeleteDataDialog(context, api: context.read<ApiClient>(), customerName: c.selectedCustomer, dateFrom: c.dateFrom, dateTo: c.dateTo, singleDay: day.date);
                 if (n != null) await c.afterDeleted(n);
               },
-              child: const Text('Xóa ngày này'),
             ),
           ]),
         ),

@@ -4,6 +4,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import 'date_field.dart';
 import 'entry_model.dart';
+import '../../core/widgets/app_button.dart';
 
 /// "Đặt lịch xóa": schedule the automatic removal of saved entries (one customer or everyone, an optional date range, or
 /// repeating while keeping the newest N days) and see / cancel the pending schedules.
@@ -199,8 +200,8 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
           title: const Text('Xác nhận lịch xoá dữ liệu'),
           content: SingleChildScrollView(child: Text(lines.join('\n\n'))),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-            FilledButton(style: FilledButton.styleFrom(backgroundColor: ctx.badColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: const Text('Đặt lịch xoá')),
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+            AppButton(label: 'Đặt lịch xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
           ],
         ),
       );
@@ -228,8 +229,8 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
         title: const Text('Huỷ lịch xoá'),
         content: Text('Huỷ lịch này? ${describeSchedule(s)}. Dữ liệu đã bị xoá trước đó sẽ không được khôi phục.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Không')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Huỷ lịch')),
+          AppButton(label: 'Không', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+          AppButton(label: 'Huỷ lịch', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -325,7 +326,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                   const SizedBox(height: 10),
                   TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'Mật khẩu đăng nhập')),
                   const SizedBox(height: 12),
-                  FilledButton(onPressed: _saving ? null : _submit, child: Text(_saving ? 'Đang xử lý...' : 'Đặt lịch xoá')),
+                  AppButton(label: 'Đặt lịch xoá', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving ? null : _submit),
                 ]),
               ),
             ),

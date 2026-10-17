@@ -9,6 +9,7 @@ import '../../../core/auth_store.dart';
 import '../account_widgets.dart';
 import 'privacy_store.dart';
 import 'screen_secure.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Wraps the whole router (MaterialApp.router `builder`):
 ///  - FLAG_SECURE (screenshots/recording/recents thumbnail blocked) per `/me/policy`, ON by default,
@@ -173,8 +174,8 @@ class _LockFormState extends State<_LockForm> {
                 if (_error != null) NoticeBox(_error!),
                 PasswordField(controller: _password, label: 'Mật khẩu', enabled: !_busy, autofocus: true, onSubmitted: (_) => _unlock()),
                 const SizedBox(height: 14),
-                FilledButton(onPressed: _busy ? null : _unlock, child: Text(_busy ? 'Đang kiểm tra...' : 'Mở khoá')),
-                TextButton(onPressed: _busy ? null : widget.auth.clear, child: const Text('Đăng xuất')),
+                AppButton(label: 'Mở khoá', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _unlock),
+                AppButton(label: 'Đăng xuất', variant: AppButtonVariant.ghost, onPressed: _busy ? null : widget.auth.clear),
               ]),
             ),
           ),

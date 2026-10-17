@@ -8,6 +8,7 @@ import '../../../core/format.dart';
 import '../../../core/theme.dart';
 import '../settings/settings_ui.dart';
 import 'payments_logic.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Admin - Thanh toán & gia hạn (right payments.manage). Body only (the admin shell draws the AppBar and drawer).
 class AdminPaymentsScreen extends StatefulWidget {
@@ -224,7 +225,7 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
                 Expanded(
                   child: Text('Hiển thị ${_items.length} / $_total', style: TextStyle(color: context.mutedColor)),
                 ),
-                if (_hasMore) OutlinedButton(onPressed: _more ? null : () => _load(more: true), child: Text(_more ? 'Đang tải...' : 'Xem thêm')),
+                if (_hasMore) AppButton(label: 'Xem thêm', variant: AppButtonVariant.secondary, loading: _more, onPressed: _more ? null : () => _load(more: true)),
               ],
             ),
           ],
@@ -274,11 +275,7 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
 
   Widget _filters() {
     Widget date(String label, String value, bool isFrom) => Expanded(
-      child: OutlinedButton.icon(
-        onPressed: () => _pickDate(isFrom),
-        icon: const Icon(Icons.event, size: 18),
-        label: Text(value.isEmpty ? label : '$label ${viDate(value)}', overflow: TextOverflow.ellipsis),
-      ),
+      child: AppButton(label: value.isEmpty ? label : '$label ${viDate(value)}', variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(isFrom)),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,11 +293,7 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
               ),
             ),
             const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: _exporting || _loading ? null : _export,
-              icon: _exporting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download, size: 18),
-              label: const Text('Xuất CSV'),
-            ),
+            AppButton(label: 'Xuất CSV', variant: AppButtonVariant.secondary, icon: Icons.download, loading: _exporting, onPressed: _exporting || _loading ? null : _export),
           ],
         ),
         const SizedBox(height: 10),
@@ -314,13 +307,10 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
         if (_f.hasExtra)
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {
+            child: AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, onPressed: () {
                 _q.clear();
                 _setFilter(PaymentFilter(status: _f.status));
-              },
-              child: const Text('Xoá lọc'),
-            ),
+              }),
           ),
       ],
     );
@@ -366,15 +356,11 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
               Row(
                 children: [
                   Expanded(
-                    child: FilledButton(onPressed: _busy ? null : () => _approve(r), child: const Text('Duyệt')),
+                    child: AppButton(label: 'Duyệt', variant: AppButtonVariant.primary, onPressed: _busy ? null : () => _approve(r)),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(foregroundColor: context.badColor),
-                      onPressed: _busy ? null : () => _reject(r),
-                      child: const Text('Từ chối'),
-                    ),
+                    child: AppButton(label: 'Từ chối', variant: AppButtonVariant.danger, onPressed: _busy ? null : () => _reject(r)),
                   ),
                 ],
               ),
@@ -433,12 +419,8 @@ class _RejectDialogState extends State<_RejectDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: context.badColor),
-          onPressed: () => Navigator.pop(context, _c.text.trim()),
-          child: const Text('Từ chối'),
-        ),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
+        AppButton(label: 'Từ chối', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, _c.text.trim())),
       ],
     );
   }

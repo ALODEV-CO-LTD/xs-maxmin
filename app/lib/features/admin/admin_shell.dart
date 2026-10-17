@@ -15,6 +15,7 @@ import 'settings/admin_settings_screen.dart';
 import 'staff/admin_staff_screen.dart';
 import 'stats/admin_stats_screen.dart';
 import 'users/admin_users_screen.dart';
+import '../../core/widgets/app_button.dart';
 
 class _Section {
   const _Section(this.title, this.icon, this.perm, this.build, {this.root = false});
@@ -66,8 +67,8 @@ class _AdminShellState extends State<AdminShell> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text(session.error!, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              FilledButton(onPressed: () => session.load(context.read<ApiClient>()), child: const Text('Thử lại')),
-              TextButton(onPressed: () => context.read<AuthStore>().clear(), child: const Text('Đăng xuất')),
+              AppButton(label: 'Thử lại', variant: AppButtonVariant.primary, onPressed: () => session.load(context.read<ApiClient>())),
+              AppButton(label: 'Đăng xuất', variant: AppButtonVariant.ghost, onPressed: () => context.read<AuthStore>().clear()),
             ]),
           ),
         ),

@@ -14,6 +14,7 @@ import 'add_customer_dialog.dart';
 import 'customer_config_screen.dart';
 import 'customer_model.dart';
 import 'customers_controller.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Khách hàng: the customer roster with totals from the entries, add / edit phone / delete, and the scoring configs.
 class CustomersScreen extends StatelessWidget {
@@ -79,8 +80,11 @@ class _CustomersBodyState extends State<_CustomersBody> {
             if (error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(error)),
           ]),
           actions: [
-            TextButton(onPressed: busy ? null : () => Navigator.pop(ctx), child: const Text('Huỷ')),
-            FilledButton(
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: busy ? null : () => Navigator.pop(ctx)),
+            AppButton(
+              label: 'Lưu',
+              variant: AppButtonVariant.primary,
+              loading: busy,
               onPressed: busy
                   ? null
                   : () async {
@@ -98,7 +102,6 @@ class _CustomersBodyState extends State<_CustomersBody> {
                         });
                       }
                     },
-              child: Text(busy ? 'Đang lưu...' : 'Lưu'),
             ),
           ],
         ),
@@ -140,12 +143,12 @@ class _CustomersBodyState extends State<_CustomersBody> {
               const Padding(padding: EdgeInsets.only(top: 60), child: Center(child: CircularProgressIndicator()))
             else if (c.error.isNotEmpty && c.roster.isEmpty && c.entries.isEmpty) ...[
               InfoBox(c.error),
-              FilledButton(onPressed: c.load, child: const Text('Thử lại')),
+              AppButton(label: 'Thử lại', variant: AppButtonVariant.primary, onPressed: c.load),
             ] else ...[
               const Align(alignment: Alignment.centerLeft, child: MaskBar()),
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                FilledButton.icon(onPressed: () => _add(c), icon: const Icon(Icons.add), label: const Text('Thêm khách hàng')),
+                AppButton(label: 'Thêm khách hàng', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: () => _add(c)),
               ]),
               const SizedBox(height: 10),
               TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: Icon(Icons.search)), onChanged: c.setQuery),
@@ -195,18 +198,11 @@ class _CustomersBodyState extends State<_CustomersBody> {
           ]),
           const SizedBox(height: 6),
           Wrap(spacing: 4, runSpacing: 0, children: [
-            if (cu != null) TextButton(onPressed: () => _editPhone(c, cu), child: const Text('Sửa')),
+            if (cu != null) AppButton(label: 'Sửa', variant: AppButtonVariant.ghost, onPressed: () => _editPhone(c, cu)),
             if (cu != null)
-              TextButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CustomerConfigScreen(controller: c, customer: cu))),
-                child: Text(cu.scoringRates != null ? 'Cấu hình tính điểm (riêng)' : 'Cấu hình tính điểm'),
-              ),
+              AppButton(label: cu.scoringRates != null ? 'Cấu hình tính điểm (riêng)' : 'Cấu hình tính điểm', variant: AppButtonVariant.ghost, onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CustomerConfigScreen(controller: c, customer: cu)))),
             if (cu != null)
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: context.badColor),
-                onPressed: _busyId == cu.id ? null : () => _remove(c, cu),
-                child: Text(_busyId == cu.id ? 'Đang xoá...' : 'Xoá khỏi danh sách'),
-              ),
+              AppButton(label: 'Xoá khỏi danh sách', variant: AppButtonVariant.danger, loading: _busyId == cu.id, onPressed: _busyId == cu.id ? null : () => _remove(c, cu)),
             if (cu == null) Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text('Chưa thêm vào danh sách', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
           ]),
         ]),

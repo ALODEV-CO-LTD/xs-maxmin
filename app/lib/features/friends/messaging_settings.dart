@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import 'friends_controller.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Texts of the keep-alive switch (shown in the sheet, and checked by a test: they must be honest about the battery).
 const keepAliveTitle = 'Giữ kết nối để nhận tin nhắn và cuộc gọi khi thoát app';
@@ -67,13 +68,10 @@ class _SheetState extends State<_Sheet> {
               subtitle: const Text('Thông báo tin nhắn chỉ ghi "Tin nhắn mới từ <tên>", không bao giờ hiện nội dung.'),
               trailing: _allowed == true
                   ? null
-                  : TextButton(
-                      onPressed: () async {
+                  : AppButton(label: 'Bật', variant: AppButtonVariant.ghost, onPressed: () async {
                         await c.requestNotificationPermission(force: true);
                         _refresh();
-                      },
-                      child: const Text('Bật'),
-                    ),
+                      }),
             ),
           ]),
         ),

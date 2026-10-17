@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../api_client.dart';
 import '../mask_store.dart';
+import 'app_button.dart';
 
 /// A figure that shows "••••" while [MaskStore.masked] (the real text is never built then).
 class MaskedText extends StatelessWidget {
@@ -31,9 +32,10 @@ class MaskBar extends StatelessWidget {
         onSelected: (v) => mask.setEnabled(v),
       ),
       if (mask.enabled)
-        FilledButton.tonalIcon(
-          icon: Icon(mask.revealed ? Icons.lock : Icons.lock_open, size: 18),
-          label: Text(mask.revealed ? 'Ẩn lại' : 'Hiện số liệu'),
+        AppButton(
+          icon: mask.revealed ? Icons.lock : Icons.lock_open,
+          label: mask.revealed ? 'Ẩn lại' : 'Hiện số liệu',
+          variant: AppButtonVariant.secondary,
           onPressed: () => mask.revealed ? mask.cover() : showRevealDialog(context),
         ),
       if (mask.enabled)
@@ -66,9 +68,8 @@ Future<void> showRevealDialog(BuildContext context) async {
           TextField(controller: ctrl, obscureText: true, autofocus: true, decoration: InputDecoration(labelText: 'Mật khẩu', errorText: error)),
         ]),
         actions: [
-          TextButton(onPressed: busy ? null : () => Navigator.pop(ctx), child: const Text('Huỷ')),
-          FilledButton(
-            onPressed: busy
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: busy ? null : () => Navigator.pop(ctx)),
+          AppButton(label: 'Xác nhận', variant: AppButtonVariant.primary, onPressed: busy
                 ? null
                 : () async {
                     setState(() {
@@ -84,9 +85,7 @@ Future<void> showRevealDialog(BuildContext context) async {
                         error = e.message;
                       });
                     }
-                  },
-            child: const Text('Xác nhận'),
-          ),
+                  }),
         ],
       ),
     ),

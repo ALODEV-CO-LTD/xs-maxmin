@@ -7,6 +7,7 @@ import '../../../core/theme.dart';
 import '../users/admin_users_logic.dart';
 import '../users/admin_users_widgets.dart';
 import 'admin_staff_logic.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Admin - Phân quyền: staff admin accounts and their rights (root Admin only). Body only.
 class AdminStaffScreen extends StatelessWidget {
@@ -114,7 +115,7 @@ class _StaffBodyState extends State<StaffBody> {
         else ...[
           Row(children: [
             Expanded(child: Text('Tài khoản thứ cấp (${_data.staff.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-            FilledButton.icon(onPressed: _create, icon: const Icon(Icons.add), label: const Text('Tạo')),
+            AppButton(label: 'Tạo', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: _create),
           ]),
           const SizedBox(height: 12),
           if (_data.staff.isEmpty && _error == null) const EmptyState('Chưa có tài khoản thứ cấp nào.'),
@@ -144,9 +145,9 @@ class _StaffBodyState extends State<StaffBody> {
             ),
           const SizedBox(height: 8),
           Wrap(spacing: 8, children: [
-            FilledButton(onPressed: busy ? null : () => _edit(s), child: const Text('Sửa')),
-            OutlinedButton(onPressed: busy ? null : () => _toggleLock(s), child: Text(s.locked ? 'Mở khoá' : 'Khoá')),
-            TextButton(style: TextButton.styleFrom(foregroundColor: context.badColor), onPressed: busy ? null : () => _remove(s), child: const Text('Xoá')),
+            AppButton(label: 'Sửa', variant: AppButtonVariant.primary, onPressed: busy ? null : () => _edit(s)),
+            AppButton(label: s.locked ? 'Mở khoá' : 'Khoá', variant: AppButtonVariant.secondary, onPressed: busy ? null : () => _toggleLock(s)),
+            AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: busy ? null : () => _remove(s)),
           ]),
         ]),
       ),
@@ -229,7 +230,7 @@ class _StaffCreateState extends State<StaffCreatePage> {
           const SizedBox(height: 16),
           PermissionPicker(catalog: widget.catalog, selected: _perms, onChanged: (v) => setState(() => _perms = v)),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Đang tạo...' : 'Tạo tài khoản')),
+          AppButton(label: 'Tạo tài khoản', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submit),
         ]),
       );
 }
@@ -277,19 +278,13 @@ class _StaffEditState extends State<StaffEditPage> {
         if (_error != null) AdminBanner(_error!),
         PermissionPicker(catalog: widget.catalog, selected: _perms, onChanged: (v) => setState(() => _perms = v)),
         const SizedBox(height: 8),
-        FilledButton(
-          onPressed: _busy || !changed || _perms.isEmpty ? null : () => _send({'permissions': _perms}, 'Đã lưu quyền của ${a.name}'),
-          child: const Text('Lưu quyền'),
-        ),
+        AppButton(label: 'Lưu quyền', variant: AppButtonVariant.primary, onPressed: _busy || !changed || _perms.isEmpty ? null : () => _send({'permissions': _perms}, 'Đã lưu quyền của ${a.name}')),
         const Divider(height: 32),
         const Text('Đặt lại mật khẩu', style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         TextField(controller: _pw, autocorrect: false, enableSuggestions: false, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'Mật khẩu mới (từ 8 ký tự)')),
         const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: _busy || _pw.text.isEmpty ? null : () => _send({'newPassword': _pw.text}, 'Đã đặt mật khẩu mới cho ${a.name} (đã đăng xuất mọi thiết bị)'),
-          child: const Text('Đặt mật khẩu mới'),
-        ),
+        AppButton(label: 'Đặt mật khẩu mới', variant: AppButtonVariant.secondary, onPressed: _busy || _pw.text.isEmpty ? null : () => _send({'newPassword': _pw.text}, 'Đã đặt mật khẩu mới cho ${a.name} (đã đăng xuất mọi thiết bị)')),
       ]),
     );
   }

@@ -30,6 +30,7 @@ import 'features/support/support_page.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/shell/app_shell.dart';
 import 'features/shell/update_gate.dart';
+import 'core/widgets/app_button.dart';
 
 const _authRoutes = {'/login', '/register', '/recover'};
 
@@ -137,8 +138,8 @@ class _MambaAppState extends State<MambaApp> {
         title: const Text('Bật thông báo?'),
         content: const Text('Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ. Thông báo chỉ báo "có người nhắn / gọi bạn" (kèm tên), không hiện nội dung; bạn cần mở MAMBA để nhận tin.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Để sau')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Bật thông báo')),
+          AppButton(label: 'Để sau', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(c, false)),
+          AppButton(label: 'Bật thông báo', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(c, true)),
         ],
       ),
     );

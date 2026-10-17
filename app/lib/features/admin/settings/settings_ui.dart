@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Shared bits for the payments / notices / settings admin screens.
 
@@ -79,12 +80,8 @@ Future<bool> confirmDialog(BuildContext context, {required String title, require
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-        FilledButton(
-          style: danger ? FilledButton.styleFrom(backgroundColor: ctx.badColor) : null,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(confirmText),
-        ),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+        AppButton(label: confirmText, variant: danger ? AppButtonVariant.danger : AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
       ],
     ),
   );

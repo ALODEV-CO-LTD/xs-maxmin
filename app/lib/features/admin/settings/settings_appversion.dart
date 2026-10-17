@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api_client.dart';
 import '../../../core/app_version.dart';
 import 'settings_ui.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Phiên bản ứng dụng (A17): newest version, oldest version still allowed, download link, release notes.
 /// Display-only until "Sửa" (then Huỷ / Lưu), like the other settings forms. `GET/PUT /admin/app-version`.
@@ -106,29 +107,23 @@ class _AppVersionSectionState extends State<AppVersionSection> {
         if (!on)
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => setState(() {
+            child: AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: () => setState(() {
                 _edit.begin();
                 _saved = false;
-              }),
-              child: const Text('Sửa'),
-            ),
+              })),
           )
         else
           Row(children: [
             Expanded(
-              child: OutlinedButton(
-                onPressed: _saving
+              child: AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _saving
                     ? null
                     : () => setState(() {
                           _fill(_edit.cancel());
                           _error = null;
-                        }),
-                child: const Text('Huỷ'),
-              ),
+                        })),
             ),
             const SizedBox(width: 8),
-            Expanded(flex: 2, child: FilledButton(onPressed: _saving || !_edit.dirty(_form) ? null : _save, child: Text(_saving ? 'Đang lưu...' : 'Lưu'))),
+            Expanded(flex: 2, child: AppButton(label: 'Lưu', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !_edit.dirty(_form) ? null : _save)),
           ]),
       ],
     );

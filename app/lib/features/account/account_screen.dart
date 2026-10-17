@@ -11,6 +11,7 @@ import 'account_devices_tab.dart';
 import 'account_packages_tab.dart';
 import 'account_profile_tab.dart';
 import 'account_widgets.dart';
+import '../../core/widgets/app_button.dart';
 
 enum AccountTab { profile, devices, packages, data }
 
@@ -110,7 +111,7 @@ class _AccountScreenState extends State<AccountScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             NoticeBox(_ctl.error ?? 'Không tải được thông tin tài khoản'),
-            OutlinedButton(onPressed: _ctl.load, child: const Text('Thử lại')),
+            AppButton(label: 'Thử lại', variant: AppButtonVariant.secondary, onPressed: _ctl.load),
           ]),
         ),
       );

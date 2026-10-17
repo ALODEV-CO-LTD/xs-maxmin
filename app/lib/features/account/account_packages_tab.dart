@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import 'account_controller.dart';
 import 'account_widgets.dart';
 import 'me_profile.dart';
+import '../../core/widgets/app_button.dart';
 
 String formatVnd(num n) => '${formatNumber(n)}đ';
 
@@ -133,13 +134,13 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _plans.isEmpty) return const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()));
-    if (_loadError != null && _plans.isEmpty) return Column(children: [NoticeBox(_loadError!), OutlinedButton(onPressed: _loadAll, child: const Text('Thử lại'))]);
+    if (_loadError != null && _plans.isEmpty) return Column(children: [NoticeBox(_loadError!), AppButton(label: 'Thử lại', variant: AppButtonVariant.secondary, onPressed: _loadAll)]);
     final me = widget.ctl.me;
     final pending = _pending;
     final qr = vietQrUrl(bank: _bank, pending: pending, username: me?.username ?? '');
     final ok = context.okColor, bad = context.badColor;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: _loading ? null : _loadAll, icon: const Icon(Icons.refresh, size: 18), label: const Text('Làm mới'))),
+      Align(alignment: Alignment.centerRight, child: AppButton(label: 'Làm mới', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: _loading ? null : _loadAll)),
       SectionCard(title: 'Gói hiện tại', children: [
         Wrap(spacing: 12, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
           StatusChip(me?.packageLabel ?? '-', color: me?.packageActive == true ? ok : bad),
@@ -154,9 +155,9 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(children: [
-            Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'), label: const Text('Sao chép nội dung'))),
+            Expanded(child: AppButton(label: 'Sao chép nội dung', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'))),
             const SizedBox(width: 10),
-            Expanded(child: OutlinedButton(onPressed: _cancelling ? null : () => _cancel(pending), child: const Text('Huỷ yêu cầu'))),
+            Expanded(child: AppButton(label: 'Huỷ yêu cầu', variant: AppButtonVariant.secondary, onPressed: _cancelling ? null : () => _cancel(pending))),
           ]),
         ),
       if (_error != null) NoticeBox(_error!),
@@ -177,7 +178,7 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
                     Text('${plan['durationDays']} ngày', style: TextStyle(color: context.mutedColor, fontSize: 13)),
                   ]),
                 ),
-                FilledButton(onPressed: pending != null || _purchasing != null ? null : () => _purchase(plan), child: Text(_purchasing == plan['type'] ? 'Đang xử lý...' : 'Đăng ký')),
+                AppButton(label: _purchasing == plan['type'] ? 'Đang xử lý...' : 'Đăng ký', variant: AppButtonVariant.primary, onPressed: pending != null || _purchasing != null ? null : () => _purchase(plan)),
               ]),
             ),
           ),

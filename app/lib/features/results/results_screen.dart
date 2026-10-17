@@ -15,6 +15,8 @@ import '../scoring/scoring_data.dart';
 import '../scoring/scoring_logic.dart';
 import '../entries/dialogs.dart';
 import 'results_controller.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/action_bar.dart';
 
 /// Nhập kết quả: lottery results per day (one form for every region, station chosen by chip), reading them from a photo, and the
 /// calculated "Điểm ra" list of the chosen day (frontend/src/views/ResultsView.vue).
@@ -127,7 +129,7 @@ class _Msg extends StatelessWidget {
           ? Text(text, style: TextStyle(color: color, fontSize: 13.5))
           : Row(children: [
               Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13.5))),
-              TextButton(onPressed: onAction, child: Text(action!)),
+              AppButton(label: action!, variant: AppButtonVariant.ghost, onPressed: onAction),
             ]),
     );
   }
@@ -205,10 +207,12 @@ class _PhotoBox extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
           width: double.infinity,
-          child: FilledButton.tonalIcon(
+          child: AppButton(
+            label: north ? 'Đọc kết quả từ ảnh' : 'Đọc kết quả từ ảnh (nhiều đài)',
+            variant: AppButtonVariant.secondary,
+            icon: Icons.photo_camera_outlined,
+            loading: c.ocrRunning,
             onPressed: c.ocrRunning ? null : () => _choose(context, c),
-            icon: c.ocrRunning ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.photo_camera_outlined),
-            label: Text(c.ocrRunning ? 'Đang đọc ảnh...' : (north ? 'Đọc kết quả từ ảnh' : 'Đọc kết quả từ ảnh (nhiều đài)')),
           ),
         ),
         const SizedBox(height: 6),
@@ -310,21 +314,16 @@ class _ResultForm extends StatelessWidget {
       }
     }
     children.add(const SizedBox(height: 12));
-    children.add(Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.end, children: [
-      if (c.savedOf(cur))
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(foregroundColor: context.badColor, minimumSize: const Size(0, 44)),
-          onPressed: c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, cur),
-          child: Text(c.deleting == cur ? 'Đang xoá...' : 'Xoá kết quả này'),
-        ),
-      OutlinedButton(
-        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-        onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null,
-        child: const Text('Sửa'),
-      ),
-      TextButton(onPressed: c.clearForm, child: const Text('Xoá form')),
-      _SaveButton(c),
-    ]));
+    children.add(ActionBar(
+      start: [
+        if (c.savedOf(cur)) AppButton(label: 'Xoá kết quả này', variant: AppButtonVariant.danger, loading: c.deleting == cur, onPressed: c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, cur)),
+        AppButton(label: 'Xoá form', variant: AppButtonVariant.ghost, onPressed: c.clearForm),
+      ],
+      children: [
+        AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null),
+        _SaveButton(c),
+      ],
+    ));
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 }
@@ -373,7 +372,7 @@ class _SaveButton extends StatelessWidget {
   const _SaveButton(this.c);
   final ResultsController c;
   @override
-  Widget build(BuildContext context) => FilledButton(onPressed: c.saving ? null : c.save, child: Text(c.saving ? 'Đang lưu...' : 'Lưu kết quả'));
+  Widget build(BuildContext context) => AppButton(label: 'Lưu kết quả', variant: AppButtonVariant.primary, loading: c.saving, onPressed: c.saving ? null : c.save);
 }
 
 Future<void> _confirmDelete(BuildContext context, ResultsController c, String station) async {
@@ -384,8 +383,8 @@ Future<void> _confirmDelete(BuildContext context, ResultsController c, String st
       title: const Text('Xoá kết quả'),
       content: Text('Xoá kết quả xổ số $name ngày ${viDate(c.date)}? Không thể hoàn tác.'),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-        FilledButton(style: FilledButton.styleFrom(backgroundColor: ctx.badColor), onPressed: () => Navigator.pop(ctx, true), child: const Text('Xoá')),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+        AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
       ],
     ),
   );
@@ -496,7 +495,7 @@ class _ScoreList extends StatelessWidget {
           else if (c.entriesError != null)
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _Msg(c.entriesError!, error: true),
-              TextButton.icon(onPressed: c.loadEntryData, icon: const Icon(Icons.refresh), label: const Text('Thử lại')),
+              AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: c.loadEntryData),
             ])
           else if (c.groups.isEmpty)
             Text('Không có số liệu nào của ngày này.', style: TextStyle(color: context.mutedColor))

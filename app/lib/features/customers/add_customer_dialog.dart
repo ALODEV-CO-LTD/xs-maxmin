@@ -6,6 +6,7 @@ import '../../core/lottery_stations.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../entries/dialogs.dart';
 import 'customer_model.dart';
+import '../../core/widgets/app_button.dart';
 
 const offlineWriteMessage = 'Đang offline: thêm/xoá khách hàng cần có mạng, vui lòng thử lại khi kết nối lại.';
 
@@ -101,8 +102,8 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
           if (_error.isNotEmpty) ...[const SizedBox(height: 10), InfoBox(_error)],
       ]),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Huỷ')),
-        FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Đang thêm...' : 'Thêm khách hàng')),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
+        AppButton(label: 'Thêm khách hàng', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submit),
       ],
     );
   }

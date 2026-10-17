@@ -16,6 +16,7 @@ import 'chat_calc_screen.dart';
 import 'chat_calc_services.dart';
 import 'chat_decode_model.dart';
 import 'chat_prefill.dart';
+import '../../core/widgets/app_button.dart';
 
 const chatCalcRouteName = 'chat_calc';
 
@@ -225,15 +226,15 @@ class _ChatDecodeScreenState extends State<ChatDecodeScreen> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Row(children: [
-              Expanded(child: TextButton(onPressed: _redo, child: const Text('Giải mã lại'))),
-              Expanded(child: TextButton(onPressed: _save, child: const Text('Lưu bản sửa'))),
+              Expanded(child: AppButton(label: 'Giải mã lại', variant: AppButtonVariant.ghost, onPressed: _redo)),
+              Expanded(child: AppButton(label: 'Lưu bản sửa', variant: AppButtonVariant.ghost, onPressed: _save)),
             ]),
             Row(children: [
               Expanded(
-                child: widget.calcFirst ? OutlinedButton(onPressed: _use, child: const Text('Dùng cho Nhập số')) : FilledButton.tonal(onPressed: _use, child: const Text('Dùng cho Nhập số')),
+                child: widget.calcFirst ? AppButton(label: 'Dùng cho Nhập số', variant: AppButtonVariant.secondary, onPressed: _use) : AppButton(label: 'Dùng cho Nhập số', variant: AppButtonVariant.secondary, onPressed: _use),
               ),
               const SizedBox(width: 8),
-              Expanded(child: FilledButton(onPressed: _calc, child: const Text('Tính toán'))),
+              Expanded(child: AppButton(label: 'Tính toán', variant: AppButtonVariant.primary, onPressed: _calc)),
             ]),
           ]),
         ),
@@ -285,7 +286,7 @@ class _ChatDecodeScreenState extends State<ChatDecodeScreen> {
             ),
           ),
           if (l.unknown) const Padding(padding: EdgeInsets.only(left: 8), child: Tooltip(message: 'Có phần chưa nhận ra, hãy kiểm tra', child: Text('!', style: TextStyle(color: Color(0xFFB45309), fontWeight: FontWeight.w800, fontSize: 18)))),
-          if (l.edited) TextButton(onPressed: () => _restore(l), child: const Text('Khôi phục')),
+          if (l.edited) AppButton(label: 'Khôi phục', variant: AppButtonVariant.ghost, onPressed: () => _restore(l)),
         ]),
       ]),
     );

@@ -17,6 +17,7 @@ import '../scoring/entry_model.dart';
 import '../scoring/scoring_logic.dart' show LotteryResult;
 import 'chat_calc_services.dart';
 import 'chat_report.dart';
+import '../../core/widgets/app_button.dart';
 
 enum _Step { station, report, saved }
 
@@ -179,8 +180,8 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
         title: Text('Gửi cho ${widget.friendName}'),
         content: SingleChildScrollView(child: Text(_text)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Gửi')),
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+          AppButton(label: 'Gửi', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -269,9 +270,9 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
           ),
         ),
       if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(_error, style: TextStyle(color: context.badColor))),
-      FilledButton(onPressed: _selected.isEmpty || _busy ? null : _confirmStation, child: Text(_busy ? 'Đang tính...' : 'Xác nhận chọn đài')),
+      AppButton(label: 'Xác nhận chọn đài', variant: AppButtonVariant.primary, loading: _busy, onPressed: _selected.isEmpty || _busy ? null : _confirmStation),
       const SizedBox(height: 4),
-      TextButton(onPressed: () => setState(() => _step = _Step.saved), child: Text('Báo cáo đã lưu (${_saved.length})')),
+      AppButton(label: 'Báo cáo đã lưu (${_saved.length})', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _step = _Step.saved)),
     ]);
   }
 
@@ -322,7 +323,7 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
                 Text(_error, style: TextStyle(color: context.badColor)),
-                if (rep.missingResult) TextButton(onPressed: _busy ? null : _confirmStation, child: const Text('Thử lại')),
+                if (rep.missingResult) AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: _busy ? null : _confirmStation),
               ]),
             ),
           for (var i = 0; i < rep.groups.length; i++)
@@ -347,11 +348,11 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Row(children: [
-            Expanded(child: OutlinedButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined, size: 18), label: const Text('Lưu'))),
+            Expanded(child: AppButton(label: 'Lưu', variant: AppButtonVariant.secondary, icon: Icons.save_outlined, onPressed: _save)),
             const SizedBox(width: 8),
-            Expanded(child: OutlinedButton.icon(onPressed: _copy, icon: const Icon(Icons.copy, size: 18), label: const Text('Copy'))),
+            Expanded(child: AppButton(label: 'Copy', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: _copy)),
             const SizedBox(width: 8),
-            Expanded(flex: 2, child: FilledButton.icon(onPressed: _sending ? null : _send, icon: const Icon(Icons.send, size: 18), label: Text(_sending ? 'Đang gửi...' : 'Gửi cho khách', overflow: TextOverflow.ellipsis))),
+            Expanded(flex: 2, child: AppButton(label: 'Gửi cho khách', variant: AppButtonVariant.primary, icon: Icons.send, loading: _sending, onPressed: _sending ? null : _send)),
           ]),
         ),
       ),

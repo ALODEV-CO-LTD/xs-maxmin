@@ -5,23 +5,24 @@ import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import 'settings_logic.dart';
 import 'settings_ui.dart';
+import '../../../core/widgets/app_button.dart';
 
 Widget _editBar({required bool editing, required bool saving, required VoidCallback onEdit, required VoidCallback onCancel, required VoidCallback? onSave, required String saveLabel}) {
   if (!editing) {
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton(onPressed: onEdit, child: const Text('Sửa')),
+      child: AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: onEdit),
     );
   }
   return Row(
     children: [
       Expanded(
-        child: OutlinedButton(onPressed: saving ? null : onCancel, child: const Text('Huỷ')),
+        child: AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: saving ? null : onCancel),
       ),
       const SizedBox(width: 8),
       Expanded(
         flex: 2,
-        child: FilledButton(onPressed: saving ? null : onSave, child: Text(saving ? 'Đang lưu...' : saveLabel)),
+        child: AppButton(label: saveLabel, variant: AppButtonVariant.primary, loading: saving, onPressed: saving ? null : onSave),
       ),
     ],
   );
@@ -383,12 +384,12 @@ class _PackagesSectionState extends State<PackagesSection> {
       Row(
         children: [
           Expanded(
-            child: OutlinedButton(onPressed: _busy == key ? null : () => setState(() => _editing = null), child: const Text('Huỷ')),
+            child: AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy == key ? null : () => setState(() => _editing = null)),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
-            child: FilledButton(onPressed: _busy == key ? null : _save, child: Text(saveLabel)),
+            child: AppButton(label: saveLabel, variant: AppButtonVariant.primary, onPressed: _busy == key ? null : _save),
           ),
         ],
       ),
@@ -410,7 +411,7 @@ class _PackagesSectionState extends State<PackagesSection> {
         else
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.icon(onPressed: _startNew, icon: const Icon(Icons.add), label: const Text('Thêm gói')),
+            child: AppButton(label: 'Thêm gói', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: _startNew),
           ),
         const SizedBox(height: 10),
         if (_items.isEmpty && _editing != 'new') const Placeholder2('Chưa có gói nào.'),
@@ -443,19 +444,15 @@ class _PackagesSectionState extends State<PackagesSection> {
                           Row(
                             children: [
                               Expanded(
-                                child: FilledButton(onPressed: _busy == p.type ? null : () => _startEdit(p), child: const Text('Sửa')),
+                                child: AppButton(label: 'Sửa', variant: AppButtonVariant.primary, onPressed: _busy == p.type ? null : () => _startEdit(p)),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: OutlinedButton(onPressed: _busy == p.type ? null : () => _toggle(p), child: Text(p.active ? 'Ẩn' : 'Hiện lại')),
+                                child: AppButton(label: p.active ? 'Ẩn' : 'Hiện lại', variant: AppButtonVariant.secondary, onPressed: _busy == p.type ? null : () => _toggle(p)),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: OutlinedButton(
-                                  style: OutlinedButton.styleFrom(foregroundColor: context.badColor),
-                                  onPressed: _busy == p.type ? null : () => _remove(p),
-                                  child: const Text('Xoá'),
-                                ),
+                                child: AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: _busy == p.type ? null : () => _remove(p)),
                               ),
                             ],
                           ),

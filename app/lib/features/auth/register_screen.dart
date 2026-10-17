@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../account/account_widgets.dart';
 import '../account/auth_flows.dart';
 import '../account/auth_scaffold.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Tạo tài khoản: account info -> security (second password, optional wipe password) -> recovery code shown once ->
 /// second password re-typed (final verification). Same flow as frontend RegisterView.vue.
@@ -133,9 +134,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 12),
         _field('confirmPassword', _confirm, 'Nhập lại mật khẩu', errors, secret: true, action: TextInputAction.done, onSubmitted: (_) => _next()),
         const SizedBox(height: 20),
-        FilledButton(onPressed: _flow.loading ? null : _next, child: const Text('Tiếp tục')),
+        AppButton(label: 'Tiếp tục', variant: AppButtonVariant.primary, onPressed: _flow.loading ? null : _next),
         const SizedBox(height: 4),
-        TextButton(onPressed: () => context.canPop() ? context.pop() : context.go('/login'), child: const Text('Đã có tài khoản? Đăng nhập')),
+        AppButton(label: 'Đã có tài khoản? Đăng nhập', variant: AppButtonVariant.ghost, onPressed: () => context.canPop() ? context.pop() : context.go('/login')),
       ],
     );
   }
@@ -191,16 +192,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _field('wipePassword', _wipe, 'Mật khẩu xoá dữ liệu', errors, secret: true, hint: 'Tuỳ bạn đặt', action: TextInputAction.done, onSubmitted: (_) => _create()),
         ],
         const SizedBox(height: 20),
-        FilledButton(onPressed: _flow.loading ? null : _create, child: Text(_flow.loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản')),
-        TextButton(
-          onPressed: _flow.loading
+        AppButton(label: 'Tạo tài khoản', variant: AppButtonVariant.primary, loading: _flow.loading, onPressed: _flow.loading ? null : _create),
+        AppButton(label: 'Quay lại', variant: AppButtonVariant.ghost, onPressed: _flow.loading
               ? null
               : () {
                   setState(() => _submitted = false);
                   _flow.backToAccount();
-                },
-          child: const Text('Quay lại'),
-        ),
+                }),
       ],
     );
   }
@@ -231,7 +229,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _errorBox(),
           PasswordField(controller: _step2, label: 'Mật khẩu lớp hai', enabled: !_flow.loading, autofocus: true, onSubmitted: (_) => _flow.submitStep2(_step2.text)),
           const SizedBox(height: 20),
-          FilledButton(onPressed: _flow.loading ? null : () => _flow.submitStep2(_step2.text), child: Text(_flow.loading ? 'Đang xử lý...' : 'Hoàn tất')),
+          AppButton(label: 'Hoàn tất', variant: AppButtonVariant.primary, loading: _flow.loading, onPressed: _flow.loading ? null : () => _flow.submitStep2(_step2.text)),
         ],
       ),
     );

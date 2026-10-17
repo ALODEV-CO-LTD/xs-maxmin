@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/app_dialog.dart';
 import 'date_field.dart';
+import '../../core/widgets/app_button.dart';
 
 /// "Xóa số liệu": delete saved entries now - one customer or everyone, an optional date range, optionally keeping the
 /// newest N days. Shows how many entries would go (dry run, no password) and needs the account password.
@@ -199,12 +200,8 @@ class _DeleteDataDialogState extends State<DeleteDataDialog> {
         if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_error, style: TextStyle(color: context.badColor))),
       ]),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Huỷ')),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: context.badColor, foregroundColor: Colors.white),
-          onPressed: _busy || _count == 0 ? null : _submit,
-          child: Text(_busy ? 'Đang xóa...' : 'Xóa'),
-        ),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
+        AppButton(label: 'Xóa', variant: AppButtonVariant.danger, loading: _busy, onPressed: _busy || _count == 0 ? null : _submit),
       ],
     );
   }

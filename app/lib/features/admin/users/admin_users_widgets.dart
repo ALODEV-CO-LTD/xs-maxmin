@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_button.dart';
 
 Future<bool> adminConfirm(BuildContext context, {required String title, required String message, required String confirmText, bool danger = false}) async {
   final ok = await showDialog<bool>(
@@ -10,12 +11,8 @@ Future<bool> adminConfirm(BuildContext context, {required String title, required
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
-        FilledButton(
-          style: danger ? FilledButton.styleFrom(backgroundColor: c.badColor, foregroundColor: Colors.white) : null,
-          onPressed: () => Navigator.pop(c, true),
-          child: Text(confirmText),
-        ),
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(c, false)),
+        AppButton(label: confirmText, variant: danger ? AppButtonVariant.danger : AppButtonVariant.primary, onPressed: () => Navigator.pop(c, true)),
       ],
     ),
   );
@@ -69,14 +66,10 @@ class SecretRow extends StatelessWidget {
             SelectableText(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 1)),
           ]),
         ),
-        TextButton.icon(
-          icon: const Icon(Icons.copy, size: 16),
-          label: const Text('Chép'),
-          onPressed: () async {
+        AppButton(label: 'Chép', variant: AppButtonVariant.ghost, icon: Icons.copy, onPressed: () async {
             await Clipboard.setData(ClipboardData(text: value));
             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã chép')));
-          },
-        ),
+          }),
       ]),
     );
   }

@@ -18,6 +18,7 @@ import 'entries_controller.dart';
 import 'entry_form.dart';
 import 'entry_model.dart';
 import 'offline_store.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Nhập số: pick a customer, add numbers (by hand, from a pasted message or from a photo), review the list.
 class EntriesScreen extends StatelessWidget {
@@ -175,7 +176,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
               SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverToBoxAdapter(
-                  child: Column(children: [InfoBox(c.loadError), FilledButton(onPressed: c.reload, child: const Text('Thử lại'))]),
+                  child: Column(children: [InfoBox(c.loadError), AppButton(label: 'Thử lại', variant: AppButtonVariant.primary, onPressed: c.reload)]),
                 ),
               )
             else if (!showList)
@@ -226,7 +227,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
         InfoBox(
           '${c.pending} thay đổi đang chờ đồng bộ.',
           kind: InfoKind.warning,
-          action: TextButton(onPressed: () => c.sync(), child: const Text('Đồng bộ ngay')),
+          action: AppButton(label: 'Đồng bộ ngay', variant: AppButtonVariant.ghost, onPressed: () => c.sync()),
         ),
       if (c.notice.isNotEmpty) InfoBox(c.notice, kind: InfoKind.success, onClose: c.clearNotice),
       for (final f in c.failures.toList()) InfoBox(f.message, onClose: () => c.dismissFailure(f)),
@@ -256,8 +257,8 @@ class _EntriesBodyState extends State<_EntriesBody> {
       'Số liệu "${k.mine['value'] ?? ''}" đã được sửa ở nơi khác. Giữ bản nào?',
       kind: InfoKind.warning,
       action: Wrap(children: [
-        TextButton(onPressed: () => _resolve(c, k, true), child: const Text('Bản của tôi')),
-        TextButton(onPressed: () => _resolve(c, k, false), child: const Text('Bản máy chủ')),
+        AppButton(label: 'Bản của tôi', variant: AppButtonVariant.ghost, onPressed: () => _resolve(c, k, true)),
+        AppButton(label: 'Bản máy chủ', variant: AppButtonVariant.ghost, onPressed: () => _resolve(c, k, false)),
       ]),
     );
   }
@@ -289,11 +290,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
       const SizedBox(height: 8),
       Row(children: [
         Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _pickDate(c),
-            icon: const Icon(Icons.event, size: 18),
-            label: Text(f.date.isEmpty ? 'Mọi ngày' : viDate(f.date), overflow: TextOverflow.ellipsis),
-          ),
+          child: AppButton(label: f.date.isEmpty ? 'Mọi ngày' : viDate(f.date), variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(c)),
         ),
         if (f.date.isNotEmpty) IconButton(tooltip: 'Bỏ lọc ngày', icon: const Icon(Icons.close, size: 18), onPressed: () { f.date = ''; c.touchFilter(); }),
         const SizedBox(width: 8),
@@ -324,7 +321,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
             },
           ),
         ),
-        if (f.active) TextButton(onPressed: () { _search.clear(); f.clear(); c.touchFilter(); }, child: const Text('Xoá lọc')),
+        if (f.active) AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, onPressed: () { _search.clear(); f.clear(); c.touchFilter(); }),
       ]),
     ]);
   }
@@ -332,16 +329,8 @@ class _EntriesBodyState extends State<_EntriesBody> {
   Widget _copyBar(BuildContext context, EntriesController c, List<Entry> shown, bool masked) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        OutlinedButton.icon(
-          onPressed: shown.isEmpty || masked ? null : () => _copy(c, shown),
-          icon: const Icon(Icons.copy, size: 18),
-          label: Text('Sao chép ${masked ? '•••' : shown.length} số liệu'),
-        ),
-        OutlinedButton.icon(
-          onPressed: shown.isEmpty ? null : () => setState(() { _selecting = !_selecting; _selected.clear(); _bulkError = ''; }),
-          icon: Icon(_selecting ? Icons.close : Icons.checklist, size: 18),
-          label: Text(_selecting ? 'Thôi chọn' : 'Chọn để xoá'),
-        ),
+        AppButton(label: 'Sao chép ${masked ? '•••' : shown.length} số liệu', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: shown.isEmpty || masked ? null : () => _copy(c, shown)),
+        AppButton(label: _selecting ? 'Thôi chọn' : 'Chọn để xoá', variant: AppButtonVariant.secondary, icon: _selecting ? Icons.close : Icons.checklist, onPressed: shown.isEmpty ? null : () => setState(() { _selecting = !_selecting; _selected.clear(); _bulkError = ''; })),
       ]),
       if (masked) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Đang ẩn số liệu: bấm Hiện số liệu để sao chép.', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
       CheckboxListTile(
@@ -359,13 +348,9 @@ class _EntriesBodyState extends State<_EntriesBody> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
           child: Row(children: [
-            TextButton(onPressed: () => setState(() { _selected..clear()..addAll(shown.where((e) => !e.pending).map((e) => e.id)); }), child: const Text('Chọn tất cả')),
+            AppButton(label: 'Chọn tất cả', variant: AppButtonVariant.ghost, onPressed: () => setState(() { _selected..clear()..addAll(shown.where((e) => !e.pending).map((e) => e.id)); })),
             const Spacer(),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: context.badColor, foregroundColor: Colors.white, minimumSize: const Size(0, 40)),
-              onPressed: _selected.isEmpty || _bulkBusy ? null : () => _deleteSelected(c),
-              child: Text(_bulkBusy ? 'Đang xoá...' : 'Xoá ${_selected.length} dòng'),
-            ),
+            AppButton(label: 'Xoá ${_selected.length} dòng', variant: AppButtonVariant.danger, loading: _bulkBusy, onPressed: _selected.isEmpty || _bulkBusy ? null : () => _deleteSelected(c)),
           ]),
         ),
       if (_bulkError.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: InfoBox(_bulkError)),

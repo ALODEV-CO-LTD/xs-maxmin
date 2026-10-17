@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../account/account_widgets.dart';
 import '../account/auth_flows.dart';
 import '../account/auth_scaffold.dart';
+import '../../core/widgets/app_button.dart';
 
 /// Khôi phục mật khẩu: username + mã khôi phục + new password (then a NEW code is shown once), or the
 /// admin-assisted flow (recovery-request -> mã hỗ trợ -> recover-with-ticket). Port of the LoginView.vue recover stages.
@@ -69,10 +70,10 @@ class _RecoverScreenState extends State<RecoverScreen> {
           const SizedBox(height: 12),
           PasswordField(controller: _confirm, label: 'Nhập lại mật khẩu mới', enabled: !_busy, onSubmitted: (_) => _submitRecover()),
           const SizedBox(height: 18),
-          FilledButton(onPressed: _busy ? null : _submitRecover, child: Text(_busy ? 'Đang xử lý...' : 'Đặt lại mật khẩu')),
-          TextButton(onPressed: _busy ? null : () => _flow.go(RecoverStage.helpRequest), child: const Text('Mất cả mã khôi phục? Nhờ Admin hỗ trợ', textAlign: TextAlign.center)),
-          TextButton(onPressed: _busy ? null : () => _flow.go(RecoverStage.ticket), child: const Text('Tôi đã có mã hỗ trợ từ Admin')),
-          TextButton(onPressed: _toLogin, child: const Text('Quay lại đăng nhập')),
+          AppButton(label: 'Đặt lại mật khẩu', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submitRecover),
+          AppButton(label: 'Mất cả mã khôi phục? Nhờ Admin hỗ trợ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => _flow.go(RecoverStage.helpRequest)),
+          AppButton(label: 'Tôi đã có mã hỗ trợ từ Admin', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => _flow.go(RecoverStage.ticket)),
+          AppButton(label: 'Quay lại đăng nhập', variant: AppButtonVariant.ghost, onPressed: _toLogin),
         ]);
       case RecoverStage.helpRequest:
         return AuthScaffold(title: 'Nhờ Admin hỗ trợ', onBack: () => _flow.go(RecoverStage.recover), children: [
@@ -82,14 +83,14 @@ class _RecoverScreenState extends State<RecoverScreen> {
           const SizedBox(height: 12),
           TextField(controller: _note, enabled: !_busy, maxLength: 300, decoration: const InputDecoration(labelText: 'Thông tin giúp Admin xác minh (không bắt buộc)', hintText: 'Ví dụ: tên, số điện thoại liên hệ')),
           const SizedBox(height: 10),
-          FilledButton(onPressed: _busy ? null : () => _flow.submitHelp(username: _username.text, note: _note.text), child: Text(_busy ? 'Đang gửi...' : 'Gửi yêu cầu')),
-          TextButton(onPressed: _busy ? null : () => _flow.go(RecoverStage.recover), child: const Text('Quay lại')),
+          AppButton(label: 'Gửi yêu cầu', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : () => _flow.submitHelp(username: _username.text, note: _note.text)),
+          AppButton(label: 'Quay lại', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => _flow.go(RecoverStage.recover)),
         ]);
       case RecoverStage.helpSent:
         return AuthScaffold(title: 'Nhờ Admin hỗ trợ', onBack: _toLogin, children: [
           NoticeBox(_flow.helpMessage, kind: NoticeKind.success),
-          FilledButton(onPressed: () => _flow.go(RecoverStage.ticket), child: const Text('Tôi đã có mã hỗ trợ')),
-          TextButton(onPressed: _toLogin, child: const Text('Về trang đăng nhập')),
+          AppButton(label: 'Tôi đã có mã hỗ trợ', variant: AppButtonVariant.primary, onPressed: () => _flow.go(RecoverStage.ticket)),
+          AppButton(label: 'Về trang đăng nhập', variant: AppButtonVariant.ghost, onPressed: _toLogin),
         ]);
       case RecoverStage.ticket:
         return AuthScaffold(title: 'Nhập mã hỗ trợ', onBack: () => _flow.go(RecoverStage.recover), children: [
@@ -103,8 +104,8 @@ class _RecoverScreenState extends State<RecoverScreen> {
           const SizedBox(height: 12),
           PasswordField(controller: _confirm, label: 'Nhập lại mật khẩu mới', enabled: !_busy, onSubmitted: (_) => _submitTicket()),
           const SizedBox(height: 18),
-          FilledButton(onPressed: _busy ? null : _submitTicket, child: Text(_busy ? 'Đang xử lý...' : 'Đặt lại mật khẩu')),
-          TextButton(onPressed: _toLogin, child: const Text('Quay lại đăng nhập')),
+          AppButton(label: 'Đặt lại mật khẩu', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _submitTicket),
+          AppButton(label: 'Quay lại đăng nhập', variant: AppButtonVariant.ghost, onPressed: _toLogin),
         ]);
       case RecoverStage.recoveryCode:
         return PopScope(

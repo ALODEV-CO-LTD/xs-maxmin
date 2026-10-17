@@ -6,6 +6,7 @@ import '../../../core/theme.dart';
 import '../payments/payments_logic.dart' show viDateTime;
 import 'settings_logic.dart';
 import 'settings_ui.dart';
+import '../../../core/widgets/app_button.dart';
 
 /// Nhật ký bảo mật: the 50 latest security events.
 class SecurityEventsSection extends StatefulWidget {
@@ -267,33 +268,27 @@ class _SecurityPolicySectionState extends State<SecurityPolicySection> {
         ),
         const SizedBox(height: 14),
         if (!editing)
-          OutlinedButton(
-            onPressed: () => setState(() {
+          AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: () => setState(() {
               _edit.begin();
               _notice = null;
-            }),
-            child: const Text('Sửa'),
-          )
+            }))
         else ...[
-          OutlinedButton(onPressed: _saving ? null : _reset, child: const Text('Đặt lại mặc định')),
+          AppButton(label: 'Đặt lại mặc định', variant: AppButtonVariant.secondary, onPressed: _saving ? null : _reset),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
-                  onPressed: _saving
+                child: AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _saving
                       ? null
                       : () => setState(() {
                           _setForm(_edit.cancel());
                           _error = null;
-                        }),
-                  child: const Text('Huỷ'),
-                ),
+                        })),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: FilledButton(onPressed: _saving || !_edit.dirty(cur) ? null : _save, child: Text(_saving ? 'Đang lưu...' : 'Lưu chính sách')),
+                child: AppButton(label: 'Lưu chính sách', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !_edit.dirty(cur) ? null : _save),
               ),
             ],
           ),
