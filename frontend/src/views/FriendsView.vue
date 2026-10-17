@@ -24,7 +24,6 @@ import ChatAttachButtons from '../components/ChatAttachButtons.vue'
 import AttachmentPreview from '../components/AttachmentPreview.vue'
 import ChatCalcDialog from '../components/ChatCalcDialog.vue'
 import ChatDecodeDialog from '../components/ChatDecodeDialog.vue'
-import ChatKeyboard from '../components/ChatKeyboard.vue'
 import ChatRetentionPanel from '../components/ChatRetentionPanel.vue'
 import MessageAttachment from '../components/MessageAttachment.vue'
 import { useChatStore } from '../e2ee/chat'
@@ -646,12 +645,10 @@ onBeforeUnmount(stopShotWatch)
 
 const peerInfo = computed(() => chat.peerInfo[selectedFriendId.value] || null)
 // Thêm: tạo nhóm. Giao diện đã có; nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.
-// Mở cuộc trò chuyện: ô nhập CHƯA được chọn, không con trỏ, không bàn phím (cả bàn phím ảo của app lẫn bàn phím hệ thống), nội dung
-// tin nhắn chiếm hết chỗ. Chạm vào ô nhập thì bàn phím hệ thống hiện như thường lệ; nút ⌨ mới bật bàn phím ảo của app (mặc định tắt).
+// Mở cuộc trò chuyện: ô nhập CHƯA được chọn, không con trỏ, không bàn phím hệ thống, nội dung
+// tin nhắn chiếm hết chỗ. Chạm vào ô nhập thì bàn phím hệ thống hiện như thường lệ (web không còn bàn phím ảo riêng).
 const msgInput = ref(null)
-const kbOpen = ref(false)
 function focusInput() { nextTick(() => msgInput.value?.focus({ preventScroll: true })) }
-function toggleKeyboard() { kbOpen.value = !kbOpen.value; if (kbOpen.value) focusInput() }
 
 const groupOpen = ref(false)
 const groupName = ref('')
@@ -912,14 +909,12 @@ async function acceptKey() {
           </div>
           <div class="send-tools">
             <button type="button" class="calc-btn" :class="{ ready: selecting && pickedIds.length }" @click="onAction">{{ actionLabel }}</button>
-            <button type="button" class="kb-toggle" :aria-pressed="kbOpen" :title="kbOpen ? 'Ẩn bàn phím' : 'Hiện bàn phím'" @click="toggleKeyboard">⌨</button>
           </div>
           <form class="send-row" @submit.prevent="sendMessage">
             <ChatAttachButtons icon="paperclip" :disabled="sending" @pick="(f) => { attachment = f; messagesError = '' }" @error="(m) => (messagesError = m)" />
-            <input ref="msgInput" v-model="newMessage" type="text" placeholder="Nhập tin nhắn..." :inputmode="kbOpen ? 'none' : 'text'" autocomplete="off" />
+            <input ref="msgInput" v-model="newMessage" type="text" placeholder="Nhập tin nhắn..." autocomplete="off" />
             <AppButton variant="primary" type="submit" :disabled="sending || (!newMessage.trim() && !attachment)">Gửi</AppButton>
           </form>
-          <ChatKeyboard v-if="kbOpen" v-model="newMessage" :can-send="!sending && (!!newMessage.trim() || !!attachment)" @enter="sendMessage" />
         </template>
       </div>
     </div>
@@ -1222,8 +1217,6 @@ async function acceptKey() {
 .pin-bar, .reply-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 6px; padding: 4px 10px; font-size: 13.5px; background: #f0fdf4; border-left: 3px solid #16a34a; border-radius: 6px; }
 .pin-bar span, .reply-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .send-tools { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.kb-toggle { flex: none; width: 40px; height: 40px; font-size: 20px; background: #fff; color: #16a34a; border: 1px solid #d9e8dd; border-radius: 10px; cursor: pointer; }
-.kb-toggle[aria-pressed='true'] { background: #f0fdf4; border-color: #16a34a; }
 .thread-body {
   flex: 1;
   min-height: 300px;
