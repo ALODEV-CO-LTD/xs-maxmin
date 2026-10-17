@@ -162,12 +162,21 @@ class ChatService extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  /// The user saw the "key changed" warning for this friend.
+  /// The user saw the "key changed" warning for this friend: trust the key the server shows NOW. The stored key is replaced too,
+  /// otherwise the next refresh of the friend list still sees "different from the stored one" and shows the warning again.
   Future<void> acceptKeyChange(String friendId) async {
+    final current = friendKeys[friendId];
     final known = await store.peer(friendId);
-    if (known != null) await store.putPeer(PeerRecord(id: known.id, jwk: known.jwk, fingerprint: known.fingerprint, changed: false));
-    final info = peerInfo[friendId];
-    if (info != null) peerInfo[friendId] = PeerInfo(fingerprint: info.fingerprint, changed: false);
+    if (current != null) {
+      final fp = await fingerprint(current);
+      await store.putPeer(PeerRecord(id: friendId, jwk: current, fingerprint: fp, changed: false));
+      peerInfo[friendId] = PeerInfo(fingerprint: fp, changed: false);
+      _sessions.remove(friendId);
+    } else {
+      if (known != null) await store.putPeer(PeerRecord(id: known.id, jwk: known.jwk, fingerprint: known.fingerprint, changed: false));
+      final info = peerInfo[friendId];
+      if (info != null) peerInfo[friendId] = PeerInfo(fingerprint: info.fingerprint, changed: false);
+    }
     if (!_disposed) notifyListeners();
   }
 

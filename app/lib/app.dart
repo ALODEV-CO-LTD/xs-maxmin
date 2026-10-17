@@ -120,13 +120,21 @@ class _MambaAppState extends State<MambaApp> {
   @override
   void initState() {
     super.initState();
+    _auth.addListener(_onAuth);
     _push.start();
   }
 
   @override
   void dispose() {
+    _auth.removeListener(_onAuth);
     _push.dispose();
     super.dispose();
+  }
+
+  /// The saved session has been read (or changed): make the router re-check where the person must be. Without this a cold
+  /// start with nobody signed in could stay on the home tab ("Chưa đăng nhập") until the first tap.
+  void _onAuth() {
+    if (_auth.ready) _router.refresh();
   }
 
   Future<bool> _explainPush() async {
@@ -165,15 +173,22 @@ class _MambaAppState extends State<MambaApp> {
         // Always the light theme (white, green accents): the customer's design has no dark mode.
         themeMode: ThemeMode.light,
         routerConfig: _router,
-        builder: (context, child) => MessagingHost(
-          auth: _auth,
-          api: _api,
-          router: _router,
-          privacy: _privacy,
-          notifier: _notifier,
-          ringer: _ringer,
-          background: _background,
-          child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: PrivacyGate(child: child ?? const SizedBox.shrink()))),
+        builder: (context, child) => ListenableBuilder(
+          listenable: _auth,
+          builder: (context, _) => Stack(children: [
+            MessagingHost(
+              auth: _auth,
+              api: _api,
+              router: _router,
+              privacy: _privacy,
+              notifier: _notifier,
+              ringer: _ringer,
+              background: _background,
+              child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: PrivacyGate(child: child ?? const SizedBox.shrink()))),
+            ),
+            // Until the saved session is read, nothing of the app is shown (no flash of the home tab for a signed-out start).
+            if (!_auth.ready) const Positioned.fill(child: ColoredBox(color: Colors.white, child: Center(child: CircularProgressIndicator()))),
+          ]),
         ),
         locale: const Locale('vi'),
         localizationsDelegates: const [
