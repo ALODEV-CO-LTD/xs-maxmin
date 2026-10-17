@@ -19,6 +19,7 @@
        PATCH /me/entries/:id with only `{ result }`.
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import { effectiveConfig } from '../scoringConfig'
 import { entryDetail } from '../scoringSummary'
 import { loadAllEntries } from '../offline'
@@ -752,9 +753,9 @@ function clearLotteryForm() {
       <div class="lottery-head">
         <h3 style="margin: 0">Kết quả xổ số {{ stationLabelOf }}</h3>
         <div class="date-nav">
-          <button type="button" class="btn btn-ghost btn-sm" aria-label="Ngày trước" title="Ngày trước" @click="shiftDay(-1)">‹</button>
+          <AppButton variant="ghost" size="sm" aria-label="Ngày trước" title="Ngày trước" @click="shiftDay(-1)">‹</AppButton>
           <AppDatePicker v-model="lotteryDate" class="lottery-date" />
-          <button type="button" class="btn btn-ghost btn-sm" aria-label="Ngày sau" title="Ngày sau" @click="shiftDay(1)">›</button>
+          <AppButton variant="ghost" size="sm" aria-label="Ngày sau" title="Ngày sau" @click="shiftDay(1)">›</AppButton>
         </div>
       </div>
 
@@ -776,10 +777,10 @@ function clearLotteryForm() {
       <div class="ocr-box mc-box">
         <input v-if="region === 'mb'" ref="lrFileInput" type="file" accept="image/*" capture="environment" style="display: none" @change="onLrImageSelected" />
         <input v-else ref="mcFileInput" type="file" accept="image/*" style="display: none" @change="onMcImageSelected" />
-        <button type="button" class="btn btn-secondary btn-block" :disabled="ocrRunning" @click="region === 'mb' ? pickLrImage() : pickMcImage()">
-          <AppIcon v-if="!ocrRunning" name="camera" />
+        <AppButton variant="secondary" block :disabled="ocrRunning" @click="region === 'mb' ? pickLrImage() : pickMcImage()">
+<AppIcon v-if="!ocrRunning" name="camera" />
           {{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Đọc kết quả từ ảnh' }}
-        </button>
+</AppButton>
         <button type="button" class="btn btn-ghost btn-sm paste-btn" :disabled="ocrRunning" @click="pasteFromButton">Dán ảnh từ bộ nhớ tạm</button>
         <p class="ocr-hint">
           Chọn hoặc dán ảnh (Ctrl/Cmd+V) bảng kết quả{{ region === 'mb' ? '' : ' (mỗi đài một cột)' }}. Xử lý ngay trên trình duyệt; kết quả chỉ là gợi ý để bạn kiểm tra (đặc biệt số có số 0 ở đầu), chưa lưu cho tới khi bạn bấm lưu.
@@ -867,14 +868,12 @@ function clearLotteryForm() {
           </div>
 
           <div class="lottery-actions">
-            <button v-if="colSaved(curCol)" type="button" class="btn btn-danger btn-sm" :disabled="colDeleting(curCol)" @click="colDelete(curCol)">
-              {{ colDeleting(curCol) ? 'Đang xoá...' : 'Xoá kết quả này' }}
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="!colLocked(curCol)" @click="colEdit(curCol)">Sửa</button>
-            <button type="button" class="btn btn-ghost btn-sm" @click="clearLotteryForm">Xoá form</button>
-            <button type="button" class="btn btn-primary" :disabled="lotterySaving || !tableCols.length" @click="saveLottery">
-              {{ lotterySaving ? 'Đang lưu...' : 'Lưu kết quả' }}
-            </button>
+            <AppButton variant="danger" size="sm" v-if="colSaved(curCol)"  :disabled="colDeleting(curCol)" @click="colDelete(curCol)">
+{{ colDeleting(curCol) ? 'Đang xoá...' : 'Xoá kết quả này' }}
+</AppButton>
+            <AppButton variant="secondary" size="sm" :disabled="!colLocked(curCol)" @click="colEdit(curCol)">Sửa</AppButton>
+            <AppButton variant="ghost" size="sm" @click="clearLotteryForm">Xoá form</AppButton>
+            <AppButton variant="primary" :disabled="lotterySaving || !tableCols.length" @click="saveLottery">{{ lotterySaving ? 'Đang lưu...' : 'Lưu kết quả' }}</AppButton>
           </div>
         </template>
       </template>
@@ -896,9 +895,7 @@ function clearLotteryForm() {
 
       <div v-if="syncMsg" class="alert alert-success sync-msg">
         <span>{{ syncMsg }}</span>
-        <button v-if="undoSync" type="button" class="btn btn-secondary btn-sm" :disabled="undoing" @click="undoScores">
-          {{ undoing ? 'Đang hoàn tác...' : 'Hoàn tác' }}
-        </button>
+        <AppButton variant="secondary" size="sm" v-if="undoSync"  :disabled="undoing" @click="undoScores">{{ undoing ? 'Đang hoàn tác...' : 'Hoàn tác' }}</AppButton>
       </div>
       <div v-if="syncError" class="alert alert-error">{{ syncError }}</div>
 

@@ -5,6 +5,7 @@
        POST /admin/messages/:userId { content, attachment? } -> the created message
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useNotifyStore } from '../stores/notify'
 import { api, ApiError } from '../api'
@@ -164,7 +165,7 @@ onBeforeUnmount(() => clearInterval(timer))
       <form class="reply-row" @submit.prevent="send">
         <ChatAttachButtons :disabled="sending" @pick="(f) => { attachment = f; sendError = '' }" @error="(m) => (sendError = m)" />
         <input v-model="draft" type="text" placeholder="Nhập phản hồi..." :disabled="sending" aria-label="Nội dung phản hồi" />
-        <button class="btn btn-primary" type="submit" :disabled="sending || (!draft.trim() && !attachment)">Gửi</button>
+        <AppButton variant="primary" type="submit" :disabled="sending || (!draft.trim() && !attachment)">Gửi</AppButton>
       </form>
     </div>
   </div>

@@ -12,6 +12,7 @@
   A repeating schedule never carries dateFrom/dateTo (the server refuses it).
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { showConfirm } from '../confirm'
@@ -277,7 +278,7 @@ async function cancel(s) {
         <label for="sched-password">Mật khẩu đăng nhập</label>
         <PasswordInput id="sched-password" v-model="form.password" autocomplete="current-password" />
       </div>
-      <button type="submit" class="btn btn-danger" :disabled="saving">{{ saving ? 'Đang xử lý...' : 'Đặt lịch xoá' }}</button>
+      <AppButton variant="danger" type="submit" :disabled="saving">{{ saving ? 'Đang xử lý...' : 'Đặt lịch xoá' }}</AppButton>
     </form>
 
     <div v-if="loading" style="margin-top: 12px">Đang tải...</div>
@@ -298,7 +299,7 @@ async function cancel(s) {
               (lần cuối {{ fmt(s.lastRunAt) }})</template>
           </span>
         </div>
-        <button v-if="s.status === 'pending'" class="btn btn-ghost btn-sm" @click="cancel(s)">Huỷ lịch</button>
+        <AppButton variant="ghost" size="sm" v-if="s.status === 'pending'" @click="cancel(s)">Huỷ lịch</AppButton>
       </div>
     </div>
   </div>

@@ -10,6 +10,7 @@
   Emits:  close, add({ key, rate, digits, tiers })
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 
 const props = defineProps({
@@ -188,8 +189,8 @@ function onKey(e) {
 
         <p v-if="saveError" class="bt-error" role="alert">{{ saveError }}</p>
         <footer class="bt-actions">
-          <button type="button" class="btn btn-secondary" :disabled="busy" @click="emit('close')">Huỷ</button>
-          <button type="submit" class="btn btn-primary" :disabled="busy">{{ busy ? 'Đang lưu...' : saveError ? 'Thử lại' : 'Thêm loại đánh' }}</button>
+          <AppButton variant="ghost" :disabled="busy" @click="emit('close')">Huỷ</AppButton>
+          <AppButton variant="primary" type="submit" :disabled="busy">{{ busy ? 'Đang lưu...' : saveError ? 'Thử lại' : 'Thêm loại đánh' }}</AppButton>
         </footer>
       </form>
     </div>

@@ -14,6 +14,7 @@
   user confirms -> save; nothing is ever saved automatically).
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import { showConfirm } from '../confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -841,7 +842,7 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
     </div>
     <div v-if="notice" class="alert alert-success notice-row">
       <span>{{ notice }}</span>
-      <button type="button" class="btn btn-ghost btn-sm" @click="notice = ''">Đóng</button>
+      <AppButton variant="ghost" size="sm" @click="notice = ''">Đóng</AppButton>
     </div>
 
     <div class="entries-layout">
@@ -909,7 +910,7 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
                 <div class="ocr-text-wrap">
                   <span class="ocr-hint" style="margin: 0">{{ ocrRunning ? `Đang đọc ảnh... ${ocrProgress}%` : 'Văn bản đọc từ ảnh đã đưa vào ô trên.' }}</span>
                   <div>
-                    <button type="button" class="btn btn-ghost btn-sm" :disabled="ocrRunning" @click="clearOcr">Xoá ảnh</button>
+                    <AppButton variant="ghost" size="sm" :disabled="ocrRunning" @click="clearOcr">Xoá ảnh</AppButton>
                   </div>
                 </div>
               </div>
@@ -918,14 +919,12 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
               </ModalDialog>
 
               <div class="paste-actions">
-                <button type="button" class="btn btn-primary btn-sm" :disabled="!pasteText.trim() || ocrRunning" @click="analyzeMessage">Phân tích</button>
-                <button type="button" class="btn btn-secondary btn-sm" :disabled="ocrRunning" @click="pickImage">
-                  <AppIcon name="camera" /> {{ ocrRunning ? `Đang đọc ${ocrProgress}%` : 'Chọn ảnh' }}
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" :disabled="ocrRunning" title="Dán ảnh từ bộ nhớ tạm" @click="pasteImageFromButton">Dán ảnh</button>
-                <button type="button" class="btn btn-ghost btn-sm" @click="templateOpen = !templateOpen">
-                  Mẫu cú pháp của khách này {{ savedTemplate ? '(đã lưu)' : '(chưa lưu)' }}
-                </button>
+                <AppButton variant="primary" size="sm" :disabled="!pasteText.trim() || ocrRunning" @click="analyzeMessage">Phân tích</AppButton>
+                <AppButton variant="secondary" size="sm" icon="camera" :disabled="ocrRunning" @click="pickImage">{{ ocrRunning ? `Đang đọc ${ocrProgress}%` : 'Chọn ảnh' }}</AppButton>
+                <AppButton variant="ghost" size="sm" :disabled="ocrRunning" title="Dán ảnh từ bộ nhớ tạm" @click="pasteImageFromButton">Dán ảnh</AppButton>
+                <AppButton variant="ghost" size="sm" @click="templateOpen = !templateOpen">
+Mẫu cú pháp của khách này {{ savedTemplate ? '(đã lưu)' : '(chưa lưu)' }}
+</AppButton>
               </div>
 
               <div v-if="templateOpen" class="tpl-box">
@@ -950,8 +949,8 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
                   </div>
                 </div>
                 <div class="paste-actions">
-                  <button type="button" class="btn btn-secondary btn-sm" @click="saveTemplate">Lưu mẫu cho {{ form.customerName }}</button>
-                  <button v-if="savedTemplate" type="button" class="btn btn-ghost btn-sm" @click="deleteTemplate">Xoá mẫu</button>
+                  <AppButton variant="secondary" size="sm" @click="saveTemplate">Lưu mẫu cho {{ form.customerName }}</AppButton>
+                  <AppButton variant="ghost" size="sm" v-if="savedTemplate"  @click="deleteTemplate">Xoá mẫu</AppButton>
                 </div>
                 <p v-if="templateMsg" class="ocr-hint">{{ templateMsg }}</p>
               </div>
@@ -978,11 +977,11 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
                 </div>
                 <p v-if="previewIgnored.length" class="ocr-hint">Bỏ qua {{ previewIgnored.length }} dòng không có số: {{ previewIgnored.join(' / ') }}</p>
                 <div class="paste-actions">
-                  <button type="button" class="btn btn-primary btn-sm" :disabled="pasteSaving || !canAdd || !previewSelected.length" @click="savePreview">
-                    {{ pasteSaving ? 'Đang lưu...' : `Xác nhận và lưu ${previewSelected.length} dòng` }}
-                  </button>
-                  <button type="button" class="btn btn-secondary btn-sm" :disabled="!previewSelected.length" @click="previewToRows">Đưa vào bảng nhập tay để sửa</button>
-                  <button type="button" class="btn btn-ghost btn-sm" @click="clearPreview">Bỏ xem trước</button>
+                  <AppButton variant="primary" size="sm" :disabled="pasteSaving || !canAdd || !previewSelected.length" @click="savePreview">
+{{ pasteSaving ? 'Đang lưu...' : `Xác nhận và lưu ${previewSelected.length} dòng` }}
+</AppButton>
+                  <AppButton variant="secondary" size="sm" :disabled="!previewSelected.length" @click="previewToRows">Đưa vào bảng nhập tay để sửa</AppButton>
+                  <AppButton variant="ghost" size="sm" @click="clearPreview">Bỏ xem trước</AppButton>
                 </div>
               </div>
             </div>
@@ -1071,17 +1070,8 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
           <div v-if="deleteAllError" class="alert alert-error">{{ deleteAllError }}</div>
           <div class="form-actions">
             <div v-if="addedMsg" class="alert alert-success" role="status">{{ addedMsg }}</div>
-            <button type="submit" class="btn btn-primary" :disabled="submitting || !canAdd">
-              {{ submitting ? 'Đang thêm...' : 'Thêm số liệu' }}
-            </button>
-            <button
-              type="button"
-              class="btn btn-danger"
-              :disabled="deletingAll || visibleEntries.length === 0"
-              @click="deleteAllEntries"
-            >
-              {{ deletingAll ? 'Đang xoá...' : 'Xoá tất cả số liệu' }}
-            </button>
+            <AppButton variant="primary" type="submit" :disabled="submitting || !canAdd">{{ submitting ? 'Đang thêm...' : 'Thêm số liệu' }}</AppButton>
+            <AppButton variant="danger" :disabled="deletingAll || visibleEntries.length === 0" @click="deleteAllEntries">{{ deletingAll ? 'Đang xoá...' : 'Xoá tất cả số liệu' }}</AppButton>
           </div>
         </form>
 
@@ -1107,12 +1097,12 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
               <label class="filter-all">
                 <input v-model="filters.all" type="checkbox" /> Tất cả khách hàng
               </label>
-              <button v-if="hasFilter" type="button" class="btn btn-ghost btn-sm" @click="clearFilters">Xoá lọc</button>
+              <AppButton variant="ghost" size="sm" v-if="hasFilter"  @click="clearFilters">Xoá lọc</AppButton>
             </div>
             <div class="copy-bar">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="filteredEntries.length === 0 || mask.masked.value" :title="mask.masked.value ? 'Đang ẩn số liệu: bấm Hiện để sao chép' : undefined" @click="copyShown">
-                Sao chép {{ mask.masked.value ? '•••' : filteredEntries.length }} số liệu đang hiện
-              </button>
+              <AppButton variant="secondary" size="sm" :disabled="filteredEntries.length === 0 || mask.masked.value" :title="mask.masked.value ? 'Đang ẩn số liệu: bấm Hiện để sao chép' : undefined" @click="copyShown">
+Sao chép {{ mask.masked.value ? '•••' : filteredEntries.length }} số liệu đang hiện
+</AppButton>
               <label class="filter-all">
                 <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
               </label>
@@ -1151,12 +1141,10 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
                       <td data-label="Điểm ra" class="cell-points"><MaskedValue :text="fmtPoints(entry.result)" /></td>
                       <td data-label="Ghi chú" class="cell-note"><MaskedValue :text="entry.note || '-'" /></td>
                       <td class="col-btn">
-                        <button class="btn btn-secondary btn-sm" @click="startEdit(entry)">Sửa</button>
+                        <AppButton variant="secondary" size="sm" @click="startEdit(entry)">Sửa</AppButton>
                       </td>
                       <td class="col-btn">
-                        <button class="btn btn-danger btn-sm" :disabled="deletingId === entry.id" @click="deleteEntry(entry)">
-                          {{ deletingId === entry.id ? 'Đang xoá...' : 'Xoá' }}
-                        </button>
+                        <AppButton variant="danger" size="sm" :disabled="deletingId === entry.id" @click="deleteEntry(entry)">{{ deletingId === entry.id ? 'Đang xoá...' : 'Xoá' }}</AppButton>
                       </td>
                     </tr>
                     <tr v-if="deleteErrors[entry.id]" class="row-error">
@@ -1229,10 +1217,8 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
               </div>
 
               <div class="em-foot">
-                <button type="button" class="btn btn-secondary" :disabled="editSubmitting" @click="cancelEdit">Huỷ</button>
-                <button type="submit" class="btn btn-primary" :disabled="editSubmitting">
-                  {{ editSubmitting ? 'Đang lưu...' : 'Lưu thay đổi' }}
-                </button>
+                <AppButton variant="ghost" :disabled="editSubmitting" @click="cancelEdit">Huỷ</AppButton>
+                <AppButton variant="primary" type="submit" :disabled="editSubmitting">{{ editSubmitting ? 'Đang lưu...' : 'Lưu thay đổi' }}</AppButton>
               </div>
             </form>
           </div>

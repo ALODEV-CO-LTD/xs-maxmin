@@ -1,12 +1,15 @@
 <!-- Centred confirmation box driven by src/confirm.js. Mounted once in AppShell. -->
 <script setup>
 import { nextTick, ref, watch } from 'vue'
+import AppButton from './AppButton.vue'
 import { confirmState, resolveConfirm } from '../confirm'
 
 const box = ref(null)
 const cancelBtn = ref(null)
 const okBtn = ref(null)
 let lastFocus = null
+// ref tới component AppButton -> lấy phần tử <button> thật
+const elOf = (r) => r.value?.$el ?? r.value ?? null
 
 watch(
   () => confirmState.open,
@@ -15,7 +18,7 @@ watch(
       lastFocus = document.activeElement
       await nextTick()
       // destructive actions focus "Huỷ" first so a stray Enter can't confirm them
-      ;(confirmState.danger ? cancelBtn.value : okBtn.value)?.focus()
+      ;(confirmState.danger ? elOf(cancelBtn) : elOf(okBtn))?.focus()
     } else if (lastFocus && typeof lastFocus.focus === 'function') {
       lastFocus.focus()
       lastFocus = null
@@ -29,7 +32,7 @@ function onKey(e) {
     resolveConfirm(false)
   } else if (e.key === 'Tab') {
     // keep focus inside the dialog
-    const items = [cancelBtn.value, okBtn.value].filter(Boolean)
+    const items = [elOf(cancelBtn), elOf(okBtn)].filter(Boolean)
     const i = items.indexOf(document.activeElement)
     e.preventDefault()
     items[(i + (e.shiftKey ? -1 : 1) + items.length) % items.length]?.focus()
@@ -51,18 +54,16 @@ function onKey(e) {
         <h2 id="cd-title" class="cd-title">{{ confirmState.title }}</h2>
         <p id="cd-message" class="cd-message">{{ confirmState.message }}</p>
         <div class="cd-actions">
-          <button ref="cancelBtn" type="button" class="btn btn-secondary" @click="resolveConfirm(false)">
+          <AppButton ref="cancelBtn" variant="ghost" @click="resolveConfirm(false)">
             {{ confirmState.cancelText }}
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             ref="okBtn"
-            type="button"
-            class="btn"
-            :class="confirmState.danger ? 'btn-danger' : 'btn-primary'"
+            :variant="confirmState.danger ? 'danger' : 'primary'"
             @click="resolveConfirm(true)"
           >
             {{ confirmState.confirmText }}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

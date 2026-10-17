@@ -19,6 +19,7 @@
   shows up here too if someone looks.
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 import AppSelect from '../../components/AppSelect.vue'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -364,10 +365,10 @@ function onTabKey(e) {
         </fieldset>
 
         <div class="edit-actions">
-          <button v-if="!editBank" class="btn btn-secondary" type="button" @click="editBank = true">Sửa</button>
+          <AppButton variant="secondary" v-if="!editBank"  @click="editBank = true">Sửa</AppButton>
           <template v-else>
-            <button class="btn btn-ghost" type="button" :disabled="bankSaving" @click="cancelBank">Huỷ</button>
-            <button class="btn btn-primary" type="submit" :disabled="bankSaving">{{ bankSaving ? 'Đang lưu...' : 'Lưu cấu hình thanh toán' }}</button>
+            <AppButton variant="ghost" :disabled="bankSaving" @click="cancelBank">Huỷ</AppButton>
+            <AppButton variant="primary" type="submit" :disabled="bankSaving">{{ bankSaving ? 'Đang lưu...' : 'Lưu cấu hình thanh toán' }}</AppButton>
           </template>
         </div>
       </form>
@@ -386,10 +387,10 @@ function onTabKey(e) {
           </div>
         </fieldset>
         <div class="edit-actions">
-          <button v-if="!editMax" class="btn btn-secondary" type="button" @click="editMax = true">Sửa</button>
+          <AppButton variant="secondary" v-if="!editMax"  @click="editMax = true">Sửa</AppButton>
           <template v-else>
-            <button class="btn btn-ghost" type="button" :disabled="maxIdsSaving" @click="cancelMax">Huỷ</button>
-            <button class="btn btn-primary" type="submit" :disabled="maxIdsSaving">{{ maxIdsSaving ? 'Đang lưu...' : 'Lưu giới hạn' }}</button>
+            <AppButton variant="ghost" :disabled="maxIdsSaving" @click="cancelMax">Huỷ</AppButton>
+            <AppButton variant="primary" type="submit" :disabled="maxIdsSaving">{{ maxIdsSaving ? 'Đang lưu...' : 'Lưu giới hạn' }}</AppButton>
           </template>
         </div>
       </form>
@@ -402,7 +403,7 @@ function onTabKey(e) {
       <div v-if="pkgNotice" class="alert alert-success">{{ pkgNotice }}</div>
 
       <div class="pkg-bar">
-        <button v-if="pkgEditing !== 'new'" type="button" class="btn btn-primary btn-sm" @click="startNewPackage">+ Thêm gói</button>
+        <AppButton variant="primary" size="sm" v-if="pkgEditing !== 'new'"  @click="startNewPackage">+ Thêm gói</AppButton>
       </div>
 
       <form v-if="pkgEditing === 'new'" class="card pkg-form" @submit.prevent="savePackage">
@@ -412,8 +413,8 @@ function onTabKey(e) {
           <label>Giá (đ)<input v-model="pkgForm.priceVnd" type="number" min="0" required /></label>
         </div>
         <div class="pkg-actions">
-          <button type="submit" class="btn btn-primary btn-sm" :disabled="pkgBusy === 'new'">Thêm gói</button>
-          <button type="button" class="btn btn-ghost btn-sm" @click="cancelPackage">Huỷ</button>
+          <AppButton variant="primary" size="sm" type="submit" :disabled="pkgBusy === 'new'">Thêm gói</AppButton>
+          <AppButton variant="ghost" size="sm" @click="cancelPackage">Huỷ</AppButton>
         </div>
       </form>
 
@@ -427,8 +428,8 @@ function onTabKey(e) {
               <div class="pkg-meta">{{ formatDuration(p.durationDays) }} · {{ formatVnd(p.priceVnd) }} · {{ p.usage.users }} tài khoản đang dùng</div>
             </div>
             <div class="pkg-actions">
-              <button type="button" class="btn btn-primary btn-sm" :disabled="pkgBusy === p.type" @click="startEditPackage(p)">Sửa</button>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="pkgBusy === p.type" @click="togglePackage(p)">{{ p.active ? 'Ẩn' : 'Hiện lại' }}</button>
+              <AppButton variant="primary" size="sm" :disabled="pkgBusy === p.type" @click="startEditPackage(p)">Sửa</AppButton>
+              <AppButton variant="secondary" size="sm" :disabled="pkgBusy === p.type" @click="togglePackage(p)">{{ p.active ? 'Ẩn' : 'Hiện lại' }}</AppButton>
               <button type="button" class="btn btn-ghost btn-sm pkg-danger" :disabled="pkgBusy === p.type" @click="removePackage(p)">Xoá</button>
             </div>
           </div>
@@ -440,8 +441,8 @@ function onTabKey(e) {
             <label>Giá (đ)<input v-model="pkgForm.priceVnd" type="number" min="0" required /></label>
           </div>
           <div class="pkg-actions">
-            <button type="submit" class="btn btn-primary btn-sm" :disabled="pkgBusy === p.type">Lưu</button>
-            <button type="button" class="btn btn-ghost btn-sm" @click="cancelPackage">Huỷ</button>
+            <AppButton variant="primary" size="sm" type="submit" :disabled="pkgBusy === p.type">Lưu</AppButton>
+            <AppButton variant="ghost" size="sm" @click="cancelPackage">Huỷ</AppButton>
           </div>
         </form>
       </div>

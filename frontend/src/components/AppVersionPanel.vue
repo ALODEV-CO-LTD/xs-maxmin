@@ -5,6 +5,7 @@
   API: GET/PUT /admin/app-version  { latestVersion, minVersion, downloadUrl, notes }
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api, ApiError } from '../api'
 
@@ -116,10 +117,10 @@ async function save() {
         </div>
       </fieldset>
       <div class="edit-actions">
-        <button v-if="!editing" type="button" class="btn btn-secondary" @click="editing = true">Sửa</button>
+        <AppButton variant="secondary" v-if="!editing"  @click="editing = true">Sửa</AppButton>
         <template v-else>
-          <button type="button" class="btn btn-ghost" :disabled="saving" @click="cancel">Huỷ</button>
-          <button type="submit" class="btn btn-primary" :disabled="saving || !dirty">{{ saving ? 'Đang lưu...' : 'Lưu' }}</button>
+          <AppButton variant="ghost" :disabled="saving" @click="cancel">Huỷ</AppButton>
+          <AppButton variant="primary" type="submit" :disabled="saving || !dirty">{{ saving ? 'Đang lưu...' : 'Lưu' }}</AppButton>
         </template>
       </div>
     </form>

@@ -7,6 +7,7 @@
   POST /api/auth/step2 exactly like LoginView does.
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import { computed, nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, ApiError } from '../api'
@@ -269,7 +270,7 @@ async function submitStep2() {
         </p>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block">Tiếp tục</button>
+      <AppButton variant="primary" block type="submit">Tiếp tục</AppButton>
     </form>
 
     <form v-else-if="stage === 'security'" novalidate @submit.prevent="submitForm">
@@ -319,10 +320,8 @@ async function submitStep2() {
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản' }}
-      </button>
-      <button type="button" class="btn btn-ghost btn-block" :disabled="loading" @click="goToAccount">Quay lại</button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản' }}</AppButton>
+      <AppButton variant="ghost" block :disabled="loading" @click="goToAccount">Quay lại</AppButton>
     </form>
 
     <div v-else-if="stage === 'recovery_code'">
@@ -345,9 +344,7 @@ async function submitStep2() {
         />
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang xử lý...' : 'Hoàn tất đăng ký' }}
-      </button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang xử lý...' : 'Hoàn tất đăng ký' }}</AppButton>
     </form>
   </AuthLayout>
 </template>

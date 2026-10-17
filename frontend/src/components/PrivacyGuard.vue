@@ -5,6 +5,7 @@
   half-typed input is not lost. A web page cannot stop screenshots (K33).
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError } from '../api'
@@ -96,10 +97,8 @@ function logoutNow() {
           <label for="pl-password">Mật khẩu</label>
           <PasswordInput id="pl-password" v-model="password" autocomplete="current-password" :disabled="busy" />
         </div>
-        <button type="submit" class="btn btn-primary btn-block" :disabled="busy" :aria-busy="busy">
-          {{ busy ? 'Đang kiểm tra...' : 'Mở khoá' }}
-        </button>
-        <button type="button" class="btn btn-ghost btn-block" @click="logoutNow">Đăng xuất</button>
+        <AppButton variant="primary" block type="submit" :loading="busy">{{ busy ? 'Đang kiểm tra...' : 'Mở khoá' }}</AppButton>
+        <AppButton variant="ghost" block @click="logoutNow">Đăng xuất</AppButton>
       </form>
     </div>
     <div v-else-if="privacy.away" class="pl-veil" aria-hidden="true"></div>

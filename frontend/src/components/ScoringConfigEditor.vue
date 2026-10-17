@@ -405,7 +405,7 @@ const regions = REGION_IDS
             {{ REGION_NAMES[id] }}<span v-if="regionHasOverride(id)" class="sce-dot" title="Có cấu hình riêng cho miền này"></span>
           </button>
         </div>
-        <button v-if="!editing" type="button" class="btn btn-secondary btn-sm" @click="editing = true; notice = ''">Sửa</button>
+        <AppButton variant="secondary" size="sm" v-if="!editing"  @click="editing = true; notice = ''">Sửa</AppButton>
         <span v-else class="sce-muted">Đang sửa: thêm, sửa giá, xoá từng cách đánh rồi bấm Lưu</span>
       </div>
 
@@ -459,8 +459,8 @@ const regions = REGION_IDS
                   </div>
                   <p v-if="addForm.error" class="alert alert-error">{{ addForm.error }}</p>
                   <div class="sce-add-actions">
-                    <button type="button" class="btn btn-ghost btn-sm" @click="addForm.open = false">Huỷ</button>
-                    <button type="submit" class="btn btn-primary btn-sm">{{ addForm.pick === 'new' ? 'Thêm' : 'Khôi phục' }}</button>
+                    <AppButton variant="ghost" size="sm" @click="addForm.open = false">Huỷ</AppButton>
+                    <AppButton variant="primary" size="sm" type="submit">{{ addForm.pick === 'new' ? 'Thêm' : 'Khôi phục' }}</AppButton>
                   </div>
                 </form>
               </td>
@@ -494,7 +494,7 @@ const regions = REGION_IDS
               </td>
               <td class="c-act">
                 <template v-if="editing">
-                  <button v-if="hasOwn(r) && isCustomer" type="button" class="btn btn-ghost btn-sm" @click="resetRow(r)">Theo chung</button>
+                  <AppButton variant="ghost" size="sm" v-if="hasOwn(r) && isCustomer"  @click="resetRow(r)">Theo chung</AppButton>
                   <button v-if="r.extra || !isCustomer" type="button" class="btn btn-ghost btn-sm sce-del" @click="removeRow(r)">Xoá</button>
                 </template>
               </td>
@@ -521,7 +521,7 @@ const regions = REGION_IDS
                     <label v-if="fields(r).pick">Lô thứ (để trống = mọi lô của giải)
                       <input v-model="r.srcPick" type="text" placeholder="Ví dụ: 1, 2" />
                     </label>
-                    <button type="button" class="btn btn-ghost btn-sm" @click="resetSrc(r)">Về mặc định</button>
+                    <AppButton variant="ghost" size="sm" @click="resetSrc(r)">Về mặc định</AppButton>
                   </div>
                   <small class="sce-muted">Đang lấy: {{ describeSource(srcOf(r), region) }}</small>
                 </div>

@@ -6,6 +6,7 @@
   API: GET/POST /admin/staff, PATCH/DELETE /admin/staff/:id
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { api, ApiError } from '../../api'
 import { showConfirm } from '../../confirm'
@@ -132,7 +133,7 @@ const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
     <template v-else>
       <div class="bar">
         <h2 class="bar-title">Tài khoản thứ cấp <span class="count">{{ staff.length }}</span></h2>
-        <button type="button" class="btn btn-primary" @click="showForm = !showForm">{{ showForm ? 'Đóng' : '+ Tạo tài khoản' }}</button>
+        <AppButton variant="primary" @click="showForm = !showForm">{{ showForm ? 'Đóng' : '+ Tạo tài khoản' }}</AppButton>
       </div>
 
       <form v-if="showForm" class="card block" @submit.prevent="create">
@@ -145,7 +146,7 @@ const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
         <div class="presets">
           <span>Chọn nhanh:</span>
           <button v-for="p in PRESETS" :key="p.label" type="button" class="btn btn-secondary btn-sm" @click="applyPreset(form.permissions, p.keys)">{{ p.label }}</button>
-          <button type="button" class="btn btn-ghost btn-sm" @click="form.permissions.splice(0)">Bỏ chọn</button>
+          <AppButton variant="ghost" size="sm" @click="form.permissions.splice(0)">Bỏ chọn</AppButton>
         </div>
         <div class="perms">
           <label v-for="(label, key) in catalog" :key="key" class="perm">
@@ -153,7 +154,7 @@ const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
             <span>{{ label }}</span>
           </label>
         </div>
-        <button type="submit" class="btn btn-primary" :disabled="creating">{{ creating ? 'Đang tạo...' : 'Tạo tài khoản' }}</button>
+        <AppButton variant="primary" type="submit" :disabled="creating">{{ creating ? 'Đang tạo...' : 'Tạo tài khoản' }}</AppButton>
       </form>
 
       <div v-if="staff.length === 0 && !showForm" class="card">Chưa có tài khoản thứ cấp nào.</div>
@@ -165,8 +166,8 @@ const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
             <span v-if="s.locked" class="tag">Đang khoá</span>
           </div>
           <div class="head-actions">
-            <button v-if="editing !== s.id" type="button" class="btn btn-primary btn-sm" :disabled="busyId === s.id" @click="startEdit(s)">Sửa</button>
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="busyId === s.id" @click="toggleLock(s)">{{ s.locked ? 'Mở khoá' : 'Khoá' }}</button>
+            <AppButton variant="primary" size="sm" v-if="editing !== s.id"  :disabled="busyId === s.id" @click="startEdit(s)">Sửa</AppButton>
+            <AppButton variant="secondary" size="sm" :disabled="busyId === s.id" @click="toggleLock(s)">{{ s.locked ? 'Mở khoá' : 'Khoá' }}</AppButton>
             <button type="button" class="btn btn-ghost btn-sm danger" :disabled="busyId === s.id" @click="remove(s)">Xoá</button>
           </div>
         </div>
@@ -190,12 +191,12 @@ const same = (a, b) => a.length === b.length && a.every((k) => b.includes(k))
             </label>
           </div>
           <div class="row">
-            <button type="button" class="btn btn-primary btn-sm" :disabled="busyId === s.id || !edits[s.id].permissions.length || same(edits[s.id].permissions, s.permissions)" @click="savePermissions(s)">Lưu quyền</button>
-            <button type="button" class="btn btn-ghost btn-sm" :disabled="busyId === s.id" @click="cancelEdit(s)">Huỷ</button>
+            <AppButton variant="primary" size="sm" :disabled="busyId === s.id || !edits[s.id].permissions.length || same(edits[s.id].permissions, s.permissions)" @click="savePermissions(s)">Lưu quyền</AppButton>
+            <AppButton variant="ghost" size="sm" :disabled="busyId === s.id" @click="cancelEdit(s)">Huỷ</AppButton>
           </div>
           <div class="row pw-row">
             <input v-model="edits[s.id].newPassword" type="text" placeholder="Mật khẩu mới" autocomplete="off" />
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="busyId === s.id || !edits[s.id].newPassword" @click="resetPassword(s)">Đặt lại mật khẩu</button>
+            <AppButton variant="secondary" size="sm" :disabled="busyId === s.id || !edits[s.id].newPassword" @click="resetPassword(s)">Đặt lại mật khẩu</AppButton>
           </div>
         </template>
       </div>

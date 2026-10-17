@@ -4,6 +4,7 @@
   over useCallStore's state; all WebRTC/signaling logic lives there.
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import AppIcon from './AppIcon.vue'
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useCallStore } from '../stores/call'
@@ -149,7 +150,7 @@ watch(
         <div class="call-sub">{{ durationLabel }}</div>
         <div v-if="call.reconnecting" class="call-health warn">Mất kết nối mạng, đang kết nối lại…</div>
         <div v-if="call.health.text" class="call-health" :class="call.health.level">{{ call.health.text }}</div>
-        <button v-if="speakerBlocked" class="btn btn-primary btn-sm" @click="enableSpeaker"><AppIcon name="volume-2" /> Bấm để bật loa</button>
+        <AppButton variant="primary" size="sm" icon="volume-2" v-if="speakerBlocked" @click="enableSpeaker">Bấm để bật loa</AppButton>
 
         <div class="video-area">
           <audio ref="remoteAudioEl" autoplay></audio>

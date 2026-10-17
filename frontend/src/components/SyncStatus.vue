@@ -4,6 +4,7 @@
   was edited elsewhere while this device was offline (see src/offline.js).
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, ref } from 'vue'
 import { betTypeLabel } from '../betTypes'
 import { dismissFailure, flushQueue, resolveConflict, syncState } from '../offline'
@@ -70,7 +71,7 @@ async function choose(choice) {
     <div v-if="syncState.failures.length" class="sync-failures" role="alert">
       <div v-for="f in syncState.failures" :key="f.id" class="sync-failure">
         <span>{{ f.message }}</span>
-        <button type="button" class="btn btn-ghost btn-sm" @click="dismissFailure(f.id)">Đóng</button>
+        <AppButton variant="ghost" size="sm" @click="dismissFailure(f.id)">Đóng</AppButton>
       </div>
     </div>
 
@@ -94,8 +95,8 @@ async function choose(choice) {
           </tbody>
         </table>
         <div class="sync-actions">
-          <button type="button" class="btn btn-secondary" :disabled="resolving" @click="choose('server')">Dùng bản trên máy chủ</button>
-          <button type="button" class="btn btn-primary" :disabled="resolving" @click="choose('mine')">Giữ bản của tôi</button>
+          <AppButton variant="secondary" :disabled="resolving" @click="choose('server')">Dùng bản trên máy chủ</AppButton>
+          <AppButton variant="primary" :disabled="resolving" @click="choose('mine')">Giữ bản của tôi</AppButton>
         </div>
       </div>
     </div>

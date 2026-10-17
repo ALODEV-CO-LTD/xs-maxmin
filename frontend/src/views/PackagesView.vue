@@ -16,6 +16,7 @@
        POST /me/packages/purchase
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 // Shown as a tab of Tài khoản (AccountView) - `embedded` hides the page title there.
 defineProps({ embedded: { type: Boolean, default: false } })
 import { showConfirm } from '../confirm'
@@ -198,10 +199,8 @@ async function purchase(plan) {
           <strong class="ref-code">{{ pendingRequest.referenceCode }}</strong> để được duyệt nhanh.
         </div>
         <div class="pending-actions">
-          <button type="button" class="btn btn-secondary btn-sm" @click="copyReference(pendingRequest.referenceCode)">
-            {{ copied ? 'Đã sao chép' : 'Sao chép nội dung' }}
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" :disabled="cancelling" @click="cancelPending">Huỷ yêu cầu</button>
+          <AppButton variant="secondary" size="sm" @click="copyReference(pendingRequest.referenceCode)">{{ copied ? 'Đã sao chép' : 'Sao chép nội dung' }}</AppButton>
+          <AppButton variant="ghost" size="sm" :disabled="cancelling" @click="cancelPending">Huỷ yêu cầu</AppButton>
         </div>
       </div>
       <div v-if="purchaseError" class="alert alert-error">{{ purchaseError }}</div>
@@ -213,14 +212,7 @@ async function purchase(plan) {
           <div class="plan-label">{{ plan.label }}</div>
           <div class="plan-price">{{ formatVnd(plan.priceVnd) }}</div>
           <div class="plan-detail">{{ plan.durationDays }} ngày</div>
-          <button
-            class="btn btn-primary btn-block"
-            style="margin-top: 12px"
-            :disabled="!!pendingRequest || purchasing === plan.type"
-            @click="purchase(plan)"
-          >
-            {{ purchasing === plan.type ? 'Đang xử lý...' : 'Đăng ký' }}
-          </button>
+          <AppButton variant="primary" block style="margin-top: 12px" :disabled="!!pendingRequest || purchasing === plan.type" @click="purchase(plan)">{{ purchasing === plan.type ? 'Đang xử lý...' : 'Đăng ký' }}</AppButton>
         </div>
       </div>
 

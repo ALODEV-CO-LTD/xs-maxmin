@@ -9,6 +9,7 @@
   user is told of the decision at once (push) and every decision is written to the security log.
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 import { showConfirm } from '../../confirm'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '../../api'
@@ -164,7 +165,7 @@ onMounted(() => {
         <h1 class="page-title">Quản lý thanh toán</h1>
         <p class="page-subtitle" style="margin-bottom: 0">Duyệt chuyển khoản, theo dõi doanh thu và lịch sử thanh toán gói dịch vụ.</p>
       </div>
-      <button v-if="view === 'requests'" class="btn btn-secondary btn-sm" :disabled="loading" @click="exportCsv">Xuất CSV</button>
+      <AppButton variant="secondary" size="sm" v-if="view === 'requests'" :disabled="loading" @click="exportCsv">Xuất CSV</AppButton>
     </div>
 
     <div class="tabs view-tabs" role="tablist" aria-label="Thanh toán">
@@ -207,7 +208,7 @@ onMounted(() => {
       <input v-model="q" type="search" class="f-input f-q" placeholder="Tìm tên, tài khoản hoặc mã tham chiếu..." aria-label="Tìm kiếm" />
       <label class="f-date">Từ <input v-model="from" type="date" class="f-input" /></label>
       <label class="f-date">Đến <input v-model="to" type="date" class="f-input" /></label>
-      <button v-if="hasFilter" type="button" class="btn btn-ghost btn-sm" @click="clearFilters">Xoá lọc</button>
+      <AppButton variant="ghost" size="sm" v-if="hasFilter"  @click="clearFilters">Xoá lọc</AppButton>
     </div>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
@@ -249,8 +250,8 @@ onMounted(() => {
             </td>
             <td data-label="Thao tác">
               <div v-if="r.status === 'pending'" style="display: flex; gap: 6px">
-                <button class="btn btn-primary btn-sm" :disabled="actionBusy" @click="approve(r)">Duyệt</button>
-                <button class="btn btn-danger btn-sm" :disabled="actionBusy" @click="askReject(r)">Từ chối</button>
+                <AppButton variant="primary" size="sm" :disabled="actionBusy" @click="approve(r)">Duyệt</AppButton>
+                <AppButton variant="danger" size="sm" :disabled="actionBusy" @click="askReject(r)">Từ chối</AppButton>
               </div>
               <span v-else>-</span>
             </td>
@@ -260,9 +261,7 @@ onMounted(() => {
     </div>
     <div v-if="!loading && requests.length" class="more">
       <span>Hiển thị {{ requests.length }} / {{ total }}</span>
-      <button v-if="hasMore" class="btn btn-secondary btn-sm" :disabled="loadingMore" @click="load({ more: true })">
-        {{ loadingMore ? 'Đang tải...' : 'Xem thêm' }}
-      </button>
+      <AppButton variant="secondary" size="sm" v-if="hasMore" :disabled="loadingMore" @click="load({ more: true })">{{ loadingMore ? 'Đang tải...' : 'Xem thêm' }}</AppButton>
     </div>
 
     <ModalDialog
@@ -277,8 +276,8 @@ onMounted(() => {
       </div>
       <textarea id="reject-reason" v-model="rejectReason" class="f-input r-text" rows="3" maxlength="200" data-autofocus placeholder="Không bắt buộc"></textarea>
       <template #footer>
-        <button type="button" class="btn btn-secondary" @click="rejectFor = null">Huỷ</button>
-        <button type="button" class="btn btn-danger" :disabled="actionBusy" @click="confirmReject">Từ chối</button>
+        <AppButton variant="ghost" @click="rejectFor = null">Huỷ</AppButton>
+        <AppButton variant="danger" :disabled="actionBusy" @click="confirmReject">Từ chối</AppButton>
       </template>
     </ModalDialog>
     </template>

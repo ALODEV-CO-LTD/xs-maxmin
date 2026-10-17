@@ -11,6 +11,7 @@
                                      only then POST /api/auth/confirm-wipe
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import { onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api, ApiError } from '../api'
@@ -295,9 +296,7 @@ function backToCredentials() {
 
       <div class="auth-link-row"><button type="button" class="auth-link-button" @click="startRecover">Quên mật khẩu?</button></div>
 
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang xử lý...' : 'Đăng nhập' }}
-      </button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang xử lý...' : 'Đăng nhập' }}</AppButton>
 
     </form>
 
@@ -317,10 +316,8 @@ function backToCredentials() {
         />
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang xử lý...' : 'Xác nhận' }}
-      </button>
-      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Quay lại</button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang xử lý...' : 'Xác nhận' }}</AppButton>
+      <AppButton variant="ghost" block @click="backToCredentials">Quay lại</AppButton>
     </form>
 
     <form v-else-if="stage === 'recover'" @submit.prevent="submitRecover">
@@ -349,12 +346,10 @@ function backToCredentials() {
         <label for="rec-confirm">Nhập lại mật khẩu mới</label>
         <PasswordInput id="rec-confirm" v-model="recoverConfirm" autocomplete="new-password" :disabled="loading" />
       </div>
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}
-      </button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}</AppButton>
       <div class="auth-link-row"><button type="button" class="auth-link-button" @click="startHelp">Mất cả mã khôi phục? Nhờ Admin hỗ trợ</button></div>
       <div class="auth-link-row"><button type="button" class="auth-link-button" @click="startTicket">Tôi đã có mã hỗ trợ từ Admin</button></div>
-      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Quay lại đăng nhập</button>
+      <AppButton variant="ghost" block @click="backToCredentials">Quay lại đăng nhập</AppButton>
     </form>
 
     <form v-else-if="stage === 'help_request'" @submit.prevent="submitHelp">
@@ -375,16 +370,14 @@ function backToCredentials() {
           <input id="help-note" v-model="helpNote" type="text" maxlength="300" placeholder="Ví dụ: tên, số điện thoại liên hệ" :disabled="loading" />
         </div>
       </div>
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang gửi...' : 'Gửi yêu cầu' }}
-      </button>
-      <button type="button" class="btn btn-ghost btn-block" @click="stage = 'recover'">Quay lại</button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang gửi...' : 'Gửi yêu cầu' }}</AppButton>
+      <AppButton variant="ghost" block @click="stage = 'recover'">Quay lại</AppButton>
     </form>
 
     <div v-else-if="stage === 'help_sent'">
       <div class="alert alert-success">{{ helpMessage }}</div>
-      <button type="button" class="btn btn-primary btn-block" @click="startTicket">Tôi đã có mã hỗ trợ</button>
-      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Về trang đăng nhập</button>
+      <AppButton variant="primary" block @click="startTicket">Tôi đã có mã hỗ trợ</AppButton>
+      <AppButton variant="ghost" block @click="backToCredentials">Về trang đăng nhập</AppButton>
     </div>
 
     <form v-else-if="stage === 'ticket'" @submit.prevent="submitTicket">
@@ -410,10 +403,8 @@ function backToCredentials() {
         <label for="tk-confirm">Nhập lại mật khẩu mới</label>
         <PasswordInput id="tk-confirm" v-model="recoverConfirm" autocomplete="new-password" :disabled="loading" />
       </div>
-      <button type="submit" class="btn btn-primary btn-block" :disabled="loading" :aria-busy="loading">
-        {{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}
-      </button>
-      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Quay lại đăng nhập</button>
+      <AppButton variant="primary" block type="submit" :loading="loading">{{ loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu' }}</AppButton>
+      <AppButton variant="ghost" block @click="backToCredentials">Quay lại đăng nhập</AppButton>
     </form>
 
     <div v-else-if="stage === 'recover_code'">
@@ -435,15 +426,13 @@ function backToCredentials() {
         <span>Tôi hiểu rằng thao tác này sẽ xoá vĩnh viễn các dữ liệu nêu trên của tài khoản này.</span>
       </label>
 
-      <button type="button" class="btn btn-danger btn-block" :disabled="!wipeAck || loading" @click="confirmWipe">
-        {{ loading ? 'Đang xử lý...' : 'Xác nhận xoá dữ liệu' }}
-      </button>
-      <button type="button" class="btn btn-ghost btn-block" @click="backToCredentials">Huỷ, quay lại đăng nhập</button>
+      <AppButton variant="danger" block :disabled="!wipeAck || loading" @click="confirmWipe">{{ loading ? 'Đang xử lý...' : 'Xác nhận xoá dữ liệu' }}</AppButton>
+      <AppButton variant="ghost" block @click="backToCredentials">Huỷ, quay lại đăng nhập</AppButton>
     </div>
 
     <div v-else-if="stage === 'wipe_done'">
       <div class="alert alert-success">Dữ liệu của tài khoản đã được xoá. Bạn có thể đăng nhập lại bình thường.</div>
-      <button type="button" class="btn btn-primary btn-block" @click="backToCredentials">Về trang đăng nhập</button>
+      <AppButton variant="primary" block @click="backToCredentials">Về trang đăng nhập</AppButton>
     </div>
   </AuthLayout>
 </template>

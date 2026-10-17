@@ -343,8 +343,8 @@ async function savePhone() {
     <template v-else>
       <MaskBar class="mask-row" />
       <div class="config-row">
-        <button type="button" class="btn btn-primary btn-sm" @click="addOpen = true">+ Thêm khách hàng</button>
-        <button type="button" class="btn btn-secondary btn-sm" @click="defaultConfigOpen = true">Cấu hình tính điểm mặc định</button>
+        <AppButton variant="primary" size="sm" @click="addOpen = true">+ Thêm khách hàng</AppButton>
+        <AppButton variant="secondary" size="sm" @click="defaultConfigOpen = true">Cấu hình tính điểm mặc định</AppButton>
       </div>
       <div class="field search-field">
         <div class="input-wrap">
@@ -379,7 +379,7 @@ async function savePhone() {
                 <td data-label="Điểm đầu ra"><MaskedValue :text="formatNumber(c.ra)" /></td>
                 <td data-label="Lợi nhuận" :class="c.chenhLech >= 0 ? 'calc-in' : 'calc-out'"><MaskedValue :text="formatNumber(c.chenhLech)" /></td>
                 <td class="actions-cell">
-                  <button v-if="c.rosterId" type="button" class="btn btn-secondary btn-sm" @click.stop="openEdit(c)">Sửa</button>
+                  <AppButton variant="secondary" size="sm" v-if="c.rosterId"  @click.stop="openEdit(c)">Sửa</AppButton>
                   <button type="button" class="btn btn-secondary btn-sm btn-detail" @click.stop="toggle(c.name)">
                     Cấu hình tính điểm
                   </button>
@@ -440,7 +440,7 @@ async function savePhone() {
           Số điện thoại
           <input v-model="phoneDraft" type="tel" inputmode="tel" placeholder="Chưa có" :disabled="savingPhone" data-autofocus />
         </label>
-        <button type="submit" class="btn btn-primary" :disabled="savingPhone || phoneDraft.trim() === (editing?.phone || '')">{{ savingPhone ? 'Đang lưu...' : 'Lưu' }}</button>
+        <AppButton variant="primary" type="submit" :disabled="savingPhone || phoneDraft.trim() === (editing?.phone || '')">{{ savingPhone ? 'Đang lưu...' : 'Lưu' }}</AppButton>
       </form>
       <p v-if="phoneMsg" class="alert alert-error" role="alert" style="margin-top: 10px">{{ phoneMsg }}</p>
     </ModalDialog>

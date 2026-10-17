@@ -6,6 +6,7 @@
   API: GET /admin/recovery-requests, POST /admin/recovery-requests/:id {action}
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { onMounted, ref } from 'vue'
 import { api, ApiError } from '../api'
 import { showConfirm } from '../confirm'
@@ -79,12 +80,12 @@ async function copyTicket() {
     <div v-if="issued" class="alert alert-success rr-issued">
       <p>
         Mã hỗ trợ cho <strong>{{ issued.username }}</strong>: <strong class="rr-code">{{ issued.ticket }}</strong>
-        <button type="button" class="btn btn-ghost btn-sm" @click="copyTicket">{{ copied ? 'Đã chép' : 'Chép' }}</button>
+        <AppButton variant="ghost" size="sm" @click="copyTicket">{{ copied ? 'Đã chép' : 'Chép' }}</AppButton>
       </p>
       <p class="rr-hint">
         Hạn dùng đến {{ fmt(issued.expiresAt) }}, dùng một lần. Gửi cho khách qua kênh riêng ngay bây giờ vì mã không xem lại được. Khách vào Đăng nhập, Quên mật khẩu, "Tôi đã có mã hỗ trợ từ Admin".
       </p>
-      <button type="button" class="btn btn-secondary btn-sm" @click="issued = null">Đã gửi, ẩn mã</button>
+      <AppButton variant="secondary" size="sm" @click="issued = null">Đã gửi, ẩn mã</AppButton>
     </div>
 
     <p v-if="loading">Đang tải...</p>
@@ -103,9 +104,9 @@ async function copyTicket() {
           <div v-if="r.note" class="rr-note">Ghi chú của khách: {{ r.note }}</div>
         </div>
         <div class="rr-actions">
-          <button type="button" class="btn btn-primary btn-sm" :disabled="busyId === r.id" @click="act(r, 'approve')">
-            {{ r.status === 'pending' ? 'Duyệt, cấp mã' : 'Cấp lại mã' }}
-          </button>
+          <AppButton variant="primary" size="sm" :disabled="busyId === r.id" @click="act(r, 'approve')">
+{{ r.status === 'pending' ? 'Duyệt, cấp mã' : 'Cấp lại mã' }}
+</AppButton>
           <button type="button" class="btn btn-ghost btn-sm rr-reject" :disabled="busyId === r.id" @click="act(r, 'reject')">Từ chối</button>
         </div>
       </li>

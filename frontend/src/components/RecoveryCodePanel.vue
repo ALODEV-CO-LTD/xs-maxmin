@@ -5,6 +5,7 @@
   API: POST /me/recovery-code { currentPassword } -> { recoveryCode }
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { ref } from 'vue'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -63,9 +64,9 @@ function done() {
           <input id="rc-password" v-model="password" type="password" autocomplete="current-password" :disabled="busy" />
         </div>
       </div>
-      <button type="submit" class="btn btn-primary btn-sm" :disabled="busy">
-        {{ busy ? 'Đang tạo...' : auth.user?.hasRecoveryCode ? 'Đổi mã khôi phục' : 'Tạo mã khôi phục' }}
-      </button>
+      <AppButton variant="primary" size="sm" type="submit" :disabled="busy">
+{{ busy ? 'Đang tạo...' : auth.user?.hasRecoveryCode ? 'Đổi mã khôi phục' : 'Tạo mã khôi phục' }}
+</AppButton>
     </form>
   </div>
 </template>

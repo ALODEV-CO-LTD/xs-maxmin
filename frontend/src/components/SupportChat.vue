@@ -10,6 +10,7 @@
   notify.supportOpen lets other code (a message toast, the old /feedback link) open it.
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { api } from '../api'
 import { fileToPayload } from '../attachments'
@@ -188,7 +189,7 @@ onBeforeUnmount(() => {
         <form class="sp-form" @submit.prevent="send">
           <ChatAttachButtons :disabled="sending" @pick="(f) => { attachment = f; sendError = '' }" @error="(m) => (sendError = m)" />
           <input ref="input" v-model="draft" type="text" placeholder="Nhập tin nhắn..." maxlength="2000" aria-label="Nội dung tin nhắn" />
-          <button type="submit" class="btn btn-primary" :disabled="sending || (!draft.trim() && !attachment)">Gửi</button>
+          <AppButton variant="primary" type="submit" :disabled="sending || (!draft.trim() && !attachment)">Gửi</AppButton>
         </form>
       </footer>
     </section>

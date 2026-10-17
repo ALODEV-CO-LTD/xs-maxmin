@@ -9,6 +9,7 @@
        GET/POST /me/deletion-schedules (see DeletionSchedules.vue)
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import { showConfirm } from '../confirm'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
@@ -440,9 +441,7 @@ async function deleteAllData() {
       <div class="card profile-card">
         <div class="card-head">
           <h3 style="margin-top: 0">Thông tin cá nhân</h3>
-          <button v-if="!editingProfile" type="button" class="btn btn-secondary btn-sm" @click="startEditProfile">
-            Sửa
-          </button>
+          <AppButton variant="secondary" size="sm" v-if="!editingProfile"  @click="startEditProfile">Sửa</AppButton>
         </div>
         <div v-if="profileSuccess" class="alert alert-success">{{ profileSuccess }}</div>
         <form v-if="editingProfile" class="profile-form" @submit.prevent="saveProfile">
@@ -462,10 +461,8 @@ async function deleteAllData() {
             </div>
           </div>
           <div class="profile-actions">
-            <button type="submit" class="btn btn-primary btn-sm" :disabled="profileSaving">
-              {{ profileSaving ? 'Đang lưu...' : 'Lưu' }}
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="profileSaving" @click="cancelEditProfile">Huỷ</button>
+            <AppButton variant="primary" size="sm" type="submit" :disabled="profileSaving">{{ profileSaving ? 'Đang lưu...' : 'Lưu' }}</AppButton>
+            <AppButton variant="ghost" size="sm" :disabled="profileSaving" @click="cancelEditProfile">Huỷ</AppButton>
           </div>
         </form>
         <template v-else>
@@ -505,9 +502,9 @@ async function deleteAllData() {
           </span>
         </div>
         <div class="acct-actions" role="group" aria-label="Mật khẩu">
-          <button type="button" class="btn btn-secondary btn-sm" @click="secDialog = 'password'">Đổi mật khẩu</button>
-          <button type="button" class="btn btn-secondary btn-sm" @click="secDialog = 'second'">{{ user?.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai' }}</button>
-          <button type="button" class="btn btn-secondary btn-sm" @click="secDialog = 'wipe'">{{ user?.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu' }}</button>
+          <AppButton variant="secondary" size="sm" @click="secDialog = 'password'">Đổi mật khẩu</AppButton>
+          <AppButton variant="secondary" size="sm" @click="secDialog = 'second'">{{ user?.hasSecondPassword ? 'Đổi mật khẩu lớp hai' : 'Đặt mật khẩu lớp hai' }}</AppButton>
+          <AppButton variant="secondary" size="sm" @click="secDialog = 'wipe'">{{ user?.hasWipePassword ? 'Đổi mật khẩu xoá dữ liệu' : 'Đặt mật khẩu xoá dữ liệu' }}</AppButton>
         </div>
         <button type="button" class="btn btn-secondary logout-btn" @click="logoutNow">
           <AppIcon name="log-out" /> Đăng xuất
@@ -526,9 +523,7 @@ async function deleteAllData() {
         <form class="code-form" @submit.prevent="generateCode">
           <input v-model="newCode" type="text" inputmode="numeric" maxlength="12" placeholder="Dãy số (tuỳ chọn)" aria-label="Dãy số mong muốn" />
           <input v-model="newLabel" type="text" maxlength="40" placeholder="Nhãn (tuỳ chọn)" aria-label="Nhãn" />
-          <button type="submit" class="btn btn-secondary" :disabled="generatingCode || atCodeLimit">
-            {{ generatingCode ? 'Đang tạo...' : '+ Tạo mã mới' }}
-          </button>
+          <AppButton variant="secondary" type="submit" :disabled="generatingCode || atCodeLimit">{{ generatingCode ? 'Đang tạo...' : '+ Tạo mã mới' }}</AppButton>
         </form>
         <div v-if="atCodeLimit" class="page-subtitle" style="margin: 8px 0 0">Đã đạt giới hạn, hãy xoá bớt một mã để tạo mã mới.</div>
         <div v-if="codesLoading" style="margin-top: 12px">Đang tải...</div>
@@ -542,14 +537,14 @@ async function deleteAllData() {
               <span v-if="c.label" class="code-label">{{ c.label }}</span>
             </div>
             <div class="code-actions">
-              <button class="btn btn-ghost btn-sm" @click="editLabel(c)">Nhãn</button>
-              <button class="btn btn-ghost btn-sm" @click="copyCode(c.code)">Sao chép</button>
-              <button class="btn btn-ghost btn-sm" @click="deleteCode(c)">Xoá</button>
+              <AppButton variant="ghost" size="sm" @click="editLabel(c)">Nhãn</AppButton>
+              <AppButton variant="ghost" size="sm" @click="copyCode(c.code)">Sao chép</AppButton>
+              <AppButton variant="ghost" size="sm" @click="deleteCode(c)">Xoá</AppButton>
             </div>
             <form v-if="editingLabelId === c.id" class="label-edit" @submit.prevent="saveLabel(c)" @keydown.esc="cancelLabel">
               <input v-model="labelDraft" v-focus type="text" maxlength="40" placeholder="Nhãn (để trống để xoá)" aria-label="Nhãn cho mã ID này" />
-              <button type="submit" class="btn btn-primary btn-sm">Lưu</button>
-              <button type="button" class="btn btn-secondary btn-sm" @click="cancelLabel">Huỷ</button>
+              <AppButton variant="primary" size="sm" type="submit">Lưu</AppButton>
+              <AppButton variant="ghost" size="sm" @click="cancelLabel">Huỷ</AppButton>
             </form>
           </div>
         </div>
@@ -563,14 +558,7 @@ async function deleteAllData() {
       <div class="card" style="margin-bottom: 16px">
         <div class="card-head">
           <h3 style="margin-top: 0">Thiết bị đang đăng nhập</h3>
-          <button
-            v-if="sessions.length > 1"
-            type="button"
-            class="btn btn-secondary btn-sm"
-            @click="revokeOtherSessions"
-          >
-            Đăng xuất thiết bị khác
-          </button>
+          <AppButton variant="secondary" size="sm" v-if="sessions.length > 1"  @click="revokeOtherSessions">Đăng xuất thiết bị khác</AppButton>
         </div>
         <div v-if="sessionsError" class="alert alert-error">{{ sessionsError }}</div>
         <div v-if="sessionsLoading">Đang tải...</div>
@@ -587,7 +575,7 @@ async function deleteAllData() {
               </div>
             </div>
             <div v-if="!s.current" class="code-actions">
-              <button class="btn btn-ghost btn-sm" @click="revokeSession(s)">Đăng xuất</button>
+              <AppButton variant="ghost" size="sm" @click="revokeSession(s)">Đăng xuất</AppButton>
             </div>
           </div>
         </div>
@@ -620,9 +608,7 @@ async function deleteAllData() {
         </p>
         <div v-if="deleteError" class="alert alert-error">{{ deleteError }}</div>
         <div v-if="deleteSuccess" class="alert alert-success">{{ deleteSuccess }}</div>
-        <button class="btn btn-danger" @click="deleteAllData" :disabled="deleting">
-          {{ deleting ? 'Đang xoá...' : 'Xoá toàn bộ dữ liệu' }}
-        </button>
+        <AppButton variant="danger" @click="deleteAllData" :disabled="deleting">{{ deleting ? 'Đang xoá...' : 'Xoá toàn bộ dữ liệu' }}</AppButton>
       </div>
       </div>
     </template>

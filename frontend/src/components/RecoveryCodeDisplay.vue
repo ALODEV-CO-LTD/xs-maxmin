@@ -5,6 +5,7 @@
   The code is only held in the parent's memory - never stored client-side.
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { ref } from 'vue'
 
 defineProps({
@@ -34,16 +35,12 @@ async function copy(code) {
       quên - vì vậy đừng chia sẻ cho người khác.
     </div>
     <div class="rc-code" aria-label="Mã khôi phục">{{ code }}</div>
-    <button type="button" class="btn btn-secondary btn-block" @click="copy(code)">
-      {{ copied ? 'Đã sao chép' : 'Sao chép mã' }}
-    </button>
+    <AppButton variant="secondary" block @click="copy(code)">{{ copied ? 'Đã sao chép' : 'Sao chép mã' }}</AppButton>
     <label class="rc-ack">
       <input v-model="saved" type="checkbox" />
       <span>Tôi đã lưu mã khôi phục ở nơi an toàn.</span>
     </label>
-    <button type="button" class="btn btn-primary btn-block" :disabled="!saved" @click="emit('confirmed')">
-      {{ continueText }}
-    </button>
+    <AppButton variant="primary" block :disabled="!saved" @click="emit('confirmed')">{{ continueText }}</AppButton>
   </div>
 </template>
 

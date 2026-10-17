@@ -9,6 +9,7 @@
   Exposes cancel().
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, ref, watch } from 'vue'
 import { useChatStore } from '../e2ee/chat'
 import AppSelect from './AppSelect.vue'
@@ -85,7 +86,7 @@ defineExpose({ cancel })
           <option value="all">Tin nhắn và tệp đính kèm</option>
           <option value="images">Chỉ ảnh</option>
         </AppSelect>
-        <button type="submit" class="btn btn-danger btn-sm" :disabled="busy">{{ busy ? '...' : 'Áp dụng' }}</button>
+        <AppButton variant="danger" size="sm" type="submit" :disabled="busy">{{ busy ? '...' : 'Áp dụng' }}</AppButton>
       </div>
     </form>
   </div>

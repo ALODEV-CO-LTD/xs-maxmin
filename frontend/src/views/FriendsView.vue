@@ -15,6 +15,7 @@
   the actual call UI is CallOverlay.vue, mounted globally in AppShell.vue.
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import { showConfirm } from '../confirm'
 import { fold } from '../messageParser'
 import { kindSymbolsFor, typesOf } from '../scoringConfig'
@@ -682,9 +683,7 @@ async function acceptKey() {
       <div v-if="myCode" class="my-id-corner">
         <span class="my-id-label">ID của bạn</span>
         <span class="my-id-code">{{ myCode }}</span>
-        <button type="button" class="btn btn-secondary btn-sm" @click="copyMyCode">
-          {{ codeCopied ? 'Đã chép' : 'Sao chép' }}
-        </button>
+        <AppButton variant="secondary" size="sm" @click="copyMyCode">{{ codeCopied ? 'Đã chép' : 'Sao chép' }}</AppButton>
       </div>
       <div v-else-if="noMyCode" class="my-id-corner">
         <span class="my-id-label">Chưa có ID. <router-link to="/account">Tạo ID trong Tài khoản.</router-link></span>
@@ -711,9 +710,7 @@ async function acceptKey() {
                 <strong>{{ r.name }} <span v-if="r.isAdmin" class="chip chip-brand" style="font-size: 14px; padding: 1px 6px">Admin</span></strong>
                 <span class="friend-last">@{{ r.username }}</span>
               </div>
-              <button class="btn btn-secondary btn-sm" :disabled="addingId === r.id" @click="addFromSearch(r)">
-                {{ addingId === r.id ? '...' : 'Kết bạn' }}
-              </button>
+              <AppButton variant="secondary" size="sm" :disabled="addingId === r.id" @click="addFromSearch(r)">{{ addingId === r.id ? '...' : 'Kết bạn' }}</AppButton>
             </div>
           </div>
         </div>
@@ -813,19 +810,12 @@ async function acceptKey() {
             </button>
             <button type="button" class="btn btn-ghost btn-sm gear" aria-label="Cài đặt cuộc trò chuyện" title="Cài đặt cuộc trò chuyện" @click="openSettings"><AppIcon name="settings" /></button>
             <div v-if="canCall" class="call-buttons">
-              <button
-                class="btn btn-ghost btn-sm"
-                title="Gọi thoại"
-                :disabled="call.status !== 'idle' || call.acquiring"
-                @click="selectedFriend && call.startCall(selectedFriend)"
-              >
-                <AppIcon name="phone" />
-              </button>
+              <AppButton variant="ghost" size="sm" icon="phone" title="Gọi thoại" :disabled="call.status !== 'idle' || call.acquiring" @click="selectedFriend && call.startCall(selectedFriend)"></AppButton>
             </div>
           </div>
           <div v-if="peerInfo?.changed" class="alert alert-warning e2ee-warn" role="alert">
             Khoá bảo mật của {{ selectedFriend?.name }} đã thay đổi (họ đổi máy hoặc xoá dữ liệu trình duyệt). Hãy xác minh mã bảo mật mới với họ qua kênh khác rồi bấm Đã hiểu.
-            <button type="button" class="btn btn-secondary btn-sm" @click="acceptKey">Đã hiểu</button>
+            <AppButton variant="secondary" size="sm" @click="acceptKey">Đã hiểu</AppButton>
           </div>
           <div v-if="selectedFriend && !chat.friendKeys[selectedFriend.id]" class="alert alert-warning e2ee-warn">
             {{ selectedFriend.name }} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.
@@ -895,7 +885,7 @@ async function acceptKey() {
                   </div>
                   <div v-if="item.m.mine && item.m.status === 'failed'" class="msg-state msg-failed">
                     {{ chat.reasonText(item.m.reason) }}
-                    <button type="button" class="btn btn-ghost btn-sm" @click="retryMessage(item.m)">Gửi lại</button>
+                    <AppButton variant="ghost" size="sm" @click="retryMessage(item.m)">Gửi lại</AppButton>
                   </div>
                   <div v-else-if="item.m.mine && item.m.status !== 'delivered'" class="msg-state">
                     {{ item.m.status === 'sending' ? 'Đang gửi...' : 'Đã gửi, chờ xác nhận...' }}
@@ -904,12 +894,7 @@ async function acceptKey() {
                 <div v-else class="call-line" :class="{ missed: isMissedCall(item.c) || item.c.status === 'failed' }">
                   <AppIcon name="phone" />
                   <span>{{ callLine(item.c) }}</span>
-                  <button
-                    v-if="canCall && (isMissedCall(item.c) || item.c.status === 'rejected' || item.c.status === 'failed')"
-                    class="btn btn-ghost btn-sm"
-                    :disabled="call.status !== 'idle' || call.acquiring"
-                    @click="selectedFriend && call.startCall(selectedFriend)"
-                  >Gọi lại</button>
+                  <AppButton variant="ghost" size="sm" v-if="canCall && (isMissedCall(item.c) || item.c.status === 'rejected' || item.c.status === 'failed')" :disabled="call.status !== 'idle' || call.acquiring" @click="selectedFriend && call.startCall(selectedFriend)">Gọi lại</AppButton>
                 </div>
               </template>
             </div>
@@ -932,7 +917,7 @@ async function acceptKey() {
           <form class="send-row" @submit.prevent="sendMessage">
             <ChatAttachButtons icon="paperclip" :disabled="sending" @pick="(f) => { attachment = f; messagesError = '' }" @error="(m) => (messagesError = m)" />
             <input ref="msgInput" v-model="newMessage" type="text" placeholder="Nhập tin nhắn..." :inputmode="kbOpen ? 'none' : 'text'" autocomplete="off" />
-            <button type="submit" class="btn btn-primary" :disabled="sending || (!newMessage.trim() && !attachment)">Gửi</button>
+            <AppButton variant="primary" type="submit" :disabled="sending || (!newMessage.trim() && !attachment)">Gửi</AppButton>
           </form>
           <ChatKeyboard v-if="kbOpen" v-model="newMessage" :can-send="!sending && (!!newMessage.trim() || !!attachment)" @enter="sendMessage" />
         </template>
@@ -1021,8 +1006,8 @@ async function acceptKey() {
         </ul>
         <p class="search-sub">Nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.</p>
         <div class="group-actions">
-          <button type="button" class="btn btn-ghost btn-sm" @click="groupOpen = false">Đóng</button>
-          <button type="button" class="btn btn-primary btn-sm" disabled>Tạo nhóm</button>
+          <AppButton variant="ghost" size="sm" @click="groupOpen = false">Đóng</AppButton>
+          <AppButton variant="primary" size="sm" disabled>Tạo nhóm</AppButton>
         </div>
       </div>
     </div>

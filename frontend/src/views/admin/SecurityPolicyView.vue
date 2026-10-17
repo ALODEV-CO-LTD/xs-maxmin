@@ -6,6 +6,7 @@
   API: GET/PUT/DELETE /admin/security-policy
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 defineProps({ embedded: { type: Boolean, default: false } }) // true inside Cài đặt (no page title)
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api, ApiError } from '../../api'
@@ -141,11 +142,11 @@ async function reset() {
       </fieldset>
 
       <div class="actions">
-        <button v-if="!editing" type="button" class="btn btn-secondary" @click="editing = true">Sửa</button>
+        <AppButton variant="secondary" v-if="!editing"  @click="editing = true">Sửa</AppButton>
         <template v-else>
-          <button type="button" class="btn btn-ghost" :disabled="saving" @click="reset">Đặt lại mặc định</button>
-          <button type="button" class="btn btn-ghost" :disabled="saving" @click="cancel">Huỷ</button>
-          <button type="submit" class="btn btn-primary" :disabled="saving || !dirty">{{ saving ? 'Đang lưu...' : 'Lưu chính sách' }}</button>
+          <AppButton variant="ghost" :disabled="saving" @click="reset">Đặt lại mặc định</AppButton>
+          <AppButton variant="ghost" :disabled="saving" @click="cancel">Huỷ</AppButton>
+          <AppButton variant="primary" type="submit" :disabled="saving || !dirty">{{ saving ? 'Đang lưu...' : 'Lưu chính sách' }}</AppButton>
         </template>
       </div>
     </form>

@@ -30,6 +30,7 @@
        /me/deletion-schedules (inside DeletionSchedules.vue).
 -->
 <script setup>
+import AppButton from '../components/AppButton.vue'
 import AppSelect from '../components/AppSelect.vue'
 import ScoringSummary from '../components/ScoringSummary.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -444,8 +445,8 @@ onMounted(async () => {
     <div class="toolbar card">
       <MaskBar />
       <div class="toolbar-actions">
-        <button type="button" class="btn btn-secondary btn-sm" @click="openDelete('')">Xóa số liệu</button>
-        <button type="button" class="btn btn-secondary btn-sm" @click="scheduleOpen = true">Đặt lịch xóa</button>
+        <AppButton variant="secondary" size="sm" @click="openDelete('')">Xóa số liệu</AppButton>
+        <AppButton variant="secondary" size="sm" @click="scheduleOpen = true">Đặt lịch xóa</AppButton>
       </div>
     </div>
 
@@ -498,14 +499,7 @@ onMounted(async () => {
           <input type="checkbox" v-model="onlyMissing" />
           Chỉ hiện số liệu chưa có kết quả xổ số
         </label>
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          :disabled="autoCalcRunning > 0 || !selectedCustomer"
-          @click="recalc"
-        >
-          {{ autoCalcRunning > 0 ? 'Đang tính...' : '↻ Tính lại' }}
-        </button>
+        <AppButton variant="secondary" size="sm" :disabled="autoCalcRunning > 0 || !selectedCustomer" @click="recalc">{{ autoCalcRunning > 0 ? 'Đang tính...' : '↻ Tính lại' }}</AppButton>
       </div>
 
       <ScoringSummary
@@ -663,7 +657,7 @@ onMounted(async () => {
     <ModalDialog :open="scheduleOpen" title="Đặt lịch xóa" description="Hệ thống tự xóa số liệu theo lịch, một lần hoặc lặp lại. Dữ liệu đã xóa không thể khôi phục." wide @close="scheduleOpen = false">
       <DeletionSchedules embedded :customer-name="selectedCustomer" />
       <template #footer>
-        <button type="button" class="btn btn-secondary" @click="scheduleOpen = false">Đóng</button>
+        <AppButton variant="secondary" @click="scheduleOpen = false">Đóng</AppButton>
       </template>
     </ModalDialog>
   </div>

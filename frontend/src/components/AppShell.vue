@@ -8,6 +8,7 @@
   route `name`/`path` values already match what's in src/router/index.js.
 -->
 <script setup>
+import AppButton from './AppButton.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -185,7 +186,7 @@ async function logout() {
             auth.isAdmin ? 'Admin' : 'Khách hàng'
           }}</span>
         </span>
-        <button class="btn btn-ghost btn-sm" @click="logout">Đăng xuất</button>
+        <AppButton variant="ghost" size="sm" @click="logout">Đăng xuất</AppButton>
       </div>
     </header>
 

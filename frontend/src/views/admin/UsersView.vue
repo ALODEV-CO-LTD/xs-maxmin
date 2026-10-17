@@ -6,6 +6,7 @@
        DELETE /admin/users/:id  (permanently removes account + their data)
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 import { showConfirm } from '../../confirm'
 import { ref, onMounted, watch } from 'vue'
 import { api, ApiError } from '../../api'
@@ -322,13 +323,7 @@ onMounted(loadList)
           <div v-if="auth.can('users.lock')" class="info-card">
             <p class="info-row">
               <strong>Thiết bị đang đăng nhập ({{ userSessions.length }})</strong>
-              <button
-                v-if="userSessions.length > 0"
-                class="btn btn-secondary btn-sm"
-                @click="revokeUserSession(null)"
-              >
-                Thu hồi tất cả
-              </button>
+              <AppButton variant="secondary" size="sm" v-if="userSessions.length > 0" @click="revokeUserSession(null)">Thu hồi tất cả</AppButton>
             </p>
             <div v-if="sessionsError" class="alert alert-error">{{ sessionsError }}</div>
             <p v-for="s in userSessions" :key="s.id" class="info-row">
@@ -336,7 +331,7 @@ onMounted(loadList)
                 {{ s.deviceLabel }} · IP {{ s.ip || '-' }}<br />
                 <small>Gần nhất: {{ s.lastSeen ? new Date(s.lastSeen).toLocaleString('vi-VN') : '-' }}</small>
               </span>
-              <button class="btn btn-secondary btn-sm" @click="revokeUserSession(s.id)">Thu hồi</button>
+              <AppButton variant="secondary" size="sm" @click="revokeUserSession(s.id)">Thu hồi</AppButton>
             </p>
           </div>
 
@@ -345,15 +340,11 @@ onMounted(loadList)
           <div v-if="lastSetPassword || lastRecoveryCode" class="alert alert-success recovery-result">
             <p v-if="lastSetPassword">
               Mật khẩu mới: <strong>{{ lastSetPassword }}</strong>
-              <button type="button" class="btn btn-ghost btn-sm" @click="copyText(lastSetPassword, 'pw')">
-                {{ copied === 'pw' ? 'Đã chép' : 'Chép' }}
-              </button>
+              <AppButton variant="ghost" size="sm" @click="copyText(lastSetPassword, 'pw')">{{ copied === 'pw' ? 'Đã chép' : 'Chép' }}</AppButton>
             </p>
             <p v-if="lastRecoveryCode">
               Mã khôi phục mới: <strong>{{ lastRecoveryCode }}</strong>
-              <button type="button" class="btn btn-ghost btn-sm" @click="copyText(lastRecoveryCode, 'rc')">
-                {{ copied === 'rc' ? 'Đã chép' : 'Chép' }}
-              </button>
+              <AppButton variant="ghost" size="sm" @click="copyText(lastRecoveryCode, 'rc')">{{ copied === 'rc' ? 'Đã chép' : 'Chép' }}</AppButton>
             </p>
             <p class="recovery-hint">
               Gửi cho khách hàng qua kênh riêng ngay bây giờ: hai giá trị này không xem lại được. Mọi thiết bị của
@@ -367,47 +358,25 @@ onMounted(loadList)
             <label class="reset-label" for="new-password">Mật khẩu mới cho tài khoản này</label>
             <div class="reset-row">
               <input id="new-password" v-model="newPassword" type="text" placeholder="Mật khẩu mới" autocomplete="off" />
-              <button class="btn btn-secondary btn-sm" :disabled="actionBusy" type="button" @click="generatePassword">
-                Tạo ngẫu nhiên
-              </button>
-              <button class="btn btn-primary btn-sm" :disabled="actionBusy || !newPassword.trim()" @click="resetPassword">
-                Lưu
-              </button>
-              <button class="btn btn-secondary btn-sm" :disabled="actionBusy" @click="showResetPassword = false; newPassword = ''">
-                Huỷ
-              </button>
+              <AppButton variant="secondary" size="sm" :disabled="actionBusy"  @click="generatePassword">Tạo ngẫu nhiên</AppButton>
+              <AppButton variant="primary" size="sm" :disabled="actionBusy || !newPassword.trim()" @click="resetPassword">Lưu</AppButton>
+              <AppButton variant="ghost" size="sm" :disabled="actionBusy" @click="showResetPassword = false; newPassword = ''">Huỷ</AppButton>
             </div>
           </div>
 
           <div class="modal-actions">
             <div class="actions-main">
-            <button
-              v-if="auth.can('users.lock')"
-              class="btn btn-secondary"
-              :disabled="actionBusy"
-              @click="toggleLock"
-            >
-              {{ selected.accountLocked ? 'Mở khoá tài khoản' : 'Khoá tài khoản' }}
-            </button>
+            <AppButton variant="secondary" v-if="auth.can('users.lock')" :disabled="actionBusy" @click="toggleLock">
+{{ selected.accountLocked ? 'Mở khoá tài khoản' : 'Khoá tài khoản' }}
+</AppButton>
 
-            <button
-              v-if="!showResetPassword && auth.can('users.recovery')"
-              class="btn btn-secondary"
-              :disabled="actionBusy"
-              @click="showResetPassword = true; lastSetPassword = ''"
-            >
-              Đặt lại mật khẩu
-            </button>
-            <button v-if="auth.can('users.recovery')" class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('code')">
-              Cấp lại mã khôi phục
-            </button>
-            <button v-if="auth.can('users.recovery')" class="btn btn-secondary" :disabled="actionBusy" @click="supportAction('unlock')">
-              Gỡ khoá đăng nhập
-            </button>
+            <AppButton variant="secondary" v-if="!showResetPassword && auth.can('users.recovery')" :disabled="actionBusy" @click="showResetPassword = true; lastSetPassword = ''">Đặt lại mật khẩu</AppButton>
+            <AppButton variant="secondary" v-if="auth.can('users.recovery')" :disabled="actionBusy" @click="supportAction('code')">Cấp lại mã khôi phục</AppButton>
+            <AppButton variant="secondary" v-if="auth.can('users.recovery')" :disabled="actionBusy" @click="supportAction('unlock')">Gỡ khoá đăng nhập</AppButton>
             </div>
 
             <div v-if="auth.can('users.delete')" class="actions-danger">
-            <button class="btn btn-danger" :disabled="actionBusy" @click="deleteUser">Xoá tài khoản</button>
+            <AppButton variant="danger" :disabled="actionBusy" @click="deleteUser">Xoá tài khoản</AppButton>
             </div>
           </div>
         </div>

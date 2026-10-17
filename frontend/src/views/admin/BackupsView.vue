@@ -6,6 +6,7 @@
   Backup files never go into git (backend/data/ is ignored).
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 defineProps({ embedded: { type: Boolean, default: false } }) // true inside Cài đặt (no page title)
 import { onMounted, ref } from 'vue'
 import { api, ApiError } from '../../api'
@@ -81,9 +82,7 @@ onMounted(load)
     <div v-if="message" class="alert alert-success">{{ message }}</div>
 
     <div class="card">
-      <button type="button" class="btn btn-primary" :disabled="creating" @click="create">
-        {{ creating ? 'Đang tạo...' : 'Tạo bản sao lưu mới' }}
-      </button>
+      <AppButton variant="primary" :disabled="creating" @click="create">{{ creating ? 'Đang tạo...' : 'Tạo bản sao lưu mới' }}</AppButton>
 
       <div v-if="loading" class="gap">Đang tải...</div>
       <p v-else-if="backups.length === 0" class="gap muted">Chưa có bản sao lưu nào.</p>
@@ -97,9 +96,7 @@ onMounted(load)
             <td data-label="Thời gian">{{ new Date(b.createdAt).toLocaleString('vi-VN') }}</td>
             <td data-label="Dung lượng">{{ formatSize(b.size) }}</td>
             <td>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="downloading === b.name" @click="download(b)">
-                {{ downloading === b.name ? 'Đang tải...' : 'Tải về' }}
-              </button>
+              <AppButton variant="secondary" size="sm" :disabled="downloading === b.name" @click="download(b)">{{ downloading === b.name ? 'Đang tải...' : 'Tải về' }}</AppButton>
             </td>
           </tr>
         </tbody>

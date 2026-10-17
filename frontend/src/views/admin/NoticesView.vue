@@ -6,6 +6,7 @@
        block anyone.
 -->
 <script setup>
+import AppButton from '../../components/AppButton.vue'
 import AppSelect from '../../components/AppSelect.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -188,9 +189,9 @@ onMounted(load)
           </div>
         </div>
         <div v-if="maintenanceSaved" class="alert alert-success">Đã lưu.</div>
-        <button type="button" class="btn btn-primary" :disabled="maintenanceSaving" @click="saveMaintenance">
-          {{ maintenanceSaving ? 'Đang lưu...' : 'Lưu cấu hình bảo trì' }}
-        </button>
+        <AppButton variant="primary" :disabled="maintenanceSaving" @click="saveMaintenance">
+{{ maintenanceSaving ? 'Đang lưu...' : 'Lưu cấu hình bảo trì' }}
+</AppButton>
       </section>
 
       <section v-if="canAnnounce" v-show="activeTab === 'compose'" class="card block">
@@ -210,9 +211,7 @@ onMounted(load)
             <label for="an-body">Nội dung (tuỳ chọn)</label>
             <div class="input-wrap"><textarea id="an-body" v-model="form.body" rows="3" maxlength="2000"></textarea></div>
           </div>
-          <button type="submit" class="btn btn-primary" :disabled="posting || !form.title.trim()">
-            {{ posting ? 'Đang gửi...' : 'Gửi thông báo' }}
-          </button>
+          <AppButton variant="primary" type="submit" :disabled="posting || !form.title.trim()">{{ posting ? 'Đang gửi...' : 'Gửi thông báo' }}</AppButton>
         </form>
       </section>
 
@@ -231,8 +230,8 @@ onMounted(load)
               <div class="ann-date">{{ new Date(a.createdAt).toLocaleString('vi-VN') }}</div>
             </div>
             <div class="ann-actions">
-              <button type="button" class="btn btn-secondary btn-sm" @click="toggle(a)">{{ a.active ? 'Ẩn' : 'Hiện lại' }}</button>
-              <button type="button" class="btn btn-danger btn-sm" @click="remove(a)">Xoá</button>
+              <AppButton variant="secondary" size="sm" @click="toggle(a)">{{ a.active ? 'Ẩn' : 'Hiện lại' }}</AppButton>
+              <AppButton variant="danger" size="sm" @click="remove(a)">Xoá</AppButton>
             </div>
           </li>
         </ul>
