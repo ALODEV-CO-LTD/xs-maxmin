@@ -117,11 +117,23 @@ export const useChatStore = defineStore('e2ee-chat', {
       }
     },
 
-    // The user has seen the "key changed" warning for this friend.
+    // The user has seen the "key changed" warning for this friend: trust the key the server shows NOW. The stored key
+    // must be replaced too, otherwise the next refresh of the friend list still sees "different from the stored one"
+    // and shows the warning again.
     async acceptKeyChange(friendId) {
+      const current = this.friendKeys[friendId]
       const known = await get(db, 'peers', friendId)
-      if (known) await put(db, 'peers', { ...known, changed: false })
-      if (this.peerInfo[friendId]) this.peerInfo[friendId].changed = false
+      if (current) {
+        // A plain copy: `current` is a reactive proxy and IndexedDB cannot clone a proxy.
+        const jwk = { kty: current.kty, crv: current.crv, x: current.x, y: current.y }
+        const fp = await fingerprint(jwk)
+        await put(db, 'peers', { id: friendId, jwk, fingerprint: fp, changed: false })
+        this.peerInfo[friendId] = { fingerprint: fp, changed: false }
+        sessionKeys.delete(friendId)
+      } else if (known) {
+        await put(db, 'peers', { ...known, changed: false })
+        if (this.peerInfo[friendId]) this.peerInfo[friendId].changed = false
+      }
     },
 
     async _session(friendId) {
