@@ -14,6 +14,11 @@ class CallSignalingRegistry {
 
   final Map<String, WebSocketChannel> _sockets = {};
 
+  // Every connection a user has open (app, web tabs, a second device). Calls keep using only the latest one
+  // ([_sockets]); the end-to-end encrypted chat frames (message + "received" receipt) go to ALL of them, so an old tab
+  // or a second device never makes the user look offline or swallows the receipt (see [sendToAll]).
+  final Map<String, List<WebSocketChannel>> _all = {};
+
   // Who each user is currently ringing/talking to, tracked purely so a
   // disconnect (closed tab, crashed app, dropped network - anything that
   // isn't the user cleanly pressing "end call") can still tell the other
@@ -34,14 +39,29 @@ class CallSignalingRegistry {
 
   void register(String userId, WebSocketChannel channel) {
     _sockets[userId] = channel;
+    final list = _all.putIfAbsent(userId, () => []);
+    if (!list.contains(channel)) list.add(channel);
   }
 
   /// Only removes the mapping if it still points at [channel] - guards
   /// against a stale disconnect handler clearing a newer connection that
   /// already replaced it for the same user.
   void unregister(String userId, WebSocketChannel channel) {
-    if (_sockets[userId] == channel) _sockets.remove(userId);
+    if (_sockets[userId] == channel) {
+      _sockets.remove(userId);
+      // The newest connection is gone: fall back to the most recent one still open (if any), so calls keep working.
+      final rest = _all[userId]?.where((c) => c != channel).toList();
+      if (rest != null && rest.isNotEmpty) _sockets[userId] = rest.last;
+    }
+    final list = _all[userId];
+    if (list != null) {
+      list.remove(channel);
+      if (list.isEmpty) _all.remove(userId);
+    }
   }
+
+  /// Number of connections [userId] has open right now.
+  int connectionCount(String userId) => _all[userId]?.length ?? 0;
 
   void setActivePeer(String a, String b, {String? logId}) {
     _activePeer[a] = b;
@@ -78,7 +98,7 @@ class CallSignalingRegistry {
     return true;
   }
 
-  bool isOnline(String userId) => _sockets.containsKey(userId);
+  bool isOnline(String userId) => _sockets.containsKey(userId) || (_all[userId]?.isNotEmpty ?? false);
 
   /// Sends a JSON message to [userId]'s socket if connected. Returns false
   /// (caller should tell the sender the other side is offline) if not.
@@ -87,5 +107,23 @@ class CallSignalingRegistry {
     if (channel == null) return false;
     channel.sink.add(jsonEncode(message));
     return true;
+  }
+
+  /// Sends a JSON message to EVERY open connection of [userId]. Returns true if at least one accepted it. A connection
+  /// that throws (already closed) is dropped from the list.
+  bool sendToAll(String userId, Map<String, dynamic> message) {
+    final list = _all[userId];
+    if (list == null || list.isEmpty) return false;
+    final data = jsonEncode(message);
+    var any = false;
+    for (final channel in List.of(list)) {
+      try {
+        channel.sink.add(data);
+        any = true;
+      } catch (_) {
+        unregister(userId, channel);
+      }
+    }
+    return any;
   }
 }

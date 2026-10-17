@@ -261,7 +261,7 @@ void _relayE2ee(
   }
 
   if (type == 'e2ee-ack') {
-    registry.sendTo(to, {'type': 'e2ee-ack', 'id': id, 'from': userId});
+    registry.sendToAll(to, {'type': 'e2ee-ack', 'id': id, 'from': userId});
     return;
   }
 
@@ -280,7 +280,7 @@ void _relayE2ee(
   // `ts` is the sender's clock, shown by the receiver; `fromName` comes from the
   // account, never from the client.
   final nameRow = db.select('SELECT name FROM users WHERE id = ?', [userId]);
-  final delivered = registry.sendTo(to, {
+  final delivered = registry.sendToAll(to, {
     'type': 'e2ee-msg',
     'id': id,
     'from': userId,
