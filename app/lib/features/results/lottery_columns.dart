@@ -265,9 +265,36 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
   }
 
   // dd/mm/yyyy anywhere in the text -> ISO
-  final m = RegExp(r'(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})').firstMatch(words.map((w) => w.text).join(' '));
-  final date = m == null ? null : '${m.group(3)}-${m.group(2)!.padLeft(2, '0')}-${m.group(1)!.padLeft(2, '0')}';
+  String? date;
+  for (final m in RegExp(r'(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})').allMatches(words.map((w) => w.text).join(' '))) {
+    final d = int.parse(m.group(1)!), mo = int.parse(m.group(2)!), y = int.parse(m.group(3)!);
+    final real = DateTime.utc(y, mo, d); // 31/02 would roll over to March: only a date that exists counts
+    if (mo >= 1 && mo <= 12 && d >= 1 && real.month == mo && real.day == d) {
+      date = '$y-${mo.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+      break;
+    }
+  }
   return ParsedColumns(columns, date);
+}
+
+/// 'mt' / 'mn' / 'mb' when the TITLE area (top quarter of the picture) holds that region's word as a whole token
+/// ("XSMT", "XSMN", "XSMB"); null otherwise. A word elsewhere in the picture (a station name, a footer) does not count.
+String? regionFromTitle(List<OcrWord> words) {
+  if (words.isEmpty) return null;
+  final top = words.map((w) => w.y0).reduce(math.min), bottom = words.map((w) => w.y1).reduce(math.max);
+  final limit = top + (bottom - top) * 0.25;
+  for (final w in words) {
+    if (w.cy > limit) continue;
+    switch (w.text.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '')) {
+      case 'xsmt':
+        return 'mt';
+      case 'xsmn':
+        return 'mn';
+      case 'xsmb':
+        return 'mb';
+    }
+  }
+  return null;
 }
 
 /// Miền Bắc photo: sorts the all-digit words of the recognised text into the 27 boxes (port of applyLrOcrGuess).
@@ -300,8 +327,14 @@ List<List<OcrWord>> _digitRows(List<OcrWord> words) {
 /// The digit-only words of a photo in TABLE reading order: top to bottom by row, left to right inside a row. ML Kit's own
 /// text order follows its text blocks (often column by column), which scatters one prize over several; using the positions
 /// keeps every row together, so "Giải nhì 21143 52941" and the two lines of "Giải ba" come out in the printed order.
-String orderedDigitText(List<OcrWord> words) =>
-    [for (final r in _digitRows(words)) ...r.map((w) => w.text.trim())].join(' ');
+///
+/// Rows ABOVE the first row holding a 5-digit number (the đặc biệt) are dropped: they are the title / date ("18 10 2026"),
+/// whose digits would otherwise take the first slots of giải tư / giải bảy.
+String orderedDigitText(List<OcrWord> words) {
+  final rows = _digitRows(words);
+  final first = rows.indexWhere((r) => r.any((w) => w.text.trim().length == 5));
+  return [for (final r in (first > 0 ? rows.sublist(first) : rows)) ...r.map((w) => w.text.trim())].join(' ');
+}
 
 /// A photo can reach the reader turned (a phone held sideways or upside down): then "top to bottom" runs the other way,
 /// which shows up as the table being read right to left / bottom to top. This tries the four turns of the picture and keeps

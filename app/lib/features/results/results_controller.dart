@@ -684,8 +684,8 @@ class ResultsController extends ChangeNotifier {
       return;
     }
     // Which region and day the photo is of: from its title ("XSMT ... 09/10/2026"), else what is selected now.
-    final text = res.words.map((w) => w.text).join(' ').toLowerCase();
-    final seenRegion = text.contains('xsmt') ? 'mt' : (text.contains('xsmn') ? 'mn' : region);
+    final titleRegion = regionFromTitle(res.words);
+    final seenRegion = titleRegion == 'mt' || titleRegion == 'mn' ? titleRegion! : region;
     final seenDate = parsed.date ?? date;
     assignStations(parsed.columns, stations.stationsOn(seenRegion, seenDate), stations);
     if (seenRegion != region || seenDate != date) {
