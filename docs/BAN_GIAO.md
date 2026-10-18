@@ -352,3 +352,49 @@ Theo ba tài liệu khách mới thêm (giao diện kiểu Telegram: danh sách 
 - Tên người dùng `1` là admin mặc định; nhập mật khẩu xoá (`confirm-wipe`) ở bước 2 sẽ xoá dữ liệu thật – cẩn thận khi demo.
 - `.gitignore` gốc bỏ qua `build/`, `web/`, `*.db`, `*.tar.gz`: đừng mong những thứ đó có trong git.
 - Cloudflare tunnel của site này chạy bằng service riêng (`cloudflared-xs-massage`); tunnel cũ của `xs.maxmin.vn` đã ngắt.
+
+## Nhóm chat (17/10/2026)
+
+Tạo nhóm hoạt động ở app và web, **không cần máy chủ lưu gì** (giữ đúng cam kết mã hoá 2 đầu):
+- Nhóm chỉ nằm trên máy của các thành viên (app: meta `group:<id>` trong SQLite chat, web: `meta` trong IndexedDB). Mã nhóm có dạng `g-<ngẫu nhiên>`, cũng là khoá của mọi thứ theo cuộc trò chuyện (tin nhắn, chưa đọc, ghim, tự xoá, lưu trữ).
+- Mỗi tin nhắn nhóm được mã hoá **riêng cho từng thành viên** và chuyển tiếp như tin 1-1 (cùng khung `e2ee-msg`, máy chủ không đổi). Phần đầu tin có thêm `g: {i: mã nhóm, n: tên, c: người tạo, u: thời điểm cập nhật, m: [[id, tên], ...]}`, nên máy nào lỡ tin đầu vẫn biết nhóm ở tin sau.
+- `k: group-new` (tạo nhóm / đổi tên) và `k: group-left` (rời nhóm) là tin không có chữ, chỉ mang thông tin nhóm. Chỉ thành viên mới nói được trong nhóm; người tạo của một nhóm đã biết không đổi được; ai rời nhóm thì bị bỏ khỏi danh sách ở các máy khác.
+- Trạng thái "đã gửi" của tin nhóm: xác nhận (ack) của bất kỳ thành viên nào là "đã nhận"; chỉ báo lỗi khi không ai nhận được.
+- Hạn chế: thành viên phải là **bạn bè của người tạo**; hai thành viên không phải bạn của nhau thì không nhận được tin của nhau (máy chủ chỉ chuyển tin giữa bạn bè). Chưa có thêm/bớt thành viên sau khi tạo (chỉ đổi tên và rời nhóm).
+- Mã: app `chat_models.dart` (ChatGroup), `chat_service.dart` (createGroup, leaveGroup, renameGroup, _fanOutFrames), `friends_screen.dart` (hộp Tạo nhóm), `chat_page.dart` (chế độ nhóm); web `e2ee/groups.js`, `e2ee/chat.js`, `FriendsView.vue`. Test: `app/test/group_chat_test.dart` (3 thiết bị qua một relay giả), `frontend/tests/groups.test.mjs`.
+
+**Nhập số liệu trong khung chat = tab Nhập số (17/10/2026):** nút "Nhập số" trong cuộc trò chuyện (chọn tin, bấm "Nhập số (N)") đưa thẳng nội dung các tin đã chọn (đúng thứ tự hiển thị, bỏ dòng trích dẫn trả lời) vào ô nhập nhanh của Tính toán > Nhập số, nơi xem trước, sửa và lưu; không còn bước Đối chiếu riêng trong chat. Khách, ngày, đài chọn ở Nhập số.
+
+## Nhật ký 17–18/10/2026: tổng hợp trong ngày, kể cả việc đang làm dở
+
+**Trạng thái mã nguồn (cuối ngày 17/10, đầu 18/10):** nhánh `mask-short`, HEAD `9f8d5b6`. **Mọi thay đổi dưới đây chưa commit (khoảng 79 tệp) và chưa deploy.** Máy chủ thật vẫn chạy bản deploy cũ (`badcb98` + web đến `b464fa3`); backend chưa có sửa phát tin tới mọi kết nối (`f87481d`, đã commit nhưng chưa deploy). Số phiên bản app trong mã đã tăng lên **1.4.7 (13)** (`app/pubspec.yaml` và `app/lib/core/config.dart`), nhưng APK `~/Desktop/MAMBA.apk` (17/10, 17:57) được dựng **trước** khi tăng nên vẫn là 1.4.6 (12), và bản đã cài lên iPhone 12 cũng cũ. Việc đầu tiên khi làm tiếp: chạy toàn bộ test, commit (nhóm commit theo mục dưới), rồi deploy web + backend theo mục 7, đóng lại APK và cài lại iPhone.
+
+### Đã làm (có test, chỉ local)
+- **Thống kê hợp nhất ở Tổng quan** (app + web): chỉ số Điểm vào/Điểm ra/Lợi nhuận × Ngày/Tuần/Tháng/Năm; cột biểu đồ cùng độ rộng; nhãn trục không đè nhau (`stats_chart.dart`, `stats_logic.dart`, `statsSeries.js`, `AccountStats.vue`).
+- **Bỏ "Ẩn số liệu"** (app + web): số luôn hiện; cài đặt cũ tự xoá (`mask_store.dart` luôn `masked=false`; `stores/mask.js`; xoá `MaskBar.vue`). **Bỏ "Hỏi trước khi sao chép"** (app + web).
+- **Sửa lỗi "Chưa đăng nhập" khi mở app**: router giữ trang `/splash` cho đến khi đọc xong phiên (`app.dart`).
+- **Giao diện app:** `AppButton` 34dp (nhỏ 28), ô nhập dense, `AppDropdown` dùng chung, menu/hộp thoại/bảng dưới nền trắng viền xanh (`theme.dart`); các hàng nút gom một hàng (Nhập số, Kết quả, Tính điểm, Khách hàng dạng biểu tượng, Cấu hình: Đặt lại/Huỷ/Lưu cùng hàng dưới các miền); danh sách số liệu Nhập số mỗi số liệu một dòng, số cùng cỡ chữ; xiên từ 3 số xuống dòng riêng cho ô Số.
+- **Danh sách tin nhắn kiểu messenger** (app): avatar màu theo tên, tin cuối, giờ bên phải, vạch ngăn; thanh trên gọn (tìm kiếm, Sửa, Thêm, ID, cài đặt); tiêu đề "Tin nhắn". Web chưa đổi kiểu.
+- **Nhập số trong chat = tab Nhập số** (app + web): chọn tin → "Nhập số (N)" → đưa chữ vào ô nhập nhanh (`ChatPrefillHub` / `sessionStorage['entries-prefill']`); bỏ bước Đối chiếu khỏi chat (mã Đối chiếu còn, không còn lối vào).
+- **Nhóm chat** (app + web, không lưu máy chủ): xem mục "Nhóm chat" ở trên và hàng tiến độ; thêm: người tạo thêm/xoá thành viên (`addGroupMembers`, `removeGroupMember`, kiểu tin `group-removed`), chỉ người tạo đổi tên/thành viên; thành viên rời chỉ xoá chính mình; tiêu đề mới chỉ tin khi từ người tạo hoặc khi đang rời. Test app `group_chat_test.dart` 8 test; web `groups.test.mjs`.
+- **Bộ đọc số** (app + web): `22.67lo10` = xiên 2, `81.24.69lo10` = xiên 3 (đúng yêu cầu khách), viết lỏng (`22 67 lo 10`, `;` `/` `-`, "điểm", `lô`); `22.67de10` vẫn là danh sách đề; xiên không còn bị gắn cờ "chưa hỗ trợ" khi tài khoản có loại Xiên (có tính điểm xiên thật). Hơn 4 số → một dòng "xiên N" bị đánh dấu.
+- **Tính điểm** (app + web): chỉ chọn khách + ngày (mặc định hôm nay), đồng bộ với Nhập số (app `CalcSync`, web `calcSync.js`); **sửa lỗi** kết quả lưu sau vẫn báo chưa có (tab giữ bộ nhớ kết quả cũ): mở tab/bấm Tính lại thì `ScoringController.syncFrom` xoá bộ nhớ và đọc lại; bỏ 2 mục "Chi tiết tiền gửi theo loại đánh" và "Các lô trúng"; mỗi số liệu chỉ ghi kiểu đánh, khu vực, Trúng/Không trúng, số, điểm vào, điểm ra.
+- **Báo cáo Kết quả tính toán** (app): thẻ viền xanh theo ảnh mẫu, Lưu/Copy một hàng, Gửi cho khách hàng riêng. Web chưa đổi.
+- **Tab Kết quả** (app + web): bỏ khối "Điểm ra ngày …" (còn thông báo lưu + Hoàn tác); chỉ một nút xoá (xoá kết quả đã lưu hoặc xoá form).
+- **Đối soát công thức:** `app/test/scoring_audit_test.dart` dùng kết quả Miền Bắc 12/10/2026 lấy từ DB (đếm tay 27 đuôi): lô (đếm lần ra), đề, xiên 2/3 (thắng một lần), 3-4 càng, đuôi: 7 test qua.
+- **Dữ liệu dev (máy này, `backend/data/xoso.db`):** kết bạn tài khoản `2` với 85 tài khoản khách khác (hai chiều; sao lưu `data/backups/xoso.db.before-friend-all-*`); xoá một dòng số liệu thử do mình lưu nhầm. Nhóm thử "Nhom_thu" chỉ nằm trong app trên máy ảo.
+
+### Việc đang làm dở / chưa làm
+1. **Commit và deploy** (web + backend) đến máy chủ thật; chat giữa hai điện thoại và bản sửa phát tin tới nhiều thiết bị chỉ có hiệu lực sau deploy backend. Nhóm chat cần mọi thành viên cài bản mới.
+2. **APK và iPhone:** đóng lại APK 1.4.7 (13) sau khi commit; cài iPhone 12 (`00008101-0019496E2260001E`, đã ghép đôi); hai iPhone còn lại chưa kết nối.
+3. **Xiên hơn 4 số** (ví dụ `45.16.73.32.88lo10`): chờ chốt nghĩa (tách xiên nhỏ hơn, hay một xiên nhiều số, hay bao nhiêu số cũng tính một xiên); hiện là một dòng bị đánh dấu.
+4. **Web chưa theo app:** kiểu danh sách tin nhắn messenger, báo cáo Kết quả tính toán theo ảnh mẫu, thẻ biểu tượng ở Khách hàng, một số hàng nút gom một hàng.
+5. **Nhóm chat:** chưa thử nhắn thật giữa nhiều thiết bị (mới test bằng relay giả); thành viên phải là bạn của người tạo; người mới thêm không thấy tin cũ; chưa có "chỉ người tạo", chuyển quyền, ảnh nhóm.
+6. **Đối soát công thức tiền** với ví dụ cụ thể của khách (từng con số): chờ khách đưa ví dụ; test hiện chỉ kiểm số lần ra và quy tắc thắng, chưa kiểm số tiền theo từng giá của khách. Lưu ý: giá trúng mặc định của xiên/trượt/thần tài/bao lô 3-4 số đang là 0 (chờ khách điền) nên tiền trúng các loại đó bằng 0 cho đến khi khách điền.
+7. **Quyết định còn treo từ trước:** chặn chụp màn hình hay cho chụp + báo (Android); tin nhắn mã hoá chờ khi bạn offline (hàng đợi mã hoá).
+8. **Xoá dữ liệu trên máy chủ:** `wipeUserData` xoá hàng trong SQLite nhưng chưa bật `secure_delete`/`VACUUM`, và bản sao lưu Admin (`data/backups`) không bị xoá theo: nếu cần "xoá sạch thật" thì làm thêm `PRAGMA secure_delete`, `VACUUM` sau xoá và cho Admin xoá bản sao lưu cũ.
+
+### Ghi chú khi thử trên máy ảo Android
+- `adb` nằm ở `~/Library/Android/sdk/platform-tools/adb`; bản debug: `flutter build apk --debug --dart-define=ALLOW_CAPTURE=true --dart-define=API_BASE=http://localhost:8080` rồi `adb reverse tcp:8080 tcp:8080`.
+- Máy ảo chạy chậm khi mở app (có lúc 30–40 giây màn hình trắng/quay vòng); đợi `uiautomator dump` thấy chữ "Tính toán" rồi mới chạm. Toạ độ chạm = toạ độ trong ảnh × 1,2. Hộp thoại có bàn phím sẽ dịch lên: chụp lại trước khi chạm.
+- Đừng chạy `dart format` cả thư mục: định dạng bị đổi hàng loạt (đã gặp, đã khôi phục).
