@@ -58,7 +58,7 @@ Sao lưu: Admin tạo bản sao ở `data/backups/` (từ màn Cài đặt); ngo
 Quan trọng:
 - **Gỡ app hoặc cài lại = mất lịch sử chat và hàng chờ chưa gửi** (khoá riêng trong Keychain iOS có thể còn, nhưng tin thì mất). Phải **cài đè** khi cập nhật: `tools/install_ios.sh` (iPhone) hoặc `adb install -r` (Android); **không dùng `flutter install`**.
 - Đăng xuất / đăng nhập lại **không xoá** lịch sử chat (mỗi tài khoản một file `.db`).
-- Android: `allowBackup` đang là mặc định (cho phép Google sao lưu dữ liệu app); đang được sửa thành tắt (xem `docs/KIEM_TOAN_18-10-2026.md`).
+- Android: `allowBackup=false` (từ đợt sửa 18/10/2026, chưa phát hành): Google không sao lưu dữ liệu app. iOS: dữ liệu app loại khỏi sao lưu iCloud/iTunes và khoá Keychain chỉ dùng trên máy này, nên khôi phục sang máy mới không mang theo lịch sử chat hay khoá.
 - Đọc ảnh (OCR) chạy trên máy bằng ML Kit; ảnh không được gửi đi đâu.
 
 ### 3.2. Web
@@ -78,7 +78,7 @@ Xoá dữ liệu trình duyệt = mất lịch sử chat web. Web chưa xoá Ind
 
 **Một đường duy nhất:** `wss://xs.massagehomeriyadh.com/api/ws/calls?token=<JWT>`.
 - Đi qua Cloudflare Tunnel → nginx (có `Upgrade`) → backend `127.0.0.1:9091` (`routes/api/ws/calls.dart`).
-- Mã JWT nằm trong **địa chỉ** (trình duyệt không gửi được header cho WebSocket), nên có thể lọt vào log máy chủ trung gian. Đã ghi nhận để đổi sang vé một lần.
+- Mã JWT nằm trong **địa chỉ** (trình duyệt không gửi được header cho WebSocket), nên có thể lọt vào log máy chủ trung gian. Đã ghi nhận để đổi sang vé một lần (đang chờ quyết định). Khi phiên bị thu hồi, máy chủ đóng WebSocket với mã **4401**; web và app coi đó là "phiên đã bị thu hồi" và đăng xuất, không kết nối lại.
 - Máy chủ kiểm tra phiên (`sessionIsActive`) lúc bắt tay. Admin cũng giữ kênh này để nhận sự kiện phản hồi của khách, nhưng không nhắn tin bạn bè hay gọi. Máy chủ ping 10 giây; app ping 20 giây; app tự nối lại với độ trễ tăng dần từ 1 giây đến 30 giây (có ngẫu nhiên) và nối lại ngay khi mở lại app; web nối lại tương tự.
 - Mỗi tin mang địa chỉ người nhận `to`; máy chủ **đổi `to` thành `from` = id của người gửi**, nên không thể mạo danh.
 
@@ -98,7 +98,7 @@ Xoá dữ liệu trình duyệt = mất lịch sử chat web. Web chưa xoá Ind
 5. Người nhận **đang offline hoặc app đã bị tắt hẳn**: không có chuông; chỉ có thể có **thông báo đẩy** (mục 5.3). Mở app lên thì cuộc gọi thường đã kết thúc và hiện là cuộc gọi nhỡ.
 
 ### 4.3. Phản hồi Admin
-Dùng REST (`/me/messages`, `/admin/messages/...`), **không** qua mã hoá 2 đầu, lưu ở máy chủ. Khi có tin mới, máy chủ đẩy sự kiện `new-message` qua WebSocket để app hiện thông báo; ngoài ra app/web tự đối chiếu `/me/unread` mỗi 10 giây (dự phòng khi WebSocket bị chặn).
+Dùng REST (`/me/messages`, `/admin/messages/...`), **không** qua mã hoá 2 đầu, lưu ở máy chủ. Gửi tin hỗ trợ bị giới hạn 30 tin/giờ/tài khoản (vượt thì 429). Khi có tin mới, máy chủ đẩy sự kiện `new-message` qua WebSocket để app hiện thông báo; ngoài ra app/web tự đối chiếu `/me/unread` mỗi 10 giây (dự phòng khi WebSocket bị chặn).
 
 ## 5. Thông báo
 
@@ -115,7 +115,7 @@ Mặc định tắt. Bật "Giữ kết nối khi thoát app" thì app chạy d�
 - **Android: Firebase Cloud Messaging** (dự án `mamba-99e37`, khoá dịch vụ trên máy chủ). **iPhone: APNs của Apple** — **chưa cấu hình khoá Apple trên máy chủ nên iPhone chưa nhận được thông báo đẩy**.
 - Nội dung thông báo chỉ có: tên hiển thị người gửi, loại (tin / cuộc gọi) và id người gửi (để mở đúng cuộc trò chuyện): tin "Đang nhắn tin cho bạn. Mở MAMBA để nhận." hoặc "Cuộc gọi đến". **Không bao giờ có nội dung tin.**
 - Thông báo chỉ **đánh thức**: tin vẫn không được lưu ở đâu. Người gửi thấy "chưa gửi" và bấm Gửi lại sau khi người nhận mở app.
-- Mã thiết bị lưu ở `push_tokens`. App đăng ký sau khi khách đăng nhập và gỡ khi đăng xuất. (Phần máy chủ tự xoá mã khi thu hồi phiên đang được sửa.)
+- Mã thiết bị lưu ở `push_tokens`. App đăng ký sau khi khách đăng nhập và gỡ khi đăng xuất. Máy chủ cũng xoá mã thiết bị của phiên khi phiên bị thu hồi (từ đợt sửa 18/10/2026, chưa deploy).
 
 ### 5.4. Thông báo hệ thống
 Admin đăng thông báo bảo trì hoặc chính sách (`announcements`), hiện thành banner cho người dùng; người dùng bấm "Đã hiểu" thì ẩn (`xoso_dismissed_notices`).

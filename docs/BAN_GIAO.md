@@ -431,3 +431,19 @@ Tạo nhóm hoạt động ở app và web, **không cần máy chủ lưu gì**
 - **Cách cập nhật đúng:** iPhone dùng `tools/install_ios.sh <mã thiết bị>` (cài đè bằng `devicectl`, **không gỡ**); Android dùng `adb install -r` hoặc mở thẳng file APK (cùng khoá ký debug nên cài đè được). Không dùng `flutter install`.
 - **Sửa thêm:** nếu **không đọc được** khoá riêng (iPhone đang khoá, kho khoá bận), app không còn tạo khoá mới đè lên (làm bạn bè thấy "khoá đã đổi" và phiên cũ hỏng) mà báo lỗi và thử lại sau (`ChatService.init`, có test).
 - **Vẫn đúng theo thiết kế:** gỡ app hẳn hoặc đổi máy thì mất lịch sử chat (xem `MA_HOA_2_DAU.md`). Bản web lưu trong IndexedDB của trình duyệt, xoá dữ liệu trình duyệt thì mất.
+
+## Nhật ký 18/10/2026 (đêm): đợt sửa theo kiểm toán (chưa triển khai)
+
+Chi tiết từng mục và trạng thái: `docs/KIEM_TOAN_18-10-2026.md`. Mọi thứ dưới đây nằm trong nhánh tích hợp, **chưa deploy**; máy chủ thật vẫn chạy bản cũ cho tới khi bạn deploy.
+
+- **Biến môi trường backend mới** (đặt qua drop-in như mục 7):
+  - `XOSO_ADMIN_PASSWORD`: mật khẩu admin khi tạo DB mới. Backend **không còn mật khẩu admin cố định `1234`**; không đặt thì sinh ngẫu nhiên và in một lần ra log lúc seed. Chỉ có tác dụng khi seed (DB đã có admin thì không đổi).
+  - `XOSO_SEED_DEMO=1`: mới tạo các khách demo. Mặc định tắt; **không bật trên máy chủ thật**. Dùng cho backend thử (xem `tools/e2e/README.md`, script đọc mật khẩu admin từ `E2E_ADMIN_PASSWORD`).
+- **IP khách hàng:** backend chỉ tin `CF-Connecting-IP` (rồi `X-Forwarded-For`, `X-Real-IP`) khi kết nối đến từ địa chỉ loopback, tức là từ nginx trên cùng máy chủ. Production dựa vào điều này để giới hạn tốc độ và nhật ký phiên; ai gọi thẳng vào cổng 9091 từ máy khác thì các header bị bỏ qua. Nếu đổi kiến trúc (nginx ở máy khác), phải xem lại.
+- **Giới hạn mới:** body JSON quá lớn trả **413** (xác thực 8 KB, thường 256 KB, tin nhắn tối đa khoảng 7,5 MB); đăng ký tối đa **10 lần/giờ/IP**; tin nhắn hỗ trợ tối đa **30 tin/giờ/tài khoản**; thử sai mã ID khách bị làm chậm; vượt giới hạn trả **429**. Web và app hiện thông báo tiếng Việt rõ ràng cho 413 và 429.
+- **Phiên bị thu hồi:** WebSocket được đóng với mã **4401** và mã thiết bị đẩy bị xoá cùng phiên; web và app đăng xuất thay vì kết nối lại liên tục.
+- **Khác ở backend:** danh sách khoá cho phép ghi qua `/admin/settings`; ngày xổ số chỉ nhận `YYYY-MM-DD` hợp lệ; sao lưu Admin giữ tối đa 20 bản và từ chối khi ổ đĩa gần đầy; xoá nhân viên đã có lịch sử không còn lỗi.
+- **Repo:** `backend/pubspec.lock` nay **được git theo dõi** (gói deploy phải có nó, xem mục 7); CI ở `.github/workflows/ci.yml`; nên build từ bản checkout sạch.
+- **Android:** `allowBackup=false`; khung ký release qua `app/android/key.properties` (file này và keystore **không** commit; thiếu file thì build release vẫn ký bằng khoá debug, cần tạo keystore thật trước khi phát hành). iOS: loại khỏi sao lưu iCloud/iTunes và khoá Keychain chỉ dùng trên máy này.
+- **Máy chủ đã áp dụng sẵn (xem `deploy/README-ops.md`):** header bảo mật nginx (CSP mới ở chế độ Report-Only), cron sao lưu DB hằng ngày (giữ 14 bản, cùng ổ đĩa), quyền file DB 600, đã dọn thư mục sao lưu cũ.
+- **Việc chờ bạn quyết:** chặn gửi khi khoá bạn bè đổi, ép đồng ý kết bạn, độ dài tối thiểu mật khẩu admin/nhân viên, vé WebSocket thay `?token=`, giới hạn tốc độ khung E2EE, đồng ý trước khi tự thêm vào nhóm, sao lưu ra ngoài máy chủ, bật CSP chặn thật.
