@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package_plans.dart';
 import 'customer_codes.dart';
+import 'friend_requests.dart';
 import 'deletion_scheduler.dart';
 
 const _uuid = Uuid();
@@ -181,6 +182,7 @@ void _ensureColumn(Database db, String table, String column, String type) {
 }
 
 void _createSchema(Database db) {
+  ensureFriendRequestsTable(db);
   // Device sessions (K10/A04/A14/S04): the JWT carries the row id as `sid`;
   // a row with revoked_at set is rejected by the auth middleware.
   db.execute('''

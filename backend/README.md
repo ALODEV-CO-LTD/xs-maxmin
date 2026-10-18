@@ -23,3 +23,14 @@ Local dev on a fresh `data/` folder:
     XOSO_SEED_DEMO=1 XOSO_ADMIN_PASSWORD=dev-password XOSO_JWT_SECRET=dev-secret-0123456789 dart_frog dev
 
 Existing databases are not changed.
+
+## Friend requests
+
+Adding a friend (`POST /api/me/friends` with `{userId}` or `{code}`) now creates a
+request that the other person must accept. Table `friend_requests` is created
+idempotently in `lib/src/database.dart`; existing friendships are untouched.
+Routes: `GET /api/me/friend-requests`, `POST /api/me/friend-requests/{id}/accept|decline`,
+`DELETE /api/me/friend-requests/{id}`; `friends/search` returns `requestState`,
+`GET /api/me/unread` returns `friendRequests`. Realtime events `friend-request`
+and `friend-accepted` go over the signalling WebSocket; offline users get a
+push (`PushKind.friendRequest`). Logic lives in `lib/src/friend_requests.dart`.

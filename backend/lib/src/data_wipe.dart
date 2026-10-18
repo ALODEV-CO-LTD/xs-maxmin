@@ -15,6 +15,7 @@ import 'package:sqlite3/sqlite3.dart';
 ///  - messages (bảng cũ)         tin nhắn cũ phản hồi với Admin
 ///  - transactions               lịch sử giao dịch
 ///  - payment_requests 'pending' yêu cầu thanh toán chưa duyệt
+///  - friend_requests            lời mời kết bạn (cả hai chiều, mọi trạng thái)
 ///
 /// Kept on purpose: the account itself, package/quota, friendships, friend
 /// chat (`direct_messages` between two non-admin users belongs to both people), customer codes (Mã ID),
@@ -53,6 +54,7 @@ Map<String, int> wipeUserData(Database db, String userId) {
     db.execute("DELETE FROM message_reads WHERE user_id = ? AND peer_key = 'support'", [userId]);
     del('transactions', 'DELETE FROM transactions WHERE user_id = ?');
     del('payment_requests', "DELETE FROM payment_requests WHERE user_id = ? AND status = 'pending'");
+    del('friend_requests', 'DELETE FROM friend_requests WHERE from_user_id = ? OR to_user_id = ?', [userId, userId]);
     db.execute('UPDATE users SET data_used = 0 WHERE id = ?', [userId]);
     db.execute('COMMIT');
   } catch (_) {

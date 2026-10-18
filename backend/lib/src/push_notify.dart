@@ -32,9 +32,13 @@ void notifyOfflineRecipient({
   required String toUserId,
 }) {
   if (!pushThrottle.allow(fromUserId, toUserId, kind)) return;
-  final message = kind == PushKind.call
-      ? PushMessage(kind: kind, title: 'Cuộc gọi đến', body: '$fromName đang gọi bạn', friendId: fromUserId)
-      : PushMessage(kind: kind, title: fromName, body: 'Đang nhắn tin cho bạn. Mở MAMBA để nhận.', friendId: fromUserId);
+  final message = switch (kind) {
+    PushKind.call => PushMessage(kind: kind, title: 'Cuộc gọi đến', body: '$fromName đang gọi bạn', friendId: fromUserId),
+    PushKind.friendRequest =>
+      PushMessage(kind: kind, title: 'Lời mời kết bạn', body: '$fromName muốn kết bạn với bạn', friendId: fromUserId),
+    PushKind.message =>
+      PushMessage(kind: kind, title: fromName, body: 'Đang nhắn tin cho bạn. Mở MAMBA để nhận.', friendId: fromUserId),
+  };
   try {
     unawaited(pushSender.send(toUserId, message).catchError((Object _) {}));
   } catch (_) {}
