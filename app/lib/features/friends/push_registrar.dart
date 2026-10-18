@@ -23,8 +23,11 @@ class PushInitial {
 class PushOpened {
   const PushOpened(this.friendId, this.kind);
   final String friendId;
-  final String kind; // 'message' | 'call'
+  final String kind; // 'message' | 'call' | 'friendRequest'
 }
+
+/// The kind a push carries; anything unknown is a plain message (the oldest, safest behaviour).
+String pushKindOf(Object? raw) => raw == 'call' ? 'call' : (raw == 'friendRequest' ? 'friendRequest' : 'message');
 
 /// The native bridge, so the logic can be tested without a platform channel.
 abstract class PushPort {
@@ -61,7 +64,7 @@ class ChannelPushPort implements PushPort {
     if (args is! Map) return null;
     final id = args['friendId'];
     if (id is! String || id.isEmpty) return null;
-    return PushOpened(id, args['kind'] == 'call' ? 'call' : 'message');
+    return PushOpened(id, pushKindOf(args['kind']));
   }
 
   @override
@@ -269,14 +272,17 @@ class PushRegistrar {
     final o = _pendingOpen;
     if (o == null || !_signedInCustomer) return; // wait until a customer is signed in
     _pendingOpen = null;
-    // Calls open the chat too: a call that rang while the app was closed is long over.
-    Timer(openDelay, () => openRoute('/friends/chat/${Uri.encodeComponent(o.friendId)}'));
+    // Calls open the chat too: a call that rang while the app was closed is long over. A friend request opens the
+    // friends screen, where the requests block is at the top.
+    final route = o.kind == 'friendRequest' ? '/friends' : '/friends/chat/${Uri.encodeComponent(o.friendId)}';
+    Timer(openDelay, () => openRoute(route));
   }
 
   /// Foreground: show the OS banner only if the same information is not already on screen in the app.
   bool _present(PushOpened info) {
     final h = hub?.call();
     if (h == null) return true;
+    if (info.kind == 'friendRequest') return !(h.socket.ready); // the live event already shows an in-app banner
     if (info.kind == 'call') return h.call == null || h.call!.status == CallStatus.idle;
     return h.chat?.openPeer != info.friendId;
   }

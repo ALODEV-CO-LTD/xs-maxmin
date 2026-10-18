@@ -37,7 +37,7 @@ class AppShell extends StatelessWidget {
   }
 }
 
-/// Red count on the "Bạn bè" icon: unread friend messages + unseen missed calls + replies from Admin.
+/// Red count on the "Bạn bè" icon: unread friend messages + unseen missed calls + replies from Admin + pending friend requests.
 class _UnreadBadge extends StatelessWidget {
   const _UnreadBadge({required this.hub, required this.child});
   final FriendsController? hub;

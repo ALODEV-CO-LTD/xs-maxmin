@@ -205,6 +205,26 @@ void main() {
     reg.dispose();
   });
 
+  test('tap on a friend-request push opens the friends screen (warm and cold start)', () async {
+    await make(_Fcm(token: _t1));
+    auth.signIn('user');
+    await settle();
+    fcm.opened.add({'friendId': 'u7', 'kind': 'friendRequest'});
+    await settle();
+    expect(routes, ['/friends']);
+    reg.dispose();
+  });
+
+  test('cold start from a friend-request push opens the friends screen once signed in', () async {
+    await make(_Fcm(token: _t1, initialData: {'friendId': 'u7', 'kind': 'friendRequest'}));
+    await settle();
+    expect(routes, isEmpty);
+    auth.signIn('user');
+    await settle();
+    expect(routes, ['/friends']);
+    reg.dispose();
+  });
+
   test('cold start from a notification: opens the chat once a customer is signed in', () async {
     await make(_Fcm(token: _t1, initialData: {'friendId': 'f9', 'kind': 'message'}));
     await settle();
