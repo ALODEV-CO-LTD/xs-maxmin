@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS users (
   data_used             INTEGER NOT NULL DEFAULT 0,
   status                TEXT NOT NULL DEFAULT 'active',
   created_at            TEXT NOT NULL,
-  scoring_rates         TEXT                -- JSON: {typeKey: {rate, tiers[]}} -- added via migration
+  scoring_rates         TEXT,               -- JSON: {typeKey: {rate, tiers[]}} -- added via migration
+  -- Mã khôi phục: bcrypt hash only (never the code), + throttle state -- added via migration
+  recovery_code_hash        TEXT,
+  recovery_code_created_at  TEXT,
+  recovery_failed_attempts  INTEGER NOT NULL DEFAULT 0,
+  recovery_locked_until     TEXT
 );
 
 
@@ -165,7 +170,35 @@ CREATE TABLE IF NOT EXISTS customer_codes (
   id          TEXT PRIMARY KEY,
   user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   code        TEXT NOT NULL UNIQUE,
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  label       TEXT                -- optional note on a "virtual ID" -- added via migration
+);
+-- Max IDs per account: settings key `max_virtual_ids` (default 5, Admin-editable).
+
+
+-- -----------------------------------------------------------------------------
+-- User-set deletion schedules, executed by a background Timer in the server.
+--   kind 'data': one-off delete of the user's data_entries (optionally one
+--                customer_name and/or entry_date range) at run_at.
+--   kind 'chat': standing rule - messages (chat_scope 'all') or image
+--                attachments ('images') older than ttl_seconds in the
+--                conversation with friend_id are deleted for both sides.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS deletion_schedules (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN ('data', 'chat')),
+  customer_name  TEXT,
+  date_from      TEXT,
+  date_to        TEXT,
+  friend_id      TEXT REFERENCES users(id) ON DELETE CASCADE,
+  chat_scope     TEXT,
+  ttl_seconds    INTEGER,
+  run_at         TEXT,
+  status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'cancelled')),
+  deleted_count  INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL,
+  executed_at    TEXT
 );
 
 
@@ -176,6 +209,57 @@ CREATE TABLE IF NOT EXISTS settings (
   key    TEXT PRIMARY KEY,
   value  TEXT NOT NULL
 );
+
+
+-- -----------------------------------------------------------------------------
+-- Device sessions, login throttling and security event log
+-- (JWT carries device_sessions.id as the `sid` claim)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS device_sessions (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_label TEXT,
+  user_agent   TEXT,
+  ip           TEXT,
+  created_at   TEXT NOT NULL,
+  last_seen    TEXT NOT NULL,
+  revoked_at   TEXT,
+  revoked_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  key          TEXT PRIMARY KEY,  -- "<username lowercase>|<ip>"
+  fail_count   INTEGER NOT NULL DEFAULT 0,
+  last_fail_at TEXT NOT NULL,
+  locked_until TEXT
+);
+
+CREATE TABLE IF NOT EXISTS security_events (
+  id         TEXT PRIMARY KEY,
+  type       TEXT NOT NULL,       -- login_failed, login_locked, session_revoked, data_wiped
+  user_id    TEXT,
+  username   TEXT,
+  ip         TEXT,
+  detail     TEXT,                -- never a password or token
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
+
+-- Call history (voice calls only), written by the signaling relay.
+CREATE TABLE IF NOT EXISTS call_logs (
+  id               TEXT PRIMARY KEY,
+  caller_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  callee_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status           TEXT NOT NULL,   -- ringing | in_progress | completed | missed | rejected | busy | failed
+  created_at       TEXT NOT NULL,
+  answered_at      TEXT,
+  ended_at         TEXT,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  callee_seen      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_id, created_at);
 
 
 -- =============================================================================

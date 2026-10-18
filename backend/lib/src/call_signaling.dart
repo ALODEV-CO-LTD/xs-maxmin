@@ -24,6 +24,14 @@ class CallSignalingRegistry {
   // delivered, cleared symmetrically on call-end/call-reject/disconnect.
   final Map<String, String> _activePeer = {};
 
+  // The call_logs row of the call each user is in (same lifetime as
+  // _activePeer), so accept/reject/end can update the right history row.
+  final Map<String, String> _activeLog = {};
+
+  // Timestamps of recent invites per caller, to stop someone from ringing a
+  // friend over and over.
+  final Map<String, List<DateTime>> _recentInvites = {};
+
   void register(String userId, WebSocketChannel channel) {
     _sockets[userId] = channel;
   }
@@ -35,18 +43,39 @@ class CallSignalingRegistry {
     if (_sockets[userId] == channel) _sockets.remove(userId);
   }
 
-  void setActivePeer(String a, String b) {
+  void setActivePeer(String a, String b, {String? logId}) {
     _activePeer[a] = b;
     _activePeer[b] = a;
+    if (logId != null) {
+      _activeLog[a] = logId;
+      _activeLog[b] = logId;
+    }
   }
 
   String? activePeerOf(String userId) => _activePeer[userId];
+
+  String? activeLogOf(String userId) => _activeLog[userId];
 
   /// Clears the pairing for [userId] and whoever they were paired with
   /// (symmetric - a single id is enough to find and remove both sides).
   void clearActivePeer(String userId) {
     final peer = _activePeer.remove(userId);
-    if (peer != null) _activePeer.remove(peer);
+    _activeLog.remove(userId);
+    if (peer != null) {
+      _activePeer.remove(peer);
+      _activeLog.remove(peer);
+    }
+  }
+
+  /// True if [userId] may place another call now: at most [max] invites in
+  /// the last [window]. Records the attempt when allowed.
+  bool allowInvite(String userId, {int max = 6, Duration window = const Duration(minutes: 1)}) {
+    final now = DateTime.now();
+    final list = _recentInvites.putIfAbsent(userId, () => []);
+    list.removeWhere((t) => now.difference(t) > window);
+    if (list.length >= max) return false;
+    list.add(now);
+    return true;
   }
 
   bool isOnline(String userId) => _sockets.containsKey(userId);

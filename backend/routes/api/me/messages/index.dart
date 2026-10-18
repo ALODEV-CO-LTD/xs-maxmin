@@ -4,6 +4,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/attachments.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/push.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// A customer's own thread with admin support - the Phản hồi (feedback)
@@ -86,6 +87,7 @@ Future<Response> _send(RequestContext context, String userId) async {
     [id, userId, adminId, content, now, att?.name, att?.type, att?.data.length, att?.data],
   );
   final saved = db.select('SELECT * FROM direct_messages WHERE id = ?', [id]).first;
+  pushNewMessage(db, toUserId: adminId, fromUserId: userId, source: 'support', messageId: id, content: content, hasAttachment: att != null);
   return Response.json(
     statusCode: 201,
     body: {

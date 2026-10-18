@@ -7,11 +7,10 @@
 import AppIcon from './AppIcon.vue'
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useCallStore } from '../stores/call'
+import { notifyIncoming, playEndTone, startRingback, startRingtone, stopNotify, stopSounds } from '../callSounds'
 
 const call = useCallStore()
 
-const localVideoEl = ref(null)
-const remoteVideoEl = ref(null)
 const remoteAudioEl = ref(null)
 
 // Attach each stream to its element whenever *either* one changes. The
@@ -38,23 +37,15 @@ function attach(el, stream) {
   }
 }
 function enableSpeaker() {
-  const els = [remoteAudioEl.value, remoteVideoEl.value].filter(Boolean)
+  const els = [remoteAudioEl.value].filter(Boolean)
   Promise.all(els.map((el) => el.play())).then(
     () => { speakerBlocked.value = false },
     () => {},
   )
 }
 watch(
-  [() => call.localStream, localVideoEl],
-  ([stream, el]) => attach(el, stream),
-  { flush: 'post' },
-)
-watch(
-  [() => call.remoteStream, remoteVideoEl, remoteAudioEl],
-  ([stream, videoEl, audioEl]) => {
-    attach(videoEl, stream)
-    attach(audioEl, stream)
-  },
+  [() => call.remoteStream, remoteAudioEl],
+  ([stream, audioEl]) => attach(audioEl, stream),
   { flush: 'post' },
 )
 
@@ -76,7 +67,29 @@ watch(
   () => call.status,
   (st) => { if (st === 'idle') speakerBlocked.value = false },
 )
-onBeforeUnmount(() => clearInterval(timer))
+
+// Sounds: ring while a call is incoming, ringback tone for the caller once the
+// other phone is ringing, a short tone when a call that was up ends.
+watch(
+  [() => call.status, () => call.ringing],
+  ([st, ringing], [prevSt] = []) => {
+    stopSounds()
+    if (st !== 'incoming') stopNotify()
+    if (st === 'incoming') {
+      startRingtone()
+      notifyIncoming(call.peer?.name || 'Người dùng')
+    } else if (st === 'outgoing' && ringing) {
+      startRingback()
+    } else if (st === 'idle' && prevSt && prevSt !== 'idle') {
+      playEndTone()
+    }
+  },
+)
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  stopSounds()
+  stopNotify()
+})
 
 const durationLabel = computed(() => {
   const m = String(Math.floor(elapsed.value / 60)).padStart(2, '0')
@@ -111,14 +124,14 @@ watch(
       <template v-if="call.status === 'outgoing'">
         <div class="call-avatar">{{ call.peer?.name?.[0] || '?' }}</div>
         <div class="call-name">{{ call.peer?.name }}</div>
-        <div class="call-sub">Đang gọi...</div>
+        <div class="call-sub">{{ call.ringing ? 'Đang đổ chuông...' : 'Đang gọi...' }}</div>
         <button class="btn btn-danger btn-round" @click="call.endCall()"><AppIcon name="x" /> Huỷ</button>
       </template>
 
       <template v-else-if="call.status === 'incoming'">
         <div class="call-avatar">{{ call.peer?.name?.[0] || '?' }}</div>
         <div class="call-name">{{ call.peer?.name }}</div>
-        <div class="call-sub">{{ call.video ? 'Cuộc gọi video đến...' : 'Cuộc gọi thoại đến...' }}</div>
+        <div class="call-sub">Cuộc gọi thoại đến...</div>
         <div class="call-actions">
           <button class="btn btn-danger btn-round" @click="call.rejectCall()"><AppIcon name="x" /> Từ chối</button>
           <button class="btn btn-primary btn-round" @click="call.acceptCall()"><AppIcon name="check" /> Nghe máy</button>
@@ -134,22 +147,18 @@ watch(
       <template v-else-if="call.status === 'connected'">
         <div class="call-name">{{ call.peer?.name }}</div>
         <div class="call-sub">{{ durationLabel }}</div>
+        <div v-if="call.reconnecting" class="call-health warn">Mất kết nối mạng, đang kết nối lại…</div>
         <div v-if="call.health.text" class="call-health" :class="call.health.level">{{ call.health.text }}</div>
         <button v-if="speakerBlocked" class="btn btn-primary btn-sm" @click="enableSpeaker"><AppIcon name="volume-2" /> Bấm để bật loa</button>
 
-        <div class="video-area" :class="{ 'has-video': call.video }">
-          <video v-if="call.video" ref="remoteVideoEl" class="remote-video" autoplay playsinline></video>
-          <audio v-else ref="remoteAudioEl" autoplay></audio>
-          <video v-if="call.video" ref="localVideoEl" class="local-video" autoplay playsinline muted></video>
-          <div v-if="!call.video" class="call-avatar big">{{ call.peer?.name?.[0] || '?' }}</div>
+        <div class="video-area">
+          <audio ref="remoteAudioEl" autoplay></audio>
+          <div class="call-avatar big">{{ call.peer?.name?.[0] || '?' }}</div>
         </div>
 
         <div class="call-actions">
           <button class="btn btn-ghost btn-round" :class="{ active: call.muted }" @click="call.toggleMute()">
             <AppIcon :name="call.muted ? 'mic-off' : 'mic'" />
-          </button>
-          <button class="btn btn-ghost btn-round" :class="{ active: call.video }" @click="call.toggleVideo()">
-            <AppIcon name="video" />
           </button>
           <button class="btn btn-danger btn-round" @click="call.endCall()"><AppIcon name="x" /> Kết thúc</button>
         </div>
@@ -268,25 +277,5 @@ watch(
   background: var(--surface-2);
   border-radius: var(--radius-md);
   overflow: hidden;
-}
-.video-area.has-video {
-  min-height: 220px;
-}
-.remote-video {
-  width: 100%;
-  height: 220px;
-  object-fit: cover;
-  background: #000;
-}
-.local-video {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 80px;
-  height: 60px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--card);
-  background: #000;
 }
 </style>

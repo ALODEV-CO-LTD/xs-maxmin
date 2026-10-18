@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package_plans.dart';
 import 'customer_codes.dart';
+import 'deletion_scheduler.dart';
 
 const _uuid = Uuid();
 
@@ -41,6 +42,8 @@ Database _openAppDatabase() {
   for (final u in db.select("SELECT id FROM users WHERE role = 'user'")) {
     ensureCustomerCode(db, u['id'] as String);
   }
+  // Background job that carries out the deletion schedules (K35/K36/S05).
+  startDeletionScheduler(db);
   return db;
 }
 
@@ -75,6 +78,20 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'direct_messages', 'attachment_type', 'TEXT');
   _ensureColumn(db, 'direct_messages', 'attachment_size', 'INTEGER');
   _ensureColumn(db, 'direct_messages', 'attachment_data', 'BLOB');
+  // Mã khôi phục (K07/K08): only a bcrypt hash of the code is stored, never
+  // the code itself (see recovery_codes.dart). The failed-attempt counter and
+  // lock-until timestamp throttle guessing on /api/auth/recover. All nullable
+  // / defaulted so existing accounts simply have "no code yet".
+  _ensureColumn(db, 'users', 'recovery_code_hash', 'TEXT');
+  _ensureColumn(db, 'users', 'recovery_code_created_at', 'TEXT');
+  _ensureColumn(db, 'users', 'recovery_failed_attempts', 'INTEGER NOT NULL DEFAULT 0');
+  _ensureColumn(db, 'users', 'recovery_locked_until', 'TEXT');
+  // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
+  _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
+  // Last-change timestamp of an entry (ISO-8601 UTC). The offline client
+  // sends the value it last saw when it replays an edit; a mismatch means the
+  // entry was changed elsewhere meanwhile (conflict, see entries/[id].dart).
+  _ensureColumn(db, 'data_entries', 'updated_at', 'TEXT');
 }
 
 void _ensureColumn(Database db, String table, String column, String type) {
@@ -85,6 +102,67 @@ void _ensureColumn(Database db, String table, String column, String type) {
 }
 
 void _createSchema(Database db) {
+  // Device sessions (K10/A04/A14/S04): the JWT carries the row id as `sid`;
+  // a row with revoked_at set is rejected by the auth middleware.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS device_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      device_label TEXT,
+      user_agent TEXT,
+      ip TEXT,
+      created_at TEXT NOT NULL,
+      last_seen TEXT NOT NULL,
+      revoked_at TEXT,
+      revoked_by TEXT
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id)');
+
+  // Failed-login counters per account+IP with temporary lock (K03/S03).
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      key TEXT PRIMARY KEY,
+      fail_count INTEGER NOT NULL DEFAULT 0,
+      last_fail_at TEXT NOT NULL,
+      locked_until TEXT
+    );
+  ''');
+
+  // Minimal security event log (NFR-07). Never stores passwords/tokens.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS security_events (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      user_id TEXT,
+      username TEXT,
+      ip TEXT,
+      detail TEXT,
+      created_at TEXT NOT NULL
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)');
+
+  // Call history (voice calls only). Written by the signaling relay, see
+  // call_log.dart. status: ringing | in_progress | completed | missed |
+  // rejected | busy | failed. callee_seen = 0 marks a missed call the callee
+  // has not looked at yet (drives the "cuộc gọi nhỡ" badge).
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS call_logs (
+      id TEXT PRIMARY KEY,
+      caller_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      callee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      answered_at TEXT,
+      ended_at TEXT,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      callee_seen INTEGER NOT NULL DEFAULT 0
+    );
+  ''');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_id, created_at)');
+  db.execute('CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_id, created_at)');
+
   db.execute('''
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -224,6 +302,34 @@ void _createSchema(Database db) {
     );
   ''');
 
+  // Admin broadcast notices (bảo trì, đổi chính sách...) shown as a banner
+  // to every user (A16). `active = 0` hides one without deleting it.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL DEFAULT 'info' CHECK (kind IN ('info', 'maintenance', 'policy')),
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      created_by TEXT REFERENCES users(id)
+    );
+  ''');
+
+  // Per-customer entry-syntax template (K16): the user confirms how THIS
+  // customer writes their messages (type aliases, stake markers...). `config`
+  // is a JSON object. Never learned automatically - only saved on request.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS customer_syntax_templates (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      customer_name TEXT NOT NULL,
+      config TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (user_id, customer_name)
+    );
+  ''');
+
   // A user's own customer roster - entering data (data_entries) is meant
   // to pick a name FROM here (see routes/api/me/entries), not free-type a
   // new one each time, so a typo doesn't silently create a duplicate
@@ -237,6 +343,30 @@ void _createSchema(Database db) {
       name TEXT NOT NULL,
       created_at TEXT NOT NULL,
       UNIQUE (user_id, name)
+    );
+  ''');
+
+  // User-set deletion schedules (K35/K36/S05). `kind` is 'data' (the user's
+  // own saved entries, optionally narrowed by customer and/or date range) or
+  // 'chat' (messages/images in one friend conversation older than
+  // `ttl_seconds`, re-applied every run until cancelled). 'data' schedules
+  // run once at `run_at`; `friend_id`/`ttl_seconds` apply to 'chat' only.
+  db.execute('''
+    CREATE TABLE IF NOT EXISTS deletion_schedules (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('data', 'chat')),
+      customer_name TEXT,
+      date_from TEXT,
+      date_to TEXT,
+      friend_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      chat_scope TEXT,
+      ttl_seconds INTEGER,
+      run_at TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'cancelled')),
+      deleted_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      executed_at TEXT
     );
   ''');
 }

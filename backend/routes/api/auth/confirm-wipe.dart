@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/security.dart';
+import 'package:server/src/sessions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// Only reachable with a [wipeToken] from a login attempt that matched the
@@ -29,19 +30,28 @@ Future<Response> onRequest(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu thông tin xác thực'});
   }
 
+  final db = context.read<Database>();
+  // Invalid/expired tokens count as failed attempts (per IP) so the endpoint
+  // can't be hammered; a lock only delays, it never deletes anything.
+  final ip = clientIp(context);
+  final wait = lockedSecondsLeft(db, '-confirm-wipe', ip);
+  if (wait > 0) return lockedResponse(wait);
+
   final userId = verifyPendingWipeToken(wipeToken);
   if (userId == null) {
+    final lock = recordLoginFailure(db, '-confirm-wipe', ip);
+    if (lock > 0) return lockedResponse(lock);
     return Response.json(
       statusCode: 401,
       body: {'error': 'Yêu cầu đã hết hạn, vui lòng thử đăng nhập lại'},
     );
   }
 
-  final db = context.read<Database>();
   db.execute('DELETE FROM data_entries WHERE user_id = ?', [userId]);
   db.execute('DELETE FROM messages WHERE user_id = ?', [userId]);
   db.execute('DELETE FROM transactions WHERE user_id = ?', [userId]);
   db.execute('UPDATE users SET data_used = 0 WHERE id = ?', [userId]);
+  logSecurityEvent(db, 'data_wiped', userId: userId, ip: ip, detail: 'Xoá dữ liệu bằng mật khẩu xoá (đăng nhập)');
 
   return Response.json(body: {'ok': true});
 }

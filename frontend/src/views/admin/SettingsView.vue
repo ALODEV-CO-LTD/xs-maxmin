@@ -87,6 +87,7 @@ async function load() {
       p[pkg.wire] = raw.value[keyFor(pkg.wire)] ?? ''
     }
     prices.value = p
+    maxIds.value = raw.value.max_virtual_ids ?? ''
     bank.value = {
       bank_bin: raw.value.bank_bin ?? '',
       bank_account_number: raw.value.bank_account_number ?? '',
@@ -99,7 +100,28 @@ async function load() {
   }
 }
 
-const bankKeys = ['bank_name', 'bank_bin', 'bank_account_number', 'bank_account_holder']
+const bankKeys = ['bank_name', 'bank_bin', 'bank_account_number', 'bank_account_holder', 'max_virtual_ids']
+
+// Cap on Mã ID per customer account (settings.max_virtual_ids, default 5).
+const maxIds = ref('')
+const maxIdsSaving = ref(false)
+const maxIdsSaved = ref(false)
+const maxIdsError = ref('')
+
+async function saveMaxIds() {
+  maxIdsSaving.value = true
+  maxIdsSaved.value = false
+  maxIdsError.value = ''
+  try {
+    raw.value = await api.put('/admin/settings', { max_virtual_ids: String(maxIds.value).trim() || '5' })
+    maxIds.value = raw.value.max_virtual_ids ?? ''
+    maxIdsSaved.value = true
+  } catch (err) {
+    maxIdsError.value = err instanceof ApiError ? err.message : 'Không thể lưu giới hạn ID ảo'
+  } finally {
+    maxIdsSaving.value = false
+  }
+}
 
 const otherKeys = computed(() =>
   Object.keys(raw.value).filter((k) => !packages.some((p) => keyFor(p.wire) === k) && !bankKeys.includes(k)),
@@ -166,7 +188,27 @@ async function resetPrice(wire) {
   await save()
 }
 
+// Recent security events (failed logins, lockouts, session revocations, wipes)
+const events = ref([])
+const eventsError = ref('')
+const EVENT_LABELS = {
+  login_failed: 'Đăng nhập sai',
+  login_locked: 'Khoá tạm đăng nhập',
+  session_revoked: 'Thu hồi phiên',
+  data_wiped: 'Xoá dữ liệu',
+}
+
+async function loadEvents() {
+  eventsError.value = ''
+  try {
+    events.value = (await api.get('/admin/security-events?limit=50')).events || []
+  } catch (err) {
+    eventsError.value = err instanceof ApiError ? err.message : 'Không thể tải nhật ký bảo mật'
+  }
+}
+
 onMounted(load)
+onMounted(loadEvents)
 </script>
 
 <template>
@@ -204,6 +246,20 @@ onMounted(load)
         </button>
       </form>
 
+      <h2>Giới hạn ID ảo</h2>
+      <p class="page-subtitle">Số Mã ID (ID ảo) tối đa mỗi tài khoản khách hàng được tạo. Mặc định 5.</p>
+      <form class="card" @submit.prevent="saveMaxIds">
+        <div v-if="maxIdsError" class="alert alert-error">{{ maxIdsError }}</div>
+        <div v-if="maxIdsSaved" class="alert alert-success">Đã lưu giới hạn ID ảo</div>
+        <div class="field">
+          <label>Số ID tối đa mỗi tài khoản (1-100)</label>
+          <input v-model="maxIds" type="number" min="1" max="100" placeholder="5" />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" :disabled="maxIdsSaving">
+          {{ maxIdsSaving ? 'Đang lưu...' : 'Lưu giới hạn' }}
+        </button>
+      </form>
+
       <h2>Giá gói dịch vụ</h2>
       <form class="card" @submit.prevent="save">
       <div v-for="pkg in packages" :key="pkg.wire" class="field">
@@ -231,6 +287,33 @@ onMounted(load)
       </button>
     </form>
     </template>
+
+    <h2 style="margin-top: 32px">Nhật ký bảo mật gần đây</h2>
+    <p class="page-subtitle">Không ghi mật khẩu hay token.</p>
+    <div v-if="eventsError" class="alert alert-error">{{ eventsError }}</div>
+    <div class="card" style="padding: 0">
+      <div v-if="events.length === 0" style="padding: 16px">Chưa có sự kiện nào.</div>
+      <table v-else class="table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Sự kiện</th>
+            <th>Tài khoản</th>
+            <th>IP</th>
+            <th>Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="e in events" :key="e.id">
+            <td>{{ new Date(e.createdAt).toLocaleString('vi-VN') }}</td>
+            <td>{{ EVENT_LABELS[e.type] || e.type }}</td>
+            <td>{{ e.username || '-' }}</td>
+            <td>{{ e.ip || '-' }}</td>
+            <td>{{ e.detail || '' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <template v-if="!loading && otherKeys.length > 0">
       <h2 style="margin-top: 32px">Các khoá cài đặt khác</h2>

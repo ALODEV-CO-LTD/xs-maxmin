@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/security.dart';
+import 'package:server/src/sessions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// Step 2 of login: exchanges a pending token (from a step-1 login that
@@ -41,9 +42,17 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final row = rows.first;
+  // Same counter as login (account+IP) so step 2 can't be brute-forced by
+  // re-running step 1 - see routes/api/auth/login.dart.
+  final username = row['username'] as String;
+  final ip = clientIp(context);
+  final wait = lockedSecondsLeft(db, username, ip);
+  if (wait > 0) return lockedResponse(wait);
   final secondPasswordHash = row['second_password_hash'] as String?;
   if (secondPasswordHash != null && BCrypt.checkpw(password, secondPasswordHash)) {
-    final token = issueToken(userId: userId, role: row['role'] as String);
+    clearLoginFailures(db, username, ip);
+    final sessionId = createSession(db, userId, context);
+    final token = issueToken(userId: userId, role: row['role'] as String, sessionId: sessionId);
     return Response.json(body: {'token': token, 'role': row['role']});
   }
 
@@ -61,5 +70,7 @@ Future<Response> onRequest(RequestContext context) async {
     });
   }
 
+  final lock = recordLoginFailure(db, username, ip, userId: userId);
+  if (lock > 0) return lockedResponse(lock);
   return Response.json(statusCode: 401, body: {'error': 'Mật khẩu lớp hai không đúng'});
 }

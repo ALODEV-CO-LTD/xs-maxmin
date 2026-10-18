@@ -5,7 +5,8 @@
 -->
 <script setup>
 import AppIcon from '../../components/AppIcon.vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useNotifyStore } from '../../stores/notify'
 import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../../api'
 import ChatAttachButtons from '../../components/ChatAttachButtons.vue'
@@ -25,8 +26,8 @@ const sending = ref(false)
 const attachment = ref(null) // File waiting to be sent with the next reply
 const sendError = ref('')
 
-async function load() {
-  loading.value = true
+async function load({ quiet = false } = {}) {
+  if (!quiet) loading.value = true
   error.value = ''
   try {
     const res = await api.get(`/admin/messages/${userId}`)
@@ -61,12 +62,27 @@ function goBack() {
   router.push({ name: 'admin-messages' })
 }
 
-onMounted(load)
+const notify = useNotifyStore()
+// The customer wrote again while this thread is open (pushed over the WebSocket).
+watch(
+  () => notify.incomingTick,
+  () => {
+    const m = notify.lastIncoming
+    if (m?.source === 'support' && m.from === userId) {
+      load({ quiet: true })
+      notify.clear(`support:${userId}`)
+    }
+  },
+)
+
+onMounted(() => {
+  notify.clear(`support:${userId}`)
+  load()
+})
 </script>
 
 <template>
   <div class="page">
-    <button class="btn btn-ghost btn-sm" style="margin-bottom: 8px" @click="goBack"><AppIcon name="arrow-left" /> Quay lại</button>
     <h1 class="page-title">Cuộc trò chuyện</h1>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
