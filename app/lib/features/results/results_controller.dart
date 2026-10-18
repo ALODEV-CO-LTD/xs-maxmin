@@ -181,7 +181,7 @@ class ResultsController extends ChangeNotifier {
     entriesError = null;
     notifyListeners();
     try {
-      final r = await Future.wait([fetchAllEntries(api), fetchCustomers(api).catchError((_) => <CustomerRec>[]), fetchAccountRates(api)]);
+      final r = await Future.wait([fetchAllEntries(api, overlay: true), fetchCustomers(api).catchError((_) => <CustomerRec>[]), fetchAccountRates(api)]);
       entries = r[0] as List<Entry>;
       customers = r[1] as List<CustomerRec>;
       rates = r[2] as RatesMap;
@@ -565,7 +565,7 @@ class ResultsController extends ChangeNotifier {
     syncError = null;
     undoItems = null;
     try {
-      entries = await fetchAllEntries(api);
+      entries = await fetchAllEntries(api, overlay: true);
     } catch (_) {/* score what is already loaded */}
     final changes = <({Entry e, String value, String prev})>[];
     for (final e in List<Entry>.of(entries)) {
