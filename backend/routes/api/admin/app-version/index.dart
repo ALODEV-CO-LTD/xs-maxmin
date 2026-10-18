@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/app_version.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/permissions.dart';
@@ -21,12 +20,9 @@ Future<Response> onRequest(RequestContext context) async {
     case HttpMethod.get:
       return Response.json(body: loadAppVersion(db).toJson());
     case HttpMethod.put:
-      final Map<String, dynamic> body;
-      try {
-        body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-      } catch (_) {
-        return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-      }
+      final read = await readJsonBody(context, smallBodyMaxBytes);
+      if (read.error != null) return read.error!;
+      final body = read.body!;
       final before = loadAppVersion(db);
       final error = validateAppVersionInput(body, before);
       if (error != null) return Response.json(statusCode: 400, body: {'error': error});

@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/reauth_limit.dart';
 import 'package:server/src/recovery_codes.dart';
@@ -20,12 +19,9 @@ Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
 
-  final Map<String, dynamic> body;
-  try {
-    body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-  }
+  final read = await readJsonBody(context, smallBodyMaxBytes);
+  if (read.error != null) return read.error!;
+  final body = read.body!;
 
   final self = loadSelfRow(context, auth.userId);
   if (self == null) return unauthorized('Tài khoản không tồn tại');

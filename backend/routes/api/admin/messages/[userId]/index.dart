@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/attachments.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/permissions.dart';
@@ -55,12 +54,9 @@ Response _list(RequestContext context, String userId) {
 }
 
 Future<Response> _reply(RequestContext context, String adminId, String userId) async {
-  final Map<String, dynamic> body;
-  try {
-    body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-  }
+  final read = await readJsonBody(context, messageBodyMaxBytes);
+  if (read.error != null) return read.error!;
+  final body = read.body!;
   final content = (body['content'] as String?)?.trim() ?? '';
   final parsed = parseAttachment(body['attachment']);
   if (parsed.error != null) {

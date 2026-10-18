@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/permissions.dart';
 import 'package:server/src/recovery_requests.dart';
@@ -21,12 +20,9 @@ Future<Response> onRequest(RequestContext context, String id) async {
   final denied = denyUnless(context, auth, 'users.recovery');
   if (denied != null) return denied;
 
-  final Map<String, dynamic> body;
-  try {
-    body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-  }
+  final read = await readJsonBody(context, smallBodyMaxBytes);
+  if (read.error != null) return read.error!;
+  final body = read.body!;
   final action = body['action'];
   if (action != 'approve' && action != 'reject') {
     return Response.json(statusCode: 400, body: {'error': "action phải là 'approve' hoặc 'reject'"});

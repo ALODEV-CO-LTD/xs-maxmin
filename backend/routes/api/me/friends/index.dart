@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/rate_gate.dart';
@@ -20,12 +21,9 @@ Future<Response> onRequest(RequestContext context) async {
 /// Dispatches to add-by-code (existing flow, code shared out-of-band) or
 /// add-by-id (new: picked directly from `GET /me/friends/search` results).
 Future<Response> _add(RequestContext context, String userId) async {
-  final Map<String, dynamic> body;
-  try {
-    body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-  }
+  final read = await readJsonBody(context, smallBodyMaxBytes);
+  if (read.error != null) return read.error!;
+  final body = read.body!;
   if ((body['userId'] != null && body['userId'] is! String) || (body['code'] != null && body['code'] is! String)) {
     return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
   }

@@ -544,7 +544,7 @@ void seedDatabase(Database db, Map<String, String> env, {void Function(String li
     INSERT INTO users (id, name, username, password_hash, role, package_type, status, created_at)
     VALUES (?, ?, ?, ?, 'admin', 'none', 'active', ?)
     ''',
-    [adminId, 'Admin', '1', hash(adminPassword!), now.toIso8601String()],
+    [adminId, 'Admin', '1', hash(adminPassword), now.toIso8601String()],
   );
   if (generated) (log ?? stderr.writeln)('[seed] admin password: $adminPassword');
 
