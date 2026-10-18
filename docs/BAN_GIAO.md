@@ -406,3 +406,10 @@ Tạo nhóm hoạt động ở app và web, **không cần máy chủ lưu gì**
 - **Bàn phím số:** ô Số/Điểm dùng bàn phím hệ thống lớp "số và dấu chấm câu" (`core/keyboard.dart`), chỉ nhận chữ số và `. , -`. Lỗi camera/ảnh có câu hướng dẫn bật quyền (`core/photo_errors.dart`).
 - **Kiểm thử trên máy thật:** `app/integration_test/offline_real_test.dart` chạy trên điện thoại/máy ảo với **backend thật** và bộ nhớ thật của máy, chỉ giả lập mất mạng. Đạt trên máy ảo Android và **iPhone 12** (iPhone cần backend thử qua IP mạng nội bộ; khi chạy thử phải thêm tạm `NSAppTransportSecurity > NSAllowsLocalNetworking` vào `ios/Runner/Info.plist` rồi bỏ đi; iPhone kết nối không dây phải dùng `flutter run -t integration_test/offline_real_test.dart --publish-port` vì `flutter test` không hỗ trợ).
 - **Còn chưa làm:** sửa số điện thoại / cấu hình tính điểm của khách đã xếp hàng chờ (báo "chờ đồng bộ"); xoá hàng loạt có mật khẩu và đặt lịch xoá vẫn cần mạng; kiểm tay offline bằng chế độ máy bay trên điện thoại (mới có kiểm tự động).
+
+## Nhật ký 18/10/2026 (tối): danh mục đài có sẵn trong app, tính điểm Miền Nam/Trung offline (app 1.4.12 (18))
+
+- **Lỗi:** danh mục đài và lịch quay theo thứ (`GET /lottery-stations`) chỉ được tải khi có mạng và không lưu lại, nên offline chỉ còn Miền Bắc; số liệu và kết quả Miền Nam/Trung không tính được điểm. Công thức tỉ lệ ăn mặc định (`defaultRates`) thì đã có sẵn trong app.
+- **Sửa:** `app/lib/core/lottery_catalog.dart` chứa **bản sao danh mục có sẵn trong app** (3 miền, 35 đài, lịch theo thứ, cấu trúc giải; nguồn là `backend/lib/src/lottery_stations.dart`, đổi bên đó phải đổi cả bản sao này). `LotteryStations` dùng bản có sẵn ngay từ đầu; khi máy chủ trả lời thì dùng bản của máy chủ và **lưu lại trên máy** (`xoso_stations_catalog`) cho lần sau mất mạng. Màn Tính toán trong chat dùng danh mục này kể cả khi chưa tải được.
+- **Số gõ offline lúc chưa từng đồng bộ:** không còn báo lỗi "chưa có số liệu đã lưu" khi đã có số đang chờ gửi.
+- **Còn lại:** lần đăng nhập đầu tiên vẫn cần mạng (xác thực tài khoản); sau đó dùng offline hoàn toàn. Chế độ dùng ngay không cần tài khoản chưa có.

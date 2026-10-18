@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
+import 'lottery_catalog.dart';
 
 /// One prize group of a region: how many numbers it has and how many digits each number has.
 class Prize {
@@ -57,18 +61,40 @@ const regionIds = ['mb', 'mt', 'mn'];
 /// source of truth). An entry's `station` is 'mb' (or empty), a region code ('mt'/'mn' = every station of that region
 /// drawing that day) or one station id ('mn-tphcm').
 class LotteryStations extends ChangeNotifier {
-  List<Region> regions = [];
+  /// Starts as the catalog BUILT INTO the app (all three regions, so Miền Nam / Miền Trung work with no network). The server's
+  /// answer replaces it once it arrives, and is also kept on the phone for the next time the network is down.
+  List<Region> regions = builtInRegions;
   bool loaded = false;
   Future<void>? _loading;
+  static const _cacheKey = 'xoso_stations_catalog';
 
   Future<void> load(ApiClient api) {
     if (loaded) return Future.value();
-    return _loading ??= api.get('/lottery-stations').then((res) {
-      regions = [for (final r in (res['regions'] as List)) Region.fromJson(Map<String, dynamic>.from(r as Map))];
+    return _loading ??= _fetch(api).whenComplete(() => _loading = null);
+  }
+
+  Future<void> _fetch(ApiClient api) async {
+    try {
+      final res = await api.get('/lottery-stations');
+      regions = _parse(res);
       loaded = true;
       notifyListeners();
-    }).catchError((_) {/* offline: Miền Bắc keeps working */}).whenComplete(() => _loading = null);
+      try {
+        (await SharedPreferences.getInstance()).setString(_cacheKey, jsonEncode(res));
+      } catch (_) {/* keeping a copy is best effort */}
+    } catch (_) {
+      // Offline: the copy of the last answer, else the built-in catalog (already in place).
+      try {
+        final raw = (await SharedPreferences.getInstance()).getString(_cacheKey);
+        if (raw != null) {
+          regions = _parse(jsonDecode(raw));
+          notifyListeners();
+        }
+      } catch (_) {/* keep the built-in catalog */}
+    }
   }
+
+  static List<Region> _parse(dynamic res) => [for (final r in (res['regions'] as List)) Region.fromJson(Map<String, dynamic>.from(r as Map))];
 
   List<Region> get regionList => regions.isEmpty ? [_mbFallback] : regions;
 

@@ -16,7 +16,8 @@ Future<List<Entry>> fetchAllEntries(ApiClient api, {bool overlay = false}) async
   final store = await OfflineStore.open(api, api.auth);
   final r = await store.loadAllEntries(overlay: overlay);
   DataSource.fromCache = r.fromCache;
-  if (r.noCache) throw ApiError(0, 'Đang offline và chưa có số liệu đã lưu trên máy. Hãy mở app khi có mạng một lần.');
+  // offline with nothing saved yet: an error only when there is not even a number typed offline waiting to be sent
+  if (r.noCache && r.entries.isEmpty) throw ApiError(0, 'Đang offline và chưa có số liệu đã lưu trên máy. Hãy mở app khi có mạng một lần.');
   return [for (final e in r.entries) Entry.fromJson(Map<String, dynamic>.from(e.toJson()))];
 }
 

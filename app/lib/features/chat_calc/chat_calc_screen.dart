@@ -73,7 +73,7 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
 
   List<String> get _stationIds => ['mb', ...svc.stations.stationsOn('mt', widget.date), ...svc.stations.stationsOn('mn', widget.date)];
   String _nameFor(String id) => id == 'mb' ? 'Miền Bắc' : svc.stations.stationName(id);
-  String _regionOf(String id) => svc.stations.loaded ? svc.stations.regionOf(id).id : defaultRegionOf(id);
+  String _regionOf(String id) => svc.stations.regionOf(id).id;
 
   Future<void> _confirmStation() async {
     if (_selected.isEmpty) return;

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
 import 'package:mamba_app/core/auth_store.dart';
+import 'package:mamba_app/core/lottery_stations.dart';
 import 'package:mamba_app/features/entries/offline_store.dart';
 import 'package:mamba_app/features/results/results_controller.dart';
 import 'package:mamba_app/features/scoring/scoring_controller.dart';
@@ -205,4 +206,52 @@ void main() {
     expect(s.customers.map((c) => c['name']), ['An', 'Dũng', 'Cường']);
     expect(await store.pendingCount(), 0);
   });
+
+  test('Miền Nam works with NO network and without ever having loaded the catalog: stations come from the built-in copy', () async {
+    final s = _Server();
+    s.entries
+      ..clear()
+      ..add({'id': 's1', 'customerName': 'An', 'entryDate': day, 'value': '47', 'score': '10', 'betType': 'lo', 'station': 'mn-dongnai', 'result': null})
+      ..add({'id': 's2', 'customerName': 'An', 'entryDate': day, 'value': '56', 'score': '100000', 'betType': 'de', 'station': 'mn-cantho', 'result': null});
+    final api = s.api();
+    // the phone opened the day once online (entries, customers and rates are kept), but NOT the station catalog
+    await fetchOnce(api);
+    s.offline = true;
+
+    final stations = LotteryStations(); // never loaded: only what is built into the app
+    await stations.load(api); // offline: must not fail
+    expect(stations.regionList.map((r) => r.id), ['mb', 'mt', 'mn']);
+    expect(stations.stationsOn('mn', day), ['mn-dongnai', 'mn-cantho', 'mn-soctrang']); // 2026-10-07 is a Wednesday
+    expect(stations.regionOf('mn-dongnai').id, 'mn');
+
+    final results = ResultsController(api, stations, initialDate: day);
+    await results.init();
+    expect(results.entries.length, 2);
+    results.setRegion('mn');
+    await Future<void>.delayed(Duration.zero);
+    await results.loadDay();
+    expect(results.boardStations, ['mn-dongnai', 'mn-cantho', 'mn-soctrang']);
+    final tam = results.structure.firstWhere((p) => p.tier == 'giaiTam');
+    for (final st in ['mn-dongnai', 'mn-cantho']) {
+      for (final p in results.structure) {
+        for (var k = 0; k < p.count; k++) {
+          results.setCell(st, p, k, p.tier == 'giaiTam' ? '47' : (p.tier == 'dacBiet' && st == 'mn-cantho' ? '999956' : '1' * p.digits));
+        }
+      }
+    }
+    expect(tam.digits, 2);
+    await results.save();
+    expect(results.error, isNull);
+    // the points are worked out with no network: lô 47 at đồng nai (giải tám 47 appears once), đề 56 at cần thơ (đặc biệt …56)
+    final byId = {for (final e in results.entries) e.id: e};
+    expect(byId['s1']!.result, isNotEmpty);
+    expect(byId['s2']!.result, '7000000'); // 100.000 x 70
+  });
+}
+
+Future<void> fetchOnce(ApiClient api) async {
+  final store = await OfflineStore.open(api, api.auth);
+  await store.loadAllEntries();
+  await store.cachedGet('/me/customers');
+  await store.cachedGet('/me/scoring-settings');
 }
