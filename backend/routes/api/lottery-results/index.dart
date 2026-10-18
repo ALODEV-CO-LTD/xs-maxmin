@@ -39,6 +39,17 @@ Map<String, dynamic> _rowToJson(Row r) => {
       'updatedAt': r['updated_at'],
     };
 
+final _drawDatePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+/// True for a real calendar date written exactly `YYYY-MM-DD`.
+bool isValidDrawDate(String s) {
+  if (!_drawDatePattern.hasMatch(s)) return false;
+  final d = DateTime.tryParse(s);
+  if (d == null) return false;
+  final two = (int n) => n.toString().padLeft(2, '0');
+  return '${d.year.toString().padLeft(4, '0')}-${two(d.month)}-${two(d.day)}' == s;
+}
+
 Response _get(RequestContext context, String userId) {
   final qp = context.request.uri.queryParameters;
   final date = qp['date'];
@@ -73,17 +84,21 @@ Future<Response> _upsert(RequestContext context, String userId) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
-  final drawDate = (body['drawDate'] as String?)?.trim();
-  if (drawDate == null || drawDate.isEmpty) {
+  final rawDate = body['drawDate'];
+  if (rawDate == null || (rawDate is String && rawDate.trim().isEmpty)) {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu ngày (drawDate)'});
   }
-  try {
-    DateTime.parse(drawDate);
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Ngày không hợp lệ'});
+  // Strictly YYYY-MM-DD: any other form ("2026-10-18 00:00") would be stored under a key the lookups never find.
+  final drawDate = rawDate is String ? rawDate.trim() : null;
+  if (drawDate == null || !isValidDrawDate(drawDate)) {
+    return Response.json(statusCode: 400, body: {'error': 'Ngày không hợp lệ (định dạng YYYY-MM-DD)'});
   }
 
-  final station = (body['station'] as String?)?.trim() ?? 'mb';
+  final rawStation = body['station'];
+  if (rawStation != null && rawStation is! String) {
+    return Response.json(statusCode: 400, body: {'error': 'Đài không hợp lệ'});
+  }
+  final station = (rawStation as String?)?.trim() ?? 'mb';
   if (!isResultStation(station)) {
     return Response.json(statusCode: 400, body: {'error': 'Đài không hợp lệ'});
   }

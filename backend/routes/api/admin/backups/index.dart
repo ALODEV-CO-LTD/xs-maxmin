@@ -46,9 +46,54 @@ List<Map<String, Object?>> listBackups() {
   ];
 }
 
+/// Keeps at most this many backups; the oldest beyond that are deleted after a new one is made.
+const maxBackups = 20;
+
+/// Refuse a new backup when the disk has less than this free.
+const minFreeBytes = 200 * 1024 * 1024;
+
+/// Deletes the oldest `xoso-*.db` files in [dir] beyond [keep] (names carry a UTC timestamp, so name order = age).
+/// Returns how many were removed.
+int pruneBackups(Directory dir, {int keep = maxBackups}) {
+  if (!dir.existsSync()) return 0;
+  final files = dir
+      .listSync()
+      .whereType<File>()
+      .where((f) => p.basename(f.path).startsWith('xoso-') && f.path.endsWith('.db'))
+      .toList()
+    ..sort((a, b) => b.path.compareTo(a.path));
+  var removed = 0;
+  for (final f in files.skip(keep)) {
+    try {
+      f.deleteSync();
+      removed++;
+    } catch (_) {}
+  }
+  return removed;
+}
+
+/// Free bytes on the disk holding [dir], or null when it cannot be determined (`df -k`).
+int? freeDiskBytes(Directory dir) {
+  try {
+    final r = Process.runSync('df', ['-k', dir.path]);
+    if (r.exitCode != 0) return null;
+    final lines = (r.stdout as String).trim().split('\n');
+    if (lines.length < 2) return null;
+    final cols = lines.last.trim().split(RegExp(r'\s+'));
+    final kb = int.tryParse(cols.length > 3 ? cols[3] : '');
+    return kb == null ? null : kb * 1024;
+  } catch (_) {
+    return null;
+  }
+}
+
 Response _create(RequestContext context) {
   final dir = backupDir();
   if (!dir.existsSync()) dir.createSync(recursive: true);
+  final free = freeDiskBytes(dir);
+  if (free != null && free < minFreeBytes) {
+    return Response.json(statusCode: 507, body: {'error': 'Ổ đĩa còn trống quá ít (dưới 200 MB), chưa thể sao lưu'});
+  }
   final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
   final name = 'xoso-$stamp.db';
   final path = p.join(dir.path, name);
@@ -58,6 +103,7 @@ Response _create(RequestContext context) {
     return Response.json(statusCode: 500, body: {'error': 'Không tạo được bản sao lưu'});
   }
   final f = File(path);
+  pruneBackups(dir);
   return Response.json(
     statusCode: 201,
     body: {
