@@ -50,3 +50,12 @@ export function badgeText(n) {
   const v = Number(n) || 0
   return v > 99 ? '99+' : v > 0 ? String(v) : ''
 }
+
+/**
+ * Whether the "Lời mời kết bạn" block is shown. With the bottom bar it lives on the Danh bạ tab; the web build has NO bottom
+ * bar (the only list is "chats"), so there it must show above that list or the requests could never be reached.
+ */
+export function showRequestsBlock(tab, hasBottomNav, hasRequests) {
+  if (!hasRequests) return false
+  return hasBottomNav ? tab === 'contacts' : tab === 'chats' || tab === 'contacts'
+}

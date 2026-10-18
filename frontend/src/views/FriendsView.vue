@@ -37,6 +37,7 @@ import { useAuthStore } from '../stores/auth'
 import { useNotifyStore } from '../stores/notify'
 import {
   badgeText, incomingFrom, interpretAddResponse, normalizeRequests, removeRequest, searchAction, upsertFriend,
+  showRequestsBlock,
 } from '../friendRequests'
 
 const route = useRoute()
@@ -971,7 +972,7 @@ async function acceptKey() {
           <!-- Tin nhắn / Danh bạ -->
           <template v-if="tab === 'chats' || tab === 'contacts'">
             <!-- Lời mời kết bạn -->
-            <div v-if="tab === 'contacts' && hasRequests" class="card req-block">
+            <div v-if="showRequestsBlock(tab, SHOW_BOTTOM_NAV, hasRequests)" class="card req-block">
               <div class="req-title">
                 <strong>Lời mời kết bạn</strong>
                 <span v-if="notify.friendRequests" class="unread-badge" title="Lời mời chưa trả lời">{{ badgeText(notify.friendRequests) }}</span>

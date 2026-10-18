@@ -50,3 +50,12 @@ test('badgeText', () => {
   assert.equal(badgeText(3), '3')
   assert.equal(badgeText(150), '99+')
 })
+
+test('the requests block is reachable on the web (no bottom bar) and stays on Danh bạ when there is a bar', async () => {
+  const { showRequestsBlock } = await import('../src/friendRequests.js')
+  assert.equal(showRequestsBlock('chats', false, true), true) // web: the chats list is the only list
+  assert.equal(showRequestsBlock('contacts', false, true), true)
+  assert.equal(showRequestsBlock('chats', true, true), false) // with the bottom bar it belongs to Danh bạ
+  assert.equal(showRequestsBlock('contacts', true, true), true)
+  assert.equal(showRequestsBlock('chats', false, false), false) // nothing to show
+})
