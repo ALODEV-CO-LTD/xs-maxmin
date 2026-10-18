@@ -2,6 +2,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image_picker/image_picker.dart';
 
 import 'lottery_columns.dart';
+import '../../core/photo_errors.dart';
 
 /// What the reader found in a photo.
 class OcrResult {
@@ -42,6 +43,8 @@ class OcrService {
 
 /// The sentence shown for any failure of the reader.
 String describeOcrError(Object err) {
+  final photo = describePhotoError(err);
+  if (photo != null) return photo;
   final t = '$err';
   if (RegExp(r'memory|OutOfMemory', caseSensitive: false).hasMatch(t)) {
     return 'Ảnh quá lớn hoặc thiết bị không đủ bộ nhớ để đọc. Hãy chụp hoặc cắt ảnh nhỏ hơn rồi thử lại.';

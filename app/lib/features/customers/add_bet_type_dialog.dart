@@ -5,6 +5,7 @@ import '../../core/widgets/app_dialog.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/keyboard.dart';
 
 /// What the user typed in "Kiểu đánh khác".
 class NewBetType {
@@ -101,7 +102,7 @@ class _AddBetTypeDialogState extends State<_AddBetTypeDialog> {
   }
 
   List<Widget> _newFields() {
-    const num = TextInputType.numberWithOptions(decimal: true);
+    const num = kNumbersKeyboard;
     return [
         TextField(controller: _name, maxLength: 30, decoration: const InputDecoration(labelText: 'Tên', hintText: 'Ví dụ: Tài xỉu', counterText: '')),
         const SizedBox(height: 10),

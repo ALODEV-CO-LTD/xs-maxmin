@@ -11,6 +11,7 @@ import 'customer_model.dart';
 import 'scoring_editor_model.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/keyboard.dart';
 
 /// Cấu hình tính điểm, one editor for both places:
 ///  - [customer] == null: the account-wide default (GET/PUT /me/scoring-settings);
@@ -319,7 +320,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                 child: TextFormField(
                   key: ValueKey('price-$k'),
                   initialValue: r.price,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: kNumbersKeyboard,
                   decoration: const InputDecoration(labelText: 'Giá tiền / 1 điểm', isDense: true),
                   onChanged: (v) => setState(() => r.price = v),
                 ),
@@ -329,7 +330,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                 child: TextFormField(
                   key: ValueKey('payout-$k'),
                   initialValue: r.payout,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: kNumbersKeyboard,
                   decoration: InputDecoration(labelText: 'Giá trúng / 1 điểm', isDense: true, errorText: notSet ? 'Chưa nhập' : null),
                   onChanged: (v) => setState(() => r.payout = v),
                 ),

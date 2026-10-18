@@ -9,6 +9,7 @@ import 'dialogs.dart';
 import 'entries_controller.dart';
 import 'entry_model.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/keyboard.dart';
 
 /// "Chỉnh sửa số liệu": customer / hạng mục / ngày are read-only info; số, điểm vào and ghi chú can change.
 Future<void> showEditEntry(BuildContext context, EntriesController c, Entry entry) {
@@ -71,7 +72,7 @@ class _EditEntryState extends State<_EditEntry> {
         if (_error.isNotEmpty) InfoBox(_error),
         TextField(controller: _value, autofocus: true, enabled: !_busy, decoration: const InputDecoration(labelText: 'Số liệu')),
         const SizedBox(height: 12),
-        TextField(controller: _score, enabled: !_busy, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Điểm vào')),
+        TextField(controller: _score, enabled: !_busy, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(labelText: 'Điểm vào')),
         if ((e.result ?? '').isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),

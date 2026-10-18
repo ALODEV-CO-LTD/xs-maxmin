@@ -1,6 +1,7 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'message_parser.dart';
+import '../../core/photo_errors.dart';
 
 /// On-device text recognition (ML Kit): the photo never leaves the phone. Throws on failure.
 Future<String> recognizeImageText(String path) async {
@@ -32,6 +33,8 @@ List<ParsedRow> suggestionsFromOcr(String text, {List<String> betTypes = const [
 
 /// Friendly message for a failed recognition.
 String describeOcrError(Object e) {
+  final photo = describePhotoError(e);
+  if (photo != null) return photo;
   final t = '$e'.toLowerCase();
   if (t.contains('memory')) return 'Ảnh quá lớn hoặc thiết bị không đủ bộ nhớ để đọc. Hãy chụp ảnh nhỏ hơn rồi thử lại.';
   if (t.contains('model') || t.contains('download')) return 'Công cụ đọc ảnh chưa sẵn sàng. Hãy kết nối mạng một lần để tải mô hình rồi thử lại, hoặc nhập tay.';

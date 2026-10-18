@@ -19,6 +19,7 @@ import 'image_scrub.dart';
 import 'realtime_socket.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/photo_errors.dart';
 
 sealed class _Item {
   _Item(this.at);
@@ -161,7 +162,7 @@ class _ChatPageState extends State<ChatPage> {
       final clean = await scrubImage(bytes);
       if (mounted) setState(() => _pending = clean);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = describePhotoError(e) ?? e.toString().replaceFirst('Exception: ', ''));
     }
   }
 

@@ -14,6 +14,7 @@ import '../scoring/scoring_data.dart';
 import '../entries/dialogs.dart';
 import 'results_controller.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/keyboard.dart';
 
 /// Nhập kết quả: lottery results per day (one form for every region, station chosen by chip), reading them from a photo, and the
 /// calculated "Điểm ra" list of the chosen day (frontend/src/views/ResultsView.vue).
@@ -438,7 +439,7 @@ class _DigitCellState extends State<DigitCell> {
           controller: _ctrl,
           readOnly: widget.readOnly,
           textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
+          keyboardType: kNumbersKeyboard,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(widget.digits)],
           style: TextStyle(fontWeight: widget.big ? FontWeight.w800 : FontWeight.w600, fontSize: (widget.maxWidth != null && widget.maxWidth! < 80) ? 13 : (widget.big ? 16 : 14), color: color, fontFeatures: const [FontFeature.tabularFigures()]),
           onChanged: widget.onChanged,

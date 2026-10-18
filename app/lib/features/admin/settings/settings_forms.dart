@@ -7,6 +7,7 @@ import 'settings_logic.dart';
 import 'settings_ui.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_dropdown.dart';
+import '../../../core/keyboard.dart';
 
 Widget _editBar({required bool editing, required bool saving, required VoidCallback onEdit, required VoidCallback onCancel, required VoidCallback? onSave, required String saveLabel}) {
   if (!editing) {
@@ -112,7 +113,7 @@ class _BankSectionState extends State<BankSection> {
         TextField(
           controller: _acc,
           enabled: editing,
-          keyboardType: TextInputType.number,
+          keyboardType: kNumbersKeyboard,
           decoration: const InputDecoration(labelText: 'Số tài khoản'),
         ),
         const SizedBox(height: 12),
@@ -201,7 +202,7 @@ class _MaxIdsSectionState extends State<MaxIdsSection> {
       TextField(
         controller: _c,
         enabled: _edit.editing,
-        keyboardType: TextInputType.number,
+        keyboardType: kNumbersKeyboard,
         decoration: const InputDecoration(labelText: 'Số ID tối đa mỗi tài khoản (1-100)', hintText: '5'),
       ),
       const SizedBox(height: 14),
@@ -367,7 +368,7 @@ class _PackagesSectionState extends State<PackagesSection> {
           Expanded(
             child: TextField(
               controller: _days,
-              keyboardType: TextInputType.number,
+              keyboardType: kNumbersKeyboard,
               decoration: const InputDecoration(labelText: 'Thời hạn (ngày)', helperText: '1-3650'),
             ),
           ),
@@ -375,7 +376,7 @@ class _PackagesSectionState extends State<PackagesSection> {
           Expanded(
             child: TextField(
               controller: _price,
-              keyboardType: TextInputType.number,
+              keyboardType: kNumbersKeyboard,
               decoration: const InputDecoration(labelText: 'Giá (đ)'),
             ),
           ),

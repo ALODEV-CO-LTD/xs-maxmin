@@ -14,6 +14,7 @@ import 'message_parser.dart';
 import 'ocr_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/keyboard.dart';
 
 /// Picks a picture and returns its path (null = cancelled). Replaceable in tests.
 typedef PickImagePath = Future<String?> Function(ImageSource source);
@@ -409,8 +410,8 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
       items: [for (final t in typeList) DropdownMenuItem(value: t, child: Text(betTypeLabel(t), overflow: TextOverflow.ellipsis))],
       onChanged: (v) => setState(() => d.type = v ?? d.type),
     );
-    final value = TextField(key: _valueKeys.putIfAbsent(d, () => GlobalKey()), controller: d.value, keyboardType: TextInputType.number, decoration: const InputDecoration(isDense: true, hintText: 'Số'), onChanged: (_) => setState(() {}));
-    final score = SizedBox(width: 72, child: TextField(controller: d.score, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(isDense: true, hintText: 'Điểm'), onChanged: (_) => setState(() {})));
+    final value = TextField(key: _valueKeys.putIfAbsent(d, () => GlobalKey()), controller: d.value, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(isDense: true, hintText: 'Số'), onChanged: (_) => setState(() {}));
+    final score = SizedBox(width: 72, child: TextField(controller: d.score, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(isDense: true, hintText: 'Điểm'), onChanged: (_) => setState(() {})));
     final tick = Checkbox(value: d.selected, onChanged: (v) => setState(() => d.selected = v ?? false));
     if (stacked) {
       return Column(children: [

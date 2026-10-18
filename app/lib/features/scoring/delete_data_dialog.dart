@@ -9,6 +9,7 @@ import '../../core/widgets/app_dialog.dart';
 import 'date_field.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/keyboard.dart';
 
 /// "Xóa số liệu": delete saved entries now - one customer or everyone, an optional date range, optionally keeping the
 /// newest N days. Shows how many entries would go (dry run, no password) and needs the account password.
@@ -171,7 +172,7 @@ class _DeleteDataDialogState extends State<DeleteDataDialog> {
         const SizedBox(height: 12),
         TextField(
           controller: _keep,
-          keyboardType: TextInputType.number,
+          keyboardType: kNumbersKeyboard,
           decoration: const InputDecoration(labelText: 'Giữ lại N ngày gần nhất (tuỳ chọn)'),
           onChanged: (_) => _changed(() {}),
         ),

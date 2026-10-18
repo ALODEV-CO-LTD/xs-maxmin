@@ -10,6 +10,7 @@ import 'entries_controller.dart';
 import 'quick_entry_box.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/keyboard.dart';
 
 /// "Thêm số liệu mới": đài, ngày, the quick-entry box (message or photo), several rows (hạng mục / số / điểm vào) and a note.
 class EntryFormCard extends StatefulWidget {
@@ -141,7 +142,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
             onChanged: (v) => setState(() => _bulkType = v ?? ''),
           ),
         ),
-        SizedBox(width: 110, child: TextField(controller: _bulkScore, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(isDense: true, hintText: 'Đổi điểm vào'), onChanged: (_) => setState(() {}))),
+        SizedBox(width: 110, child: TextField(controller: _bulkScore, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(isDense: true, hintText: 'Đổi điểm vào'), onChanged: (_) => setState(() {}))),
         AppButton(label: 'Áp dụng', variant: AppButtonVariant.secondary, onPressed: _bulkType.isEmpty && _bulkScore.text.trim().isEmpty
               ? null
               : () {
@@ -175,8 +176,8 @@ class _EntryFormCardState extends State<EntryFormCard> {
         c.touchRows();
       },
     );
-    final value = TextField(key: _valueKeys.putIfAbsent(r.uid, () => GlobalKey()), controller: r.value, keyboardType: TextInputType.number, onChanged: (_) => c.touchRows(), decoration: const InputDecoration(isDense: true, hintText: 'Số', contentPadding: pad));
-    final score = TextField(controller: r.score, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(isDense: true, hintText: 'Điểm', contentPadding: pad));
+    final value = TextField(key: _valueKeys.putIfAbsent(r.uid, () => GlobalKey()), controller: r.value, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, onChanged: (_) => c.touchRows(), decoration: const InputDecoration(isDense: true, hintText: 'Số', contentPadding: pad));
+    final score = TextField(controller: r.score, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(isDense: true, hintText: 'Điểm', contentPadding: pad));
     final tick = Checkbox(value: r.selected, visualDensity: VisualDensity.compact, onChanged: (v) {
       r.selected = v ?? false;
       c.touchRows();

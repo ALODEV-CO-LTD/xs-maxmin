@@ -15,6 +15,7 @@ import '../shell/version_card.dart';
 import '../support/support_page.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/action_bar.dart';
+import '../../core/keyboard.dart';
 
 /// Hồ sơ: personal info (edit), package info, password dialogs, Mã ID kết bạn, logout.
 class AccountProfileTab extends StatelessWidget {
@@ -320,7 +321,7 @@ class _CustomerCodesCardState extends State<_CustomerCodesCard> {
       TextField(
         controller: _digits,
         enabled: !_creating,
-        keyboardType: TextInputType.number,
+        keyboardType: kNumbersKeyboard,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)],
         decoration: const InputDecoration(labelText: 'Dãy số (tuỳ chọn)'),
       ),

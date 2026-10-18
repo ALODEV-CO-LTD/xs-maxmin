@@ -7,6 +7,7 @@ import '../payments/payments_logic.dart' show viDateTime;
 import 'settings_logic.dart';
 import 'settings_ui.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/keyboard.dart';
 
 /// Nhật ký bảo mật: the 50 latest security events.
 class SecurityEventsSection extends StatefulWidget {
@@ -205,7 +206,7 @@ class _SecurityPolicySectionState extends State<SecurityPolicySection> {
         key: ValueKey('policy-$key'),
         controller: _ctrls[key],
         enabled: _edit.editing,
-        keyboardType: TextInputType.number,
+        keyboardType: kNumbersKeyboard,
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(labelText: r.label, helperMaxLines: 3, helperText: '${r.min} đến ${r.max} (mặc định ${_defaults.numeric(key)}). $help'.trim()),
       ),

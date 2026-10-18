@@ -6,6 +6,7 @@ import 'date_field.dart';
 import 'entry_model.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../../core/keyboard.dart';
 
 /// "Đặt lịch xóa": schedule the automatic removal of saved entries (one customer or everyone, an optional date range, or
 /// repeating while keeping the newest N days) and see / cancel the pending schedules.
@@ -292,7 +293,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                   if (_repeat == 'custom') ...[
                     const SizedBox(height: 10),
                     Row(children: [
-                      Expanded(child: TextField(controller: _customN, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Mỗi (số)'), onChanged: (_) => setState(_defaultRunAt))),
+                      Expanded(child: TextField(controller: _customN, keyboardType: kNumbersKeyboard, decoration: const InputDecoration(labelText: 'Mỗi (số)'), onChanged: (_) => setState(_defaultRunAt))),
                       const SizedBox(width: 10),
                       Expanded(
                         child: AppDropdown<String>(
@@ -314,7 +315,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                     DateField(label: 'Đến ngày (tuỳ chọn)', value: _dateTo, clearable: true, onChanged: (v) => setState(() => _dateTo = v)),
                   ],
                   const SizedBox(height: 10),
-                  TextField(controller: _keep, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Giữ lại N ngày gần nhất (tuỳ chọn)')),
+                  TextField(controller: _keep, keyboardType: kNumbersKeyboard, decoration: const InputDecoration(labelText: 'Giữ lại N ngày gần nhất (tuỳ chọn)')),
                   const SizedBox(height: 10),
                   InkWell(
                     borderRadius: BorderRadius.circular(10),
