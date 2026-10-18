@@ -447,3 +447,9 @@ Chi tiết từng mục và trạng thái: `docs/KIEM_TOAN_18-10-2026.md`. Mọi
 - **Android:** `allowBackup=false`; khung ký release qua `app/android/key.properties` (file này và keystore **không** commit; thiếu file thì build release vẫn ký bằng khoá debug, cần tạo keystore thật trước khi phát hành). iOS: loại khỏi sao lưu iCloud/iTunes và khoá Keychain chỉ dùng trên máy này.
 - **Máy chủ đã áp dụng sẵn (xem `deploy/README-ops.md`):** header bảo mật nginx (CSP mới ở chế độ Report-Only), cron sao lưu DB hằng ngày (giữ 14 bản, cùng ổ đĩa), quyền file DB 600, đã dọn thư mục sao lưu cũ.
 - **Việc chờ bạn quyết:** chặn gửi khi khoá bạn bè đổi, ép đồng ý kết bạn, độ dài tối thiểu mật khẩu admin/nhân viên, vé WebSocket thay `?token=`, giới hạn tốc độ khung E2EE, đồng ý trước khi tự thêm vào nhóm, sao lưu ra ngoài máy chủ, bật CSP chặn thật.
+
+## Nhật ký 18/10/2026 (tối): deploy đợt sửa lỗi kiểm toán, app 1.4.14 (20)
+
+- **Đã deploy lên máy chủ thật** (web + backend, từ bản checkout sạch của `9974ced`; sao lưu `backend.bak-20261018-065915`, `web.bak-20261018-065915`, DB `/root/xoso-live-20261018-065915.db`). Gồm toàn bộ nhóm sửa lỗi của kiểm toán: giới hạn kích thước và tần suất, danh sách khoá cho phép của cài đặt Admin, đóng WebSocket khi thu hồi phiên (mã 4401), xoá mã thông báo khi thu hồi phiên, nhận diện địa chỉ IP thật qua nginx, DB mới không còn admin mặc định.
+- **Kiểm sau deploy:** header bảo mật có mặt; các route chính trả đúng; backend thấy **địa chỉ IP thật của người dùng** (không còn 127.0.0.1) nên khoá đăng nhập theo từng người dùng; kiểm toàn vẹn DB `ok`, 9 người dùng, cột `push_tokens.session_id` đã có.
+- **App 1.4.14 (20):** gồm các sửa của app (dấu phẩy thập phân, kiểm tra nhóm chat, hàng chờ offline, đóng kết nối khi phiên bị thu hồi, tắt sao lưu đám mây Android, khoá Keychain chỉ trên thiết bị). iPhone 12 đã được cài đè (không gỡ). APK `MAMBA-1.4.14.apk`; ký bằng khoá debug (chưa có khoá phát hành riêng).
