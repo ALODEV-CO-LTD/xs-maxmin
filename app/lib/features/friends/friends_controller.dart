@@ -86,6 +86,8 @@ class FriendsController extends ChangeNotifier {
         ringer = ringer ?? SilentRinger(),
         background = background ?? const NoopBackgroundService(),
         socket = socket ?? RealtimeSocket(tokenProvider: () => auth.token) {
+    // Server closed the socket with 4401 (session revoked): sign out, do not reconnect in a loop.
+    this.socket.onSessionRevoked ??= auth.clear;
     screenshots = ScreenshotBridge(
       openPeer: () => chat?.openPeer,
       isForeground: () => foreground,

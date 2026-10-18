@@ -36,6 +36,11 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
         _delay = delay ?? reconnectDelay;
 
   final String? Function() tokenProvider;
+
+  /// Called (once, without reconnecting) when the server closes the socket with [sessionRevokedCloseCode]: the session
+  /// was revoked, so the owner must sign out instead of retrying with a dead token.
+  void Function()? onSessionRevoked;
+  static const sessionRevokedCloseCode = 4401;
   final ChannelFactory _factory;
   final Duration Function(int attempt) _delay;
   final _frames = StreamController<Map<String, dynamic>>.broadcast();
@@ -123,7 +128,7 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
             if (m is Map<String, dynamic>) _frames.add(m);
           } catch (_) {/* not JSON */}
         },
-        onDone: () => _lost(gen),
+        onDone: () => _lost(gen, closeCode: ch.closeCode),
         onError: (_) => _lost(gen),
         cancelOnError: true,
       );
@@ -132,11 +137,18 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
     }
   }
 
-  void _lost(int gen) {
+  void _lost(int gen, {int? closeCode}) {
     if (gen != _generation) return;
     _teardown();
     _dialing = false;
     if (!_disposed) notifyListeners();
+    if (closeCode == sessionRevokedCloseCode) {
+      _wanted = false;
+      _retry?.cancel();
+      _retry = null;
+      if (!_disposed) onSessionRevoked?.call();
+      return;
+    }
     if (!_wanted || _disposed) return;
     _retry?.cancel();
     _retry = Timer(_delay(_attempt++), _connect);

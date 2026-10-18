@@ -172,7 +172,7 @@ export const useCallStore = defineStore('call', {
         // Messages may have arrived while the socket was down.
         useNotifyStore().refresh()
       }
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         this.socketReady = false
         this.socket = null
         // A dead signaling channel can't carry a call anyway - end
@@ -182,6 +182,12 @@ export const useCallStore = defineStore('call', {
         if (this.status !== 'idle') {
           this.error = this.error || 'Mất kết nối, cuộc gọi đã kết thúc'
           this._cleanup()
+        }
+        // 4401: the server revoked this session (logged out elsewhere, removed by
+        // admin). Do not reconnect in a loop: drop the session; App.vue tears the rest down.
+        if (event && event.code === 4401) {
+          useAuthStore().clear()
+          return
         }
         // Reconnect after a short delay as long as the session is still
         // logged in - covers the dev server restarting, a brief network
