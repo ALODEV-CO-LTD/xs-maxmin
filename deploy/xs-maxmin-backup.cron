@@ -1,0 +1,2 @@
+# /etc/cron.d/xs-maxmin-backup - daily 03:30 container time
+30 3 * * * root /usr/local/bin/xs-maxmin-backup.sh
