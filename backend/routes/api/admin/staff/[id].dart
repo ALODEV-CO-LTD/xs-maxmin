@@ -32,7 +32,20 @@ Future<Response> onRequest(RequestContext context, String id) async {
   final ip = clientIp(context);
 
   if (context.request.method == HttpMethod.delete) {
-    db.execute('DELETE FROM users WHERE id = ?', [id]);
+    // payment_requests.decided_by and announcements.created_by reference users(id) without ON DELETE, so a staff
+    // member with history could not be deleted (FK error => 500). Keep the history, drop only the reference.
+    db.execute('BEGIN');
+    try {
+      db.execute('UPDATE payment_requests SET decided_by = NULL WHERE decided_by = ?', [id]);
+      db.execute('UPDATE announcements SET created_by = NULL WHERE created_by = ?', [id]);
+      db.execute('DELETE FROM users WHERE id = ?', [id]);
+      db.execute('COMMIT');
+    } catch (_) {
+      try {
+        db.execute('ROLLBACK');
+      } catch (_) {}
+      return Response.json(statusCode: 409, body: {'error': 'Không xoá được tài khoản (còn dữ liệu liên quan)'});
+    }
     logSecurityEvent(db, 'staff_deleted', userId: id, username: username, ip: ip, detail: 'Admin xoá tài khoản thứ cấp');
     return Response.json(body: {'deleted': true});
   }
