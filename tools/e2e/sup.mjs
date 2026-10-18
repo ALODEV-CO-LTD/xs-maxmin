@@ -1,8 +1,10 @@
 import puppeteer from 'puppeteer-core'
+const ADMIN_PW = process.env.E2E_ADMIN_PASSWORD
+if (!ADMIN_PW) { console.error('Set E2E_ADMIN_PASSWORD (the XOSO_ADMIN_PASSWORD the throw-away backend was started with)'); process.exit(2) }
 const B='http://127.0.0.1:4173',AP=B+'/api';const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 const call=async(m,p,b,t)=>{const r=await fetch(AP+p,{method:m,headers:{'content-type':'application/json',...(t?{authorization:'Bearer '+t}:{})},body:b?JSON.stringify(b):undefined});let j=null;try{j=await r.json()}catch{};return{s:r.status,j}}
 let pass=0,fail=0;const ok=(c,n,e='')=>{c?pass++:fail++;console.log((c?'PASS ':'FAIL ')+n+(c?'':' -> '+e))}
-const adm=await call('POST','/auth/login',{username:'1',password:'1234'});const AT=adm.j.token
+const adm=await call('POST','/auth/login',{username:'1',password:ADMIN_PW});const AT=adm.j.token
 const u='sp'+Date.now().toString(36).slice(-5)
 const br0=null
 const br=await puppeteer.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--no-sandbox']})

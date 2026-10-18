@@ -1,3 +1,5 @@
+const ADMIN_PW = process.env.E2E_ADMIN_PASSWORD
+if (!ADMIN_PW) { console.error('Set E2E_ADMIN_PASSWORD (the XOSO_ADMIN_PASSWORD the throw-away backend was started with)'); process.exit(2) }
 const B = 'http://127.0.0.1:4173/api'
 let pass = 0, fail = 0
 const ok = (c, n, e = '') => { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : '  -> ' + e)) }
@@ -40,7 +42,7 @@ const tKnown = await time('2'), tUnknown = await time('no-such-user-' + x)
 ok(Math.max(tKnown, tUnknown) / Math.max(1, Math.min(tKnown, tUnknown)) < 2, `timing known ${tKnown}ms vs unknown ${tUnknown}ms are close`)
 
 console.log('--- admin lock')
-const adm = await call('POST', '/auth/login', { username: '1', password: '1234' }); const A = adm.d.token
+const adm = await call('POST', '/auth/login', { username: '1', password: ADMIN_PW }); const A = adm.d.token
 const usr = await call('POST', '/auth/login', { username: U, password: PW }); const pend = usr.d.pendingToken
 const s4 = await call('POST', '/auth/step2', { pendingToken: (await call('POST', '/auth/login', { username: U, password: PW })).d.pendingToken, password: SEC }); const S5 = s4.d.token
 const list = await call('GET', '/admin/users', undefined, A); const uid = (list.d.subscribers).find((u) => u.username === U).id

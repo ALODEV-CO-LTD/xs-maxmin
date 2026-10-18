@@ -1,8 +1,10 @@
+const ADMIN_PW = process.env.E2E_ADMIN_PASSWORD
+if (!ADMIN_PW) { console.error('Set E2E_ADMIN_PASSWORD (the XOSO_ADMIN_PASSWORD the throw-away backend was started with)'); process.exit(2) }
 const B='http://localhost:8291/api'
 const call=async(m,p,b,t)=>{const r=await fetch(B+p,{method:m,headers:{'content-type':'application/json',...(t?{authorization:'Bearer '+t}:{})},body:b?JSON.stringify(b):undefined});let j=null;try{j=await r.json()}catch{};return{s:r.status,j}}
 let pass=0,fail=0;const ok=(c,n,e='')=>{c?pass++:fail++;console.log((c?'PASS ':'FAIL ')+n+(c?'':' -> '+e))}
-const adm=await call('POST','/auth/login',{username:'1',password:'1234'});console.log('admin login',adm.s,Object.keys(adm.j||{}))
-const AT=adm.j.token||(await call('POST','/auth/step2',{pendingToken:adm.j.pendingToken,password:'1234'})).j?.token
+const adm=await call('POST','/auth/login',{username:'1',password:ADMIN_PW});console.log('admin login',adm.s,Object.keys(adm.j||{}))
+const AT=adm.j.token||(await call('POST','/auth/step2',{pendingToken:adm.j.pendingToken,password:ADMIN_PW})).j?.token
 const x=Date.now().toString(36);const u='rc'+x
 const reg=await call('POST','/auth/register',{name:'RC',username:u,password:'Smoke#Test123',secondPassword:'2468'})
 const s2=await call('POST','/auth/step2',{pendingToken:reg.j.pendingToken,password:'2468'});const me=await call('GET','/me',null,s2.j.token)
