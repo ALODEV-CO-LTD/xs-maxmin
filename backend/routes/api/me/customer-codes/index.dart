@@ -4,6 +4,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/rate_gate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 Future<Response> onRequest(RequestContext context) async {
@@ -76,12 +77,20 @@ Future<Response> _create(RequestContext context, String userId) async {
   if (wanted != null && wanted.isNotEmpty) {
     final problem = validateCustomCode(wanted);
     if (problem != null) return Response.json(statusCode: 400, body: {'error': problem});
+    // "Is this number taken?" tells a guesser which IDs exist, exactly like the add-friend lookup does, so it shares
+    // that lookup's throttle: every 409 below counts as a failed guess, and a locked caller gets the same 429.
+    final locked = checkFriendAddLock(context, userId);
+    if (locked != null) return locked;
     if (db.select('SELECT 1 FROM customer_codes WHERE code = ?', [wanted]).isNotEmpty) {
+      recordFriendAddFailure(context, userId);
       return Response.json(statusCode: 409, body: {'error': 'Mã ID này đã có người dùng, hãy chọn dãy số khác'});
     }
     // Quarantine after deletion: only the previous owner may take the number back.
     final retired = retiredCodeConflict(db, wanted, userId);
-    if (retired != null) return Response.json(statusCode: 409, body: {'error': retired});
+    if (retired != null) {
+      recordFriendAddFailure(context, userId);
+      return Response.json(statusCode: 409, body: {'error': retired});
+    }
     code = wanted;
   } else {
     code = generateUniqueCustomerCode(db);

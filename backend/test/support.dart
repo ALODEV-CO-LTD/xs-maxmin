@@ -37,7 +37,7 @@ Future<Response> callRoute(
 }) async {
   final ctx = FakeCtx();
   final raw = body == null ? '' : (body is String ? body : jsonEncode(body));
-  final req = Request(method.value, Uri.parse('http://localhost$path'), body: raw, headers: headers);
+  final req = Request(method.value, Uri.parse('http://localhost$path'), body: headers.containsKey('content-length') ? Stream.value(utf8.encode(raw)) : raw, headers: headers);
   when(() => ctx.request).thenReturn(req);
   when(() => ctx.read<Database>()).thenReturn(db);
   when(() => ctx.read<AuthTokenPayload?>()).thenReturn(AuthTokenPayload(userId: userId, role: role));

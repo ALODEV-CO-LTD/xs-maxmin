@@ -169,7 +169,8 @@ CREATE TABLE IF NOT EXISTS customer_codes (
   user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   code        TEXT NOT NULL UNIQUE,
   created_at  TEXT NOT NULL,
-  label       TEXT                -- optional note on a "virtual ID" -- added via migration
+  label       TEXT,               -- optional note on a "virtual ID" -- added via migration
+  used_at     TEXT                -- first time someone found this code (add-friend / search); NULL = never used
 );
 -- Max IDs per account: settings key `max_virtual_ids` (default 5, Admin-editable).
 

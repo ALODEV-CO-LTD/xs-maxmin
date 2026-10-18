@@ -37,6 +37,8 @@ Future<Response> onRequest(RequestContext context, String id) async {
   final read = await readJsonBody(context, smallBodyMaxBytes);
   if (read.error != null) return read.error!;
   final body = read.body!;
+  final badText = checkTextFields(body, entryTextLimits);
+  if (badText != null) return badText;
 
   final row = existing.first;
 

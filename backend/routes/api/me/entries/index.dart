@@ -38,6 +38,8 @@ Future<Response> _create(RequestContext context, String userId) async {
   final read = await readJsonBody(context, smallBodyMaxBytes);
   if (read.error != null) return read.error!;
   final body = read.body!;
+  final badText = checkTextFields(body, entryTextLimits);
+  if (badText != null) return badText;
 
   final value = (body['value'] as String?)?.trim();
   final note = (body['note'] as String?)?.trim();

@@ -5,7 +5,9 @@ import 'package:server/src/database.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:server/src/package_plans.dart';
 import 'package:server/src/password_policy.dart';
+import 'package:server/src/rate_gate.dart';
 import 'package:server/src/recovery_codes.dart';
+import 'package:server/src/sessions.dart' show clientIp;
 import 'package:server/src/security.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -14,6 +16,9 @@ Future<Response> onRequest(RequestContext context) async {
     return Response(statusCode: 405, body: 'Method not allowed');
   }
 
+  final wait = registerPerIp.hit('ip:${clientIp(context)}');
+  if (wait > 0) return tooManyRequests(wait, 'đăng ký');
+
   final read = await readJsonBody(context, authBodyMaxBytes);
   if (read.error != null) return read.error!;
   final body = read.body!;
@@ -21,6 +26,8 @@ Future<Response> onRequest(RequestContext context) async {
   if (!fieldsAreStrings(body, ['name', 'username', 'password', 'secondPassword', 'wipePassword'])) {
     return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
   }
+  final tooLong = checkTextFields(body, {'name': 60, 'username': 40, 'password': 72, 'secondPassword': 72, 'wipePassword': 72});
+  if (tooLong != null) return tooLong;
   final name = (body['name'] as String?)?.trim();
   final username = (body['username'] as String?)?.trim();
   final password = body['password'] as String?;

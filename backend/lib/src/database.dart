@@ -158,6 +158,13 @@ void _migrateSchema(Database db) {
   backfillPaymentReferences(db);
   // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
   _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
+  // First time somebody found the code; a code deleted without ever being found is not quarantined. Codes that exist
+  // when the column is first added count as used (we cannot know), so their quarantine behaves as before.
+  final codeCols = db.select('PRAGMA table_info(customer_codes)').map((r) => r['name'] as String);
+  if (!codeCols.contains('used_at')) {
+    db.execute('ALTER TABLE customer_codes ADD COLUMN used_at TEXT');
+    db.execute('UPDATE customer_codes SET used_at = created_at');
+  }
   // Last-change timestamp of an entry (ISO-8601 UTC). The offline client
   // sends the value it last saw when it replays an edit; a mismatch means the
   // entry was changed elsewhere meanwhile (conflict, see entries/[id].dart).

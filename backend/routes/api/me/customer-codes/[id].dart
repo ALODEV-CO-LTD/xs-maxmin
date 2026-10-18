@@ -13,10 +13,11 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   switch (context.request.method) {
     case HttpMethod.delete:
-      final mine = db.select('SELECT code FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
+      final mine = db.select('SELECT code, used_at FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
       if (mine.isEmpty) return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy mã ID'});
-      // Quarantine the number (90 days) before freeing it, so it cannot be re-registered by someone else.
-      retireCode(db, mine.first['code'] as String, auth.userId);
+      // Quarantine the number (90 days) before freeing it, so it cannot be re-registered by someone else - but only
+      // when somebody ever found it; a code created and deleted unused has nobody who could be misdirected.
+      if (mine.first['used_at'] != null) retireCode(db, mine.first['code'] as String, auth.userId);
       db.execute('DELETE FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
       return Response.json(body: {'ok': true});
     case HttpMethod.patch:

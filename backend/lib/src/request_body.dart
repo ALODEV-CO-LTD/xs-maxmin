@@ -44,3 +44,32 @@ Future<JsonBodyResult> readJsonBody(RequestContext context, int maxBytes) async 
 
 /// 400 response unless [value] is absent/null or a String of at most [max] characters.
 bool isShortString(Object? value, int max) => value == null || (value is String && value.length <= max);
+
+/// Text-field check for JSON bodies: every key of [maxLengths] that is present and non-null must be a String of at most
+/// that many characters (after trimming). Returns a 400 response (never a 500 from a failed `as String?` cast), or null
+/// when everything is fine.
+Response? checkTextFields(Map<String, dynamic> body, Map<String, int> maxLengths) {
+  for (final e in maxLengths.entries) {
+    final v = body[e.key];
+    if (v == null) continue;
+    if (v is! String) return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
+    if (v.trim().length > e.value) {
+      return Response.json(statusCode: 400, body: {'error': 'Nội dung quá dài (tối đa ${e.value} ký tự)'});
+    }
+  }
+  return null;
+}
+
+/// Generous caps for the free-text fields of an entry (the apps do not limit them; this only stops abuse).
+const entryTextLimits = {
+  'value': 2000,
+  'note': 1000,
+  'customerName': 100,
+  'score': 200,
+  'result': 200,
+  'betType': 200,
+  'station': 100,
+  'entryDate': 40,
+  'clientId': 64,
+  'baseUpdatedAt': 64,
+};

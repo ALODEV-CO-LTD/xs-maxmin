@@ -83,6 +83,8 @@ Future<Response> _create(RequestContext context, String userId) async {
   final read = await readJsonBody(context, smallBodyMaxBytes);
   if (read.error != null) return read.error!;
   final body = read.body!;
+  final badText = checkTextFields(body, {'name': 100});
+  if (badText != null) return badText;
 
   final name = (body['name'] as String?)?.trim();
   if (name == null || name.isEmpty) {

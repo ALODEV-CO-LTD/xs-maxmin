@@ -57,6 +57,8 @@ Future<Response> _reply(RequestContext context, String adminId, String userId) a
   final read = await readJsonBody(context, messageBodyMaxBytes);
   if (read.error != null) return read.error!;
   final body = read.body!;
+  final badText = checkTextFields(body, {'content': 4000});
+  if (badText != null) return badText;
   final content = (body['content'] as String?)?.trim() ?? '';
   final parsed = parseAttachment(body['attachment']);
   if (parsed.error != null) {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/customer_codes.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/rate_gate.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -99,6 +100,7 @@ Response _addByCode(RequestContext context, String userId, Map<String, dynamic> 
     recordFriendAddFailure(context, userId);
     return Response.json(statusCode: 404, body: {'error': 'Mã ID không tồn tại'});
   }
+  markCodeUsed(db, code);
   final friendId = codeRows.first['user_id'] as String;
   if (friendId == userId) {
     return Response.json(statusCode: 400, body: {'error': 'Không thể tự kết bạn với chính mình'});

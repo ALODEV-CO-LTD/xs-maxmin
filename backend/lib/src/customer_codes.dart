@@ -32,6 +32,14 @@ const retiredCodeQuarantine = Duration(days: 90);
 
 String _quarantineCutoff() => DateTime.now().toUtc().subtract(retiredCodeQuarantine).toIso8601String();
 
+/// Notes that somebody found [code] (add-friend or search), so deleting it later quarantines the number.
+void markCodeUsed(Database db, String code) {
+  db.execute(
+    'UPDATE customer_codes SET used_at = ? WHERE code = ? AND used_at IS NULL',
+    [DateTime.now().toUtc().toIso8601String(), code],
+  );
+}
+
 /// Records [code] as just removed from [userId] (called when a Mã ID is deleted).
 void retireCode(Database db, String code, String userId) {
   db.execute(

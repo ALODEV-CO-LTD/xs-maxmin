@@ -1,11 +1,12 @@
 import 'package:dart_frog/dart_frog.dart';
+import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
 import '../routes/api/admin/settings/index.dart' as route;
 import 'support.dart';
 
 void main() {
-  Future<Response> put(db, Object body) => callRoute(route.onRequest, db, userId: 'adm', role: 'admin', method: HttpMethod.put, body: body);
+  Future<Response> put(Database db, Object body) => callRoute(route.onRequest, db, userId: 'adm', role: 'admin', method: HttpMethod.put, body: body);
 
   test('bank info and max_virtual_ids can be saved', () async {
     final db = testDb();
