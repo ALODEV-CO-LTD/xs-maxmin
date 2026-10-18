@@ -31,12 +31,30 @@ class Friend {
 }
 
 class SearchResult {
-  SearchResult({required this.id, required this.name, required this.username, required this.isFriend, this.isAdmin = false});
+  SearchResult({required this.id, required this.name, required this.username, required this.isFriend, this.isAdmin = false, this.requestState = 'none'});
   final String id;
   final String name;
   final String username;
   final bool isAdmin;
   bool isFriend;
+
+  /// 'none' | 'outgoing' (I already asked them) | 'incoming' (they asked me: accepting adds them at once).
+  String requestState;
+}
+
+/// A pending friend request. [incoming]: someone asked me; otherwise I asked them. [userId]/[name]/[username] are the
+/// OTHER person's.
+class FriendRequest {
+  const FriendRequest({required this.id, required this.userId, required this.name, required this.username, required this.incoming, this.createdAt = 0});
+  final String id;
+  final String userId;
+  final String name;
+  final String username;
+  final bool incoming;
+  final Object createdAt;
+
+  factory FriendRequest.incomingFrom(Map j) => FriendRequest(id: '${j['id']}', userId: '${j['fromId']}', name: (j['fromName'] ?? '') as String, username: (j['fromUsername'] ?? '') as String, incoming: true, createdAt: j['createdAt'] ?? 0);
+  factory FriendRequest.outgoingTo(Map j) => FriendRequest(id: '${j['id']}', userId: '${j['toId']}', name: (j['toName'] ?? '') as String, username: (j['toUsername'] ?? '') as String, incoming: false, createdAt: j['createdAt'] ?? 0);
 }
 
 /// Lower-case, accent-free text for friend filtering ("do ngoc" finds "Đỗ Ngọc Mai"); messageParser.js `fold`.
@@ -53,9 +71,9 @@ String foldVi(String s) {
 }
 
 /// Total shown on the "Thêm" tab and the Bạn bè entry: unread chat messages + unseen missed calls + unread replies
-/// from Admin.
-int unreadBadgeCount({Map<String, int> chat = const {}, Map<String, int> missed = const {}, int support = 0}) {
-  var n = support < 0 ? 0 : support;
+/// from Admin + pending incoming friend requests.
+int unreadBadgeCount({Map<String, int> chat = const {}, Map<String, int> missed = const {}, int support = 0, int friendRequests = 0}) {
+  var n = (support < 0 ? 0 : support) + (friendRequests < 0 ? 0 : friendRequests);
   for (final v in chat.values) {
     if (v > 0) n += v;
   }
@@ -118,6 +136,16 @@ class FriendsController extends ChangeNotifier {
   Map<String, int> unseenMissed = {};
   int supportUnread = 0;
 
+  /// Friend requests: who asked me (incoming) and whom I asked (outgoing). [pendingIncoming] is the red badge: the
+  /// server's counter from `/me/unread`, bumped at once by a live `friend-request` event.
+  List<FriendRequest> incomingRequests = [];
+  List<FriendRequest> outgoingRequests = [];
+  int pendingIncoming = 0;
+
+  /// Result of the last add: "Đã gửi lời mời kết bạn tới X. Họ cần chấp nhận."
+  String addNotice = '';
+  String? requestBusyId;
+
   /// The "Hỗ trợ từ Admin" page is on screen (web: notify.supportVisible): anything new there counts as read at once.
   bool supportVisible = false;
   String searchQuery = '';
@@ -179,12 +207,20 @@ class FriendsController extends ChangeNotifier {
           _onPush(m);
           return;
         }
+        if (m['type'] == 'friend-request') {
+          _onFriendRequest(m);
+          return;
+        }
+        if (m['type'] == 'friend-accepted') {
+          _onFriendAccepted(m);
+          return;
+        }
         chat!.onFrame(m);
       });
       screenshots.attach();
       await _loadSettings();
       socket.start();
-      await Future.wait([chat!.init(), _loadFriends(), if (!isAdmin) _loadMyCode(), if (!isAdmin) loadUnseenMissed()]);
+      await Future.wait([chat!.init(), _loadFriends(), if (!isAdmin) _loadMyCode(), if (!isAdmin) loadUnseenMissed(), loadRequests()]);
       await refreshFriendList(quiet: true);
       unawaited(pollUnread());
       _poll = Timer.periodic(const Duration(seconds: 60), (_) => pollUnread());
@@ -195,7 +231,8 @@ class FriendsController extends ChangeNotifier {
     _changed();
   }
 
-  void _onChat() => refreshFriendList(quiet: true);
+  // Never re-download the list from here: loading friends notifies the chat, which would loop forever for an empty list.
+  void _onChat() => refreshFriendList(quiet: true, reload: false);
 
   Future<void> _loadSettings() async {
     keepAlive = await KeepAliveSettings.load();
@@ -233,6 +270,46 @@ class FriendsController extends ChangeNotifier {
     } else {
       unawaited(notifier.show(supportNotice()));
     }
+  }
+
+  /// `friend-request` event: someone asked to be my friend. Like a new message: a banner on screen, a notification in the
+  /// background; the list and the badge refresh.
+  void _onFriendRequest(Map<String, dynamic> m) {
+    final from = (m['fromId'] ?? '') as String;
+    final name = ((m['fromName'] ?? '') as String).trim().isEmpty ? 'Một người' : (m['fromName'] as String).trim();
+    final known = incomingRequests.any((r) => r.id == '${m['requestId']}');
+    if (!known) pendingIncoming++;
+    if (foreground) {
+      _banner(AppBanner(title: 'Lời mời kết bạn', body: '$name gửi lời mời kết bạn', route: '/friends'));
+    } else {
+      unawaited(notifier.show(friendRequestNotice(from, name)));
+    }
+    _changed();
+    unawaited(loadRequests());
+  }
+
+  /// `friend-accepted` event: they accepted my request. Reload the list (and the keys) so the chat works.
+  void _onFriendAccepted(Map<String, dynamic> m) {
+    final id = (m['friendId'] ?? '') as String;
+    final name = ((m['name'] ?? '') as String).trim().isEmpty ? 'Một người' : (m['name'] as String).trim();
+    outgoingRequests.removeWhere((r) => r.userId == id);
+    if (foreground) {
+      _banner(AppBanner(title: 'Kết bạn', body: '$name đã chấp nhận lời mời', route: '/friends'));
+    } else {
+      unawaited(notifier.show(friendAcceptedNotice(id, name)));
+    }
+    _changed();
+    unawaited(_reloadFriends());
+    unawaited(loadRequests());
+  }
+
+  /// Full reload of the friend rows and keys (a friend was added on the other side).
+  Future<void> _reloadFriends() async {
+    if (chat == null) return;
+    try {
+      await _loadFriends();
+    } catch (_) {/* the next refresh retries */}
+    await refreshFriendList(quiet: true);
   }
 
   void _banner(AppBanner b) {
@@ -350,6 +427,7 @@ class FriendsController extends ChangeNotifier {
       if (!_wasReady) {
         pollUnread(); // messages may have arrived while the socket was down
         loadUnseenMissed();
+        loadRequests();
       }
       chat?.loadFriendKeys().catchError((_) => <Map<String, dynamic>>[]);
     } else {
@@ -376,6 +454,7 @@ class FriendsController extends ChangeNotifier {
       socket.reconnectNow();
       pollUnread();
       loadUnseenMissed();
+      loadRequests();
       final open = chat?.openPeer;
       if (open != null) chat?.markRead(open);
     } else {
@@ -390,7 +469,7 @@ class FriendsController extends ChangeNotifier {
   }
 
   /// Sum shown on badges.
-  int get unreadTotal => unreadBadgeCount(chat: chat?.unread ?? const {}, missed: unseenMissed, support: supportUnread);
+  int get unreadTotal => unreadBadgeCount(chat: chat?.unread ?? const {}, missed: unseenMissed, support: supportUnread, friendRequests: pendingIncoming);
 
   Future<void> _loadFriends() async {
     final list = await chat!.loadFriendKeys();
@@ -398,13 +477,13 @@ class FriendsController extends ChangeNotifier {
   }
 
   /// Reloads the list from the server and merges the local last-message previews.
-  Future<void> refreshFriendList({bool quiet = false}) async {
+  Future<void> refreshFriendList({bool quiet = false, bool reload = true}) async {
     final c = chat;
     if (c == null) return;
     try {
       if (!quiet) loading = true;
       final prev = await c.previews();
-      if (!quiet || friends.isEmpty) await _loadFriends();
+      if (reload && (!quiet || friends.isEmpty)) await _loadFriends();
       for (final f in friends) {
         f.lastMessage = prev[f.id]?.preview;
         f.lastMessageAt = prev[f.id]?.createdAt ?? 0;
@@ -460,6 +539,12 @@ class FriendsController extends ChangeNotifier {
     try {
       final res = await api.get('/me/unread') as Map;
       supportUnread = supportVisible ? 0 : (res['support'] as num?)?.toInt() ?? 0;
+      final fr = (res['friendRequests'] as num?)?.toInt();
+      if (fr != null) {
+        final changed = fr != pendingIncoming || fr != incomingRequests.length;
+        pendingIncoming = fr < 0 ? 0 : fr;
+        if (changed) unawaited(loadRequests());
+      }
       if (supportVisible && ((res['support'] as num?)?.toInt() ?? 0) > 0) unawaited(markSupportRead());
       _changed();
     } catch (_) {/* badges are a nicety */}
@@ -474,6 +559,98 @@ class FriendsController extends ChangeNotifier {
     try {
       await api.post('/me/unread/read', {'peerId': 'support'});
     } catch (_) {/* a nicety: the next poll corrects it */}
+  }
+
+  // ---- friend requests --------------------------------------------------------------------------------------------------
+
+  Future<void> loadRequests() async {
+    try {
+      final res = await api.get('/me/friend-requests') as Map;
+      incomingRequests = [for (final r in ((res['incoming'] as List?) ?? const []).cast<Map>()) FriendRequest.incomingFrom(r)];
+      outgoingRequests = [for (final r in ((res['outgoing'] as List?) ?? const []).cast<Map>()) FriendRequest.outgoingTo(r)];
+      pendingIncoming = incomingRequests.length;
+      _changed();
+    } catch (_) {/* the block stays as it was */}
+  }
+
+  /// Adds [f] (from the answer of accept / add) to the list and remembers its key. The E2EE key comes with the row.
+  Future<void> _gotFriend(Map f) async {
+    final row = Map<String, dynamic>.from(f);
+    if (!friends.any((x) => x.id == row['id'])) friends.insert(0, Friend.fromJson(row));
+    await chat?.rememberFriends([row]);
+  }
+
+  /// Accepts a request. Returns an error message, or null.
+  Future<String?> acceptRequest(FriendRequest r) async {
+    requestBusyId = r.id;
+    _changed();
+    try {
+      final res = await api.post('/me/friend-requests/${Uri.encodeComponent(r.id)}/accept') as Map;
+      final f = res['friend'];
+      if (f is Map) {
+        await _gotFriend(f);
+      } else {
+        await _reloadFriends();
+      }
+      _dropIncoming(r);
+      requestBusyId = null;
+      _changed();
+      return null;
+    } catch (e) {
+      requestBusyId = null;
+      _changed();
+      unawaited(loadRequests());
+      return e is ApiError ? e.message : 'Không chấp nhận được lời mời';
+    }
+  }
+
+  Future<String?> declineRequest(FriendRequest r) async {
+    requestBusyId = r.id;
+    _changed();
+    try {
+      await api.post('/me/friend-requests/${Uri.encodeComponent(r.id)}/decline');
+      _dropIncoming(r);
+      requestBusyId = null;
+      _changed();
+      return null;
+    } catch (e) {
+      requestBusyId = null;
+      _changed();
+      unawaited(loadRequests());
+      return e is ApiError ? e.message : 'Không từ chối được lời mời';
+    }
+  }
+
+  /// Cancels a request I sent.
+  Future<String?> cancelRequest(FriendRequest r) async {
+    requestBusyId = r.id;
+    _changed();
+    try {
+      await api.delete('/me/friend-requests/${Uri.encodeComponent(r.id)}');
+      outgoingRequests.removeWhere((x) => x.id == r.id);
+      for (final s in results) {
+        if (s.id == r.userId) s.requestState = 'none';
+      }
+      requestBusyId = null;
+      _changed();
+      return null;
+    } catch (e) {
+      requestBusyId = null;
+      _changed();
+      unawaited(loadRequests());
+      return e is ApiError ? e.message : 'Không huỷ được lời mời';
+    }
+  }
+
+  void _dropIncoming(FriendRequest r) {
+    incomingRequests.removeWhere((x) => x.id == r.id);
+    pendingIncoming = incomingRequests.length;
+    for (final s in results) {
+      if (s.id == r.userId) {
+        s.isFriend = true;
+        s.requestState = 'none';
+      }
+    }
   }
 
   // ---- search / add / remove -------------------------------------------------------------------------------------------
@@ -495,6 +672,7 @@ class FriendsController extends ChangeNotifier {
 
   void setSearch(String q) {
     searchQuery = q;
+    addNotice = '';
     _searchTimer?.cancel();
     final query = q.trim();
     searchError = '';
@@ -512,7 +690,7 @@ class FriendsController extends ChangeNotifier {
         if (searchQuery.trim() != query) return;
         results = [
           for (final r in (res['results'] as List).cast<Map>())
-            SearchResult(id: r['id'] as String, name: (r['name'] ?? '') as String, username: (r['username'] ?? '') as String, isFriend: r['isFriend'] == true, isAdmin: r['isAdmin'] == true),
+            SearchResult(id: r['id'] as String, name: (r['name'] ?? '') as String, username: (r['username'] ?? '') as String, isFriend: r['isFriend'] == true, isAdmin: r['isAdmin'] == true, requestState: _requestState(r['requestState'])),
         ];
       } catch (e) {
         searchError = e is ApiError ? e.message : 'Không tìm kiếm được';
@@ -522,14 +700,30 @@ class FriendsController extends ChangeNotifier {
     });
   }
 
+  static String _requestState(Object? v) => v == 'outgoing' || v == 'incoming' ? v as String : 'none';
+
+  /// "Kết bạn": the other person must accept, so this normally only SENDS a request (`status: pending`). `status: friends`
+  /// (already friends, or they had asked me first) adds the friend at once.
   Future<void> addFriend(SearchResult r) async {
     addingId = r.id;
+    addNotice = '';
+    searchError = '';
     _changed();
     try {
-      final f = await api.post('/me/friends', {'userId': r.id}) as Map<String, dynamic>;
-      if (!friends.any((x) => x.id == f['id'])) friends.insert(0, Friend.fromJson(f));
-      r.isFriend = true;
-      await chat?.rememberFriends([f]);
+      final res = await api.post('/me/friends', {'userId': r.id}) as Map;
+      final friend = res['friend'] is Map ? res['friend'] as Map : null;
+      if (res['status'] == 'friends' || (res['status'] == null && friend != null)) {
+        if (friend != null) await _gotFriend(friend);
+        r.isFriend = true;
+        r.requestState = 'none';
+        incomingRequests.removeWhere((x) => x.userId == r.id);
+        pendingIncoming = incomingRequests.length;
+        if (friend == null) unawaited(_reloadFriends());
+      } else {
+        r.requestState = 'outgoing';
+        addNotice = 'Đã gửi lời mời kết bạn tới ${r.name}. Họ cần chấp nhận.';
+        unawaited(loadRequests());
+      }
     } catch (e) {
       searchError = e is ApiError ? e.message : 'Không thêm được bạn bè';
     }

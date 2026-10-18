@@ -394,7 +394,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 ),
               ),
             ),
+          if (q.isEmpty && !_showArchived && (c.incomingRequests.isNotEmpty || c.outgoingRequests.isNotEmpty)) _side(_RequestsBlock(controller: c, onMessage: _toast)),
           if (c.searchError.isNotEmpty) _side(Text(c.searchError, style: TextStyle(color: context.badColor))),
+          if (c.addNotice.isNotEmpty) _side(Text(c.addNotice, key: const Key('add-notice'), style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600))),
           if (q.isNotEmpty && (c.searching || c.newPeople.isNotEmpty)) ...[
             _side(Text('Người mới', style: theme.textTheme.titleSmall)),
             if (c.searching && c.newPeople.isEmpty) _side(const Text('Đang tìm…')),
@@ -405,11 +407,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   child: ListTile(
                     title: Text(r.name),
                     subtitle: Text('@${r.username}'),
-                    trailing: AppButton(
-                      label: c.addingId == r.id ? '…' : 'Kết bạn',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: c.addingId == r.id ? null : () => c.addFriend(r),
-                    ),
+                    trailing: switch (r.requestState) {
+                      'outgoing' => const AppButton(label: 'Đã gửi lời mời', variant: AppButtonVariant.ghost, onPressed: null),
+                      'incoming' => AppButton(label: c.addingId == r.id ? '…' : 'Chấp nhận', variant: AppButtonVariant.primary, onPressed: c.addingId == r.id ? null : () => c.addFriend(r)),
+                      _ => AppButton(label: c.addingId == r.id ? '…' : 'Kết bạn', variant: AppButtonVariant.secondary, onPressed: c.addingId == r.id ? null : () => c.addFriend(r)),
+                    },
                   ),
                 ),
               ),
@@ -477,6 +479,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
   }
 
+  void _toast(String m) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
   Widget _side(Widget w) => Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), child: w);
 
   /// One conversation row in the style of a messenger list: round avatar, bold name, one-line preview, the time of the last
@@ -534,6 +540,72 @@ class _FriendsScreenState extends State<FriendsScreen> {
         ),
         Divider(height: 1, thickness: 1, indent: 16 + 52 + 14.0 + (_edit ? 44 : 0), color: theme.colorScheme.outlineVariant),
       ],
+    );
+  }
+}
+
+/// "Lời mời kết bạn": requests sent to me (Chấp nhận / Từ chối) and requests I sent (Huỷ lời mời). The red count is the
+/// number of pending incoming ones.
+class _RequestsBlock extends StatelessWidget {
+  const _RequestsBlock({required this.controller, required this.onMessage});
+  final FriendsController controller;
+  final void Function(String message) onMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('requests-block'),
+      margin: const EdgeInsets.only(top: 4, bottom: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: theme.colorScheme.outlineVariant)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Text('Lời mời kết bạn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+              if (c.pendingIncoming > 0) _Badge(text: c.pendingIncoming > 99 ? '99+' : '${c.pendingIncoming}', color: context.badColor),
+            ],
+          ),
+          for (final r in c.incomingRequests) _row(context, r),
+          for (final r in c.outgoingRequests) _row(context, r),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(BuildContext context, FriendRequest r) {
+    final c = controller;
+    final busy = c.requestBusyId == r.id;
+    Future<void> run(Future<String?> Function(FriendRequest) f) async {
+      final err = await f(r);
+      if (err != null) onMessage(err);
+    }
+
+    return Padding(
+      key: Key('request-${r.id}'),
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          if (r.username.isNotEmpty) Text('@${r.username}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: context.mutedColor)),
+          if (!r.incoming) Text('Đã gửi lời mời, chờ chấp nhận', style: TextStyle(fontSize: 13, color: context.mutedColor)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: r.incoming
+                ? [
+                    AppButton(label: 'Chấp nhận', variant: AppButtonVariant.primary, loading: busy, onPressed: () => run(c.acceptRequest)),
+                    AppButton(label: 'Từ chối', variant: AppButtonVariant.ghost, onPressed: busy ? null : () => run(c.declineRequest)),
+                  ]
+                : [AppButton(label: 'Huỷ lời mời', variant: AppButtonVariant.ghost, loading: busy, onPressed: () => run(c.cancelRequest))],
+          ),
+        ],
+      ),
     );
   }
 }
