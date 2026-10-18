@@ -164,8 +164,15 @@ class OfflineStore {
     try {
       return [for (final j in jsonDecode(raw) as List) QueuedOp.fromJson(Map<String, dynamic>.from(j as Map))];
     } catch (_) {
+      _keepCorrupt(_queueKey, raw);
       return [];
     }
+  }
+
+  /// A value that cannot be parsed is never silently overwritten: the raw text is kept under `<key>.corrupt` (first one wins).
+  void _keepCorrupt(String key, String raw) {
+    final k = '$key.corrupt';
+    if (prefs.getString(k) == null) unawaited(prefs.setString(k, raw));
   }
 
   Future<void> _writeAll(List<QueuedOp> all) => prefs.setString(_queueKey, jsonEncode([for (final o in all) o.toJson()]));
@@ -176,16 +183,19 @@ class OfflineStore {
 
   Future<int> pendingCount() async => (await ops()).length;
 
-  Future<void> _put(QueuedOp op) => _locked(() async {
-        final all = _readAll();
-        final i = all.indexWhere((o) => o.opId == op.opId);
-        if (i == -1) {
-          all.add(op);
-        } else {
-          all[i] = op;
-        }
-        await _writeAll(all);
-      });
+  /// Read-modify-write of one op; the caller holds the lock (or is the lock's only user at that moment).
+  Future<void> _putRaw(QueuedOp op) async {
+    final all = _readAll();
+    final i = all.indexWhere((o) => o.opId == op.opId);
+    if (i == -1) {
+      all.add(op);
+    } else {
+      all[i] = op;
+    }
+    await _writeAll(all);
+  }
+
+  Future<void> _put(QueuedOp op) => _locked(() => _putRaw(op));
 
   Future<void> _delete(String opId) => _locked(() async {
         final all = _readAll()..removeWhere((o) => o.opId == opId);
@@ -244,11 +254,25 @@ class OfflineStore {
     try {
       return {for (final e in (jsonDecode(raw) as Map).entries) e.key as String: Map<String, dynamic>.from(e.value as Map)};
     } catch (_) {
+      _keepCorrupt(_resultsKey, raw);
       return {};
     }
   }
 
-  Future<void> _writeLocalResults(Map<String, Map<String, dynamic>> m) => _locked(() => prefs.setString(_resultsKey, jsonEncode(m)));
+  /// Read-modify-write of the local results as one step (so a re-save during a flush is never overwritten by stale data).
+  Future<void> _mutateResults(void Function(Map<String, Map<String, dynamic>> m) fn) => _locked(() async {
+        final m = _localResults();
+        fn(m);
+        await prefs.setString(_resultsKey, jsonEncode(m));
+      });
+
+  /// After a successful send: the entry becomes "sent" only when it is still the very same content that was sent.
+  void _markSent(Map<String, Map<String, dynamic>> m, String key, Object? sentJson, Object? saved) {
+    final cur = m[key];
+    if (cur == null) return; // forgotten (deleted) meanwhile
+    if (jsonEncode(cur['json']) != jsonEncode(sentJson)) return; // saved again meanwhile: still pending, the next flush sends it
+    m[key] = {'json': saved is Map ? Map<String, dynamic>.from(saved) : cur['json'], 'pending': false};
+  }
 
   static String _rk(String date, String station) => '$date|$station';
 
@@ -260,30 +284,29 @@ class OfflineStore {
   Future<bool> saveResult(Map<String, dynamic> body) async {
     final date = body['drawDate'] as String;
     final station = (body['station'] as String?) ?? 'mb';
-    final local = _localResults();
-    local[_rk(date, station)] = {'json': {...body, 'updatedAt': _now().toUtc().toIso8601String()}, 'pending': true};
-    await _writeLocalResults(local);
+    final key = _rk(date, station);
+    final mine = {'json': {...body, 'updatedAt': _now().toUtc().toIso8601String()}, 'pending': true};
+    await _mutateResults((m) => m[key] = mine);
     try {
       final res = await api.post('/lottery-results', body);
       final saved = res is Map ? res['result'] : null;
-      final after = _localResults();
-      after[_rk(date, station)] = {'json': saved is Map ? Map<String, dynamic>.from(saved) : local[_rk(date, station)]!['json'], 'pending': false};
-      await _writeLocalResults(after);
+      await _mutateResults((m) => _markSent(m, key, mine['json'], saved));
       return false;
     } catch (e) {
       if (isNetworkError(e)) return true;
-      final after = _localResults()..remove(_rk(date, station));
-      await _writeLocalResults(after);
+      // refused: drop it, unless it was saved again meanwhile
+      await _mutateResults((m) {
+        if (jsonEncode(m[key]?['json']) == jsonEncode(mine['json'])) m.remove(key);
+      });
       rethrow;
     }
   }
 
   /// Forgets the copy kept on this phone (after a delete). Returns true when it was still waiting to be sent.
   Future<bool> forgetResult(String date, String station) async {
-    final local = _localResults();
-    final was = local.remove(_rk(date, station));
-    await _writeLocalResults(local);
-    return was != null && was['pending'] == true;
+    Map<String, dynamic>? was;
+    await _mutateResults((m) => was = m.remove(_rk(date, station)));
+    return was != null && was!['pending'] == true;
   }
 
   /// Sends the results still waiting. Returns (sent any, offline, refused messages).
@@ -295,15 +318,14 @@ class OfflineStore {
       try {
         final res = await api.post('/lottery-results', body);
         final saved = res is Map ? res['result'] : null;
-        final after = _localResults();
-        after[e.key] = {'json': saved is Map ? Map<String, dynamic>.from(saved) : e.value['json'], 'pending': false};
-        await _writeLocalResults(after);
+        await _mutateResults((m) => _markSent(m, e.key, e.value['json'], saved));
         sent = true;
       } on ApiError catch (err) {
         if (err.status == 0) return (sent, true, refused);
-        if (err.status == 401 || err.status >= 500) return (sent, false, refused);
-        final after = _localResults()..remove(e.key);
-        await _writeLocalResults(after);
+        if (err.status == 401 || err.status == 408 || err.status == 425 || err.status == 429 || err.status >= 500) return (sent, false, refused);
+        await _mutateResults((m) {
+          if (jsonEncode(m[e.key]?['json']) == jsonEncode(e.value['json'])) m.remove(e.key);
+        });
         refused.add('Kết quả ${e.key.replaceAll('|', ' ')}: ${err.message}');
       }
     }
@@ -433,41 +455,50 @@ class OfflineStore {
   /// Edits an entry ([changes] = fields to PATCH). Offline -> queued; a still-unsynced create just absorbs the change.
   /// A 409 conflict is thrown as [ApiError] (`data['conflict']`, `data['server']`) for the caller to handle.
   Future<SaveResult> updateEntry(Entry entry, Map<String, dynamic> changes) async {
-    final all = await ops();
-    final pendingCreate = all.where((o) => o.type == 'create' && o.entryId == entry.id).firstOrNull;
-    if (pendingCreate != null) {
-      pendingCreate.payload = {...pendingCreate.payload, ...changes};
-      await _put(pendingCreate);
-      return SaveResult(entry.applying(changes, pending: true), true);
+    // Merge into a waiting create / patch under the lock (a flush that is sending that op compares the stored payload with what it
+    // sent afterwards, so nothing typed meanwhile is lost). An entry whose edit is parked as a conflict cannot be edited further.
+    Future<SaveResult?> merge({required bool allowNew}) => _locked<SaveResult?>(() async {
+          final all = _mine(_readAll());
+          if (all.any((o) => o.entryId == entry.id && o.conflict)) {
+            throw ApiError(409, 'Mục này đang có xung đột đồng bộ chưa xử lý, hãy chọn giữ bản nào trước khi sửa tiếp');
+          }
+          final pendingCreate = all.where((o) => o.type == 'create' && o.entryId == entry.id).firstOrNull;
+          if (pendingCreate != null) {
+            pendingCreate.payload = {...pendingCreate.payload, ...changes};
+            await _putRaw(pendingCreate);
+            return SaveResult(entry.applying(changes, pending: true), true);
+          }
+          final pendingPatch = all.where((o) => o.type == 'patch' && o.entryId == entry.id).firstOrNull;
+          if (pendingPatch != null) {
+            pendingPatch.payload = {...pendingPatch.payload, ...changes};
+            await _putRaw(pendingPatch);
+            return SaveResult(entry.applying(changes, pending: true), true);
+          }
+          if (!allowNew) return null;
+          await _putRaw(QueuedOp(
+            opId: _newId(),
+            seq: _nextSeq(),
+            userId: userId,
+            type: 'patch',
+            entryId: entry.id,
+            baseUpdatedAt: entry.updatedAt,
+            payload: {...changes},
+            createdAt: _now().toUtc().toIso8601String(),
+          ));
+          return SaveResult(entry.applying(changes, pending: true), true);
+        });
+
+    final merged = await merge(allowNew: false);
+    if (merged != null) return merged;
+    try {
+      final res = await api.patch('/me/entries/${entry.id}', {...changes, 'baseUpdatedAt': entry.updatedAt});
+      final updated = Entry.fromJson(Map<String, dynamic>.from(res as Map));
+      await _cacheEntryLocally(updated);
+      return SaveResult(updated, false);
+    } catch (e) {
+      if (!isNetworkError(e)) rethrow;
     }
-    final pendingPatch = all.where((o) => o.type == 'patch' && o.entryId == entry.id).firstOrNull;
-    if (pendingPatch == null) {
-      try {
-        final res = await api.patch('/me/entries/${entry.id}', {...changes, 'baseUpdatedAt': entry.updatedAt});
-        final updated = Entry.fromJson(Map<String, dynamic>.from(res as Map));
-        await _cacheEntryLocally(updated);
-        return SaveResult(updated, false);
-      } catch (e) {
-        if (!isNetworkError(e)) rethrow;
-      }
-    }
-    // offline (or an earlier edit is already waiting): queue / merge
-    if (pendingPatch != null) {
-      pendingPatch.payload = {...pendingPatch.payload, ...changes};
-      await _put(pendingPatch);
-    } else {
-      await _put(QueuedOp(
-        opId: _newId(),
-        seq: _nextSeq(),
-        userId: userId,
-        type: 'patch',
-        entryId: entry.id,
-        baseUpdatedAt: entry.updatedAt,
-        payload: {...changes},
-        createdAt: _now().toUtc().toIso8601String(),
-      ));
-    }
-    return SaveResult(entry.applying(changes, pending: true), true);
+    return (await merge(allowNew: true))!; // offline: queue (or merge with an op that appeared meanwhile)
   }
 
   // ---- deleting an entry, also offline --------------------------------------------------------------------------
@@ -475,29 +506,40 @@ class OfflineStore {
   /// Deletes an entry. Returns true when it was only QUEUED (offline: it disappears from every list now and is deleted on the
   /// server when the network is back), false when the server did it. An entry that never reached the server is just forgotten.
   Future<bool> deleteEntry(String id) async {
-    final all = await ops();
-    if (all.any((o) => o.type == 'create' && o.entryId == id)) {
-      for (final o in all.where((o) => o.entryId == id)) {
-        await _delete(o.opId);
+    // Decided under the lock so a flush cannot start sending one of these ops between the read and the removal.
+    final local = await _locked<bool?>(() async {
+      final all = _mine(_readAll());
+      final create = all.where((o) => o.type == 'create' && o.entryId == id).firstOrNull;
+      if (create != null && !_inflight.contains(create.opId)) {
+        final rest = _readAll()..removeWhere((o) => o.userId == userId && o.entryId == id);
+        await _writeAll(rest);
+        return true;
       }
-      return true;
-    }
-    if (all.any((o) => o.type == 'delete' && o.entryId == id)) return true;
-    try {
-      await api.delete('/me/entries/$id');
-      await _dropEntryFromCache(id);
-      return false;
-    } catch (e) {
-      if (e is ApiError && e.status == 404) {
+      if (all.any((o) => o.type == 'delete' && o.entryId == id)) return true;
+      // The create is on the wire right now: the server will have the entry, so it must be deleted afterwards (queue below).
+      return create != null ? false : null;
+    });
+    if (local == true) return true;
+    if (local == null) {
+      try {
+        await api.delete('/me/entries/$id');
         await _dropEntryFromCache(id);
         return false;
+      } catch (e) {
+        if (e is ApiError && e.status == 404) {
+          await _dropEntryFromCache(id);
+          return false;
+        }
+        if (!isNetworkError(e)) rethrow;
       }
-      if (!isNetworkError(e)) rethrow;
     }
-    for (final o in all.where((o) => o.entryId == id && o.type == 'patch')) {
-      await _delete(o.opId); // an edit of something about to be deleted is pointless
-    }
-    await _put(QueuedOp(opId: _newId(), seq: _nextSeq(), userId: userId, type: 'delete', entryId: id, payload: {}, createdAt: _now().toUtc().toIso8601String()));
+    await _locked(() async {
+      final all = _readAll()..removeWhere((o) => o.userId == userId && o.entryId == id && o.type == 'patch' && !_inflight.contains(o.opId)); // an edit of something about to be deleted is pointless
+      if (!all.any((o) => o.userId == userId && o.type == 'delete' && o.entryId == id)) {
+        all.add(QueuedOp(opId: _newId(), seq: _nextSeq(), userId: userId, type: 'delete', entryId: id, payload: {}, createdAt: _now().toUtc().toIso8601String()));
+      }
+      await _writeAll(all);
+    });
     return true;
   }
 
@@ -573,12 +615,24 @@ class OfflineStore {
     var offline = false;
     final conflicts = <SyncConflict>[];
     final failures = <SyncFailure>[];
+    final seen = <String>{};
     try {
-      for (final op in await ops()) {
-        if (op.conflict) continue;
+      // Up to 3 passes: operations queued while this flush was running (a delete of an entry being created, a follow-up edit)
+      // are picked up at the end instead of waiting for the next trigger.
+      outer:
+      for (var pass = 0; pass < 3 && !offline; pass++) {
+        final todo = [for (final o in await ops()) if (!o.conflict && !seen.contains(o.opId)) o];
+        if (todo.isEmpty) break;
+      for (final op in todo) {
+        seen.add(op.opId);
         try {
           if (op.type == 'create') {
-            await api.post('/me/entries', {...op.payload, 'clientId': op.entryId});
+            final sent = jsonEncode(op.payload);
+            _inflight.add(op.opId);
+            final res = await api.post('/me/entries', {...op.payload, 'clientId': op.entryId});
+            await _finishInflight(op, sent, res);
+            changed = true;
+            continue;
           } else if (op.type == 'delete') {
             try {
               await api.delete('/me/entries/${op.entryId}');
@@ -586,12 +640,17 @@ class OfflineStore {
               if (e.status != 404) rethrow; // already gone: the goal is reached
             }
           } else if (op.type == 'cust-create') {
+            final station = op.payload['defaultStation'];
             try {
               final made = Map<String, dynamic>.from(await api.post('/me/customers', {'name': op.payload['name'], 'phone': op.payload['phone'] ?? ''}) as Map);
-              final station = op.payload['defaultStation'];
               if (station is String && station.isNotEmpty) await api.patch('/me/customers/${made['id']}', {'defaultStation': station});
             } on ApiError catch (e) {
-              if (e.status != 409) rethrow; // the name already exists on the server: the goal is reached
+              if (e.status != 409) rethrow; // the name already exists on the server (an earlier try created it): the goal is reached...
+              if (station is String && station.isNotEmpty) {
+                // ...except that the station may not have been set (the PATCH after the POST failed): find the customer, set it now
+                final id = await _customerIdByName('${op.payload['name']}');
+                if (id != null) await api.patch('/me/customers/$id', {'defaultStation': station});
+              }
             }
           } else if (op.type == 'cust-delete') {
             try {
@@ -600,17 +659,23 @@ class OfflineStore {
               if (e.status != 404) rethrow;
             }
           } else {
-            await api.patch('/me/entries/${op.entryId}', {...op.payload, 'baseUpdatedAt': op.baseUpdatedAt});
+            final sent = jsonEncode(op.payload);
+            _inflight.add(op.opId);
+            final res = await api.patch('/me/entries/${op.entryId}', {...op.payload, 'baseUpdatedAt': op.baseUpdatedAt});
+            await _finishInflight(op, sent, res);
+            changed = true;
+            continue;
           }
           await _delete(op.opId);
           changed = true;
         } on ApiError catch (err) {
+          _inflight.remove(op.opId);
           if (err.status == 0) {
             offline = true;
-            break;
+            break outer;
           }
-          // 401 (session gone) / 5xx (server hiccup): keep the queue, retry later
-          if (err.status == 401 || err.status >= 500) break;
+          // 401 (session gone) / 408, 425, 429 (try again later) / 5xx (server hiccup): keep the queue, retry later
+          if (err.status == 401 || err.status == 408 || err.status == 425 || err.status == 429 || err.status >= 500) break outer;
           if (err.status == 409 && err.data?['conflict'] == true) {
             op.conflict = true;
             await _put(op);
@@ -621,7 +686,11 @@ class OfflineStore {
           await _delete(op.opId);
           changed = true;
           failures.add(SyncFailure(op.opId, 'Không đồng bộ được "${op.payload['value'] ?? op.payload['name'] ?? (op.type == 'delete' ? 'việc xoá số liệu' : 'việc xoá khách hàng')}": ${err.message}'));
+        } catch (_) {
+          _inflight.remove(op.opId);
+          rethrow;
         }
+      }
       }
       if (!offline) {
         final (sent, off, refused) = await _flushResults();
@@ -633,6 +702,43 @@ class OfflineStore {
       syncing = false;
     }
     return FlushResult(changed: changed, offline: offline, conflicts: conflicts, failures: failures);
+  }
+
+  /// Ops whose request is on the wire right now (create / patch). An edit made meanwhile lands in the stored op; when the
+  /// request succeeds the stored payload is compared with what was sent and the difference stays as a follow-up patch.
+  final Set<String> _inflight = {};
+
+  Future<void> _finishInflight(QueuedOp op, String sentJson, dynamic res) => _locked(() async {
+        _inflight.remove(op.opId);
+        final all = _readAll();
+        final i = all.indexWhere((o) => o.opId == op.opId);
+        if (i == -1) return;
+        final cur = all[i];
+        if (jsonEncode(cur.payload) == sentJson) {
+          all.removeAt(i);
+        } else {
+          final sent = Map<String, dynamic>.from(jsonDecode(sentJson) as Map);
+          final diff = {
+            for (final e in cur.payload.entries)
+              if (!sent.containsKey(e.key) || jsonEncode(sent[e.key]) != jsonEncode(e.value)) e.key: e.value,
+          };
+          if (diff.isEmpty) {
+            all.removeAt(i);
+          } else {
+            final base = res is Map ? res['updatedAt'] as String? : null;
+            all[i] = QueuedOp(opId: _newId(), seq: _nextSeq(), userId: cur.userId, type: 'patch', entryId: cur.entryId, payload: diff, createdAt: cur.createdAt, baseUpdatedAt: base ?? cur.baseUpdatedAt);
+          }
+        }
+        await _writeAll(all);
+      });
+
+  Future<String?> _customerIdByName(String name) async {
+    final data = await api.get('/me/customers');
+    final want = name.trim().toLowerCase();
+    for (final c in (data is Map ? data['customers'] as List? : null) ?? const []) {
+      if ('${(c as Map)['name']}'.trim().toLowerCase() == want) return '${c['id']}';
+    }
+    return null;
   }
 
   /// Operations parked as conflicts by an earlier session (so they can be offered again).

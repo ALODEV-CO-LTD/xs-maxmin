@@ -1,5 +1,6 @@
-/// Pure logic of the Thống kê tab (port of frontend AccountStats.vue); no Flutter imports so it is unit-testable.
 import '../../core/number_text.dart';
+
+// Pure logic of the Thống kê tab (port of frontend AccountStats.vue); no Flutter imports so it is unit-testable.
 
 enum StatUnit { day, week, month, year }
 
