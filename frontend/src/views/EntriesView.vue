@@ -19,7 +19,6 @@ import { showConfirm } from '../confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppIcon from '../components/AppIcon.vue'
 import ModalDialog from '../components/ModalDialog.vue'
-import MaskBar from '../components/MaskBar.vue'
 import MaskedValue from '../components/MaskedValue.vue'
 import { mask } from '../stores/mask'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
@@ -33,7 +32,8 @@ import { readClipboardImage, usePasteImage } from '../pasteImage'
 import { today } from '../dates'
 import { addConflict, cachedGet, createEntry, loadEntries, onEntriesChanged, updateEntry } from '../offline'
 import { aliasesToText, fold, parseMessage, textToAliases, DEFAULT_STAKE_MARKERS } from '../messageParser'
-import { confirmCopyEnabled, copyEntries, setConfirmCopy } from '../clipboard'
+import { copyEntries } from '../clipboard'
+import { writeCalcSync } from '../calcSync'
 
 const auth = useAuthStore()
 
@@ -626,8 +626,6 @@ function clearFilters() {
 }
 
 // ---- Sao chép (K18) ---------------------------------------------------------
-const confirmCopy = ref(confirmCopyEnabled())
-watch(confirmCopy, (on) => setConfirmCopy(on))
 const copyMessage = ref('')
 async function copyShown() {
   if (mask.masked.value) return
@@ -681,6 +679,8 @@ function loadDraft() {
   templateMsg.value = ''
 }
 watch(() => form.customerName, loadDraft)
+// Tính điểm opens on the customer and day chosen here.
+watch(() => [form.customerName, form.entryDate], ([customer, date]) => writeCalcSync({ customer, date }), { immediate: true })
 // Picking a customer puts the cursor in the first "Số" box so numbers can be typed straight away;
 // preventScroll keeps the page still on phones.
 watch(
@@ -831,7 +831,6 @@ const stationShort = (code) => (isRegionCode(code) ? regionOf(code).name : stati
 <template>
   <div class="page">
     <h1 class="page-title">Nhập số</h1>
-    <MaskBar class="mask-row" />
 
     <div v-if="!canAdd && stats" class="alert alert-warning">
       Gói của bạn đã hết hạn. Vui lòng gia hạn ở mục Gói dịch vụ để tiếp tục nhập số liệu.
@@ -1103,9 +1102,6 @@ Mẫu cú pháp của khách này {{ savedTemplate ? '(đã lưu)' : '(chưa lư
               <AppButton variant="secondary" size="sm" :disabled="filteredEntries.length === 0 || mask.masked.value" :title="mask.masked.value ? 'Đang ẩn số liệu: bấm Hiện để sao chép' : undefined" @click="copyShown">
 Sao chép {{ mask.masked.value ? '•••' : filteredEntries.length }} số liệu đang hiện
 </AppButton>
-              <label class="filter-all">
-                <input v-model="confirmCopy" type="checkbox" /> Hỏi xác nhận trước khi sao chép
-              </label>
               <span v-if="copyMessage" class="copy-msg" role="status">{{ copyMessage }}</span>
             </div>
 

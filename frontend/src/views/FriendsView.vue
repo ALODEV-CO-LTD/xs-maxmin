@@ -27,6 +27,7 @@ import ChatDecodeDialog from '../components/ChatDecodeDialog.vue'
 import ChatRetentionPanel from '../components/ChatRetentionPanel.vue'
 import MessageAttachment from '../components/MessageAttachment.vue'
 import { useChatStore } from '../e2ee/chat'
+import { isGroupId } from '../e2ee/groups'
 import { onScreenshotAttempt } from '../screenshotGuard'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -155,6 +156,7 @@ const timeline = computed(() => {
 })
 
 async function loadCalls(friendId) {
+  if (isGroupId(friendId)) { calls.value = []; return } // no calls with a group
   try {
     const res = await api.get(`/me/calls?friendId=${encodeURIComponent(friendId)}&limit=50`)
     calls.value = res.calls
@@ -181,7 +183,7 @@ const selectedFriendId = computed(() => route.params.friendId || null)
 const selectedFriend = computed(() =>
   friends.value.find((f) => f.id === selectedFriendId.value) || null,
 )
-// Sửa: hiện nút Xoá trên từng dòng. Chọn tin: "Nhập số liệu" bật hộp chọn, nút thành "Tính toán" khi chọn ≥1 tin.
+// Sửa: hiện nút Xoá trên từng dòng. Chọn tin: "Nhập số" bật hộp chọn, nút thành "Nhập số (N)" khi chọn ≥1 tin và chuyển sang màn Nhập số.
 const editMode = ref(false)
 const selecting = ref(false)
 const pickedIds = ref([])
@@ -202,10 +204,21 @@ function calcBack() {
   calcOpen.value = false
   decodeOpen.value = true
 }
-const actionLabel = computed(() => (selecting.value && pickedIds.value.length ? 'Tính toán' : 'Nhập số liệu'))
+// "Nhập số" here IS the Nhập số screen: the picked messages go straight into its quick-entry box (preview, edit and save there).
+const actionLabel = computed(() => (selecting.value && pickedIds.value.length ? `Nhập số (${pickedIds.value.length})` : 'Nhập số'))
 function onAction() {
   if (!selecting.value) { selecting.value = true; return }
-  if (pickedIds.value.length) openDecode()
+  if (pickedIds.value.length) sendToEntries()
+}
+function sendToEntries() {
+  const text = timeline.value
+    .filter((t) => t.kind === 'msg' && !t.m.system && pickedIds.value.includes(t.m.id))
+    .map((t) => quoteOf(t.m.content).body)
+    .filter(Boolean)
+    .join('\n')
+  if (!text) return
+  cancelPick()
+  useDecoded(text)
 }
 function togglePick(id) {
   const i = pickedIds.value.indexOf(id)
@@ -321,6 +334,15 @@ function menuSelect() {
 const SHOW_BOTTOM_NAV = false
 const tab = ref('chats') // 'contacts' | 'calls' | 'chats' | 'settings'
 const searchInput = ref(null)
+const searchOpen = ref(false)
+function openSearch() {
+  searchOpen.value = true
+  nextTick(() => searchInput.value?.focus())
+}
+function closeSearch() {
+  searchOpen.value = false
+  searchQuery.value = ''
+}
 
 // Lưu trữ cuộc trò chuyện: ẩn khỏi danh sách Tin nhắn, chỉ lưu trên máy này (theo tài khoản).
 const archiveKey = () => `chat-archive:${auth.user?.id || ''}`
@@ -336,7 +358,7 @@ const chatList = computed(() =>
     (f) => (archived.value.includes(f.id) === showArchived.value) && (!SHOW_BOTTOM_NAV || f.lastMessageAt || notify.unread[`friend:${f.id}`] || f.id === selectedFriendId.value || showArchived.value),
   ),
 )
-const contactList = computed(() => [...filteredFriends.value].sort((a, b) => displayName(a).localeCompare(displayName(b), 'vi')))
+const contactList = computed(() => [...filteredFriends.value].filter((f) => !f.isGroup).sort((a, b) => displayName(a).localeCompare(displayName(b), 'vi')))
 
 // Sửa (tab Tin nhắn): chọn nhiều cuộc trò chuyện để lưu trữ hoặc xoá.
 const editPicked = ref([])
@@ -359,11 +381,12 @@ async function deleteSelected() {
   if (!ids.length) return
   if (!(await showConfirm({
     title: 'Xoá cuộc trò chuyện',
-    message: `Xoá ${ids.length} cuộc trò chuyện khỏi máy này? Tin nhắn và ảnh trong đó sẽ mất trên máy này (người kia vẫn giữ bản của họ). Bạn bè vẫn còn trong danh bạ.`,
+    message: `Xoá ${ids.length} cuộc trò chuyện khỏi máy này? Tin nhắn và ảnh trong đó sẽ mất trên máy này (người kia vẫn giữ bản của họ). Bạn bè vẫn còn trong danh bạ; nhóm thì bạn sẽ rời khỏi nhóm.`,
     confirmText: 'Xoá',
     danger: true,
   }))) return
-  for (const id of ids) await chat.deleteConversation(id)
+  // a group is left (the members are told); a friend's conversation is only cleared on this device
+  for (const id of ids) await (isGroupId(id) ? chat.leaveGroup(id) : chat.deleteConversation(id))
   if (ids.includes(selectedFriendId.value)) backToList()
   await loadFriends({ quiet: true })
   toggleEdit()
@@ -399,7 +422,7 @@ function pickNew(kind) {
   else if (kind === 'group') groupOpen.value = true
   else {
     if (SHOW_BOTTOM_NAV) tab.value = 'contacts'
-    nextTick(() => searchInput.value?.focus())
+    openSearch()
   }
 }
 function startChat(f) { newMsgOpen.value = false; tab.value = 'chats'; openFriend(f) }
@@ -412,7 +435,11 @@ const displayName = (f) => (f ? prefs.value[f.id]?.alias || f.name : '')
 const initial = (name) => (name || '?').trim().charAt(0).toUpperCase()
 const settingsOpen = ref(false)
 const aliasDraft = ref('')
-function openSettings() { aliasDraft.value = prefs.value[selectedFriendId.value]?.alias || ''; settingsOpen.value = true }
+function openSettings() {
+  if (selectedFriend.value?.isGroup) { groupNameDraft.value = selectedFriend.value.name; groupSettingsOpen.value = true; return }
+  aliasDraft.value = prefs.value[selectedFriendId.value]?.alias || ''
+  settingsOpen.value = true
+}
 function saveSettings() {
   const alias = aliasDraft.value.trim()
   const next = { ...prefs.value }
@@ -426,7 +453,7 @@ function saveSettings() {
 // Calls exist only between customers: nobody can call Admin and Admin calls
 // nobody (chat with Admin is unaffected). The server enforces this too -
 // hiding the buttons just avoids offering something that would be refused.
-const canCall = computed(() => !auth.isAdmin && !!selectedFriend.value && !selectedFriend.value.isAdmin)
+const canCall = computed(() => !auth.isAdmin && !!selectedFriend.value && !selectedFriend.value.isAdmin && !selectedFriend.value.isGroup)
 
 
 async function loadFriends({ quiet = false } = {}) {
@@ -436,9 +463,16 @@ async function loadFriends({ quiet = false } = {}) {
     const res = await api.get('/me/friends')
     await chat.rememberFriends(res.friends)
     const prev = await chat.previews()
-    friends.value = res.friends
-      .map((f) => ({ ...f, lastMessage: prev[f.id]?.text || null, lastMessageAt: prev[f.id]?.at || 0 }))
-      .sort((a, b) => b.lastMessageAt - a.lastMessageAt || a.name.localeCompare(b.name, 'vi'))
+    // Group chats (kept on this device only) are rows of the same list.
+    const groupRows = Object.values(chat.groups).map((g) => {
+      const p = prev[g.id]
+      const last = p ? `${p.mine ? 'Bạn' : chat.memberName(g, p.from)}: ${p.text}` : null
+      return { id: g.id, name: g.name, username: '', isGroup: true, memberCount: g.members.length, lastMessage: last, lastMessageAt: p?.at || g.updatedAt }
+    })
+    friends.value = [
+      ...res.friends.map((f) => ({ ...f, lastMessage: prev[f.id]?.text || null, lastMessageAt: prev[f.id]?.at || 0 })),
+      ...groupRows,
+    ].sort((a, b) => b.lastMessageAt - a.lastMessageAt || a.name.localeCompare(b.name, 'vi'))
   } catch (err) {
     loadError.value = err.message || 'Không tải được danh sách bạn bè'
   } finally {
@@ -459,7 +493,8 @@ async function loadMessages(friendId, { quiet = false } = {}) {
     const grew = list.length !== messages.value.length
     messages.value = list.map((m) => ({
       id: m.id,
-      fromUserId: m.mine ? auth.user?.id : friendId,
+      fromUserId: m.mine ? auth.user?.id : (m.fromId || friendId),
+      fromName: m.fromId && !m.mine ? chat.memberName(chat.groups[friendId], m.fromId) : '',
       content: m.text,
       attachment: m.att,
       createdAt: new Date(m.createdAt).toISOString(),
@@ -480,6 +515,7 @@ async function loadMessages(friendId, { quiet = false } = {}) {
 // someone who wants to add them. The server gives every account one; an
 // account that has none is NOT given one here (just opening this page must
 // not create an ID) - it is pointed to Tài khoản instead.
+const showId = ref(false)
 const myCode = ref('')
 const noMyCode = ref(false)
 const codeCopied = ref(false)
@@ -644,7 +680,7 @@ const stopShotWatch = onScreenshotAttempt(() => {
 onBeforeUnmount(stopShotWatch)
 
 const peerInfo = computed(() => chat.peerInfo[selectedFriendId.value] || null)
-// Thêm: tạo nhóm. Giao diện đã có; nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.
+// Thêm: tạo nhóm. Nhóm nằm trên máy các thành viên (không lưu trên máy chủ), mỗi tin mã hoá riêng cho từng thành viên.
 // Mở cuộc trò chuyện: ô nhập CHƯA được chọn, không con trỏ, không bàn phím hệ thống, nội dung
 // tin nhắn chiếm hết chỗ. Chạm vào ô nhập thì bàn phím hệ thống hiện như thường lệ (web không còn bàn phím ảo riêng).
 const msgInput = ref(null)
@@ -653,10 +689,102 @@ function focusInput() { nextTick(() => msgInput.value?.focus({ preventScroll: tr
 const groupOpen = ref(false)
 const groupName = ref('')
 const groupMembers = ref([])
+const groupError = ref('')
+const groupBusy = ref(false)
 function toggleMember(id) {
   const i = groupMembers.value.indexOf(id)
   if (i >= 0) groupMembers.value.splice(i, 1)
   else groupMembers.value.push(id)
+}
+// Friends that can be put in a group: real friends (not Admin) whose end-to-end key is known (the relay only carries messages between friends).
+const groupCandidates = computed(() => friends.value.filter((f) => !f.isGroup && !f.isAdmin && chat.friendKeys[f.id]).sort((a, b) => displayName(a).localeCompare(displayName(b), 'vi')))
+const canCreateGroup = computed(() => !groupBusy.value && groupName.value.trim() && groupMembers.value.length >= 2)
+watch(groupOpen, (open) => { if (open) { groupName.value = ''; groupMembers.value = []; groupError.value = '' } })
+async function createGroup() {
+  groupBusy.value = true
+  groupError.value = ''
+  try {
+    const others = groupMembers.value.map((id) => ({ id, name: displayName(friendOf(id)) }))
+    const g = await chat.createGroup(groupName.value, auth.user?.name || '', others)
+    groupOpen.value = false
+    tab.value = 'chats'
+    showArchived.value = false
+    await loadFriends({ quiet: true })
+    openFriend({ id: g.id })
+  } catch (err) {
+    groupError.value = err.message || 'Không tạo được nhóm'
+  } finally {
+    groupBusy.value = false
+  }
+}
+
+// The open conversation when it is a group, and whether anybody in it can receive a message from me.
+const selectedGroup = computed(() => (selectedFriend.value?.isGroup ? chat.groups[selectedFriend.value.id] || null : null))
+const groupCanSend = computed(() => !!selectedGroup.value?.members.some((m) => m.id !== auth.user?.id && chat.friendKeys[m.id]))
+const groupSettingsOpen = ref(false)
+const groupNameDraft = ref('')
+const isGroupCreator = computed(() => !!selectedGroup.value && selectedGroup.value.creatorId === auth.user?.id)
+const addOpen = ref(false)
+const addPicked = ref([])
+const groupManageError = ref('')
+watch(groupSettingsOpen, (open) => { if (open) { addOpen.value = false; addPicked.value = []; groupManageError.value = '' } })
+// Friends (with a key, not yet in the group) that the creator can add.
+const addCandidates = computed(() => {
+  const inGroup = new Set(selectedGroup.value?.members.map((m) => m.id) || [])
+  return friends.value.filter((f) => !f.isGroup && !f.isAdmin && chat.friendKeys[f.id] && !inGroup.has(f.id))
+})
+function toggleAdd(id) {
+  const i = addPicked.value.indexOf(id)
+  if (i >= 0) addPicked.value.splice(i, 1)
+  else addPicked.value.push(id)
+}
+async function addMembers() {
+  groupManageError.value = ''
+  try {
+    await chat.addGroupMembers(selectedGroup.value.id, addPicked.value.map((id) => ({ id, name: displayName(friendOf(id)) })))
+    addPicked.value = []
+    addOpen.value = false
+    await loadFriends({ quiet: true })
+  } catch (err) {
+    groupManageError.value = err.message || 'Không thêm được thành viên'
+  }
+}
+async function removeMember(m) {
+  const g = selectedGroup.value
+  if (!(await showConfirm({
+    title: 'Xoá khỏi nhóm',
+    message: `Xoá ${chat.memberName(g, m.id)} khỏi nhóm "${g.name}"? Họ sẽ không còn nhận tin của nhóm.`,
+    confirmText: 'Xoá',
+    danger: true,
+  }))) return
+  groupManageError.value = ''
+  try {
+    await chat.removeGroupMember(g.id, m.id)
+    await loadFriends({ quiet: true })
+  } catch (err) {
+    groupManageError.value = err.message || 'Không xoá được thành viên'
+  }
+}
+async function saveGroupName() {
+  if (!selectedGroup.value) return
+  const name = groupNameDraft.value.trim()
+  if (name && name !== selectedGroup.value.name) await chat.renameGroup(selectedGroup.value.id, name)
+  groupSettingsOpen.value = false
+  await loadFriends({ quiet: true })
+}
+async function leaveSelectedGroup() {
+  const g = selectedGroup.value
+  if (!g) return
+  groupSettingsOpen.value = false
+  if (!(await showConfirm({
+    title: 'Rời nhóm',
+    message: `Rời nhóm "${g.name}"? Tin nhắn của nhóm sẽ bị xoá khỏi máy này và các thành viên được báo là bạn đã rời.`,
+    confirmText: 'Rời nhóm',
+    danger: true,
+  }))) return
+  await chat.leaveGroup(g.id)
+  backToList()
+  await loadFriends({ quiet: true })
 }
 
 const showSecurity = ref(false)
@@ -672,30 +800,33 @@ async function acceptKey() {
 <template>
   <div class="page friends-page">
     <div class="page-head">
-      <div class="page-head-text">
-        <h1 class="page-title">Bạn bè & tin nhắn</h1>
-        <p class="page-subtitle">Kết bạn bằng mã ID và nhắn tin trực tiếp.</p>
-      </div>
-      <!-- Your own ID, top-right corner of the page -->
-      <div v-if="myCode" class="my-id-corner">
-        <span class="my-id-label">ID của bạn</span>
-        <span class="my-id-code">{{ myCode }}</span>
-        <AppButton variant="secondary" size="sm" @click="copyMyCode">{{ codeCopied ? 'Đã chép' : 'Sao chép' }}</AppButton>
-      </div>
-      <div v-else-if="noMyCode" class="my-id-corner">
-        <span class="my-id-label">Chưa có ID. <router-link to="/account">Tạo ID trong Tài khoản.</router-link></span>
+      <h1 class="page-title">Tin nhắn</h1>
+      <!-- Everything in the top bar: search, Sửa, Thêm and your own ID (hidden until asked for) -->
+      <div class="head-actions">
+        <input v-if="searchOpen" id="searchQuery" ref="searchInput" v-model="searchQuery" class="head-search" type="search" aria-label="Tìm kiếm" placeholder="Tìm kiếm" autocomplete="off" @keydown.esc="closeSearch" />
+        <AppButton v-if="searchOpen" variant="ghost" size="sm" @click="closeSearch">Đóng</AppButton>
+        <template v-else>
+          <AppButton variant="ghost" size="sm" icon="search" aria-label="Tìm kiếm" @click="openSearch">Tìm kiếm</AppButton>
+          <AppButton v-if="tab === 'chats'" variant="ghost" size="sm" :aria-pressed="editMode" @click="toggleEdit">{{ editMode ? 'Xong' : 'Sửa' }}</AppButton>
+          <AppButton variant="primary" size="sm" @click="newOpen = true">Thêm</AppButton>
+          <div class="my-id-wrap" @keydown.esc="showId = false">
+            <AppButton variant="secondary" size="sm" icon="user" :aria-expanded="showId" aria-haspopup="dialog" @click="showId = !showId">ID của bạn</AppButton>
+            <div v-if="showId" class="my-id-pop" role="dialog" aria-label="ID của bạn">
+              <template v-if="myCode">
+                <span class="my-id-label">Đưa ID này cho người muốn kết bạn với bạn</span>
+                <span class="my-id-code">{{ myCode }}</span>
+                <AppButton variant="primary" size="sm" @click="copyMyCode">{{ codeCopied ? 'Đã chép' : 'Sao chép' }}</AppButton>
+              </template>
+              <span v-else class="my-id-label">Chưa có ID. <router-link to="/account">Tạo ID trong Tài khoản.</router-link></span>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
     <div class="split" :class="{ 'show-thread': !!selectedFriendId }">
       <div class="list-pane">
-        <div class="card search-form">
-          <div class="search-row">
-            <button v-if="tab === 'chats'" type="button" class="tb-link" :aria-pressed="editMode" @click="toggleEdit">{{ editMode ? 'Xong' : 'Sửa' }}</button>
-            <input id="searchQuery" ref="searchInput" v-model="searchQuery" type="search" aria-label="Tìm kiếm" placeholder="Tìm kiếm" autocomplete="off" />
-            <button type="button" class="tb-link strong" @click="newOpen = true">Mới</button>
-          </div>
-          <p class="search-sub">Lọc bạn bè của bạn và tìm người mới để kết bạn.</p>
+        <div v-if="searchError || (searchQuery.trim() && (searching || newPeople.length > 0))" class="card search-form">
           <div v-if="searchError" class="alert alert-error" style="margin: 8px 0 0">{{ searchError }}</div>
 
           <!-- people who are not friends yet -->
@@ -719,13 +850,13 @@ async function acceptKey() {
 
           <!-- Tin nhắn / Danh bạ -->
           <template v-if="tab === 'chats' || tab === 'contacts'">
-            <div v-if="friends.length === 0" class="card">Chưa có bạn bè nào. Bấm Mới &gt; Danh bạ mới để tìm và kết bạn.</div>
+            <div v-if="friends.length === 0" class="card">Chưa có bạn bè nào. Bấm Thêm &gt; Danh bạ mới để tìm và kết bạn.</div>
             <div v-else-if="(tab === 'chats' ? chatList : contactList).length === 0">
               <div v-if="searchQuery.trim() && !searching && newPeople.length === 0" class="card">
                 Không tìm thấy ai khớp với "{{ searchQuery.trim() }}". Nếu là mã ID, hãy kiểm tra lại các chữ số.
               </div>
               <div v-else-if="!searchQuery.trim()" class="card">
-                {{ showArchived ? 'Chưa lưu trữ cuộc trò chuyện nào.' : 'Chưa có cuộc trò chuyện nào. Bấm Mới > Tin nhắn mới để bắt đầu.' }}
+                {{ showArchived ? 'Chưa lưu trữ cuộc trò chuyện nào.' : 'Chưa có cuộc trò chuyện nào. Bấm Thêm > Tin nhắn mới để bắt đầu.' }}
               </div>
             </div>
             <div v-else class="friend-list">
@@ -737,7 +868,7 @@ async function acceptKey() {
                 @click="editMode && tab === 'chats' ? toggleEditPick(f.id) : openFriend(f)"
               >
                 <input v-if="editMode && tab === 'chats'" type="checkbox" class="pick" :checked="editPicked.includes(f.id)" aria-label="Chọn cuộc trò chuyện" @click.stop="toggleEditPick(f.id)" />
-                <span class="avatar">{{ initial(displayName(f)) }}</span>
+                <span class="avatar" :class="{ 'avatar-group': f.isGroup }">{{ f.isGroup ? '👥' : initial(displayName(f)) }}</span>
                 <div class="friend-info">
                   <strong>
                     {{ displayName(f) }}
@@ -802,8 +933,9 @@ async function acceptKey() {
           <div class="thread-header">
             <button class="back-btn" aria-label="Quay lại danh sách" title="Quay lại" @click="backToList"><AppIcon name="arrow-left" /></button>
             <button type="button" class="who" title="Thông tin người trò chuyện" @click="openSettings">
-              <span class="avatar sm">{{ initial(displayName(selectedFriend)) }}</span>
+              <span class="avatar sm" :class="{ 'avatar-group': selectedFriend?.isGroup }">{{ selectedFriend?.isGroup ? '👥' : initial(displayName(selectedFriend)) }}</span>
               <strong class="thread-title">{{ displayName(selectedFriend) || '...' }}</strong>
+              <span v-if="selectedGroup" class="thread-sub">{{ selectedGroup.members.length }} thành viên</span>
             </button>
             <button type="button" class="btn btn-ghost btn-sm gear" aria-label="Cài đặt cuộc trò chuyện" title="Cài đặt cuộc trò chuyện" @click="openSettings"><AppIcon name="settings" /></button>
             <div v-if="canCall" class="call-buttons">
@@ -814,12 +946,16 @@ async function acceptKey() {
             Khoá bảo mật của {{ selectedFriend?.name }} đã thay đổi (họ đổi máy hoặc xoá dữ liệu trình duyệt). Hãy xác minh mã bảo mật mới với họ qua kênh khác rồi bấm Đã hiểu.
             <AppButton variant="secondary" size="sm" @click="acceptKey">Đã hiểu</AppButton>
           </div>
-          <div v-if="selectedFriend && !chat.friendKeys[selectedFriend.id]" class="alert alert-warning e2ee-warn">
+          <div v-if="selectedGroup && !groupCanSend" class="alert alert-warning e2ee-warn">
+            Chưa có thành viên nào là bạn bè của bạn dùng mã hoá 2 đầu nên chưa nhắn được trong nhóm này.
+          </div>
+          <div v-else-if="selectedFriend && !selectedFriend.isGroup && !chat.friendKeys[selectedFriend.id]" class="alert alert-warning e2ee-warn">
             {{ selectedFriend.name }} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.
           </div>
           <div class="e2ee-line">
             <span aria-hidden="true">🔒</span>
-            <span>Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.</span>
+            <span v-if="selectedGroup">Mã hoá 2 đầu, không lưu trên máy chủ. Mỗi tin được gửi riêng cho từng thành viên là bạn bè của bạn đang online.</span>
+            <span v-else>Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.</span>
           </div>
           <div v-if="showSecurity && peerInfo" class="e2ee-codes">
             <div>Của {{ selectedFriend?.name }}: <code>{{ peerInfo.fingerprint }}</code></div>
@@ -872,6 +1008,7 @@ async function acceptKey() {
                     @touchcancel="pressEnd"
                   >
                     <span v-if="isPinned(item.m.id)" class="pin-mark" title="Đã ghim">📌</span>
+                    <div v-if="item.m.fromName && !item.m.mine" class="msg-sender">{{ item.m.fromName }}</div>
                     <div v-if="quoteOf(item.m.content).quote" class="quote">{{ quoteOf(item.m.content).quote }}</div>
                     <span v-if="item.m.content">{{ quoteOf(item.m.content).body }}</span>
                     <MessageAttachment
@@ -916,6 +1053,43 @@ async function acceptKey() {
             <AppButton variant="primary" type="submit" :disabled="sending || (!newMessage.trim() && !attachment)">Gửi</AppButton>
           </form>
         </template>
+      </div>
+    </div>
+
+    <div v-if="groupSettingsOpen && selectedGroup" class="group-overlay" @click.self="groupSettingsOpen = false">
+      <div class="card group-sheet" role="dialog" aria-label="Cài đặt nhóm">
+        <div class="set-head">
+          <span class="avatar big avatar-group">👥</span>
+          <strong>{{ selectedGroup.name }}</strong>
+        </div>
+        <label v-if="isGroupCreator" class="set-field">Tên nhóm
+          <input v-model="groupNameDraft" type="text" maxlength="60" />
+        </label>
+        <strong>{{ selectedGroup.members.length }} thành viên</strong>
+        <ul class="group-members">
+          <li v-for="m in selectedGroup.members" :key="m.id">
+            {{ chat.memberName(selectedGroup, m.id) }}<span v-if="m.id === selectedGroup.creatorId" class="search-hint"> · người tạo</span>
+            <button v-if="isGroupCreator && m.id !== selectedGroup.creatorId" type="button" class="tb-link danger" :aria-label="`Xoá ${chat.memberName(selectedGroup, m.id)} khỏi nhóm`" @click="removeMember(m)">Xoá</button>
+          </li>
+        </ul>
+        <template v-if="isGroupCreator">
+          <button type="button" class="tb-link" @click="addOpen = !addOpen">{{ addOpen ? 'Đóng danh sách' : 'Thêm thành viên' }}</button>
+          <ul v-if="addOpen" class="group-members">
+            <li v-for="f in addCandidates" :key="f.id"><label><input type="checkbox" :checked="addPicked.includes(f.id)" @change="toggleAdd(f.id)" /> {{ displayName(f) }}</label></li>
+            <li v-if="!addCandidates.length" class="search-hint">Không còn bạn bè nào (đã bật mã hoá 2 đầu) để thêm.</li>
+            <li v-if="addCandidates.length"><button type="button" class="tb-link strong" :disabled="!addPicked.length" @click="addMembers">Thêm {{ addPicked.length || '' }}</button></li>
+          </ul>
+        </template>
+        <div v-if="groupManageError" class="alert alert-error">{{ groupManageError }}</div>
+        <div class="set-tools">
+          <button type="button" class="tb-link" @click="retentionOpen = !retentionOpen; groupSettingsOpen = false">Cài đặt tự xoá</button>
+          <button v-if="retentionRule" type="button" class="tb-link" @click="retentionPanel?.cancel(); groupSettingsOpen = false">Tắt tự xoá</button>
+          <button type="button" class="tb-link danger" @click="leaveSelectedGroup">Rời nhóm</button>
+        </div>
+        <div class="group-actions">
+          <button type="button" class="tb-link" @click="groupSettingsOpen = false">Đóng</button>
+          <button v-if="isGroupCreator" type="button" class="tb-link strong" @click="saveGroupName">Lưu</button>
+        </div>
       </div>
     </div>
 
@@ -992,17 +1166,18 @@ async function acceptKey() {
     <div v-if="groupOpen" class="group-overlay" @click.self="groupOpen = false">
       <div class="card group-sheet" role="dialog" aria-label="Tạo nhóm">
         <strong>Tạo nhóm</strong>
-        <input v-model="groupName" type="text" placeholder="Tên nhóm" />
+        <input v-model="groupName" type="text" placeholder="Tên nhóm" maxlength="60" />
         <ul class="group-members">
-          <li v-for="f in friends" :key="f.id">
-            <label><input type="checkbox" :checked="groupMembers.includes(f.id)" @change="toggleMember(f.id)" /> {{ f.name }}</label>
+          <li v-for="f in groupCandidates" :key="f.id">
+            <label><input type="checkbox" :checked="groupMembers.includes(f.id)" :disabled="groupBusy" @change="toggleMember(f.id)" /> {{ displayName(f) }}</label>
           </li>
-          <li v-if="!friends.length" class="search-hint">Chưa có bạn bè nào để thêm vào nhóm.</li>
+          <li v-if="!groupCandidates.length" class="search-hint">Chưa có bạn bè nào dùng được để thêm vào nhóm.</li>
         </ul>
-        <p class="search-sub">Nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.</p>
+        <p class="search-sub">Chọn ít nhất 2 bạn bè ({{ groupMembers.length }} đã chọn). Nhóm chỉ nằm trên máy của các thành viên, tin nhắn mã hoá 2 đầu, máy chủ không lưu. Bạn chỉ gửi được cho thành viên là bạn bè của bạn.</p>
+        <div v-if="groupError" class="alert alert-error">{{ groupError }}</div>
         <div class="group-actions">
           <AppButton variant="ghost" size="sm" @click="groupOpen = false">Đóng</AppButton>
-          <AppButton variant="primary" size="sm" disabled>Tạo nhóm</AppButton>
+          <AppButton variant="primary" size="sm" :disabled="!canCreateGroup" @click="createGroup">{{ groupBusy ? 'Đang tạo...' : 'Tạo nhóm' }}</AppButton>
         </div>
       </div>
     </div>
@@ -1689,4 +1864,36 @@ async function acceptKey() {
 .list-group {
   margin-top: 0;
 }
+
+.my-id-wrap {
+  position: relative;
+  flex: none;
+}
+.my-id-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  min-width: 240px;
+  padding: 14px 16px;
+  text-align: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+.my-id-pop .my-id-code {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: var(--primary);
+}
+.head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.head-search { min-width: 200px; border: 1px solid #16a34a !important; border-radius: 18px !important; padding: 7px 12px !important; background: #fff !important; color: #000 !important; }
+.avatar-group { background: #16a34a; color: #fff; }
+.msg-sender { font-size: 12px; font-weight: 700; color: #16a34a; margin-bottom: 2px; }
+.thread-sub { margin-left: 8px; font-size: 12px; color: #8a8f8a; font-weight: 400; }
 </style>

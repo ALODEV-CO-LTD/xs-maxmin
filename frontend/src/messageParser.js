@@ -91,10 +91,14 @@ function compactSymbols(aliasMap, cfg) {
 // null = "not compact notation": the caller falls back to the legacy parser, so nothing that worked before changes.
 function makeCompactParser(symbols, betTypes) {
   const alt = (pred) =>
-    [...symbols.entries()].filter(([, v]) => pred(v)).map(([k]) => k).sort((a, b) => b.length - a.length).map(escapeRe).join('|')
+    [...symbols.entries()].filter(([k, v]) => pred(v, k)).map(([k]) => k).sort((a, b) => b.length - a.length).map(escapeRe).join('|')
   const all = alt(() => true)
   const lo = alt((v) => v.kind === 'lo')
-  const reXien = lo ? new RegExp(`^(\\d{2}(?:(?:[.,]|${lo})\\d{2}){1,3})(${lo}|xien)${POINTS_RE}$`) : null
+  const reXien = lo ? new RegExp(`^(\\d{2}(?:(?:[.,]|${lo})\\d{2}){1,})(${lo}|xien)${POINTS_RE}$`) : null
+  // "22.67lo10" / "81.24.69lo10": several numbers of the same length joined by dots (or commas), one symbol and one điểm for all.
+  const allNoX = alt((v, k) => !BARE_X.includes(k)) // "20.02x10" stays with the legacy reading (x = × điểm)
+  const reListDouble = new RegExp(`^(\\d{2,4}(?:[.,]\\d{2,4})+)(${allNoX})${POINTS_RE}(${allNoX})${POINTS_RE}$`)
+  const reList = new RegExp(`^(\\d{2,4}(?:[.,]\\d{2,4})+)(${allNoX})${POINTS_RE}$`)
   const reDouble = new RegExp(`^(\\d+)(${all})${POINTS_RE}(${all})${POINTS_RE}$`)
   const reSingle = new RegExp(`^(\\d+)(${all})${POINTS_RE}$`)
   const has = (t) => betTypes.includes(t)
@@ -128,7 +132,7 @@ function makeCompactParser(symbols, betTypes) {
     return { row: { type, value, score: points.replace(',', '.'), reasons }, canon: `${value}${canonSym}${points}` }
   }
 
-  return (tok, ctxType = '') => {
+  const run = (tok, ctxType = '') => {
     let m = reXien && tok.match(reXien)
     if (m) {
       const nums = m[1].match(/\d{2}/g)
@@ -136,15 +140,35 @@ function makeCompactParser(symbols, betTypes) {
       const type = `xien${nums.length}`
       // "20.02x10" is also how some customers list several plain numbers, so it only means xiên when the
       // account has that Xiên type; "20x02lo10" / "20.02xiên10" cannot mean anything else.
-      if (!(dotsOnly && m[2] !== 'xien' && !has(type))) {
+      // "22.67lo10" (numbers joined by dots, then a spelled lô symbol and điểm) is a xiên: 2 numbers = xiên 2, 3 = xiên 3, 4 = xiên 4.
+      // More than 4 numbers is not a xiên the system knows: it is kept as one flagged row for the user to check.
+      const spelledLo = dotsOnly && !BARE_X.includes(m[2]) && symbols.get(m[2])?.kind === 'lo'
+      if (spelledLo || !(dotsOnly && m[2] !== 'xien' && !has(type))) {
         const reasons = [
-          'Xiên: cách tính điểm chưa được hỗ trợ, hãy kiểm tra thủ công',
+          ...(nums.length > 4 ? [`Xiên ${nums.length} số: hệ thống chỉ có xiên 2, 3, 4, hãy kiểm tra`] : []),
           ...(has(type) ? [] : [`Loại "${typeLabel(type)}" chưa có trong cấu hình`]),
         ]
         return {
           rows: [{ type, value: nums.join(' '), score: m[3].replace(',', '.'), reasons }],
           canon: `${nums.join('.')}${CANON_SYMBOL.xien}${m[3]}`,
         }
+      }
+    }
+    m = tok.match(reListDouble)
+    if (m) {
+      const nums = m[1].split(/[.,]/)
+      // (a lô symbol after several 2-digit numbers is a xiên, handled above: no list of numbers with two symbols)
+      if (nums.every((n) => n.length === nums[0].length) && !(nums[0].length === 2 && [m[2], m[4]].some((x) => symbols.get(x)?.kind === 'lo'))) {
+        const made = nums.flatMap((n) => [one(n, m[2], m[3], ctxType), one(n, m[4], m[5], ctxType)])
+        if (made.every(Boolean)) return { rows: made.map((x) => x.row), canon: made.map((x) => x.canon).join(' ') }
+      }
+    }
+    m = tok.match(reList)
+    if (m) {
+      const nums = m[1].split(/[.,]/)
+      if (nums.every((n) => n.length === nums[0].length)) {
+        const made = nums.map((n) => one(n, m[2], m[3], ctxType))
+        if (made.every(Boolean)) return { rows: made.map((x) => x.row), canon: made.map((x) => x.canon).join(' ') }
       }
     }
     m = tok.match(reDouble)
@@ -160,6 +184,28 @@ function makeCompactParser(symbols, betTypes) {
     }
     return null
   }
+
+  // Loosely written compact notation -> the strict spelling the matchers above read: groups divided by ; / | or " - ",
+  // numbers of one group divided by spaces, dots, commas or dashes, the symbol / điểm separated by spaces or followed by "điểm".
+  // "22 67 lo 10; 50-65 lô 20" -> "22.67lo10 50.65lo20". Bare x / × is left alone (the legacy parser owns "× điểm").
+  const symAlt = alt((v, k) => !BARE_X.includes(k))
+  const reGroup = symAlt
+    ? new RegExp(`(?<![\\d.,])((?:\\d{2,4}[ .,\\-]+)*\\d{2,4})\\s*(${symAlt})\\s*(\\d+(?:[.,]\\d+)?)(?:\\s*diem)?(?![\\d])`, 'g')
+    : null
+  // "22.67lo10 de5" / "22.67lo10de5": the second symbol re-uses the numbers in front of the first.
+  const reAttach = symAlt
+    ? new RegExp(`((?:\\d{2,4}\\.)*\\d{2,4})(${symAlt})(\\d+(?:[.,]\\d+)?)\\s*(${symAlt})(\\d+(?:[.,]\\d+)?)(?![\\d.,]|\\s*[a-z])`, 'g')
+    : null
+  run.normalize = (f) => {
+    if (!reGroup || !reAttach) return f
+    return f
+      .replace(/\s*[;|/]\s*|\s+-\s+/g, ' ')
+      .replace(reGroup, (_all, nums, sym, pts) => `${nums.split(/[ .,-]+/).join('.')}${sym}${pts}`)
+      .replace(reAttach, '$1$2$3$4$5')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+  return run
 }
 
 export function parseMessage(text, { betTypes = ['de', 'lo'], template = null, kindSymbols = null } = {}) {
@@ -194,9 +240,18 @@ export function parseMessage(text, { betTypes = ['de', 'lo'], template = null, k
 
     // Compact notation: only when EVERY space-separated token of the line is one ("20lo100 70lo500 54lo300").
     // A line that mixes in anything else goes through the legacy path below, exactly as before.
-    const toks = f.split(/\s+/).filter(Boolean)
     const ctxType = stickyType || cfg.defaultType
-    const parsed = toks.map((t) => compact(t, ctxType))
+    let toks = f.split(/\s+/).filter(Boolean)
+    let parsed = toks.map((t) => compact(t, ctxType))
+    if (!parsed.every(Boolean)) {
+      // The same line written loosely ("22 67 lo 10", "22-67 lô10; 50.65 lo20"): tidy it and try again.
+      const tidy = compact.normalize(f).split(/\s+/).filter(Boolean)
+      const again = tidy.map((t) => compact(t, ctxType))
+      if (tidy.length && again.every(Boolean)) {
+        toks = tidy
+        parsed = again
+      }
+    }
     if (toks.length && parsed.every(Boolean)) {
       for (const p of parsed) for (const r of p.rows) rows.push({ ...r, raw: line, uncertain: r.reasons.length > 0 })
       continue

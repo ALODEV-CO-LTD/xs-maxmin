@@ -1,24 +1,11 @@
-// Copying entry data to the clipboard (K18), shared by EntriesView and
-// CustomersView. Entry data is sensitive (money), so the user can turn on
-// "ask before copying": the preference lives in localStorage.
-import { showConfirm } from './confirm'
+// Copying entry data to the clipboard (K18), shared by EntriesView and CustomersView.
 import { betTypeLabel } from './betTypes'
 
-const KEY = 'xoso_confirm_copy'
-
-export function confirmCopyEnabled() {
-  try {
-    return localStorage.getItem(KEY) === '1'
-  } catch {
-    return false
-  }
-}
-export function setConfirmCopy(on) {
-  try {
-    localStorage.setItem(KEY, on ? '1' : '0')
-  } catch {
-    /* ignore */
-  }
+// "Ask before copying" was removed: copying never asks. An old setting saved by an earlier version is forgotten.
+try {
+  localStorage.removeItem('xoso_confirm_copy')
+} catch {
+  /* ignore */
 }
 
 /** Plain-text table of entries: one line per record, tab separated. */
@@ -100,18 +87,9 @@ async function writeClipboard(text) {
   execCommandCopy(text)
 }
 
-/** Copies `entries`; asks first when the user enabled the confirmation.
- *  Resolves 'copied' | 'cancelled' | 'failed'. */
-export async function copyEntries(entries, { label = '', withCustomer = false } = {}) {
+/** Copies `entries`. Resolves 'copied' | 'failed'. */
+export async function copyEntries(entries, { withCustomer = false } = {}) {
   if (!entries.length) return 'failed'
-  if (confirmCopyEnabled()) {
-    const ok = await showConfirm({
-      title: 'Sao chép số liệu',
-      message: `Sao chép ${entries.length} số liệu${label ? ` (${label})` : ''} vào bộ nhớ tạm? Dữ liệu này nhạy cảm, chỉ dán ở nơi bạn tin tưởng.`,
-      confirmText: 'Sao chép',
-    })
-    if (!ok) return 'cancelled'
-  }
   try {
     await writeClipboard(entriesToText(entries, { withCustomer }))
     return 'copied'

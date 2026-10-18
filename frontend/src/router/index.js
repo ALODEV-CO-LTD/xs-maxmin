@@ -53,12 +53,12 @@ const routes = [
   // Cấu hình tính điểm: một tab riêng ở menu (cấu hình mặc định của tài khoản); cấu hình riêng từng khách vẫn ở nút trong danh sách Khách hàng.
   { path: '/scoring-settings', name: 'scoring-settings', component: ScoringSettingsView, meta: { userOnly: true, title: 'Cấu hình tính điểm' } },
   { path: '/customers', name: 'customers', component: CustomersView, meta: { userOnly: true, title: 'Khách hàng' } },
-  { path: '/friends', name: 'friends', component: FriendsView, meta: { userOnly: true, title: 'Bạn bè & tin nhắn' } },
+  { path: '/friends', name: 'friends', component: FriendsView, meta: { userOnly: true, title: 'Tin nhắn' } },
   {
     path: '/friends/:friendId',
     name: 'friend-thread',
     component: FriendsView,
-    meta: { userOnly: true, title: 'Bạn bè & tin nhắn' },
+    meta: { userOnly: true, title: 'Tin nhắn' },
   },
   // Phản hồi is now a popover in the top bar (components/SupportChat.vue); this old address
   // (message toasts, bookmarks) just opens it on top of the page the person is already on.

@@ -882,48 +882,12 @@ function clearLotteryForm() {
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
-      <div class="filters card">
-        <strong class="filters-title">Điểm ra ngày {{ lotteryDate.split('-').reverse().join('/') }}</strong>
-        <div class="field filter-customer" style="margin: 0">
-          <AppSelect v-model="selectedCustomer" aria-label="Khách hàng">
-            <option value="">Tất cả khách hàng</option>
-            <option v-for="c in customers" :key="c.id" :value="c.name">{{ c.name }}</option>
-          </AppSelect>
-        </div>
-        <span class="page-subtitle filters-note">Tự tính theo kết quả đã lưu và công thức của từng khách.</span>
-      </div>
-
       <div v-if="syncMsg" class="alert alert-success sync-msg">
         <span>{{ syncMsg }}</span>
         <AppButton variant="secondary" size="sm" v-if="undoSync"  :disabled="undoing" @click="undoScores">{{ undoing ? 'Đang hoàn tác...' : 'Hoàn tác' }}</AppButton>
       </div>
       <div v-if="syncError" class="alert alert-error">{{ syncError }}</div>
 
-      <div v-if="groupedByCustomer.length === 0" class="card">Không có số liệu nào của ngày này.</div>
-
-      <div v-else class="customer-groups">
-        <div v-for="group in groupedByCustomer" :key="group.name" class="card customer-group">
-          <div class="customer-group-head">
-            <strong>{{ group.name }}</strong>
-            <span class="page-subtitle">{{ group.entries.length }} số</span>
-          </div>
-
-          <div class="result-list">
-            <div v-for="entry in group.entries" :key="entry.id" class="result-row">
-              <div class="result-value">{{ entry.value }}</div>
-              <div class="result-meta">
-                <span v-if="entry.score">Điểm vào: {{ formatNumber(Number(entry.score) || entry.score) }}</span>
-              </div>
-              <div class="result-out">
-                <template v-if="scoreOf(entry) !== null">
-                  Điểm ra: <strong>{{ formatNumber(scoreOf(entry)) }}</strong>
-                </template>
-                <span v-else class="muted-out">Chưa có kết quả xổ số</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </template>
   </div>
 </template>

@@ -24,7 +24,6 @@ import { api, ApiError } from '../api'
 import { cachedGet, loadAllEntries } from '../offline'
 import { fold } from '../messageParser'
 import AppIcon from '../components/AppIcon.vue'
-import MaskBar from '../components/MaskBar.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import ScoringConfigEditor from '../components/ScoringConfigEditor.vue'
 import AppButton from '../components/AppButton.vue'
@@ -341,7 +340,6 @@ async function savePhone() {
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
     <template v-else>
-      <MaskBar class="mask-row" />
       <div class="config-row">
         <AppButton variant="primary" size="sm" @click="addOpen = true">+ Thêm khách hàng</AppButton>
         <AppButton variant="secondary" size="sm" @click="defaultConfigOpen = true">Cấu hình tính điểm mặc định</AppButton>

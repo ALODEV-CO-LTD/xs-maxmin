@@ -34,6 +34,7 @@ import AppButton from '../components/AppButton.vue'
 import AppSelect from '../components/AppSelect.vue'
 import ScoringSummary from '../components/ScoringSummary.vue'
 import AppIcon from '../components/AppIcon.vue'
+import { readCalcSync } from '../calcSync'
 import AppDatePicker from '../components/AppDatePicker.vue'
 import MaskedValue from '../components/MaskedValue.vue'
 import ModalDialog from '../components/ModalDialog.vue'
@@ -41,7 +42,7 @@ import DeleteDataDialog from '../components/DeleteDataDialog.vue'
 import DeletionSchedules from '../components/DeletionSchedules.vue'
 import { effectiveConfig, DEFAULT_RATES, isTableKind } from '../scoringConfig'
 import { entryDetail, summarize } from '../scoringSummary'
-import { entryStations, loadStations, regionOf, stationLabel } from '../lotteryStations'
+import { entryStations, isRegionCode, loadStations, regionOf, stationLabel, stationName } from '../lotteryStations'
 import { onMounted, onBeforeUnmount, computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
@@ -49,7 +50,6 @@ import { loadAllEntries } from '../offline'
 import { betTypeLabel } from '../betTypes'
 import { localDateString } from '../dates'
 import { mask } from '../stores/mask'
-import MaskBar from '../components/MaskBar.vue'
 
 const entries = ref([])
 const loading = ref(true)
@@ -116,9 +116,17 @@ const PRESETS = [
   { key: '30', label: '30 ngày' },
   { key: 'all', label: 'Tất cả' },
 ]
-const preset = ref('all')
-const dateFrom = ref('')
-const dateTo = ref('')
+// Opens on today; the day is one value (the screen asks only for a customer and a day).
+const preset = ref('today')
+const dateFrom = ref(daysAgo(0))
+const dateTo = ref(daysAgo(0))
+const day = computed({
+  get: () => (dateFrom.value && dateFrom.value === dateTo.value ? dateFrom.value : ''),
+  set: (v) => {
+    dateFrom.value = dateTo.value = v || ''
+    preset.value = v ? '' : 'all'
+  },
+})
 function setPreset(key) {
   preset.value = key
   if (key === '') return // "Tuỳ chọn": keep the dates as they are
@@ -395,7 +403,13 @@ function recalc() {
   calcVersion.value++
 }
 
-// ---- Ẩn số liệu: điều khiển nằm trong <MaskBar />; trang chỉ cần biết đang che hay không ----
+// Region / station shown on an entry row: "Miền Trung" or the name of one station (no "(tất cả đài trong ngày)" note)
+function areaName(code) {
+  if (!code || code === 'mb') return 'Miền Bắc'
+  return isRegionCode(code) ? regionOf(code).name : stationName(code)
+}
+
+// ---- Ẩn số liệu đã bỏ: các số luôn hiển thị ----
 const masked = mask.masked
 
 // ---- Xóa số liệu / Đặt lịch xóa -----------------------------------------------
@@ -421,6 +435,12 @@ onMounted(async () => {
   await Promise.all([load(), loadRates(), loadCustomers(), loadStations()])
   // Từ Nhập số (luồng tin nhắn): mở sẵn đúng khách và đúng ngày vừa nhập, rồi bỏ tham số khỏi địa chỉ.
   const { customer, date, added } = route.query
+  if (!customer) {
+    // No link: follow the customer and day chosen in Nhập số.
+    const sync = readCalcSync()
+    if (sync.customer && customers.value.some((c) => c.name === sync.customer)) selectedCustomer.value = sync.customer
+    if (sync.date) day.value = sync.date
+  }
   if (customer && customers.value.some((c) => c.name === customer)) {
     selectedCustomer.value = String(customer)
     if (date) {
@@ -443,7 +463,6 @@ onMounted(async () => {
     </p>
 
     <div class="toolbar card">
-      <MaskBar />
       <div class="toolbar-actions">
         <AppButton variant="secondary" size="sm" @click="openDelete('')">Xóa số liệu</AppButton>
         <AppButton variant="secondary" size="sm" @click="scheduleOpen = true">Đặt lịch xóa</AppButton>
@@ -467,39 +486,12 @@ onMounted(async () => {
             </AppSelect>
           </div>
         </div>
-        <div class="field filter-customer">
-          <label>Xổ số</label>
-          <div class="input-wrap">
-            <AppSelect v-model="regionFilter" aria-label="Lọc theo miền">
-              <option value="all">Tất cả các miền</option>
-              <option value="mb">Miền Bắc</option>
-              <option value="mt">Miền Trung</option>
-              <option value="mn">Miền Nam</option>
-            </AppSelect>
-          </div>
-        </div>
-        <div class="field filter-customer">
-          <label>Thời gian</label>
-          <div class="input-wrap">
-            <AppSelect :model-value="preset" aria-label="Lọc nhanh theo ngày" @update:model-value="setPreset">
-              <option v-for="p in PRESETS" :key="p.key" :value="p.key">{{ p.label }}</option>
-              <option value="">Tuỳ chọn</option>
-            </AppSelect>
-          </div>
-        </div>
         <div class="field filter-date">
-          <label>Từ ngày</label>
-          <AppDatePicker v-model="dateFrom" @change="onRangeInput" />
+          <label>Ngày</label>
+          <AppDatePicker v-model="day" />
         </div>
-        <div class="field filter-date">
-          <label>Đến ngày</label>
-          <AppDatePicker v-model="dateTo" @change="onRangeInput" />
-        </div>
-        <label class="check-field">
-          <input type="checkbox" v-model="onlyMissing" />
-          Chỉ hiện số liệu chưa có kết quả xổ số
-        </label>
         <AppButton variant="secondary" size="sm" :disabled="autoCalcRunning > 0 || !selectedCustomer" @click="recalc">{{ autoCalcRunning > 0 ? 'Đang tính...' : '↻ Tính lại' }}</AppButton>
+        <AppButton v-if="day" variant="ghost" size="sm" @click="day = ''">Xem mọi ngày</AppButton>
       </div>
 
       <ScoringSummary
@@ -587,9 +579,8 @@ onMounted(async () => {
             <div v-if="isOpen(day.date)" :id="`day-${day.date}`" class="result-list">
               <div v-for="entry in day.entries" :key="entry.id" class="result-row">
                 <div class="result-row-top">
-                  <span class="chip">{{ betTypeLabel(entry.betType || 'de') }} · {{ rateChip(entry.betType, entry.station) }}</span>
-                  <span v-if="!isTableKind(configFor(entry.betType, entry.station)?.kind) || configFor(entry.betType, entry.station)?.kind === 'custom'" class="chip">{{ digitsFor(entry.betType, entry.station) }} số cuối</span>
-                  <span v-if="entry.station && entry.station !== 'mb'" class="chip">{{ stationLabel(entry.station) }}</span>
+                  <span class="chip">{{ betTypeLabel(entry.betType || 'de') }}</span>
+                  <span class="chip">{{ areaName(entry.station) }}</span>
                   <span
                     v-if="resultStatus[entry.id]?.state === 'saved' && !masked"
                     class="chip"

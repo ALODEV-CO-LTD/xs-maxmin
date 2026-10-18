@@ -30,10 +30,11 @@ function limit(name, dflt) {
 
 function readEnabled() {
   try {
-    return localStorage.getItem(KEY) === '1'
+    localStorage.removeItem(KEY) // an old "on" saved by an earlier version must not hide anything
   } catch (_) {
-    return false
+    /* storage unavailable */
   }
+  return false
 }
 function readSeconds() {
   try {
@@ -130,7 +131,8 @@ function onPageHide() {
 export const mask = {
   state,
   /** true while figures must be shown as dots */
-  masked: computed(() => state.enabled && !state.revealed),
+  // "Ẩn số liệu" was removed from the app: figures are always shown (the store stays so the components that read it keep working)
+  masked: computed(() => false),
   /** Turning the mask ON needs no password. */
   enable() {
     state.enabled = true

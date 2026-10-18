@@ -62,35 +62,6 @@ const sign = (n) => (n > 0 ? '+' : '')
         Chưa có kết quả: <MaskedValue :text="`${nf.format(s.pending.lots)} lô, ${money(s.pending.money)}`" /> (chưa tính).
       </template>
     </p>
-
-    <details class="sum-more">
-      <summary>Chi tiết tiền gửi theo loại đánh</summary>
-      <table v-if="s.byType.length" class="sum-table">
-        <thead>
-          <tr><th>Loại</th><th>Số lô</th><th>Tổng</th><th>Thành tiền</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="t in s.byType" :key="t.key">
-            <td>{{ betTypeLabel(t.key) }}</td>
-            <td><MaskedValue :text="nf.format(t.lots)" /></td>
-            <td><MaskedValue :text="t.unit === 'point' ? `${nf.format(t.amount)} điểm × ${nf.format(t.pointValue)} đ` : 'tính theo tiền'" /></td>
-            <td><MaskedValue :text="money(t.money)" /></td>
-          </tr>
-        </tbody>
-      </table>
-    </details>
-
-    <details class="sum-more" :open="showWon" @toggle="showWon = $event.target.open">
-      <summary>Các lô trúng ({{ s.won.lots }})</summary>
-      <ul v-if="s.won.items.length" class="won-list">
-        <li v-for="(w, i) in s.won.items" :key="i">
-          <span class="won-num"><MaskedValue :text="w.number" /></span>
-          <span class="won-meta">{{ betTypeLabel(w.type) }} · {{ fmtDate(w.date) }}<template v-if="w.station && w.station !== 'mb'"> · {{ stationName(w.station) }}</template><template v-if="w.hits > 1"> · trúng {{ w.hits }} lần</template></span>
-          <strong><MaskedValue :text="money(w.money)" /></strong>
-        </li>
-      </ul>
-      <p v-else class="sum-note">Chưa có lô nào trúng.</p>
-    </details>
   </section>
 </template>
 
