@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/friend_requests.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// `GET /api/me/unread` -> unread message counts, kept on the server so they
@@ -56,5 +57,6 @@ Response onRequest(RequestContext context) {
     'support': support,
     'supportByUser': supportByUser,
     'total': total,
+    'friendRequests': pendingIncomingCount(db, me),
   });
 }

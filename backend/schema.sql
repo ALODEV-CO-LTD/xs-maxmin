@@ -161,6 +161,19 @@ CREATE TABLE IF NOT EXISTS friendships (
 );
 
 
+CREATE TABLE IF NOT EXISTS friend_requests (
+  id           TEXT PRIMARY KEY,
+  from_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       TEXT NOT NULL CHECK (status IN ('pending','accepted','declined','cancelled')),
+  created_at   TEXT NOT NULL,
+  decided_at   TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_friend_requests_pending_pair
+  ON friend_requests (from_user_id, to_user_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_friend_requests_to_status ON friend_requests (to_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_friend_requests_from_status ON friend_requests (from_user_id, status);
+
 -- -----------------------------------------------------------------------------
 -- Per-account short invite/lookup code (used to add friends)
 -- -----------------------------------------------------------------------------

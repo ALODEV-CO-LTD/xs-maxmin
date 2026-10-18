@@ -5,12 +5,14 @@ import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/friend_requests.dart';
 import 'package:server/src/rate_gate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
+  if (auth.role == 'admin' && context.request.method == HttpMethod.post) return forbidden();
 
   return switch (context.request.method) {
     HttpMethod.get => _list(context, auth.userId),
@@ -48,7 +50,7 @@ Future<Response> _addById(RequestContext context, String userId, String friendId
     recordFriendAddFailure(context, userId);
     return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy người dùng'});
   }
-  return _createFriendship(db, userId, friendRows.first);
+  return requestFriend(db, userId, friendRows.first);
 }
 
 Response _list(RequestContext context, String userId) {
@@ -84,10 +86,8 @@ Response _list(RequestContext context, String userId) {
 
 Object? _key(Object? raw) => raw is String ? jsonDecode(raw) : null;
 
-/// Adds a friend by one of their generated customer codes. Friendship is
-/// symmetric and immediate (no pending/accept step) since sharing the code
-/// out-of-band already implies consent - mirrors how the code is described
-/// to users ("gửi cho người khác để kết bạn").
+/// Asks a friend by one of their generated customer codes. Like add-by-id this
+/// only creates a friend REQUEST; the friendship exists once they accept.
 Response _addByCode(RequestContext context, String userId, Map<String, dynamic> body) {
   final code = (body['code'] as String?)?.trim();
   if (code == null || code.isEmpty) {
@@ -110,45 +110,5 @@ Response _addByCode(RequestContext context, String userId, Map<String, dynamic> 
   if (friendRows.isEmpty) {
     return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy người dùng'});
   }
-  return _createFriendship(db, userId, friendRows.first);
-}
-
-/// Shared by both add flows: inserts the symmetric friendship pair (if not
-/// already present) and returns the new friend in the list-row shape the
-/// client expects to unshift onto its friend list.
-Response _createFriendship(Database db, String userId, Row friendRow) {
-  // Admin is reached through the Phản hồi page, never as a friend.
-  if (friendRow['role'] == 'admin') {
-    return Response.json(
-      statusCode: 400,
-      body: {'error': 'Không thể kết bạn với Admin. Hãy gửi tin nhắn ở mục Phản hồi.'},
-    );
-  }
-  final friendId = friendRow['id'] as String;
-  final existing = db.select(
-    'SELECT id FROM friendships WHERE user_id = ? AND friend_id = ?',
-    [userId, friendId],
-  );
-  if (existing.isEmpty) {
-    final now = DateTime.now().toUtc().toIso8601String();
-    db.execute(
-      'INSERT INTO friendships (id, user_id, friend_id, created_at) VALUES (?, ?, ?, ?)',
-      [newId(), userId, friendId, now],
-    );
-    db.execute(
-      'INSERT INTO friendships (id, user_id, friend_id, created_at) VALUES (?, ?, ?, ?)',
-      [newId(), friendId, userId, now],
-    );
-  }
-
-  return Response.json(
-    statusCode: 201,
-    body: {
-      'id': friendRow['id'],
-      'name': friendRow['name'],
-      'username': friendRow['username'],
-      'isAdmin': friendRow['role'] == 'admin',
-      'publicKey': _key(db.select('SELECT e2ee_public_key FROM users WHERE id = ?', [friendId]).first['e2ee_public_key']),
-    },
-  );
+  return requestFriend(db, userId, friendRows.first);
 }

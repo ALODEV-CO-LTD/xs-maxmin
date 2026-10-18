@@ -37,6 +37,10 @@ Response onRequest(RequestContext context) {
     '''
     SELECT u.id, u.name, u.username, u.role,
       EXISTS(SELECT 1 FROM friendships WHERE user_id = ?1 AND friend_id = u.id) AS is_friend,
+      CASE
+        WHEN EXISTS(SELECT 1 FROM friend_requests WHERE from_user_id = ?1 AND to_user_id = u.id AND status = 'pending') THEN 'outgoing'
+        WHEN EXISTS(SELECT 1 FROM friend_requests WHERE from_user_id = u.id AND to_user_id = ?1 AND status = 'pending') THEN 'incoming'
+        ELSE 'none' END AS request_state,
       EXISTS(SELECT 1 FROM customer_codes WHERE user_id = u.id AND code = ?2) AS by_code
     FROM users u
     WHERE u.id != ?1 AND u.role != 'admin'
@@ -63,6 +67,7 @@ Response onRequest(RequestContext context) {
             'username': r['username'],
             'isAdmin': r['role'] == 'admin',
             'isFriend': (r['is_friend'] as int) == 1,
+            'requestState': r['request_state'],
           },
       ],
     },
