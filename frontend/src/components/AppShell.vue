@@ -36,7 +36,7 @@ const policy = usePolicyStore()
 
 // Unread count shown next to a nav entry (new messages pushed by the server).
 function badgeFor(name) {
-  if (name === 'friends') return notify.friendUnread
+  if (name === 'friends') return notify.friendUnread + notify.friendRequests
   if (name === 'feedback') return notify.supportUnread
   if (name === 'admin-messages') return notify.adminSupportUnread
   return 0

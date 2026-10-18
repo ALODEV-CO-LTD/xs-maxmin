@@ -31,9 +31,12 @@ export const useNotifyStore = defineStore('notify', {
     supportOpen: false, // asks <SupportChat /> to open itself (toast tap, old /feedback link)
     paymentTick: 0, // bumps when Admin decides this user's payment request
     lastIncoming: null, // the last raw event, so views can tell if it is theirs
+    friendRequests: 0, // pending incoming friend requests (server count + live pushes)
+    requestsTick: 0, // bumps on friend-request / friend-accepted so the friends screen reloads
+    lastFriendEvent: null, // { type: 'friend-request' | 'friend-accepted', ... }
   }),
   getters: {
-    total: (s) => Object.values(s.unread).reduce((a, b) => a + b, 0),
+    total: (s) => Object.values(s.unread).reduce((a, b) => a + b, 0) + s.friendRequests,
     friendUnread: (s) =>
       Object.entries(s.unread).reduce((a, [k, v]) => a + (k.startsWith('friend:') ? v : 0), 0),
     supportUnread: (s) => s.unread.support || 0,
@@ -90,6 +93,34 @@ export const useNotifyStore = defineStore('notify', {
       playMessageTone()
     },
 
+    // Someone asked to be my friend (WebSocket push).
+    friendRequestReceived(msg) {
+      this.friendRequests++
+      this.lastFriendEvent = { type: 'friend-request', ...msg }
+      this.requestsTick++
+      this._pushToast(`${msg.fromName || 'Ai đó'} gửi lời mời kết bạn`, 'Bấm để xem lời mời.', { name: 'friends' })
+    },
+
+    // Someone accepted my request (WebSocket push).
+    friendAcceptedByPeer(msg) {
+      this.lastFriendEvent = { type: 'friend-accepted', ...msg }
+      this.requestsTick++
+      this._pushToast(`${msg.name || 'Ai đó'} đã chấp nhận lời mời`, 'Các bạn đã là bạn bè.', { name: 'friends' })
+    },
+
+    // The friends screen knows the exact number after loading the lists.
+    setFriendRequests(n) {
+      this.friendRequests = Math.max(0, Number(n) || 0)
+    },
+
+    _pushToast(title, body, to) {
+      const id = `${Date.now()}-${Math.random()}`
+      this.toasts.push({ id, title, body, to })
+      if (this.toasts.length > 3) this.toasts.shift()
+      setTimeout(() => this.dismiss(id), TOAST_MS)
+      playMessageTone()
+    },
+
     dismiss(id) {
       this.toasts = this.toasts.filter((t) => t.id !== id)
     },
@@ -110,6 +141,7 @@ export const useNotifyStore = defineStore('notify', {
         if (res.support > 0) next.support = res.support
         for (const [id, n] of Object.entries(res.supportByUser || {})) if (n > 0) next[`support:${id}`] = n
         this.unread = next
+        this.friendRequests = Math.max(0, Number(res.friendRequests) || 0)
       } catch {
         /* badges are a nicety - keep whatever we have */
       }
@@ -130,6 +162,7 @@ export const useNotifyStore = defineStore('notify', {
 
     clearAll() {
       this.unread = {}
+      this.friendRequests = 0
       this.toasts = []
     },
 
