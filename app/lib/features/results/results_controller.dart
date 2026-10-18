@@ -664,7 +664,9 @@ class ResultsController extends ChangeNotifier {
 
   void _applyNorth(OcrResult res) {
     final before = filledCount(mbForm);
-    guessNorthForm(res.text, mbForm);
+    // Rows from the word positions (the plain text order of the reader can run down the columns).
+    final ordered = orderedDigitText(res.words);
+    guessNorthForm(ordered.isEmpty ? res.text : ordered, mbForm);
     mbLocked = true;
     if (filledCount(mbForm) == before) {
       ocrError = 'Không nhận ra số nào trong ảnh. Hãy chụp rõ cả bảng hoặc nhập tay.';

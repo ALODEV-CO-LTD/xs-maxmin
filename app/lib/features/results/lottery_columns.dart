@@ -273,6 +273,29 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
 /// Miền Bắc photo: sorts the all-digit words of the recognised text into the 27 boxes (port of applyLrOcrGuess).
 /// [form] holds tier -> numbers ('' = empty) and only EMPTY boxes are filled. 5-digit words in reading order are
 /// đặc biệt, nhất, nhì (2), ba (6); 4-digit tư (4), năm (6); 3-digit sáu (3); 2-digit bảy (4).
+/// The digit-only words of a photo in TABLE reading order: top to bottom by row, left to right inside a row. ML Kit's own
+/// text order follows its text blocks (often column by column), which scatters one prize over several; using the positions
+/// keeps every row together, so "Giải nhì 21143 52941" and the two lines of "Giải ba" come out in the printed order.
+String orderedDigitText(List<OcrWord> words) {
+  final digits = words.where((w) => RegExp(r'^\d+$').hasMatch(w.text.trim())).toList();
+  if (digits.isEmpty) return '';
+  final heights = digits.map((w) => w.y1 - w.y0).toList()..sort();
+  final tol = math.max(4.0, heights[heights.length ~/ 2] * 0.6);
+  digits.sort((a, b) => a.cy.compareTo(b.cy));
+  final rows = <List<OcrWord>>[];
+  var rowCy = 0.0;
+  for (final w in digits) {
+    if (rows.isEmpty || w.cy - rowCy > tol) {
+      rows.add([w]);
+      rowCy = w.cy;
+    } else {
+      rows.last.add(w);
+      rowCy = rows.last.map((x) => x.cy).reduce((a, b) => a + b) / rows.last.length;
+    }
+  }
+  return [for (final r in rows) ...(r..sort((a, b) => a.cx.compareTo(b.cx))).map((w) => w.text.trim())].join(' ');
+}
+
 void guessNorthForm(String text, Map<String, List<String>> form) {
   final tokens = RegExp(r'\S+').allMatches(text).map((m) => m.group(0)!).where((w) => RegExp(r'^\d+$').hasMatch(w));
   final byLen = <int, List<String>>{5: [], 4: [], 3: [], 2: []};
