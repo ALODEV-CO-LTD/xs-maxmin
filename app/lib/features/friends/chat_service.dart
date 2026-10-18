@@ -16,7 +16,7 @@ abstract class KeyVault {
 }
 
 class SecureKeyVault implements KeyVault {
-  const SecureKeyVault([this._s = const FlutterSecureStorage()]);
+  const SecureKeyVault([this._s = const FlutterSecureStorage(iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device))]);
   final FlutterSecureStorage _s;
   @override
   Future<String?> read(String key) => _s.read(key: key);
