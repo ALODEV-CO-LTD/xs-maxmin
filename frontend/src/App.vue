@@ -5,6 +5,7 @@ import AppShell from './components/AppShell.vue'
 import PrivacyGuard from './components/PrivacyGuard.vue'
 import ScreenWatermark from './components/ScreenWatermark.vue'
 import { useAuthStore } from './stores/auth'
+import { teardownSession } from './session'
 import { startScreenshotGuard, stopScreenshotGuard } from './screenshotGuard'
 
 const route = useRoute()
@@ -19,6 +20,15 @@ watch(
   () => auth.isAuthenticated,
   (ok) => (ok ? startScreenshotGuard() : stopScreenshotGuard()),
   { immediate: true },
+)
+
+// Whatever ended the session (explicit logout, auto-lock, 401 expiry), drop the old account's
+// call socket, chat keys/db, unread counters and toasts.
+watch(
+  () => auth.isAuthenticated,
+  (ok) => {
+    if (!ok) teardownSession()
+  },
 )
 
 watch(

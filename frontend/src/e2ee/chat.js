@@ -13,6 +13,7 @@ import { useNotifyStore } from '../stores/notify'
 import { decryptBytes, deriveSessionKey, encryptBytes, fingerprint, generateIdentity, newMessageId, packMessage, samePublicKey, unpackMessage } from './crypto'
 import { del, get, getAll, messagesOf, openChatDb, put } from './db'
 import { groupFromHeader, groupHeader, isGroupId, GROUP_PREFIX } from './groups'
+import { clampReceivedTs } from './timestamps'
 
 const REASONS = {
   offline: 'Bạn bè đang offline, tin nhắn chưa được gửi. Hãy gửi lại khi họ trực tuyến.',
@@ -317,7 +318,7 @@ export const useChatStore = defineStore('e2ee-chat', {
         if (group) return await this._handleGroupMessage(msg, { text, ts, att, file, kind, group })
         if (kind === 'screenshot') {
           // The friend took a screenshot of this conversation: show a notice line and alert.
-          await put(db, 'messages', { id: msg.id, peerId: msg.from, mine: false, text: '', att: null, sys: 'screenshot', createdAt: Math.min(ts, Date.now()), status: 'delivered' })
+          await put(db, 'messages', { id: msg.id, peerId: msg.from, mine: false, text: '', att: null, sys: 'screenshot', createdAt: clampReceivedTs(ts), status: 'delivered' })
           useCallStore()._send({ type: 'e2ee-ack', to: msg.from, id: msg.id })
           this.tick++
           useNotifyStore().receive({ source: 'friend', from: msg.from, fromName: msg.fromName, preview: 'đã chụp màn hình cuộc trò chuyện với bạn', hasAttachment: false })
@@ -334,7 +335,7 @@ export const useChatStore = defineStore('e2ee-chat', {
               blob: new Blob([file], { type: String(att.type || 'application/octet-stream') }),
             }
           : null
-        await put(db, 'messages', { id: msg.id, peerId: msg.from, mine: false, text, att: stored, createdAt: Math.min(ts, Date.now()), status: 'delivered' })
+        await put(db, 'messages', { id: msg.id, peerId: msg.from, mine: false, text, att: stored, createdAt: clampReceivedTs(ts), status: 'delivered' })
         useCallStore()._send({ type: 'e2ee-ack', to: msg.from, id: msg.id })
         this.tick++
         useNotifyStore().receive({
@@ -537,7 +538,7 @@ export const useChatStore = defineStore('e2ee-chat', {
       const stored = att && file.length && ALLOWED_IMAGE_TYPES.includes(att.type)
         ? { name: String(att.name || 'tep-dinh-kem').slice(0, 200), type: String(att.type), size: file.length, isImage: true, blob: new Blob([file], { type: String(att.type) }) }
         : null
-      await put(db, 'messages', { id: msg.id, peerId: g.id, mine: false, text, att: stored, createdAt: Math.min(ts, Date.now()), status: 'delivered', fromId: msg.from })
+      await put(db, 'messages', { id: msg.id, peerId: g.id, mine: false, text, att: stored, createdAt: clampReceivedTs(ts), status: 'delivered', fromId: msg.from })
       this.tick++
       useNotifyStore().receive({ source: 'friend', from: g.id, fromName: g.name, preview: `${who}: ${text || 'Đã gửi một tệp đính kèm'}`, hasAttachment: !!stored })
       await this.bumpUnread(g.id)
