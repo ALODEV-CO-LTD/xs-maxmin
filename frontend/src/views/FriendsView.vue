@@ -35,6 +35,9 @@ import { api } from '../api'
 import { useCallStore } from '../stores/call'
 import { useAuthStore } from '../stores/auth'
 import { useNotifyStore } from '../stores/notify'
+import {
+  badgeText, incomingFrom, interpretAddResponse, normalizeRequests, removeRequest, searchAction, upsertFriend,
+} from '../friendRequests'
 
 const route = useRoute()
 const router = useRouter()
@@ -74,6 +77,7 @@ let searchTimer = null
 
 watch(searchQuery, (q) => {
   clearTimeout(searchTimer)
+  searchNotice.value = ''
   const query = q.trim()
   if (!query) {
     searchResults.value = []
@@ -95,20 +99,134 @@ watch(searchQuery, (q) => {
 })
 
 const addingId = ref(null)
+const searchNotice = ref('')
 async function addFromSearch(result) {
   addingId.value = result.id
+  searchError.value = ''
+  searchNotice.value = ''
   try {
-    const friend = await api.post('/me/friends', { userId: result.id })
-    const idx = friends.value.findIndex((f) => f.id === friend.id)
-    if (idx === -1) friends.value.unshift(friend)
+    const res = await api.post('/me/friends', { userId: result.id })
+    const out = interpretAddResponse(res, result.name)
     const r = searchResults.value.find((r) => r.id === result.id)
-    if (r) r.isFriend = true
+    if (out.kind === 'friends') {
+      friends.value = upsertFriend(friends.value, out.friend)
+      if (r) r.isFriend = true
+      loadFriends({ quiet: true })
+    } else if (r) {
+      r.requestState = 'outgoing'
+    }
+    searchNotice.value = out.message
+    loadRequests()
   } catch (err) {
-    searchError.value = err.message || 'Không thêm được bạn bè'
+    searchError.value = err.message || 'Không gửi được lời mời kết bạn'
   } finally {
     addingId.value = null
   }
 }
+
+// The search row of someone who already asked me: accept straight from there.
+async function acceptFromSearch(result) {
+  const req = incomingFrom(requests.value.incoming, result.id)
+  if (!req) {
+    await loadRequests()
+    const again = incomingFrom(requests.value.incoming, result.id)
+    if (!again) return
+    return acceptRequest(again, result)
+  }
+  return acceptRequest(req, result)
+}
+function onSearchButton(r) {
+  const a = searchAction(r).action
+  if (a === 'add') addFromSearch(r)
+  else if (a === 'accept') acceptFromSearch(r)
+}
+
+// Friend requests (Lời mời kết bạn): incoming to accept / decline, outgoing to cancel.
+const requests = ref({ incoming: [], outgoing: [] })
+const requestBusy = ref(null)
+const requestError = ref('')
+async function loadRequests() {
+  try {
+    requests.value = normalizeRequests(await api.get('/me/friend-requests'))
+    notify.setFriendRequests(requests.value.incoming.length)
+  } catch {
+    /* the block is a nicety - keep whatever we have */
+  }
+}
+async function acceptRequest(req, searchRow = null) {
+  requestBusy.value = req.id
+  requestError.value = ''
+  searchError.value = ''
+  try {
+    const res = await api.post(`/me/friend-requests/${encodeURIComponent(req.id)}/accept`, {})
+    requests.value = { ...requests.value, incoming: removeRequest(requests.value.incoming, req.id) }
+    notify.setFriendRequests(requests.value.incoming.length)
+    if (res?.friend) friends.value = upsertFriend(friends.value, res.friend)
+    const r = searchRow || searchResults.value.find((x) => x.id === req.fromId)
+    if (r) {
+      r.isFriend = true
+      r.requestState = 'none'
+    }
+    await loadFriends({ quiet: true })
+  } catch (err) {
+    const msg = err.message || 'Không chấp nhận được lời mời'
+    if (searchRow) searchError.value = msg
+    else requestError.value = msg
+    loadRequests()
+  } finally {
+    requestBusy.value = null
+  }
+}
+async function declineRequest(req) {
+  requestBusy.value = req.id
+  requestError.value = ''
+  try {
+    await api.post(`/me/friend-requests/${encodeURIComponent(req.id)}/decline`, {})
+    requests.value = { ...requests.value, incoming: removeRequest(requests.value.incoming, req.id) }
+    notify.setFriendRequests(requests.value.incoming.length)
+  } catch (err) {
+    requestError.value = err.message || 'Không từ chối được lời mời'
+    loadRequests()
+  } finally {
+    requestBusy.value = null
+  }
+}
+async function cancelRequest(req) {
+  requestBusy.value = req.id
+  requestError.value = ''
+  try {
+    await api.del(`/me/friend-requests/${encodeURIComponent(req.id)}`)
+    requests.value = { ...requests.value, outgoing: removeRequest(requests.value.outgoing, req.id) }
+    const r = searchResults.value.find((x) => x.id === req.toId)
+    if (r) r.requestState = 'none'
+  } catch (err) {
+    requestError.value = err.message || 'Không huỷ được lời mời'
+    loadRequests()
+  } finally {
+    requestBusy.value = null
+  }
+}
+const hasRequests = computed(() => requests.value.incoming.length + requests.value.outgoing.length > 0)
+
+// Live: someone sent me a request / accepted mine -> reload the lists.
+watch(
+  () => notify.requestsTick,
+  () => {
+    loadRequests()
+    if (notify.lastFriendEvent?.type === 'friend-accepted') {
+      loadFriends({ quiet: true })
+      const q = searchQuery.value.trim()
+      if (q) searchResults.value = searchResults.value.map((r) => (r.id === notify.lastFriendEvent.friendId ? { ...r, isFriend: true, requestState: 'none' } : r))
+    }
+  },
+)
+// Fallback when the push never arrived: the periodic unread refresh changed the count.
+watch(
+  () => notify.friendRequests,
+  (n) => {
+    if (n !== requests.value.incoming.length) loadRequests()
+  },
+)
 
 const messages = ref([])
 const messagesLoading = ref(false)
@@ -540,6 +658,7 @@ async function copyMyCode() {
 
 onMounted(() => {
   loadFriends()
+  loadRequests()
   if (!auth.isAdmin) {
     loadMyCode()
     loadUnseenMissed()
@@ -826,8 +945,9 @@ async function acceptKey() {
 
     <div class="split" :class="{ 'show-thread': !!selectedFriendId }">
       <div class="list-pane">
-        <div v-if="searchError || (searchQuery.trim() && (searching || newPeople.length > 0))" class="card search-form">
+        <div v-if="searchError || searchNotice || (searchQuery.trim() && (searching || newPeople.length > 0))" class="card search-form">
           <div v-if="searchError" class="alert alert-error" style="margin: 8px 0 0">{{ searchError }}</div>
+          <div v-if="searchNotice" class="alert alert-success req-notice" role="status">{{ searchNotice }}</div>
 
           <!-- people who are not friends yet -->
           <div v-if="searchQuery.trim() && (searching || newPeople.length > 0)" class="search-results">
@@ -838,7 +958,7 @@ async function acceptKey() {
                 <strong>{{ r.name }} <span v-if="r.isAdmin" class="chip chip-brand" style="font-size: 14px; padding: 1px 6px">Admin</span></strong>
                 <span class="friend-last">@{{ r.username }}</span>
               </div>
-              <AppButton variant="secondary" size="sm" :disabled="addingId === r.id" @click="addFromSearch(r)">{{ addingId === r.id ? '...' : 'Kết bạn' }}</AppButton>
+              <AppButton variant="secondary" size="sm" :disabled="searchAction(r).disabled || addingId === r.id || requestBusy !== null" @click="onSearchButton(r)">{{ addingId === r.id ? '...' : searchAction(r).label }}</AppButton>
             </div>
           </div>
         </div>
@@ -850,6 +970,38 @@ async function acceptKey() {
 
           <!-- Tin nhắn / Danh bạ -->
           <template v-if="tab === 'chats' || tab === 'contacts'">
+            <!-- Lời mời kết bạn -->
+            <div v-if="tab === 'contacts' && hasRequests" class="card req-block">
+              <div class="req-title">
+                <strong>Lời mời kết bạn</strong>
+                <span v-if="notify.friendRequests" class="unread-badge" title="Lời mời chưa trả lời">{{ badgeText(notify.friendRequests) }}</span>
+              </div>
+              <div v-if="requestError" class="alert alert-error" style="margin: 8px 0 0">{{ requestError }}</div>
+              <div v-for="q in requests.incoming" :key="q.id" class="req-row">
+                <span class="avatar">{{ initial(q.fromName) }}</span>
+                <div class="friend-info">
+                  <strong>{{ q.fromName }}</strong>
+                  <span class="friend-last">@{{ q.fromUsername }}</span>
+                </div>
+                <div class="req-actions">
+                  <AppButton variant="primary" size="sm" :disabled="requestBusy === q.id" @click="acceptRequest(q)">Chấp nhận</AppButton>
+                  <AppButton variant="ghost" size="sm" :disabled="requestBusy === q.id" @click="declineRequest(q)">Từ chối</AppButton>
+                </div>
+              </div>
+              <template v-if="requests.outgoing.length">
+                <div class="req-sub">Đã gửi lời mời, chờ chấp nhận</div>
+                <div v-for="q in requests.outgoing" :key="q.id" class="req-row">
+                  <span class="avatar">{{ initial(q.toName) }}</span>
+                  <div class="friend-info">
+                    <strong>{{ q.toName }}</strong>
+                    <span class="friend-last">@{{ q.toUsername }}</span>
+                  </div>
+                  <div class="req-actions">
+                    <AppButton variant="ghost" size="sm" :disabled="requestBusy === q.id" @click="cancelRequest(q)">Huỷ lời mời</AppButton>
+                  </div>
+                </div>
+              </template>
+            </div>
             <div v-if="friends.length === 0" class="card">Chưa có bạn bè nào. Bấm Thêm &gt; Danh bạ mới để tìm và kết bạn.</div>
             <div v-else-if="(tab === 'chats' ? chatList : contactList).length === 0">
               <div v-if="searchQuery.trim() && !searching && newPeople.length === 0" class="card">
@@ -1185,6 +1337,14 @@ async function acceptKey() {
 </template>
 
 <style scoped>
+.req-block { padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--border, #e5e7eb); }
+.req-title { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
+.req-sub { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border, #e5e7eb); font-size: 14px; color: var(--text-secondary, #6b7280); }
+.req-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; flex-wrap: wrap; }
+.req-row .friend-info { flex: 1; min-width: 120px; }
+.req-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.req-actions .btn { min-height: 44px; padding: 0 14px; font-size: 14px; font-weight: 600; border-radius: 10px; }
+.req-notice { margin: 8px 0 0; }
 /* Giao diện sáng theo yêu cầu khách: nền trắng, viền xanh mảnh, chữ đen, phụ xám nhạt; không nền tối, không xanh dương, không gradient. */
 .friends-page {
   --background: #fff; --card: #fff; --surface: #fff; --surface-2: #fff; --bg: #fff;

@@ -243,6 +243,12 @@ export const useCallStore = defineStore('call', {
         case 'new-message':
           useNotifyStore().receive(msg, { isAdmin: useAuthStore().isAdmin })
           break
+        case 'friend-request':
+          useNotifyStore().friendRequestReceived(msg)
+          break
+        case 'friend-accepted':
+          useNotifyStore().friendAcceptedByPeer(msg)
+          break
         case 'payment-decided':
           useNotifyStore().paymentDecided(msg)
           useAuthStore().fetchMe().catch(() => {})
