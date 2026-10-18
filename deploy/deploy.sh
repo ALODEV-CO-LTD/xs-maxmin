@@ -1,4 +1,7 @@
 #!/bin/bash
+# Packages must be built from a CLEAN checkout (archive of HEAD) and the backend package must include
+# backend/pubspec.lock so `dart pub get` below resolves pinned versions. See docs/BAN_GIAO.md section 7 and
+# deploy/README-ops.md (DB backup, nginx headers). iPhone app: tools/install_ios.sh (never `flutter install`).
 # Run inside container 501. Deploys the new web + backend, rolls back on failure.
 set -u
 TS=$(date +%Y%m%d-%H%M%S)
@@ -26,6 +29,7 @@ rm -rf /root/stage && mkdir -p /root/stage/web /root/stage/backend
 tar -xzf /root/web_dist.tar.gz -C /root/stage/web || exit 1
 tar -xzf /root/backend_deploy.tar.gz -C /root/stage/backend || exit 1
 find /root/stage -name '._*' -delete
+test -f /root/stage/backend/pubspec.lock || { echo "bad package: pubspec.lock missing (unpinned deps)"; exit 1; }
 test -f /root/stage/web/index.html && test -f /root/stage/backend/routes/api/ws/calls.dart || { echo "bad package"; exit 1; }
 
 echo "== 3) web"
