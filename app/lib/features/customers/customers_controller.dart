@@ -124,6 +124,7 @@ class CustomersController extends ChangeNotifier {
 
   /// Sets the phone number. Returns an error text or ''.
   Future<String> savePhone(Customer c, String phone) async {
+    if (c.pending) return 'Khách hàng này đang chờ đồng bộ, hãy sửa sau khi có mạng và đồng bộ xong.';
     try {
       final res = await api.patch('/me/customers/${c.id}', {'phone': phone.trim()}) as Map;
       c.phone = (res['phone'] as String?) ?? '';
@@ -167,12 +168,22 @@ class CustomersController extends ChangeNotifier {
   /// Removes the customer from the roster only (entries keep their name). Returns an error text or ''.
   Future<String> remove(Customer c) async {
     try {
-      await api.delete('/me/customers/${c.id}');
+      store ??= await OfflineStore.open(api, auth);
+      if (c.pending) {
+        await store!.queueCustomerDelete(c.id); // never reached the server: just forget it
+      } else {
+        try {
+          await api.delete('/me/customers/${c.id}');
+        } on ApiError catch (e) {
+          if (e.status != 0) rethrow;
+          await store!.queueCustomerDelete(c.id); // offline: removed here now, on the server when the network is back
+        }
+      }
       roster = roster.where((x) => x.id != c.id).toList();
       invalidate();
       return '';
     } on ApiError catch (e) {
-      return e.status == 0 ? 'Đang offline: thêm/xoá khách hàng cần có mạng, vui lòng thử lại khi kết nối lại.' : e.message;
+      return e.message;
     }
   }
 }

@@ -12,7 +12,7 @@ Khách hàng,K10,Quản lý thiết bị và đăng xuất từ xa,Chưa làm,Đ
 Khách hàng,K11,Nhập dữ liệu thủ công,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
 Khách hàng,K12,Nhập dữ liệu bằng ảnh OCR,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
 Khách hàng,K13,Nhập dữ liệu bằng tin nhắn,Chưa làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Nhập từ tin nhắn dán vào, có bảng xem trước và đánh dấu dòng không chắc. Cần mẫu tin nhắn thật để tinh chỉnh bộ phân tích. | Ghi chú cũ: Chưa có mẫu",
-Khách hàng,K14,Tính toán offline,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,"Nhập số và xem lịch sử khi offline, tự đồng bộ khi có mạng. Trên app: Tính điểm và Nhập kết quả cũng chạy offline (số liệu, khách, tỉ lệ ăn, kết quả lưu trên máy; kết quả xổ số lưu trên máy trước rồi tự gửi). Xoá số liệu và thêm/xóa khách hàng vẫn cần mạng.",
+Khách hàng,K14,Tính toán offline,Chưa làm,Một phần,Có đổi,Đã lên máy chủ thật,"Nhập số, Tính điểm, Nhập kết quả, thêm/xoá khách hàng và xoá số liệu chạy offline (xếp hàng chờ trên máy, hiện ngay, tự gửi khi có mạng). Kiểm bằng test tự động và bài thử với backend thật trên máy ảo Android và iPhone 12. Sửa khách đang chờ đồng bộ, xoá hàng loạt có mật khẩu và lịch xoá vẫn cần mạng.",
 Khách hàng,K15,Lưu dữ liệu kết quả nhập tay,Đã làm,Đã làm,Có đổi,Đã lên máy chủ thật,"Kết quả xổ số thuộc TỪNG TÀI KHOẢN (không dùng chung, áp cho mọi khách trong tài khoản); app lưu trên máy trước rồi tự gửi khi có mạng (từ app 1.4.2).",
 Khách hàng,K16,Cú pháp nhập riêng từng khách,Đã làm,Đã làm,Giữ nguyên,—,,Sơn
 Khách hàng,K17,Tìm kiếm dữ liệu,Một phần,Đã làm,Có đổi,Đã lên máy chủ thật,"Tìm theo từ khóa/ngày/hạng mục, không phân biệt dấu. Đã sửa lỗi bỏ sót dữ liệu quá 200 bản ghi (phân trang).",

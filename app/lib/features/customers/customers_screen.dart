@@ -198,6 +198,7 @@ class _CustomersBodyState extends State<_CustomersBody> {
                 Text(s.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
                 if (s.phone.isNotEmpty) Text(s.phone, style: TextStyle(fontSize: 13, color: context.mutedColor)),
                 if (cu == null) Text('Chưa thêm vào danh sách', style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
+                if (cu != null && cu.pending) Text('Chờ đồng bộ (đã lưu trên máy, sẽ tạo khi có mạng)', style: TextStyle(fontSize: 12.5, color: Brand.warning)),
               ]),
             ),
             // The actions as icons (the label is the tooltip): edit, scoring config (filled when this customer has its own), remove.

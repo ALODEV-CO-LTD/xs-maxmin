@@ -8,6 +8,7 @@ import '../entries/dialogs.dart';
 import 'customer_model.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../entries/offline_store.dart';
 
 const offlineWriteMessage = 'Đang offline: thêm/xoá khách hàng cần có mạng, vui lòng thử lại khi kết nối lại.';
 
@@ -71,9 +72,26 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
       }
       if (mounted) Navigator.pop(context, created);
     } on ApiError catch (e) {
+      if (e.status == 0) {
+        // Offline: keep the customer on the phone; it is created on the server when the network is back.
+        try {
+          final store = await OfflineStore.open(widget.api, widget.api.auth);
+          final json = await store.queueCustomerCreate(name: name, phone: _phone.text.trim(), defaultStation: _station);
+          if (mounted) Navigator.pop(context, Customer.fromJson(json));
+          return;
+        } on ApiError catch (q) {
+          if (mounted) {
+            setState(() {
+              _error = q.message;
+              _busy = false;
+            });
+          }
+          return;
+        }
+      }
       if (mounted) {
         setState(() {
-          _error = e.status == 0 ? offlineWriteMessage : e.message;
+          _error = e.message;
           _busy = false;
         });
       }

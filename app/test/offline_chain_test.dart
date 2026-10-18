@@ -28,6 +28,9 @@ class _Server {
     {'id': 'e2', 'customerName': 'An', 'entryDate': day, 'value': '56', 'score': '100000', 'betType': 'de', 'station': 'mb', 'result': null},
   ];
   final posted = <Map<String, dynamic>>[];
+  final deletedEntries = <String>[];
+  final customers = <Map<String, dynamic>>[{'id': 'c1', 'name': 'An', 'phone': '', 'scoringRates': null}];
+  final deletedCustomers = <String>[];
   final patched = <String, String>{};
   Map<String, dynamic>? result; // saved MB result of `day`
 
@@ -49,7 +52,26 @@ class _Server {
             patched[id] = (jsonDecode(r.body) as Map)['result'] as String;
             return ok({'id': id});
           }
-          if (path == '/me/customers') return ok({'customers': [{'id': 'c1', 'name': 'An', 'phone': '', 'scoringRates': null}]});
+          if (path == '/me/customers' && r.method == 'GET') return ok({'customers': customers});
+          if (path == '/me/customers' && r.method == 'POST') {
+            final b = jsonDecode(r.body) as Map<String, dynamic>;
+            if (customers.any((c) => c['name'] == b['name'])) return http.Response.bytes(utf8.encode('{"error":"Tên khách hàng đã tồn tại"}'), 409, headers: {'content-type': 'application/json; charset=utf-8'});
+            customers.add({'id': 'srv${customers.length + 1}', 'name': b['name'], 'phone': b['phone'] ?? '', 'scoringRates': null});
+            return ok(customers.last);
+          }
+          if (path.startsWith('/me/customers/') && r.method == 'PATCH') return ok({'id': path.split('/').last});
+          if (path.startsWith('/me/customers/') && r.method == 'DELETE') {
+            final id = path.split('/').last;
+            deletedCustomers.add(id);
+            customers.removeWhere((c) => c['id'] == id);
+            return ok({'ok': true});
+          }
+          if (path.startsWith('/me/entries/') && r.method == 'DELETE') {
+            final id = path.split('/').last;
+            deletedEntries.add(id);
+            entries.removeWhere((e) => e['id'] == id);
+            return ok({'ok': true});
+          }
           if (path == '/me/scoring-settings') {
             return ok({'rates': {'lo': {'rate': 3.5, 'tiers': allBaseTiers, 'digits': 2}, 'de': {'rate': 70, 'tiers': ['dacBiet'], 'digits': 2}}});
           }
@@ -125,5 +147,62 @@ void main() {
     final result = s.result;
     expect(result, isNotNull, reason: 'the result saved offline reached the server');
     expect(result!['dacBiet'], '12356');
+  });
+
+  test('customers added and numbers deleted offline disappear / appear at once and reach the server later', () async {
+    final s = _Server();
+    final api = s.api();
+    final store = await OfflineStore.open(api, api.auth);
+    await store.cachedGet('/me/customers'); // opened once online
+    await store.loadAllEntries();
+    s.offline = true;
+
+    // add a customer offline: shown at once (flagged), a duplicate name is refused
+    final made = await store.queueCustomerCreate(name: 'Bình', phone: '0901234567');
+    expect(made['pending'], isTrue);
+    final shown = await store.cachedGet('/me/customers') as Map;
+    expect([for (final c in shown['customers'] as List) (c as Map)['name']], ['An', 'Bình']);
+    await expectLater(store.queueCustomerCreate(name: 'Sai', phone: '090'), throwsA(isA<ApiError>().having((e) => e.status, 'status', 400))); // a phone the server would refuse is not queued
+    await expectLater(store.queueCustomerCreate(name: ' bình '), throwsA(isA<ApiError>().having((e) => e.status, 'status', 409)));
+
+    // delete a number that is on the server: hidden at once, queued
+    expect(await store.deleteEntry('e1'), isTrue);
+    expect((await store.loadAllEntries()).entries.map((e) => e.id), ['e2']);
+    // delete a number that never reached the server: simply forgotten
+    final typed = await store.createEntry({'customerName': 'An', 'entryDate': day, 'value': '99', 'score': '5', 'betType': 'lo', 'station': 'mb'});
+    expect(await store.deleteEntry(typed.entry.id), isTrue);
+    expect((await store.loadAllEntries()).entries.map((e) => e.id), ['e2']);
+    // remove a customer: the one added offline is forgotten, the server one is queued
+    await store.queueCustomerDelete(made['id'] as String);
+    await store.queueCustomerDelete('c1');
+    expect(((await store.cachedGet('/me/customers')) as Map)['customers'], isEmpty);
+    expect(await store.pendingCount(), 2); // delete e1 + delete customer c1
+
+    // back online: the queue is sent, the server ends with exactly what the person sees
+    s.offline = false;
+    final r = await store.flush();
+    expect(r.failures, isEmpty);
+    expect(s.deletedEntries, ['e1']);
+    expect(s.deletedCustomers, ['c1']);
+    expect(s.posted, isEmpty);
+    expect(await store.pendingCount(), 0);
+    expect(s.customers, isEmpty);
+    expect(s.entries.map((e) => e['id']), ['e2']);
+  });
+
+  test('a customer added offline is created on the server when the network is back (a name that already exists is not an error)', () async {
+    final s = _Server();
+    final api = s.api();
+    final store = await OfflineStore.open(api, api.auth);
+    await store.cachedGet('/me/customers');
+    s.offline = true;
+    await store.queueCustomerCreate(name: 'Cường', phone: '0911234567', defaultStation: 'mn');
+    await store.queueCustomerCreate(name: 'Dũng');
+    s.customers.add({'id': 'srvD', 'name': 'Dũng', 'phone': '', 'scoringRates': null}); // meanwhile created on another device
+    s.offline = false;
+    final r = await store.flush();
+    expect(r.failures, isEmpty);
+    expect(s.customers.map((c) => c['name']), ['An', 'Dũng', 'Cường']);
+    expect(await store.pendingCount(), 0);
   });
 }

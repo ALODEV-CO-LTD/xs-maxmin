@@ -53,7 +53,7 @@ class QueuedOp {
   final int seq;
   final String? userId;
 
-  /// 'create' or 'patch'
+  /// Entry: 'create', 'patch', 'delete'. Customer roster: 'cust-create', 'cust-delete' ([entryId] is then the customer's id).
   final String type;
   final String entryId;
   Map<String, dynamic> payload;
@@ -197,7 +197,10 @@ class OfflineStore {
   // ---- cached GETs -----------------------------------------------------------------------------------------------
 
   /// GET with a cached fallback: the fresh answer, or the last cached one when the network is down.
-  Future<dynamic> cachedGet(String path) async => (await _cachedGetFlag(path)).$1;
+  Future<dynamic> cachedGet(String path) async {
+    final data = (await _cachedGetFlag(path)).$1;
+    return path == '/me/customers' ? await overlayCustomers(data) : data;
+  }
 
   /// Like [cachedGet] but also says whether the answer came from the saved copy (the network was down).
   Future<(dynamic, bool)> _cachedGetFlag(String path) async {
@@ -355,11 +358,13 @@ class OfflineStore {
         if (!out.any((e) => e.id == op.entryId)) {
           out.insert(0, Entry.fromJson({...op.payload, 'id': op.entryId, 'createdAt': op.createdAt, 'updatedAt': op.createdAt}));
         }
-      } else {
+      } else if (op.type == 'delete') {
+        out = [for (final e in out) if (e.id != op.entryId) e];
+      } else if (op.type == 'patch') {
         out = [for (final e in out) e.id == op.entryId ? e.applying(op.payload) : e];
       }
     }
-    final pendingIds = pendingOps.map((o) => o.entryId).toSet();
+    final pendingIds = pendingOps.where((o) => o.type == 'create' || o.type == 'patch').map((o) => o.entryId).toSet();
     return [for (final e in out) pendingIds.contains(e.id) ? e.withPending(true) : e];
   }
 
@@ -465,6 +470,101 @@ class OfflineStore {
     return SaveResult(entry.applying(changes, pending: true), true);
   }
 
+  // ---- deleting an entry, also offline --------------------------------------------------------------------------
+
+  /// Deletes an entry. Returns true when it was only QUEUED (offline: it disappears from every list now and is deleted on the
+  /// server when the network is back), false when the server did it. An entry that never reached the server is just forgotten.
+  Future<bool> deleteEntry(String id) async {
+    final all = await ops();
+    if (all.any((o) => o.type == 'create' && o.entryId == id)) {
+      for (final o in all.where((o) => o.entryId == id)) {
+        await _delete(o.opId);
+      }
+      return true;
+    }
+    if (all.any((o) => o.type == 'delete' && o.entryId == id)) return true;
+    try {
+      await api.delete('/me/entries/$id');
+      await _dropEntryFromCache(id);
+      return false;
+    } catch (e) {
+      if (e is ApiError && e.status == 404) {
+        await _dropEntryFromCache(id);
+        return false;
+      }
+      if (!isNetworkError(e)) rethrow;
+    }
+    for (final o in all.where((o) => o.entryId == id && o.type == 'patch')) {
+      await _delete(o.opId); // an edit of something about to be deleted is pointless
+    }
+    await _put(QueuedOp(opId: _newId(), seq: _nextSeq(), userId: userId, type: 'delete', entryId: id, payload: {}, createdAt: _now().toUtc().toIso8601String()));
+    return true;
+  }
+
+  Future<void> _dropEntryFromCache(String id) async {
+    final cached = _kvGet(_entriesKey);
+    if (cached is! List) return;
+    await _kvSet(_entriesKey, [for (final j in cached) if (!(j is Map && j['id'] == id)) j]);
+  }
+
+  // ---- customers (roster) added / removed offline ---------------------------------------------------------------
+
+  /// Queues a new customer while the network is down. Returns its JSON (a local id, `pending: true`); it shows in the lists
+  /// at once (see [overlayCustomers]) and is created on the server when the network is back. A name already in the list is refused.
+  Future<Map<String, dynamic>> queueCustomerCreate({required String name, String phone = '', String? defaultStation}) async {
+    // the same rule as the server (backend/lib/src/phone.dart), so a phone it would refuse is not queued to be lost later
+    final ph = phone.trim();
+    if (ph.isNotEmpty && (ph.length > 20 || !RegExp(r'^\+?[\d\s().-]+$').hasMatch(ph) || ph.replaceAll(RegExp(r'\D'), '').length < 6)) {
+      throw ApiError(400, 'Số điện thoại không hợp lệ');
+    }
+    final shown = await cachedGet('/me/customers').catchError((_) => <String, dynamic>{'customers': []});
+    final names = [for (final c in (shown is Map ? shown['customers'] as List? : null) ?? const []) '${(c as Map)['name']}'.trim().toLowerCase()];
+    if (names.contains(name.trim().toLowerCase())) throw ApiError(409, 'Tên khách hàng này đã có trong danh sách');
+    final id = _newId();
+    await _put(QueuedOp(
+      opId: _newId(),
+      seq: _nextSeq(),
+      userId: userId,
+      type: 'cust-create',
+      entryId: id,
+      payload: {'name': name.trim(), 'phone': phone.trim(), if (defaultStation != null && defaultStation != 'mb') 'defaultStation': defaultStation},
+      createdAt: _now().toUtc().toIso8601String(),
+    ));
+    return {'id': id, 'name': name.trim(), 'phone': phone.trim(), 'defaultStation': defaultStation == 'mb' ? null : defaultStation, 'pending': true};
+  }
+
+  /// Queues removing a customer from the list while offline (a customer that was only queued is simply forgotten).
+  Future<void> queueCustomerDelete(String id) async {
+    final all = await ops();
+    final pendingCreate = all.where((o) => o.type == 'cust-create' && o.entryId == id).firstOrNull;
+    if (pendingCreate != null) {
+      await _delete(pendingCreate.opId);
+      return;
+    }
+    if (all.any((o) => o.type == 'cust-delete' && o.entryId == id)) return;
+    await _put(QueuedOp(opId: _newId(), seq: _nextSeq(), userId: userId, type: 'cust-delete', entryId: id, payload: {}, createdAt: _now().toUtc().toIso8601String()));
+  }
+
+  /// `GET /me/customers` with the customers added / removed offline laid over it.
+  Future<dynamic> overlayCustomers(dynamic data) async {
+    if (data is! Map) return data;
+    final pending = (await ops()).where((o) => !o.conflict && (o.type == 'cust-create' || o.type == 'cust-delete')).toList();
+    if (pending.isEmpty) return data;
+    var list = [for (final c in (data['customers'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+    for (final op in pending) {
+      if (op.type == 'cust-create') {
+        final name = '${op.payload['name']}'.toLowerCase();
+        if (!list.any((c) => '${c['name']}'.toLowerCase() == name)) {
+          list.add({'id': op.entryId, 'name': op.payload['name'], 'phone': op.payload['phone'] ?? '', 'defaultStation': op.payload['defaultStation'], 'scoringRates': null, 'pending': true});
+        }
+      } else {
+        list = [for (final c in list) if ('${c['id']}' != op.entryId) c];
+      }
+    }
+    list.sort((a, b) => '${a['name']}'.toLowerCase().compareTo('${b['name']}'.toLowerCase()));
+    return {...data, 'customers': list};
+  }
+
   /// Replays the queue in order. Safe to call any time; stops at the first network error.
   Future<FlushResult> flush() async {
     if (syncing || userId == null) return FlushResult(skipped: true);
@@ -479,6 +579,26 @@ class OfflineStore {
         try {
           if (op.type == 'create') {
             await api.post('/me/entries', {...op.payload, 'clientId': op.entryId});
+          } else if (op.type == 'delete') {
+            try {
+              await api.delete('/me/entries/${op.entryId}');
+            } on ApiError catch (e) {
+              if (e.status != 404) rethrow; // already gone: the goal is reached
+            }
+          } else if (op.type == 'cust-create') {
+            try {
+              final made = Map<String, dynamic>.from(await api.post('/me/customers', {'name': op.payload['name'], 'phone': op.payload['phone'] ?? ''}) as Map);
+              final station = op.payload['defaultStation'];
+              if (station is String && station.isNotEmpty) await api.patch('/me/customers/${made['id']}', {'defaultStation': station});
+            } on ApiError catch (e) {
+              if (e.status != 409) rethrow; // the name already exists on the server: the goal is reached
+            }
+          } else if (op.type == 'cust-delete') {
+            try {
+              await api.delete('/me/customers/${op.entryId}');
+            } on ApiError catch (e) {
+              if (e.status != 404) rethrow;
+            }
           } else {
             await api.patch('/me/entries/${op.entryId}', {...op.payload, 'baseUpdatedAt': op.baseUpdatedAt});
           }
@@ -500,7 +620,7 @@ class OfflineStore {
           // Refused for good (quota, deleted entry, invalid...): drop it so it cannot block the queue, tell the user.
           await _delete(op.opId);
           changed = true;
-          failures.add(SyncFailure(op.opId, 'Không đồng bộ được "${op.payload['value'] ?? ''}": ${err.message}'));
+          failures.add(SyncFailure(op.opId, 'Không đồng bộ được "${op.payload['value'] ?? op.payload['name'] ?? (op.type == 'delete' ? 'việc xoá số liệu' : 'việc xoá khách hàng')}": ${err.message}'));
         }
       }
       if (!offline) {

@@ -129,10 +129,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
   }
 
   Future<void> _delete(EntriesController c, Entry e, bool masked) async {
-    if (e.pending) {
-      setState(() => _rowErrors[e.id] = 'Số liệu đang chờ đồng bộ, hãy đợi đồng bộ xong rồi xoá.');
-      return;
-    }
     final ok = await confirmDialog(context, title: 'Xoá số liệu', message: 'Xoá số liệu ${masked ? 'này' : '"${e.value}"'} (${e.customerName})? Không thể hoàn tác.', confirmText: 'Xoá', danger: true);
     if (!ok) return;
     final err = await c.deleteEntry(e);
@@ -350,7 +346,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
           child: Row(children: [
-            AppButton(label: 'Chọn tất cả', variant: AppButtonVariant.ghost, onPressed: () => setState(() { _selected..clear()..addAll(shown.where((e) => !e.pending).map((e) => e.id)); })),
+            AppButton(label: 'Chọn tất cả', variant: AppButtonVariant.ghost, onPressed: () => setState(() { _selected..clear()..addAll(shown.map((e) => e.id)); })),
             const Spacer(),
             AppButton(label: 'Xoá ${_selected.length} dòng', variant: AppButtonVariant.danger, loading: _bulkBusy, onPressed: _selected.isEmpty || _bulkBusy ? null : () => _deleteSelected(c)),
           ]),

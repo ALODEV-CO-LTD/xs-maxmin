@@ -503,12 +503,12 @@ class EntriesController extends ChangeNotifier {
     }
   }
 
-  /// Deletes one entry (needs the network). Returns an error text or ''.
+  /// Deletes one entry (also offline: it is queued). Returns an error text or ''.
   Future<String> deleteEntry(Entry e) async {
-    if (e.pending) return 'Số liệu đang chờ đồng bộ, hãy đợi đồng bộ xong rồi xoá.';
     try {
-      await api.delete('/me/entries/${e.id}');
+      await store.deleteEntry(e.id); // offline: queued and hidden at once; an entry never sent is just forgotten
       entries.removeWhere((x) => x.id == e.id);
+      pending = await store.pendingCount();
       _notify();
       return '';
     } on ApiError catch (err) {
@@ -519,14 +519,15 @@ class EntriesController extends ChangeNotifier {
   /// One DELETE per entry (the password-protected bulk endpoint is a different feature). Returns the number that failed.
   Future<int> deleteMany(List<Entry> list) async {
     var failed = 0;
-    for (final e in list.where((e) => !e.pending)) {
+    for (final e in list) {
       try {
-        await api.delete('/me/entries/${e.id}');
+        await store.deleteEntry(e.id);
         entries.removeWhere((x) => x.id == e.id);
       } catch (_) {
         failed++;
       }
     }
+    pending = await store.pendingCount();
     _notify();
     return failed;
   }

@@ -2,7 +2,7 @@ import '../../core/scoring_config.dart';
 
 /// One row of `GET /me/customers`.
 class Customer {
-  Customer({required this.id, required this.name, this.phone = '', this.scoringRates, this.defaultStation, this.homeRegion, this.createdAt});
+  Customer({required this.id, required this.name, this.phone = '', this.scoringRates, this.defaultStation, this.homeRegion, this.createdAt, this.pending = false});
 
   final String id;
   String name;
@@ -18,6 +18,9 @@ class Customer {
   String? homeRegion;
   String? createdAt;
 
+  /// Added while offline: not on the server yet (it is created when the network is back).
+  bool pending;
+
   factory Customer.fromJson(Map<String, dynamic> j) => Customer(
         id: '${j['id']}',
         name: (j['name'] as String?) ?? '',
@@ -26,6 +29,7 @@ class Customer {
         defaultStation: j['defaultStation'] is String && (j['defaultStation'] as String).isNotEmpty ? j['defaultStation'] as String : null,
         homeRegion: j['homeRegion'] == 'mb' || j['homeRegion'] == 'mn' ? j['homeRegion'] as String : null,
         createdAt: j['createdAt'] as String?,
+        pending: j['pending'] == true,
       );
 
   String get stationCode => (defaultStation == null || defaultStation!.isEmpty) ? 'mb' : defaultStation!;
