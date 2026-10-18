@@ -102,7 +102,18 @@ class ChatService extends ChangeNotifier {
   /// friends' keys. Safe to call again.
   Future<void> init() async {
     try {
-      var id = E2eeIdentity.fromStorage(await _readKey());
+      // A key that cannot be READ (phone locked, secure storage busy) is not a missing key: making a new one then would
+      // replace the real key, so every friend would see "key changed" and old sessions would stop working. Try again later.
+      String? stored;
+      try {
+        stored = await vault.read(_vaultKey);
+      } catch (_) {
+        ready = false;
+        error = 'Chưa đọc được khoá mã hoá trên máy (điện thoại đang khoá hoặc kho khoá bận). Mở khoá điện thoại rồi thử lại.';
+        if (!_disposed) notifyListeners();
+        return;
+      }
+      var id = E2eeIdentity.fromStorage(stored);
       if (id == null) {
         id = E2eeIdentity.generate();
         await vault.write(_vaultKey, id.toStorage());
@@ -125,14 +136,6 @@ class ChatService extends ChangeNotifier {
       error = e is ApiError ? e.message : 'Không khởi tạo được mã hoá 2 đầu trên thiết bị này.';
     }
     if (!_disposed) notifyListeners();
-  }
-
-  Future<String?> _readKey() async {
-    try {
-      return await vault.read(_vaultKey);
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<List<Map<String, dynamic>>> loadFriendKeys() async {

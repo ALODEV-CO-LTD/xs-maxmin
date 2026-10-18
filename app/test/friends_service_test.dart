@@ -72,7 +72,44 @@ Future<ChatService> make(FakeServer s, String me, String friend, {MemoryChatStor
 
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 50));
 
+/// A secure storage that fails to READ (phone locked / keychain busy) but still accepts writes.
+class _UnreadableVault extends MemoryKeyVault {
+  bool failReads = true;
+  int writes = 0;
+  @override
+  Future<String?> read(String key) async {
+    if (failReads) throw Exception('keychain locked');
+    return super.read(key);
+  }
+
+  @override
+  Future<void> write(String key, String value) async {
+    writes++;
+    await super.write(key, value);
+  }
+}
+
 void main() {
+  test('a key that cannot be read is NOT replaced by a new one (friends would see "key changed")', () async {
+    final server = FakeServer();
+    final good = MemoryKeyVault();
+    final first = await make(server, 'user-aaaa-1111', 'user-bbbb-2222', vault: good);
+    expect(first.ready, isTrue);
+    final real = Map<String, String>.from(good.data);
+
+    final vault = _UnreadableVault()..data.addAll(real);
+    final locked = await make(server, 'user-aaaa-1111', 'user-bbbb-2222', vault: vault);
+    expect(locked.ready, isFalse);
+    expect(locked.error, contains('khoá'));
+    expect(vault.writes, 0); // nothing overwritten
+    expect(vault.data, real);
+
+    vault.failReads = false; // unlocked: init again and the same key is used
+    await locked.init();
+    expect(locked.ready, isTrue);
+    expect(vault.data, real);
+  });
+
   late FakeServer server;
   setUp(() => server = FakeServer());
 

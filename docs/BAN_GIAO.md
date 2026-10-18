@@ -413,3 +413,10 @@ Tạo nhóm hoạt động ở app và web, **không cần máy chủ lưu gì**
 - **Sửa:** `app/lib/core/lottery_catalog.dart` chứa **bản sao danh mục có sẵn trong app** (3 miền, 35 đài, lịch theo thứ, cấu trúc giải; nguồn là `backend/lib/src/lottery_stations.dart`, đổi bên đó phải đổi cả bản sao này). `LotteryStations` dùng bản có sẵn ngay từ đầu; khi máy chủ trả lời thì dùng bản của máy chủ và **lưu lại trên máy** (`xoso_stations_catalog`) cho lần sau mất mạng. Màn Tính toán trong chat dùng danh mục này kể cả khi chưa tải được.
 - **Số gõ offline lúc chưa từng đồng bộ:** không còn báo lỗi "chưa có số liệu đã lưu" khi đã có số đang chờ gửi.
 - **Còn lại:** lần đăng nhập đầu tiên vẫn cần mạng (xác thực tài khoản); sau đó dùng offline hoàn toàn. Chế độ dùng ngay không cần tài khoản chưa có.
+
+## Nhật ký 18/10/2026 (khuya): vì sao mất tin nhắn khi cập nhật, cách cập nhật không mất (app 1.4.13 (19))
+
+- **Nguyên nhân mất lịch sử chat khi cập nhật iPhone:** `flutter install` **gỡ app cũ rồi cài lại**, xoá luôn dữ liệu trên máy (lịch sử chat mã hoá 2 đầu và hàng chờ offline nằm trong bộ nhớ riêng của app; chat không lưu ở máy chủ). Đăng xuất và đăng nhập lại **không** xoá gì: bài thử `integration_test/chat_persistence_test.dart` (SQLite thật + kho khoá thật trên máy ảo Android) cho thấy tin nhắn và cài đặt còn nguyên sau khi đóng và mở lại kho, và mỗi tài khoản có kho riêng.
+- **Cách cập nhật đúng:** iPhone dùng `tools/install_ios.sh <mã thiết bị>` (cài đè bằng `devicectl`, **không gỡ**); Android dùng `adb install -r` hoặc mở thẳng file APK (cùng khoá ký debug nên cài đè được). Không dùng `flutter install`.
+- **Sửa thêm:** nếu **không đọc được** khoá riêng (iPhone đang khoá, kho khoá bận), app không còn tạo khoá mới đè lên (làm bạn bè thấy "khoá đã đổi" và phiên cũ hỏng) mà báo lỗi và thử lại sau (`ChatService.init`, có test).
+- **Vẫn đúng theo thiết kế:** gỡ app hẳn hoặc đổi máy thì mất lịch sử chat (xem `MA_HOA_2_DAU.md`). Bản web lưu trong IndexedDB của trình duyệt, xoá dữ liệu trình duyệt thì mất.
