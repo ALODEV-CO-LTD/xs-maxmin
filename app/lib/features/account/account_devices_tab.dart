@@ -9,6 +9,7 @@ import 'account_widgets.dart';
 import 'me_profile.dart';
 import 'privacy/privacy_store.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// Thiết bị & riêng tư: signed-in devices (revoke), the recovery code and the privacy settings of this device.
 class AccountDevicesTab extends StatelessWidget {
@@ -131,7 +132,7 @@ class PrivacySettingsCard extends StatelessWidget {
     return SectionCard(title: 'Cài đặt quyền riêng tư', children: [
       Text('Áp dụng cho thiết bị này.', style: TextStyle(color: context.mutedColor, fontSize: 13)),
       const SizedBox(height: 12),
-      DropdownButtonFormField<int>(
+      AppDropdown<int>(
         key: ValueKey('idle${p.autoLockMinutes}'),
         initialValue: p.autoLockMinutes,
         isExpanded: true,
@@ -140,7 +141,7 @@ class PrivacySettingsCard extends StatelessWidget {
         onChanged: (v) => v == null ? null : store.setAutoLockMinutes(v),
       ),
       const SizedBox(height: 12),
-      DropdownButtonFormField<int>(
+      AppDropdown<int>(
         key: ValueKey('hide${p.hideLockSeconds}'),
         initialValue: p.hideLockSeconds,
         isExpanded: true,

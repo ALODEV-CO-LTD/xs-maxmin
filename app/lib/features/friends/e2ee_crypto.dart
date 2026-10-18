@@ -229,16 +229,19 @@ Future<Uint8List> decryptBytes(Uint8List key, Envelope env, {required String fro
 
 /// Decoded plaintext of one message (crypto.js `unpackMessage`). [kind] is `'screenshot'` for a system notice.
 class PackedMessage {
-  const PackedMessage({required this.text, required this.ts, this.att, this.kind, required this.file});
+  const PackedMessage({required this.text, required this.ts, this.att, this.kind, this.group, required this.file});
   final String text;
   final int ts;
   final Map<String, dynamic>? att;
   final String? kind;
+
+  /// Group header (`g`): `{i: id, n: name, c: creator, u: updatedAt, m: [[id, name], ...]}`; null for a 1:1 message.
+  final Map<String, dynamic>? group;
   final Uint8List file;
 }
 
-Uint8List packMessage({String text = '', required int ts, Map<String, dynamic>? att, String? kind, Uint8List? file}) {
-  final header = utf8.encode(jsonEncode({'v': 1, 't': text, 'ts': ts, 'a': att, 'k': ?kind}));
+Uint8List packMessage({String text = '', required int ts, Map<String, dynamic>? att, String? kind, Map<String, dynamic>? group, Uint8List? file}) {
+  final header = utf8.encode(jsonEncode({'v': 1, 't': text, 'ts': ts, 'a': att, 'k': ?kind, 'g': ?group}));
   final out = Uint8List(4 + header.length + (file?.length ?? 0));
   ByteData.sublistView(out).setUint32(0, header.length);
   out.setRange(4, 4 + header.length, header);
@@ -255,11 +258,13 @@ PackedMessage unpackMessage(Uint8List bytes) {
   final ts = header['ts'];
   final att = header['a'];
   final k = header['k'];
+  final g = header['g'];
   return PackedMessage(
     text: (header['t'] ?? '').toString(),
     ts: ts is num && ts != 0 ? ts.toInt() : DateTime.now().millisecondsSinceEpoch,
     att: att is Map<String, dynamic> ? att : null,
     kind: k == null || k == '' ? null : k.toString(),
+    group: g is Map<String, dynamic> ? g : null,
     file: Uint8List.sublistView(bytes, 4 + len),
   );
 }

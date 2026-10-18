@@ -37,12 +37,16 @@ class SqliteChatStore implements ChatStore {
     final safe = userId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
     final db = await openDatabase(
       p.join(await getDatabasesPath(), 'mamba-e2ee-$safe.db'),
-      version: 1,
+      version: 2,
+      onUpgrade: (db, from, _) async {
+        // v2: who wrote a message (group chats)
+        if (from < 2) await db.execute('ALTER TABLE messages ADD COLUMN from_id TEXT');
+      },
       onCreate: (db, _) async {
         await db.execute('CREATE TABLE peers (id TEXT PRIMARY KEY, jwk TEXT NOT NULL, fingerprint TEXT NOT NULL, changed INTEGER NOT NULL)');
         await db.execute('''CREATE TABLE messages (
           id TEXT PRIMARY KEY, peer_id TEXT NOT NULL, mine INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER NOT NULL,
-          status TEXT NOT NULL, reason TEXT, sys TEXT, att_name TEXT, att_type TEXT, att_size INTEGER, att_path TEXT)''');
+          status TEXT NOT NULL, reason TEXT, sys TEXT, att_name TEXT, att_type TEXT, att_size INTEGER, att_path TEXT, from_id TEXT)''');
         await db.execute('CREATE INDEX messages_peer ON messages (peer_id, created_at)');
         await db.execute('CREATE TABLE meta (id TEXT PRIMARY KEY, value TEXT NOT NULL)');
       },
@@ -61,6 +65,7 @@ class SqliteChatStore implements ChatStore {
         status: r['status'] as String,
         reason: r['reason'] as String?,
         sys: r['sys'] as String?,
+        fromId: r['from_id'] as String?,
         att: r['att_name'] == null
             ? null
             : ChatAttachment(name: r['att_name'] as String, type: r['att_type'] as String, size: r['att_size'] as int, path: r['att_path'] as String?),
@@ -84,6 +89,7 @@ class SqliteChatStore implements ChatStore {
           'status': m.status,
           'reason': m.reason,
           'sys': m.sys,
+          'from_id': m.fromId,
           'att_name': m.att?.name,
           'att_type': m.att?.type,
           'att_size': m.att?.size,

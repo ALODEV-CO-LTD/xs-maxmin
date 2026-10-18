@@ -18,6 +18,7 @@ class MaskStore extends ChangeNotifier with WidgetsBindingObserver {
   static const _enabledKey = 'xoso_mask_enabled';
   static const _secondsKey = 'xoso_mask_reveal_seconds';
 
+  /// "Ẩn số liệu" was removed from the app: figures are always shown. (The class stays so the screens that read [masked] keep working.)
   bool enabled = false;
   bool revealed = false;
   int revealSeconds = 30;
@@ -25,11 +26,13 @@ class MaskStore extends ChangeNotifier with WidgetsBindingObserver {
   DateTime _until = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// True while the figures must NOT be shown. Widgets show "••••" and never touch the real value.
-  bool get masked => enabled && !revealed;
+  bool get masked => false;
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
-    enabled = p.getBool(_enabledKey) ?? false;
+    // an old "on" saved by an earlier version must not hide anything any more
+    if (p.containsKey(_enabledKey)) await p.remove(_enabledKey);
+    enabled = false;
     final s = p.getInt(_secondsKey);
     if (s != null && revealChoices.contains(s)) revealSeconds = s;
     notifyListeners();

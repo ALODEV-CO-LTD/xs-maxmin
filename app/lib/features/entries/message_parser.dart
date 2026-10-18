@@ -158,15 +158,19 @@ Map<String, _Sym> _compactSymbols(Map<String, String> aliasMap, SyntaxTemplate c
 /// Returns compact(token, ctxType) for one FOLDED whitespace-free token; null = "not compact notation" (the caller falls back to
 /// the legacy parser, so nothing that worked before changes).
 _Compact? Function(String, [String]) _makeCompactParser(Map<String, _Sym> symbols, List<String> betTypes) {
-  String alt(bool Function(_Sym) pred) {
-    final keys = [for (final e in symbols.entries) if (pred(e.value)) e.key]..sort((a, b) => b.length.compareTo(a.length));
+  String alt(bool Function(_Sym, String) pred) {
+    final keys = [for (final e in symbols.entries) if (pred(e.value, e.key)) e.key]..sort((a, b) => b.length.compareTo(a.length));
     return keys.map(_escapeRe).join('|');
   }
 
-  final all = alt((_) => true);
-  final lo = alt((v) => v.kind == 'lo');
-  final reXien = lo.isNotEmpty ? RegExp('^(\\d{2}(?:(?:[.,]|$lo)\\d{2}){1,3})($lo|xien)$_pointsRe\$') : null;
+  final all = alt((_, _) => true);
+  final allNoX = alt((_, k) => !_bareX.contains(k)); // "20.02x10" stays with the legacy reading (x = × điểm)
+  final lo = alt((v, _) => v.kind == 'lo');
+  final reXien = lo.isNotEmpty ? RegExp('^(\\d{2}(?:(?:[.,]|$lo)\\d{2}){1,})($lo|xien)$_pointsRe\$') : null;
   final reDouble = RegExp('^(\\d+)($all)$_pointsRe($all)$_pointsRe\$');
+  // "22.67lo10" / "81.24.69lo10": several numbers of one length joined by dots (or commas), one symbol and one điểm for all.
+  final reList = RegExp('^(\\d{2,4}(?:[.,]\\d{2,4})+)($allNoX)$_pointsRe\$');
+  final reListDouble = RegExp('^(\\d{2,4}(?:[.,]\\d{2,4})+)($allNoX)$_pointsRe($allNoX)$_pointsRe\$');
   final reSingle = RegExp('^(\\d+)($all)$_pointsRe\$');
   bool has(String t) => betTypes.contains(t);
 
@@ -217,19 +221,39 @@ _Compact? Function(String, [String]) _makeCompactParser(Map<String, _Sym> symbol
     var m = reXien?.firstMatch(tok);
     if (m != null) {
       final nums = RegExp(r'\d{2}').allMatches(m.group(1)!).map((x) => x.group(0)!).toList();
+      // "22.67lo10" (numbers joined by dots, then a spelled lô symbol and điểm) is a xiên: 2 numbers = xiên 2, 3 = xiên 3, 4 = xiên 4.
+      // More than 4 numbers is not a xiên the system knows: it is kept as one flagged row for the user to check.
       final dotsOnly = !RegExp(r'[a-z×]').hasMatch(m.group(1)!);
+      final spelledLo = dotsOnly && !_bareX.contains(m.group(2)) && symbols[m.group(2)]?.kind == 'lo';
       final type = 'xien${nums.length}';
       // "20.02x10" is also how some customers list several plain numbers, so it only means xiên when the account has that
       // Xiên type; "20x02lo10" / "20.02xiên10" cannot mean anything else.
-      if (!(dotsOnly && m.group(2) != 'xien' && !has(type))) {
+      if (spelledLo || !(dotsOnly && m.group(2) != 'xien' && !has(type))) {
         final reasons = [
-          'Xiên: cách tính điểm chưa được hỗ trợ, hãy kiểm tra thủ công',
+          if (nums.length > 4) 'Xiên ${nums.length} số: hệ thống chỉ có xiên 2, 3, 4, hãy kiểm tra',
           if (!has(type)) 'Loại "${typeLabel(type)}" chưa có trong cấu hình',
         ];
         return _Compact(
           [ParsedRow(type: type, value: nums.join(' '), score: m.group(3)!.replaceFirst(',', '.'), raw: '', reasons: reasons)],
           '${nums.join('.')}${_canonSymbol['xien']}${m.group(3)}',
         );
+      }
+    }
+    m = reListDouble.firstMatch(tok);
+    if (m != null) {
+      final nums = m.group(1)!.split(RegExp(r'[.,]'));
+      // (a lô symbol after several 2-digit numbers is a xiên, handled above: no list of numbers with two symbols)
+      if (nums.every((n) => n.length == nums.first.length) && !(nums.first.length == 2 && [m.group(2), m.group(4)].any((x) => symbols[x]?.kind == 'lo'))) {
+        final made = [for (final n in nums) ...[one(n, m.group(2)!, m.group(3)!, ctxType), one(n, m.group(4)!, m.group(5)!, ctxType)]];
+        if (made.every((x) => x != null)) return _Compact([for (final x in made) x!.row], made.map((x) => x!.canon).join(' '));
+      }
+    }
+    m = reList.firstMatch(tok);
+    if (m != null) {
+      final nums = m.group(1)!.split(RegExp(r'[.,]'));
+      if (nums.every((n) => n.length == nums.first.length)) {
+        final made = [for (final n in nums) one(n, m.group(2)!, m.group(3)!, ctxType)];
+        if (made.every((x) => x != null)) return _Compact([for (final x in made) x!.row], made.map((x) => x!.canon).join(' '));
       }
     }
     m = reDouble.firstMatch(tok);
@@ -245,6 +269,24 @@ _Compact? Function(String, [String]) _makeCompactParser(Map<String, _Sym> symbol
     }
     return null;
   };
+}
+
+/// Loosely written compact notation -> the strict spelling the matchers read: groups divided by ; / | or " - ", numbers of one
+/// group divided by spaces, dots, commas or dashes, the symbol / điểm separated by spaces or followed by "điểm".
+/// "22 67 lo 10; 50-65 lô 20" -> "22.67lo10 50.65lo20". Bare x / × is left alone (the legacy parser owns "× điểm").
+String Function(String) _makeNormalizer(Map<String, _Sym> symbols) {
+  final keys = [for (final k in symbols.keys) if (!_bareX.contains(k)) k]..sort((a, b) => b.length.compareTo(a.length));
+  if (keys.isEmpty) return (f) => f;
+  final symAlt = keys.map(_escapeRe).join('|');
+  final reGroup = RegExp('(?<![\\d.,])((?:\\d{2,4}[ .,\\-]+)*\\d{2,4})\\s*($symAlt)\\s*(\\d+(?:[.,]\\d+)?)(?:\\s*diem)?(?![\\d])');
+  // "22.67lo10 de5" / "22.67lo10de5": the second symbol re-uses the numbers in front of the first.
+  final reAttach = RegExp('((?:\\d{2,4}\\.)*\\d{2,4})($symAlt)(\\d+(?:[.,]\\d+)?)\\s*($symAlt)(\\d+(?:[.,]\\d+)?)(?![\\d.,]|\\s*[a-z])');
+  return (f) => f
+      .replaceAll(RegExp(r'\s*[;|/]\s*|\s+-\s+'), ' ')
+      .replaceAllMapped(reGroup, (m) => '${m.group(1)!.split(RegExp(r'[ .,-]+')).join('.')}${m.group(2)}${m.group(3)}')
+      .replaceAllMapped(reAttach, (m) => '${m.group(1)}${m.group(2)}${m.group(3)}${m.group(4)}${m.group(5)}')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
 ParsedRow _withRaw(ParsedRow r, String raw) => ParsedRow(type: r.type, value: r.value, score: r.score, raw: raw, reasons: r.reasons);
@@ -315,7 +357,9 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
   final rows = <ParsedRow>[];
   final ignored = <String>[];
   var stickyType = '';
-  final compact = _makeCompactParser(_compactSymbols(aliasMap, cfg, kindSymbols), betTypes);
+  final symbols = _compactSymbols(aliasMap, cfg, kindSymbols);
+  final compact = _makeCompactParser(symbols, betTypes);
+  final normalize = _makeNormalizer(symbols);
 
   void push(String type, bool assumed, String value, String score, String raw, [List<String> extra = const []]) {
     final reasons = [...extra];
@@ -332,9 +376,18 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
 
     // Compact notation: only when EVERY space-separated token of the line is one ("20lo100 70lo500 54lo300").
     // A line that mixes in anything else goes through the legacy path below, exactly as before.
-    final toks = f.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    var toks = f.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     final ctxType = stickyType.isNotEmpty ? stickyType : cfg.defaultType;
-    final parsed = [for (final t in toks) compact(t, ctxType)];
+    var parsed = [for (final t in toks) compact(t, ctxType)];
+    if (!parsed.every((p) => p != null)) {
+      // The same line written loosely ("22 67 lo 10", "22-67 lô10; 50.65 lo20"): tidy it and try again.
+      final tidy = normalize(f).split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      final again = [for (final t in tidy) compact(t, ctxType)];
+      if (tidy.isNotEmpty && again.every((p) => p != null)) {
+        toks = tidy;
+        parsed = again;
+      }
+    }
     if (toks.isNotEmpty && parsed.every((p) => p != null)) {
       for (final p in parsed) {
         for (final r in p!.rows) {

@@ -71,6 +71,12 @@ class ChatService extends ChangeNotifier {
   final Map<String, Map<String, dynamic>> friendKeys = {};
   final Map<String, int> unread = {};
 
+  /// Group chats this device knows (the server stores none): group id -> group.
+  final Map<String, ChatGroup> groups = {};
+
+  /// Group message id -> recipients that may still receive it (decreased by each `e2ee-undelivered`; 0 and no ack = failed).
+  final Map<String, int> _fanOut = {};
+
   /// The friend whose conversation is on screen: its incoming messages are not counted as unread.
   String? openPeer;
 
@@ -109,6 +115,7 @@ class ChatService extends ChangeNotifier {
       }
       await _restoreUnread();
       await restorePrefs();
+      await restoreGroups();
       ready = true;
       error = '';
       await loadFriendKeys();
@@ -224,7 +231,7 @@ class ChatService extends ChangeNotifier {
       ext = imageExt(image.type);
       att = ChatAttachment(name: anonymousName(image.type, () => DateTime.now().microsecondsSinceEpoch & 0xff), type: image.type, size: image.bytes.length, path: await store.writeFile(id, image.bytes, ext));
     }
-    final msg = ChatMessage(id: id, peerId: friendId, mine: true, text: text, att: att, createdAt: DateTime.now().millisecondsSinceEpoch, status: MsgStatus.sending);
+    final msg = ChatMessage(id: id, peerId: friendId, mine: true, text: text, att: att, createdAt: DateTime.now().millisecondsSinceEpoch, status: MsgStatus.sending, fromId: isGroupId(friendId) ? userId : null);
     await store.putMessage(msg);
     _bump();
     await _transmit(msg, image?.bytes, att);
@@ -233,6 +240,7 @@ class ChatService extends ChangeNotifier {
 
   Future<void> _transmit(ChatMessage msg, Uint8List? fileBytes, ChatAttachment? att) async {
     Future<void> fail(String reason) => _setStatus(msg.id, MsgStatus.failed, reason);
+    if (isGroupId(msg.peerId)) return _transmitGroup(msg, fileBytes, att);
     try {
       final key = await _session(msg.peerId);
       if (key == null) return await fail('no-key');
@@ -287,6 +295,7 @@ class ChatService extends ChangeNotifier {
       att: m.att,
       sys: m.sys,
       reason: status == MsgStatus.failed ? reason : null,
+      fromId: m.fromId,
     ));
     _bump();
   }
@@ -305,11 +314,23 @@ class ChatService extends ChangeNotifier {
     final type = msg['type'];
     final id = msg['id'];
     if (type == 'e2ee-ack') {
-      if (id is String) await _setStatus(id, MsgStatus.delivered);
+      if (id is String) {
+        _fanOut.remove(id);
+        await _setStatus(id, MsgStatus.delivered);
+      }
       return;
     }
     if (type == 'e2ee-undelivered') {
-      if (id is String) await _setStatus(id, MsgStatus.failed, msg['reason'] as String?);
+      if (id is String) {
+        // A group message goes to several members: it only failed when NONE of them can get it.
+        final left = _fanOut[id];
+        if (left != null && left > 1) {
+          _fanOut[id] = left - 1;
+          return;
+        }
+        _fanOut.remove(id);
+        await _setStatus(id, MsgStatus.failed, msg['reason'] as String?);
+      }
       return;
     }
     final parsed = E2eeFrame.tryParse(msg);
@@ -333,6 +354,10 @@ class ChatService extends ChangeNotifier {
       }
       final m = unpackMessage(plain);
       final createdAt = m.ts < DateTime.now().millisecondsSinceEpoch ? m.ts : DateTime.now().millisecondsSinceEpoch;
+      if (m.group != null) {
+        await _handleGroupMessage(frame, m, createdAt);
+        return;
+      }
       if (m.kind == 'screenshot') {
         await store.putMessage(ChatMessage(id: frame.id, peerId: frame.from, mine: false, text: '', createdAt: createdAt, status: MsgStatus.delivered, sys: SysKind.screenshot));
         socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
@@ -341,19 +366,7 @@ class ChatService extends ChangeNotifier {
         onIncoming?.call(frame.from, frame.fromName, 'đã chụp màn hình cuộc trò chuyện với bạn');
         return;
       }
-      // Only pictures are accepted from a friend (a modified client could send anything).
-      ChatAttachment? att;
-      final a = m.att;
-      final aType = a?['type'];
-      if (a != null && m.file.isNotEmpty && aType is String && allowedImageTypes.contains(aType) && sniffImageType(m.file) != null) {
-        final name = (a['name'] ?? 'tep-dinh-kem').toString();
-        att = ChatAttachment(
-          name: name.length > 200 ? name.substring(0, 200) : name,
-          type: aType,
-          size: m.file.length,
-          path: await store.writeFile(frame.id, Uint8List.fromList(m.file), imageExt(aType)),
-        );
-      }
+      final att = await _incomingAttachment(m, frame.id);
       await store.putMessage(ChatMessage(id: frame.id, peerId: frame.from, mine: false, text: m.text, att: att, createdAt: createdAt, status: MsgStatus.delivered));
       socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
       _bump();
@@ -363,6 +376,237 @@ class ChatService extends ChangeNotifier {
       // Could not read an incoming message (wrong key, tampered, malformed): drop it silently like the web.
     }
   }
+
+  /// Only pictures are accepted from a friend (a modified client could send anything).
+  Future<ChatAttachment?> _incomingAttachment(PackedMessage m, String messageId) async {
+    final a = m.att;
+    final aType = a?['type'];
+    if (a != null && m.file.isNotEmpty && aType is String && allowedImageTypes.contains(aType) && sniffImageType(m.file) != null) {
+      final name = (a['name'] ?? 'tep-dinh-kem').toString();
+      return ChatAttachment(
+        name: name.length > 200 ? name.substring(0, 200) : name,
+        type: aType,
+        size: m.file.length,
+        path: await store.writeFile(messageId, Uint8List.fromList(m.file), imageExt(aType)),
+      );
+    }
+    return null;
+  }
+
+  // ---- group chats (no server involved: every message is encrypted once per member and relayed like a 1:1 message) ----------
+
+  Future<void> restoreGroups() async {
+    groups.clear();
+    for (final e in (await store.metaWithPrefix('group:')).entries) {
+      final g = ChatGroup.tryParse(e.value);
+      if (g != null) groups[g.id] = g;
+    }
+  }
+
+  Future<void> _saveGroup(ChatGroup g) async {
+    groups[g.id] = g;
+    await store.setMeta('group:${g.id}', g.toJson());
+  }
+
+  /// Creates the group on this device and tells every member (an empty, end-to-end encrypted "new group" message that carries the
+  /// name and the member list). Members must be friends of the creator, since the relay only carries messages between friends.
+  Future<ChatGroup> createGroup(String name, String myName, List<GroupMember> others) async {
+    if (!ready) throw Exception('Mã hoá 2 đầu chưa sẵn sàng trên thiết bị này.');
+    final n = name.trim();
+    if (n.isEmpty) throw Exception('Nhập tên nhóm.');
+    final ids = {for (final o in others) o.id}..remove(userId);
+    if (ids.length < 2) throw Exception('Chọn ít nhất 2 bạn bè để tạo nhóm.');
+    if (ids.length > 49) throw Exception('Nhóm tối đa 50 người.');
+    final members = [GroupMember(userId, myName.isEmpty ? 'Thành viên' : myName), for (final o in others) if (ids.remove(o.id)) o];
+    final g = ChatGroup(id: '$groupIdPrefix${newMessageId()}', name: n.length > 60 ? n.substring(0, 60) : n, members: members, creatorId: userId, updatedAt: DateTime.now().millisecondsSinceEpoch);
+    await _saveGroup(g);
+    _bump();
+    await _fanOutKind(g, 'group-new');
+    return g;
+  }
+
+  /// Renames the group for everybody (the new name travels with the next messages too).
+  Future<void> renameGroup(String groupId, String name) async {
+    final g = groups[groupId];
+    final n = name.trim();
+    if (g == null || n.isEmpty || g.creatorId != userId) return; // only the creator renames
+    final next = g.copyWith(name: n.length > 60 ? n.substring(0, 60) : n, updatedAt: DateTime.now().millisecondsSinceEpoch);
+    await _saveGroup(next);
+    _bump();
+    await _fanOutKind(next, 'group-new');
+  }
+
+  /// Creator only: adds friends to the group. Everybody (the new members included) gets the updated group; the new members see
+  /// the messages sent from now on, not the earlier ones.
+  Future<void> addGroupMembers(String groupId, List<GroupMember> added) async {
+    final g = groups[groupId];
+    if (g == null || g.creatorId != userId) return;
+    final have = {for (final m in g.members) m.id};
+    final fresh = [for (final a in added) if (have.add(a.id)) a];
+    if (fresh.isEmpty) return;
+    if (g.members.length + fresh.length > 50) throw Exception('Nhóm tối đa 50 người.');
+    final next = g.copyWith(members: [...g.members, ...fresh], updatedAt: DateTime.now().millisecondsSinceEpoch);
+    await _saveGroup(next);
+    _bump();
+    await _fanOutKind(next, 'group-new');
+  }
+
+  /// Creator only: removes a member. The others get the updated group; the removed person is told, and drops the group.
+  Future<void> removeGroupMember(String groupId, String memberId) async {
+    final g = groups[groupId];
+    if (g == null || g.creatorId != userId || memberId == userId) return;
+    final gone = g.members.where((m) => m.id == memberId).firstOrNull;
+    if (gone == null) return;
+    final next = g.copyWith(members: [for (final m in g.members) if (m.id != memberId) m], updatedAt: DateTime.now().millisecondsSinceEpoch);
+    if (next.members.length < 2) throw Exception('Nhóm cần ít nhất 2 người.');
+    await _saveGroup(next);
+    _bump();
+    // the removed member is told with the group as it was (so it still lists them) and kind "group-removed"
+    final id = newMessageId();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final key = await _session(memberId);
+    if (key != null && socket.ready) {
+      final env = await encryptBytes(key, packMessage(text: '', ts: ts, kind: 'group-removed', group: next.toHeader()), from: userId, to: memberId, id: id);
+      socket.send({'type': 'e2ee-msg', 'to': memberId, 'id': id, 'iv': env.iv, 'ct': env.ct, 'part': 0, 'parts': 1, 'ts': ts});
+    }
+    await _fanOutKind(next, 'group-new');
+  }
+
+  /// Leaves the group: the others are told, then it is removed from this device together with its messages.
+  Future<void> leaveGroup(String groupId, {bool notify = true}) async {
+    final g = groups[groupId];
+    if (g != null && notify) {
+      final rest = g.copyWith(members: [for (final m in g.members) if (m.id != userId) m], updatedAt: DateTime.now().millisecondsSinceEpoch);
+      if (rest.members.length >= 2) await _fanOutKind(rest, 'group-left');
+    }
+    await deleteConversation(groupId);
+    groups.remove(groupId);
+    await store.setMeta('group:$groupId', null);
+    if (archived.contains(groupId)) await setArchived([groupId], false);
+    unread.remove(groupId);
+    await store.setMeta('unread:$groupId', null);
+    _bump();
+  }
+
+  /// A message without text for the members, only carrying the group (creation, rename, somebody left). Returns how many members
+  /// it was sent to.
+  Future<int> _fanOutKind(ChatGroup g, String kind) async {
+    final id = newMessageId();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    return _fanOutFrames(g, id, packMessage(text: '', ts: ts, kind: kind, group: g.toHeader()), ts, ack: false);
+  }
+
+  /// Encrypts [plain] for every member except me and relays it. Returns the number of members it was handed to the socket for.
+  Future<int> _fanOutFrames(ChatGroup g, String id, Uint8List plain, int ts, {bool ack = true}) async {
+    if (!socket.ready) return 0;
+    var sent = 0;
+    for (final member in g.members) {
+      if (member.id == userId) continue;
+      final key = await _session(member.id);
+      if (key == null) continue; // not my friend (no key): the relay would refuse it anyway
+      final env = await encryptBytes(key, plain, from: userId, to: member.id, id: id);
+      final slices = splitCiphertext(env.ct);
+      if (slices.length > maxParts) continue;
+      for (var i = 0; i < slices.length; i++) {
+        socket.send({'type': 'e2ee-msg', 'to': member.id, 'id': id, 'iv': env.iv, 'ct': slices[i], 'part': i, 'parts': slices.length, 'ts': ts});
+      }
+      sent++;
+    }
+    if (ack && sent > 0) _fanOut[id] = sent;
+    return sent;
+  }
+
+  Future<void> _transmitGroup(ChatMessage msg, Uint8List? fileBytes, ChatAttachment? att) async {
+    Future<void> fail(String reason) => _setStatus(msg.id, MsgStatus.failed, reason);
+    try {
+      final g = groups[msg.peerId];
+      if (g == null) return await fail('invalid');
+      if (!socket.ready) return await fail('no-socket');
+      var bytes = fileBytes;
+      final a = att ?? msg.att;
+      if (a != null && bytes == null && a.path != null) bytes = await store.readFile(a.path!);
+      final plain = packMessage(text: msg.text, ts: msg.createdAt, att: a == null ? null : {'name': a.name, 'type': a.type, 'size': a.size}, group: g.toHeader(), file: bytes);
+      final sent = await _fanOutFrames(g, msg.id, plain, msg.createdAt);
+      if (sent == 0) return await fail('no-key');
+      await _setStatus(msg.id, MsgStatus.sent);
+      _ackTimers[msg.id]?.cancel();
+      _ackTimers[msg.id] = Timer(ackWait, () {
+        _fanOut.remove(msg.id);
+        _setStatus(msg.id, MsgStatus.failed, 'timeout');
+      });
+    } catch (_) {
+      await fail('invalid');
+    }
+  }
+
+  /// A message (or creation / rename / "left" notice) of a group chat from [frame].from.
+  Future<void> _handleGroupMessage(E2eeFrame frame, PackedMessage m, int createdAt) async {
+    final incoming = ChatGroup.fromHeader(m.group);
+    if (incoming == null) return;
+    final known = groups[incoming.id];
+    if (m.kind == 'group-removed') {
+      // The creator removed me: forget the group (its messages go with it).
+      if (known == null || known.creatorId != frame.from || incoming.members.any((x) => x.id == userId)) return;
+      socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+      final name = known.name;
+      await leaveGroup(known.id, notify: false);
+      onIncoming?.call(known.id, name, 'Bạn đã bị xoá khỏi nhóm');
+      return;
+    }
+    if (m.kind == 'group-left') {
+      // The sender is leaving: it is no longer in the list the message carries, so it must have been a member before.
+      if (known == null || !known.members.any((x) => x.id == frame.from) || incoming.members.any((x) => x.id == frame.from)) return;
+    } else if (!incoming.members.any((x) => x.id == frame.from) || !incoming.members.any((x) => x.id == userId)) {
+      // Only a member may speak in the group, and the group must include me.
+      return;
+    }
+    if (known != null && known.creatorId != incoming.creatorId) return; // the creator of an existing group cannot be changed
+    // Who may change the group (name, members): the creator; a member leaving removes only themselves. A newer header carried by an
+    // ordinary message of another member is not trusted.
+    final fromCreator = frame.from == incoming.creatorId;
+    if (known == null) {
+      await _saveGroup(incoming);
+    } else if (incoming.updatedAt > known.updatedAt) {
+      final leftOk = m.kind == 'group-left' && incoming.members.length == known.members.length - 1;
+      if (fromCreator || leftOk) await _saveGroup(incoming);
+    }
+    final g = groups[incoming.id]!;
+    socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+    final who = _nameInGroup(g, frame.from, frame.fromName);
+    if (m.kind == 'group-new' || m.kind == 'group-left') {
+      _bump();
+      if (m.kind == 'group-new' && known == null) onIncoming?.call(g.id, g.name, '$who đã thêm bạn vào nhóm');
+      return;
+    }
+    final att = await _incomingAttachment(m, frame.id);
+    await store.putMessage(ChatMessage(id: frame.id, peerId: g.id, mine: false, text: m.text, att: att, createdAt: createdAt, status: MsgStatus.delivered, fromId: frame.from));
+    _bump();
+    await _bumpUnread(g.id);
+    onIncoming?.call(g.id, g.name, '$who: ${m.text.isNotEmpty ? m.text : 'Đã gửi một tệp đính kèm'}');
+  }
+
+  /// Test hook: sends a group message of [g] to [to] as this device, without checking that it belongs to the group.
+  @visibleForTesting
+  Future<void> debugSendGroupFrame(ChatGroup g, String to, String text) async {
+    final id = newMessageId();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final key = await _session(to);
+    if (key == null) return;
+    final env = await encryptBytes(key, packMessage(text: text, ts: ts, group: g.toHeader()), from: userId, to: to, id: id);
+    socket.send({'type': 'e2ee-msg', 'to': to, 'id': id, 'iv': env.iv, 'ct': env.ct, 'part': 0, 'parts': 1, 'ts': ts});
+  }
+
+  String _nameInGroup(ChatGroup g, String id, [String? fallback]) {
+    final alias = aliases[id];
+    if (alias != null) return alias;
+    for (final x in g.members) {
+      if (x.id == id) return x.name;
+    }
+    return fallback ?? 'Thành viên';
+  }
+
+  /// The name to show for member [id] of [g] on this device.
+  String memberName(ChatGroup g, String id) => id == userId ? 'Bạn' : _nameInGroup(g, id);
 
   // ---- unread counters, kept on this device -----------------------------------------------------------------------
 

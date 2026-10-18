@@ -87,7 +87,7 @@ void main() {
       child: QuickEntryBox(controller: c, pickPath: (_) async => '/nonexistent/ảnh.jpg', recognize: (_) async => 'de 12 34 x 10\nlo 45 x 3'),
     );
     await tester.enterText(find.byType(TextField).first, 'de 99 x 1');
-    await tester.tap(find.text('Chọn ảnh'));
+    await tester.tap(find.byTooltip('Chọn ảnh'));
     await tester.pumpAndSettle();
     final box = tester.widget<TextField>(find.byType(TextField).first).controller!.text;
     expect(box, 'de 99 x 1\nde 12 34 x 10\nlo 45 x 3'); // the text joined what was already typed
@@ -110,7 +110,7 @@ void main() {
   testWidgets('a picture of plain numbers gives a preview of lines to check (no score, so none ticked)', (tester) async {
     final (c, _) = await _controller();
     await _pump(tester, c, child: QuickEntryBox(controller: c, pickPath: (_) async => '/x.jpg', recognize: (_) async => '12 34 56'));
-    await tester.tap(find.text('Chọn ảnh'));
+    await tester.tap(find.byTooltip('Chọn ảnh'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Đã chọn 0/3 dòng'), findsOneWidget);
     await _done(tester, c);
@@ -119,7 +119,7 @@ void main() {
   testWidgets('a picture with no text shows a message and keeps the box', (tester) async {
     final (c, _) = await _controller();
     await _pump(tester, c, child: QuickEntryBox(controller: c, pickPath: (_) async => '/x.jpg', recognize: (_) async => '  '));
-    await tester.tap(find.text('Chọn ảnh'));
+    await tester.tap(find.byTooltip('Chọn ảnh'));
     await tester.pumpAndSettle();
     expect(find.text('Không đọc được chữ nào từ ảnh. Hãy chụp rõ hơn hoặc nhập tay.'), findsOneWidget);
     await _done(tester, c);

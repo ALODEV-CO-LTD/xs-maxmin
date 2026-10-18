@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import 'calc_sync.dart';
 
 import '../customers/customers_screen.dart';
 import '../entries/entries_screen.dart';
@@ -33,11 +36,21 @@ class CalcScreen extends StatefulWidget {
 
 class _CalcScreenState extends State<CalcScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: calcTabs.length, vsync: this);
+  final CalcSync _sync = CalcSync();
   String? _routeUri;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs.addListener(() {
+      if (!_tabs.indexIsChanging) _sync.tabActivated(calcTabs[_tabs.index].id);
+    });
+  }
 
   @override
   void dispose() {
     _tabs.dispose();
+    _sync.dispose();
     super.dispose();
   }
 
@@ -57,6 +70,10 @@ class _CalcScreenState extends State<CalcScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider<CalcSync>.value(value: _sync, child: _scaffold(context));
+  }
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       // The TabBar is the heading of Tính toán (the screens inside do not draw their own title).
       appBar: AppBar(

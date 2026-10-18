@@ -10,13 +10,10 @@ import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/theme.dart';
 import '../scoring/date_field.dart';
-import '../scoring/entry_model.dart';
 import '../scoring/scoring_data.dart';
-import '../scoring/scoring_logic.dart';
 import '../entries/dialogs.dart';
 import 'results_controller.dart';
 import '../../core/widgets/app_button.dart';
-import '../../core/widgets/action_bar.dart';
 
 /// Nhập kết quả: lottery results per day (one form for every region, station chosen by chip), reading them from a photo, and the
 /// calculated "Điểm ra" list of the chosen day (frontend/src/views/ResultsView.vue).
@@ -88,8 +85,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
             _Header(),
             SizedBox(height: 12),
             _ResultCard(),
-            SizedBox(height: 12),
-            _ScoreList(),
+            _SyncNotices(),
           ],
         ),
       ),
@@ -314,16 +310,21 @@ class _ResultForm extends StatelessWidget {
       }
     }
     children.add(const SizedBox(height: 12));
-    children.add(ActionBar(
-      start: [
-        if (c.savedOf(cur)) AppButton(label: 'Xoá kết quả này', variant: AppButtonVariant.danger, loading: c.deleting == cur, onPressed: c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, cur)),
-        AppButton(label: 'Xoá form', variant: AppButtonVariant.ghost, onPressed: c.clearForm),
-      ],
-      children: [
-        AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null),
-        _SaveButton(c),
-      ],
-    ));
+    // One row: one delete button (the saved result of this đài, or just the form while nothing is saved), Sửa, Lưu kết quả.
+    final saved = c.savedOf(cur);
+    children.add(Row(children: [
+      AppButton.icon(
+        label: saved ? 'Xoá kết quả này' : 'Xoá form',
+        variant: saved ? AppButtonVariant.danger : AppButtonVariant.secondary,
+        icon: Icons.delete_outline,
+        loading: saved && c.deleting == cur,
+        onPressed: saved ? (c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, cur)) : c.clearForm,
+      ),
+      const SizedBox(width: 8),
+      Expanded(child: AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null)),
+      const SizedBox(width: 8),
+      Expanded(flex: 2, child: _SaveButton(c)),
+    ]));
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 }
@@ -457,112 +458,21 @@ class _DigitCellState extends State<DigitCell> {
   }
 }
 
-// ---- Điểm ra của ngày ---------------------------------------------------------------------------------------------
+// ---- Notices of the last save (the list of customers' Điểm ra is no longer shown on this tab) ----------------------------
 
-class _ScoreList extends StatelessWidget {
-  const _ScoreList();
+class _SyncNotices extends StatelessWidget {
+  const _SyncNotices();
   @override
   Widget build(BuildContext context) {
     final c = context.watch<ResultsController>();
-    final t = Theme.of(context).textTheme;
-    final names = <String>{for (final x in c.customers) x.name, for (final e in c.entries) if (e.entryDate == c.date) (e.customerName.isEmpty ? noCustomerName : e.customerName)}.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    final filter = names.contains(c.customerFilter) ? c.customerFilter : '';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Điểm ra ngày ${viDate(c.date)}', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text('Tự tính theo kết quả đã lưu và công thức của từng khách. Không nhập tay.', style: t.bodySmall?.copyWith(color: context.mutedColor)),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            key: ValueKey('cf$filter${names.length}'),
-            initialValue: filter,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Khách hàng', isDense: true),
-            items: [
-              const DropdownMenuItem(value: '', child: Text('Tất cả khách hàng')),
-              for (final n in names) DropdownMenuItem(value: n, child: Text(n, overflow: TextOverflow.ellipsis)),
-            ],
-            onChanged: (v) => c.setCustomerFilter(v ?? ''),
-          ),
-          if (c.syncMsg != null) _Msg(c.syncMsg!, error: false, action: c.undoItems == null ? null : (c.undoing ? 'Đang hoàn tác...' : 'Hoàn tác'), onAction: c.undoing ? null : c.undoScores),
-          if (c.syncError != null) _Msg(c.syncError!, error: true),
-          if (DataSource.fromCache) const _Msg('Đang offline: đang dùng số liệu đã lưu trên máy. Lưu kết quả và lưu điểm ra cần có mạng.', error: false),
-          const SizedBox(height: 10),
-          if (c.entriesLoading)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Center(child: CircularProgressIndicator()))
-          else if (c.entriesError != null)
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _Msg(c.entriesError!, error: true),
-              AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: c.loadEntryData),
-            ])
-          else if (c.groups.isEmpty)
-            Text('Không có số liệu nào của ngày này.', style: TextStyle(color: context.mutedColor))
-          else
-            for (final g in c.groups) _CustomerGroup(g.name, g.entries),
-        ]),
-      ),
-    );
-  }
-}
-
-class _CustomerGroup extends StatelessWidget {
-  const _CustomerGroup(this.name, this.entries);
-  final String name;
-  final List<Entry> entries;
-  @override
-  Widget build(BuildContext context) {
-    final c = context.watch<ResultsController>();
-    final st = context.watch<LotteryStations>();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outlineVariant), borderRadius: BorderRadius.circular(12)),
+    final offline = DataSource.fromCache;
+    if (c.syncMsg == null && c.syncError == null && !offline) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-          child: Row(children: [
-            Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
-            Text('${entries.length} số', style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
-          ]),
-        ),
-        for (final e in entries)
-          Builder(builder: (context) {
-            final v = c.scoreOf(e);
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant))),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                  flex: 5,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(e.value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    Text(
-                      [
-                        if (e.betType != null && e.betType!.isNotEmpty) e.betType == 'de' ? 'Đề' : (e.betType == 'lo' ? 'Lô' : e.betType!),
-                        if (e.station != null && e.station!.isNotEmpty && e.station != 'mb') st.stationLabel(e.station),
-                        if ((e.score ?? '').isNotEmpty) 'Điểm vào: ${formatNumber(toNumber(e.score))}',
-                      ].join(' · '),
-                      style: TextStyle(color: context.mutedColor, fontSize: 12),
-                    ),
-                  ]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: v == null
-                      ? Text('Chưa có kết quả xổ số', textAlign: TextAlign.end, style: TextStyle(color: context.mutedColor, fontSize: 12.5))
-                      : Text.rich(
-                          textAlign: TextAlign.end,
-                          TextSpan(children: [
-                            TextSpan(text: 'Điểm ra: ', style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
-                            TextSpan(text: formatNumber(v), style: TextStyle(fontWeight: FontWeight.w800, color: v > 0 ? context.okColor : null)),
-                          ]),
-                        ),
-                ),
-              ]),
-            );
-          }),
+        if (c.syncMsg != null) _Msg(c.syncMsg!, error: false, action: c.undoItems == null ? null : (c.undoing ? 'Đang hoàn tác...' : 'Hoàn tác'), onAction: c.undoing ? null : c.undoScores),
+        if (c.syncError != null) _Msg(c.syncError!, error: true),
+        if (offline) const _Msg('Đang offline: lưu kết quả cần có mạng.', error: false),
       ]),
     );
   }

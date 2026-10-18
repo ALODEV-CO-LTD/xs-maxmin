@@ -8,9 +8,9 @@ import '../../core/bet_types.dart';
 import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/mask_store.dart';
-import '../../core/scoring_config.dart';
 import '../../core/theme.dart';
 import '../calc/calc_screen.dart';
+import '../calc/calc_sync.dart';
 import '../../core/widgets/masked_text.dart';
 import 'date_field.dart';
 import 'delete_data_dialog.dart';
@@ -20,6 +20,7 @@ import 'scoring_controller.dart';
 import 'scoring_days.dart';
 import 'scoring_logic.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 String _money(num n) => '${formatNumber(n.round())} đ';
 String _signed(num n) => '${n > 0 ? '+' : ''}${_money(n)}';
@@ -42,6 +43,22 @@ class _ScoringScreenState extends State<ScoringScreen> {
     super.initState();
     _c = ScoringController(context.read<ApiClient>(), context.read<LotteryStations>());
     _loaded = _c.load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sync = CalcSync.maybeOf(context)?..addListener(_onSync);
+      final s = _sync;
+      if (s != null && s.customer.isNotEmpty) _loaded = _loaded!.then((_) => mounted ? _c.syncFrom(customer: s.customer, date: s.date) : null);
+    });
+  }
+
+  CalcSync? _sync;
+  int _seenActivation = 0;
+
+  /// Opened as a tab (or the customer / day of Nhập số changed while it is the visible one): re-read and follow Nhập số.
+  void _onSync() {
+    final s = _sync;
+    if (s == null || !mounted || s.activeTab != 'scoring' || s.activations == _seenActivation) return;
+    _seenActivation = s.activations;
+    _loaded = _c.syncFrom(customer: s.customer, date: s.date);
   }
 
   // A link such as /calc?tab=scoring&customer=An&date=...&added=3 (after the numbers of a chat were saved in Nhập số):
@@ -64,6 +81,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
 
   @override
   void dispose() {
+    _sync?.removeListener(_onSync);
     _c.dispose();
     super.dispose();
   }
@@ -126,7 +144,7 @@ class _Body extends StatelessWidget {
               icon: Icons.inbox_outlined,
               text: c.onlyMissing
                   ? 'Không có ngày nào thiếu kết quả xổ số trong khoảng này. Bỏ chọn ô lọc để xem toàn bộ lịch sử.'
-                  : (c.hasEntriesForCustomer ? 'Không có số liệu nào trong khoảng ngày này. Chọn "Tất cả" để xem lịch sử.' : 'Khách hàng này chưa có số liệu nào.'),
+                  : (c.hasEntriesForCustomer ? 'Chưa có số liệu của khách này trong ngày đã chọn. Bấm X ở ô Ngày để xem mọi ngày.' : 'Khách hàng này chưa có số liệu nào.'),
             )
           else ...[
             for (final d in c.visibleDays) _DayCard(d),
@@ -183,16 +201,14 @@ class _Toolbar extends StatelessWidget {
     final api = context.read<ApiClient>();
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const MaskBar(),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            AppButton(label: 'Xóa số liệu', variant: AppButtonVariant.secondary, icon: Icons.delete_outline, onPressed: () async {
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            AppButton(label: 'Xóa số liệu', variant: AppButtonVariant.secondary, size: AppButtonSize.small, onPressed: () async {
                 final n = await showDeleteDataDialog(context, api: api, customerName: c.selectedCustomer, dateFrom: c.dateFrom, dateTo: c.dateTo);
                 if (n != null) await c.afterDeleted(n);
               }),
-            AppButton(label: 'Đặt lịch xóa', variant: AppButtonVariant.secondary, icon: Icons.event_repeat, onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DeletionSchedulesPage(api: api, customerName: c.selectedCustomer)))),
+            AppButton(label: 'Đặt lịch xóa', variant: AppButtonVariant.secondary, size: AppButtonSize.small, onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DeletionSchedulesPage(api: api, customerName: c.selectedCustomer)))),
           ]),
         ]),
       ),
@@ -213,7 +229,8 @@ class _Filters extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          DropdownButtonFormField<String>(
+          // Only the customer and the day (they follow Nhập số); ⟳ = read everything again and recalculate.
+          AppDropdown<String>(
             key: ValueKey('cust${names.length}'),
             initialValue: customer,
             isExpanded: true,
@@ -221,52 +238,14 @@ class _Filters extends StatelessWidget {
             items: [const DropdownMenuItem(value: '', child: Text('-- Chọn khách hàng --')), for (final n in names) DropdownMenuItem(value: n, child: Text(n, overflow: TextOverflow.ellipsis))],
             onChanged: (v) => c.selectCustomer(v ?? ''),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                initialValue: c.regionFilter,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Xổ số'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Tất cả các miền')),
-                  DropdownMenuItem(value: 'mb', child: Text('Miền Bắc')),
-                  DropdownMenuItem(value: 'mt', child: Text('Miền Trung')),
-                  DropdownMenuItem(value: 'mn', child: Text('Miền Nam')),
-                ],
-                onChanged: (v) => c.setRegionFilter(v ?? 'all'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('preset${c.preset}'),
-                initialValue: c.preset,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Thời gian'),
-                items: [for (final p in timePresets) DropdownMenuItem(value: p.key, child: Text(p.label))],
-                onChanged: (v) => c.setPreset(v ?? 'all'),
-              ),
-            ),
+            Expanded(child: DateField(label: 'Ngày', value: c.dateTo, clearable: true, onChanged: c.setDay)),
+            const SizedBox(width: 6),
+            c.autoCalcRunning > 0
+                ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                : AppButton(label: 'Tính lại', variant: AppButtonVariant.secondary, size: AppButtonSize.small, icon: Icons.refresh, onPressed: c.selectedCustomer.isEmpty ? null : () => c.syncFrom()),
           ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: DateField(label: 'Từ ngày', value: c.dateFrom, clearable: true, onChanged: c.setFrom)),
-            const SizedBox(width: 10),
-            Expanded(child: DateField(label: 'Đến ngày', value: c.dateTo, clearable: true, onChanged: c.setTo)),
-          ]),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            dense: true,
-            value: c.onlyMissing,
-            onChanged: (v) => c.setOnlyMissing(v ?? false),
-            title: const Text('Chỉ hiện số liệu chưa có kết quả xổ số', style: TextStyle(fontSize: 13.5)),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: AppButton(label: 'Tính lại', variant: AppButtonVariant.secondary, icon: Icons.refresh, loading: c.autoCalcRunning > 0, onPressed: c.autoCalcRunning > 0 || c.selectedCustomer.isEmpty ? null : c.recalc),
-          ),
         ]),
       ),
     );
@@ -312,39 +291,6 @@ class _SummaryCard extends StatelessWidget {
               Text(' (chưa tính).', style: t.bodySmall?.copyWith(color: context.mutedColor)),
             ],
           ]),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: EdgeInsets.zero,
-              title: const Text('Chi tiết tiền gửi theo loại đánh', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              children: [
-                if (s.byType.isEmpty)
-                  const SizedBox.shrink()
-                else
-                  for (final tt in s.byType)
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('${betTypeLabel(tt.key)} · ${formatNumber(tt.lots)} lô'),
-                      subtitle: MaskedText(tt.unit == 'point' ? '${formatNumber(tt.amount)} điểm × ${formatNumber(tt.pointValue)} đ' : 'tính theo tiền'),
-                      trailing: MaskedText(_money(tt.money), style: const TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-              ],
-            ),
-          ),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: EdgeInsets.zero,
-              title: Text('Các lô trúng (${s.wonLots})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              children: [
-                if (s.won.isEmpty) Align(alignment: Alignment.centerLeft, child: Text('Chưa có lô nào trúng.', style: TextStyle(color: context.mutedColor))),
-                for (final w in s.won.take(200)) _WonRow(w),
-              ],
-            ),
-          ),
         ]),
       ),
     );
@@ -379,30 +325,6 @@ class _Tile extends StatelessWidget {
     );
   }
 }
-
-class _WonRow extends StatelessWidget {
-  const _WonRow(this.w);
-  final WonItem w;
-  @override
-  Widget build(BuildContext context) {
-    final st = context.read<LotteryStations>();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        SizedBox(width: 52, child: MaskedText(w.number, style: const TextStyle(fontWeight: FontWeight.w800))),
-        Expanded(
-          child: Text(
-            '${betTypeLabel(w.type)} · ${viDate(w.date)}${w.station != 'mb' ? ' · ${st.stationName(w.station)}' : ''}${w.hits > 1 ? ' · trúng ${w.hits} lần' : ''}',
-            style: TextStyle(color: context.mutedColor, fontSize: 12.5),
-          ),
-        ),
-        MaskedText(_money(w.money), style: const TextStyle(fontWeight: FontWeight.w700)),
-      ]),
-    );
-  }
-}
-
-// ---- day cards --------------------------------------------------------------------------------------------------
 
 class _DayCard extends StatelessWidget {
   const _DayCard(this.day);
@@ -501,12 +423,6 @@ class _EntryRow extends StatelessWidget {
     final st = context.read<LotteryStations>();
     final masked = context.select<MaskStore, bool>((m) => m.masked);
     final status = c.status[e.id];
-    final cfg = c.configFor(e.betType, e.station);
-    final rate = cfg['rate'];
-    final digits = (cfg['digits'] as num?) ?? 2;
-    // "Giá tiền → giá trúng" of the row the entry is scored with (older rows: "× tỉ lệ").
-    final rateText = hasMoneyModel(cfg) ? '${formatNumber(numOf(cfg['price']))} → ${formatNumber(numOf(cfg['payout']))} đ/điểm' : '× ${rate is num ? numToString(rate) : '?'}';
-    final fixedKind = isTableKind(cfg['kind']);
     final key = (e.betType == null || e.betType!.isEmpty) ? 'de' : e.betType!;
     Widget out;
     switch (status?.state) {
@@ -527,9 +443,9 @@ class _EntryRow extends StatelessWidget {
       decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6)))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Wrap(spacing: 6, runSpacing: 4, children: [
-          _MiniChip('${betTypeLabel(key)} · $rateText'),
-          if (!fixedKind) _MiniChip('${digits.toInt()} số cuối'),
-          if (e.station != null && e.station!.isNotEmpty && e.station != 'mb') _MiniChip(st.stationLabel(e.station)),
+          // Only: kind of bet, the region / station it is played on, won or not (the figures are in the cells below).
+          _MiniChip(betTypeLabel(key)),
+          _MiniChip(_areaName(st, e.station)),
           if (won) _MiniChip((status!.value ?? 0) > 0 ? 'Trúng' : 'Không trúng', color: (status.value ?? 0) > 0 ? context.okColor : null),
         ]),
         const SizedBox(height: 6),
@@ -541,6 +457,12 @@ class _EntryRow extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// "Miền Bắc" / "Miền Trung" / the name of one station, without the "(tất cả đài trong ngày)" note.
+String _areaName(LotteryStations st, String? station) {
+  if (station == null || station.isEmpty || station == 'mb') return 'Miền Bắc';
+  return st.isRegionCode(station) ? st.regionOf(station).name : st.stationName(station);
 }
 
 class _Cell extends StatelessWidget {

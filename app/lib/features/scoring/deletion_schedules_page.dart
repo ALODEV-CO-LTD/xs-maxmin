@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import 'date_field.dart';
 import 'entry_model.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// "Đặt lịch xóa": schedule the automatic removal of saved entries (one customer or everyone, an optional date range, or
 /// repeating while keeping the newest N days) and see / cancel the pending schedules.
@@ -259,7 +260,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text('Lịch mới', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
+                  AppDropdown<String>(
                     key: ValueKey('c${names.length}$_customer'),
                     initialValue: _customer,
                     isExpanded: true,
@@ -268,7 +269,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                     onChanged: (v) => setState(() => _customer = v ?? ''),
                   ),
                   const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
+                  AppDropdown<String>(
                     initialValue: _repeat,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Lặp lại'),
@@ -294,7 +295,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                       Expanded(child: TextField(controller: _customN, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Mỗi (số)'), onChanged: (_) => setState(_defaultRunAt))),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
+                        child: AppDropdown<String>(
                           initialValue: _customUnit,
                           decoration: const InputDecoration(labelText: 'Đơn vị'),
                           items: [for (final e in _unitText.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],

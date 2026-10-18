@@ -17,8 +17,10 @@ import 'edit_entry_sheet.dart';
 import 'entries_controller.dart';
 import 'entry_form.dart';
 import 'entry_model.dart';
+import '../calc/calc_sync.dart';
 import 'offline_store.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// Nhập số: pick a customer, add numbers (by hand, from a pasted message or from a photo), review the list.
 class EntriesScreen extends StatelessWidget {
@@ -51,7 +53,21 @@ class _EntriesBodyState extends State<_EntriesBody> {
   void initState() {
     super.initState();
     ChatPrefillHub.instance.addListener(_takePrefill);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _takePrefill());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _takePrefill();
+      if (!mounted) return;
+      _ctrl = context.read<EntriesController>()..addListener(_shareSelection);
+      _shareSelection();
+    });
+  }
+
+  EntriesController? _ctrl;
+
+  /// Tính điểm opens on the customer and day chosen here.
+  void _shareSelection() {
+    final c = _ctrl;
+    if (c == null || !mounted) return;
+    CalcSync.maybeOf(context)?.select(customer: c.selectedName, date: c.entryDate);
   }
 
   /// "Dùng cho Nhập số" from the chat: hand the text, customer, date and đài to the form.
@@ -64,6 +80,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
   @override
   void dispose() {
     ChatPrefillHub.instance.removeListener(_takePrefill);
+    _ctrl?.removeListener(_shareSelection);
     _search.dispose();
     super.dispose();
   }
@@ -92,26 +109,17 @@ class _EntriesBodyState extends State<_EntriesBody> {
 
   Future<void> _pickDate(EntriesController c) async {
     final now = DateTime.now();
-    final cur = DateTime.tryParse(c.filter.date) ?? now;
+    final cur = DateTime.tryParse(c.listDate) ?? now;
     final d = await showDatePicker(context: context, initialDate: cur, firstDate: DateTime(now.year - 5), lastDate: DateTime(now.year + 2));
     if (d != null) {
       c.filter.date = isoOf(d);
+      c.filter.anyDate = false;
       c.touchFilter();
     }
   }
 
   Future<void> _copy(EntriesController c, List<Entry> shown) async {
     if (shown.isEmpty) return;
-    final label = [c.filter.all ? 'tất cả khách' : c.selectedName, c.filter.date].where((s) => s.isNotEmpty).join(', ');
-    if (c.confirmCopy) {
-      final ok = await confirmDialog(
-        context,
-        title: 'Sao chép số liệu',
-        message: 'Sao chép ${shown.length} số liệu${label.isEmpty ? '' : ' ($label)'} vào bộ nhớ tạm? Dữ liệu này nhạy cảm, chỉ dán ở nơi bạn tin tưởng.',
-        confirmText: 'Sao chép',
-      );
-      if (!ok) return;
-    }
     try {
       await Clipboard.setData(ClipboardData(text: entriesToText(shown, withCustomer: c.filter.all)));
       setState(() => _copyMessage = 'Đã sao chép ${shown.length} số liệu');
@@ -184,7 +192,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
             else if (shown.isEmpty)
               SliverPadding(
                 padding: const EdgeInsets.all(24),
-                sliver: SliverToBoxAdapter(child: Center(child: Text(c.filter.active ? 'Không có số liệu nào khớp bộ lọc.' : 'Khách hàng này chưa có số liệu nào.', style: TextStyle(color: context.mutedColor)))),
+                sliver: SliverToBoxAdapter(child: Center(child: Text(c.followsForm && c.entries.any((e) => c.filter.all || e.customerName == c.selectedName) ? 'Chưa có số liệu ngày ${viDate(c.listDate)}${c.filter.all ? '' : ' (đài này)'}. Bấm biểu tượng ∞ để xem mọi ngày.' : c.filter.active ? 'Không có số liệu nào khớp bộ lọc.' : 'Khách hàng này chưa có số liệu nào.', style: TextStyle(color: context.mutedColor)))),
               )
             else
               SliverPadding(
@@ -219,8 +227,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
 
   Widget _header(BuildContext context, EntriesController c, bool masked, List<Entry> shown) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Align(alignment: Alignment.centerLeft, child: MaskBar()),
-      const SizedBox(height: 10),
       if (c.packageActive == false) const InfoBox('Gói của bạn đã hết hạn. Vui lòng gia hạn ở mục Gói dịch vụ để tiếp tục nhập số liệu.', kind: InfoKind.warning),
       if (c.fromCache) const InfoBox('Đang offline: hiển thị số liệu đã lưu trên máy. Số liệu bạn nhập sẽ được gửi lên khi có mạng.', kind: InfoKind.warning),
       if (c.pending > 0)
@@ -287,15 +293,17 @@ class _EntriesBodyState extends State<_EntriesBody> {
           c.touchFilter();
         },
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6),
       Row(children: [
         Expanded(
-          child: AppButton(label: f.date.isEmpty ? 'Mọi ngày' : viDate(f.date), variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(c)),
+          child: AppButton(label: c.listDate.isEmpty ? 'Mọi ngày' : viDate(c.listDate), variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(c)),
         ),
-        if (f.date.isNotEmpty) IconButton(tooltip: 'Bỏ lọc ngày', icon: const Icon(Icons.close, size: 18), onPressed: () { f.date = ''; c.touchFilter(); }),
+        // Following the form: one tap to see every day; otherwise one tap to go back to the day being entered.
+        if (c.followsForm) IconButton(tooltip: 'Xem mọi ngày', icon: const Icon(Icons.all_inclusive, size: 18), onPressed: () { f.anyDate = true; f.date = ''; c.touchFilter(); })
+        else IconButton(tooltip: 'Theo ngày đang nhập', icon: const Icon(Icons.close, size: 18), onPressed: () { f.anyDate = false; f.date = ''; c.touchFilter(); }),
         const SizedBox(width: 8),
         Expanded(
-          child: DropdownButtonFormField<String>(
+          child: AppDropdown<String>(
             initialValue: f.type.isEmpty || !types.contains(f.type) ? '' : f.type,
             isExpanded: true,
             decoration: const InputDecoration(isDense: true),
@@ -308,39 +316,33 @@ class _EntriesBodyState extends State<_EntriesBody> {
         ),
       ]),
       Row(children: [
-        Expanded(
-          child: CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('Tất cả khách hàng'),
-            value: f.all,
-            onChanged: (v) {
-              f.all = v ?? false;
-              c.touchFilter();
-            },
-          ),
-        ),
-        if (f.active) AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, onPressed: () { _search.clear(); f.clear(); c.touchFilter(); }),
+        _check('Tất cả khách hàng', f.all, (v) {
+          f.all = v;
+          c.touchFilter();
+        }),
+        if (f.active) AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, size: AppButtonSize.small, onPressed: () { _search.clear(); f.clear(); c.touchFilter(); }),
       ]),
     ]);
   }
 
+  /// A small checkbox with its label; two of them share one row.
+  Widget _check(String label, bool value, void Function(bool) onChanged) => Expanded(
+        child: InkWell(
+          onTap: () => onChanged(!value),
+          child: Row(children: [
+            Checkbox(value: value, visualDensity: VisualDensity.compact, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => onChanged(v ?? false)),
+            Flexible(child: Text(label, style: const TextStyle(fontSize: 13.5))),
+          ]),
+        ),
+      );
+
   Widget _copyBar(BuildContext context, EntriesController c, List<Entry> shown, bool masked) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        AppButton(label: 'Sao chép ${masked ? '•••' : shown.length} số liệu', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: shown.isEmpty || masked ? null : () => _copy(c, shown)),
-        AppButton(label: _selecting ? 'Thôi chọn' : 'Chọn để xoá', variant: AppButtonVariant.secondary, icon: _selecting ? Icons.close : Icons.checklist, onPressed: shown.isEmpty ? null : () => setState(() { _selecting = !_selecting; _selected.clear(); _bulkError = ''; })),
+        AppButton(label: 'Sao chép ${masked ? '•••' : shown.length} số liệu', variant: AppButtonVariant.secondary, size: AppButtonSize.small, icon: Icons.copy, onPressed: shown.isEmpty || masked ? null : () => _copy(c, shown)),
+        AppButton(label: _selecting ? 'Thôi chọn' : 'Chọn để xoá', variant: AppButtonVariant.secondary, size: AppButtonSize.small, icon: _selecting ? Icons.close : Icons.checklist, onPressed: shown.isEmpty ? null : () => setState(() { _selecting = !_selecting; _selected.clear(); _bulkError = ''; })),
       ]),
       if (masked) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Đang ẩn số liệu: bấm Hiện số liệu để sao chép.', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
-      CheckboxListTile(
-        contentPadding: EdgeInsets.zero,
-        dense: true,
-        controlAffinity: ListTileControlAffinity.leading,
-        title: const Text('Hỏi xác nhận trước khi sao chép'),
-        value: c.confirmCopy,
-        onChanged: (v) => c.setConfirmCopy(v ?? false),
-      ),
       if (_copyMessage.isNotEmpty) Text(_copyMessage, style: const TextStyle(fontWeight: FontWeight.w700), semanticsLabel: _copyMessage),
       if (_selecting)
         Container(
@@ -470,44 +472,56 @@ class _EntryTile extends StatelessWidget {
         ? null
         : (stations.isRegionCode(station) ? stations.regionOf(station).name : stations.stationName(station));
     final muted = TextStyle(fontSize: 12.5, color: context.mutedColor);
+    const num = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: selecting ? onToggle : null,
         onLongPress: onToggle,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+          padding: const EdgeInsets.fromLTRB(12, 4, 2, 4),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (selecting) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(selected ? Icons.check_box : Icons.check_box_outline_blank, color: selected ? Theme.of(context).colorScheme.primary : null)),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  if (withCustomer) Text(e.customerName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    Text(viDate(e.entryDate), style: muted),
-                    _Tag(betTypeLabel(e.type)),
-                    if (stationText != null) _Tag(stationText, tooltip: stations.stationLabel(station)),
-                    if (e.pending) _Tag('Chờ đồng bộ', color: Brand.warning),
-                  ]),
-                  const SizedBox(height: 4),
-                  Wrap(spacing: 14, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    MaskedText(e.value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text('Vào ', style: muted),
-                      MaskedText(fmtPoints(e.score), style: TextStyle(fontWeight: FontWeight.w600, color: context.okColor)),
-                    ]),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text('Ra ', style: muted),
-                      MaskedText(fmtPoints(e.result), style: TextStyle(fontWeight: FontWeight.w600, color: context.badColor)),
-                    ]),
-                  ]),
+                  if (withCustomer) Text(e.customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  // One line, one number size: kind, number, Vào, Ra; the date and station (least important) take what is left and are cut with "…".
+                  LayoutBuilder(builder: (context, box) => Row(children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: box.maxWidth * 0.85),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown, // only when the figures alone take more than 85% of the line
+                        alignment: Alignment.centerLeft,
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          _Tag(betTypeLabel(e.type)),
+                          const SizedBox(width: 8),
+                          MaskedText(e.value, style: num.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 10),
+                          Text('Vào ', style: muted),
+                          MaskedText(fmtPoints(e.score), style: num.copyWith(color: context.okColor)),
+                          const SizedBox(width: 8),
+                          Text('Ra ', style: muted),
+                          MaskedText(fmtPoints(e.result), style: num.copyWith(color: context.badColor)),
+                          if (e.pending) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.sync, size: 15, color: Brand.warning)),
+                        ]),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Tooltip(
+                        message: stationText == null ? '' : stations.stationLabel(station),
+                        child: Text([_shortDate(e.entryDate), ?stationText].join(' · '), style: muted, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end),
+                      ),
+                    ),
+                  ])),
                   if ((e.note ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: MaskedText(e.note!, style: muted)),
                 ]),
               ),
               if (!selecting) ...[
-                IconButton(tooltip: 'Sửa', visualDensity: VisualDensity.compact, icon: const Icon(Icons.edit_outlined, size: 20), onPressed: onEdit),
-                IconButton(tooltip: 'Xoá', visualDensity: VisualDensity.compact, icon: Icon(Icons.delete_outline, size: 20, color: context.badColor), onPressed: onDelete),
+                IconButton(tooltip: 'Sửa', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 34, height: 34), icon: const Icon(Icons.edit_outlined, size: 19), onPressed: onEdit),
+                IconButton(tooltip: 'Xoá', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 34, height: 34), icon: Icon(Icons.delete_outline, size: 19, color: context.badColor), onPressed: onDelete),
               ],
             ]),
             if (error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6, right: 8), child: Text(error, style: TextStyle(fontSize: 12.5, color: context.badColor))),
@@ -518,19 +532,22 @@ class _EntryTile extends StatelessWidget {
   }
 }
 
+/// dd/MM/yy of a yyyy-MM-dd date (short enough for the one-line entry row).
+String _shortDate(String d) {
+  final p = d.split('-');
+  return p.length == 3 ? '${p[2]}/${p[1]}/${p[0].substring(p[0].length > 2 ? p[0].length - 2 : 0)}' : d;
+}
+
 class _Tag extends StatelessWidget {
-  const _Tag(this.text, {this.color, this.tooltip});
+  const _Tag(this.text);
   final String text;
-  final Color? color;
-  final String? tooltip;
   @override
   Widget build(BuildContext context) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
-    final w = Container(
+    final c = Theme.of(context).colorScheme.primary;
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
       decoration: BoxDecoration(color: c.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(20)),
-      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color == null ? null : c)),
+      child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
     );
-    return tooltip == null ? w : Tooltip(message: tooltip!, child: w);
   }
 }

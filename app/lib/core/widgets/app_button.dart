@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 /// - [AppButtonVariant.secondary] green outline
 /// - [AppButtonVariant.ghost]    Huỷ / Đóng / Quay lại (text only)
 /// - [AppButtonVariant.danger]   xoá / hành động không hoàn tác được
-/// [loading] shows a spinner and disables the button without changing its width. Minimum touch target 44 dp
-/// (36 dp for [AppButtonSize.small], used inside lists and table-like rows).
+/// [loading] shows a spinner and disables the button without changing its width. Compact height 34 dp
+/// (28 dp for [AppButtonSize.small], used inside lists and table-like rows).
 enum AppButtonVariant { primary, secondary, ghost, danger }
 
 enum AppButtonSize { medium, small }
@@ -51,8 +51,10 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final h = size == AppButtonSize.small ? 36.0 : 44.0;
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+    final h = size == AppButtonSize.small ? 28.0 : 34.0;
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(8));
+    const pad = EdgeInsets.symmetric(horizontal: 12);
+    const text = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
     final minSize = Size(_iconOnly ? h : 0, h);
     final spinnerColor = switch (variant) {
       AppButtonVariant.primary => scheme.onPrimary,
@@ -62,25 +64,25 @@ class AppButton extends StatelessWidget {
     final Widget child = loading
         ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: spinnerColor))
         : _iconOnly
-            ? Icon(icon, size: 20)
+            ? Icon(icon, size: 18)
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
+                  if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
                   Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
                 ],
               );
     final cb = _disabled ? null : onPressed;
     final Widget button = switch (variant) {
-      AppButtonVariant.primary => FilledButton(style: FilledButton.styleFrom(minimumSize: minSize, shape: shape), onPressed: cb, child: child),
+      AppButtonVariant.primary => FilledButton(style: FilledButton.styleFrom(minimumSize: minSize, shape: shape, padding: pad, textStyle: text, tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.standard), onPressed: cb, child: child),
       AppButtonVariant.danger => FilledButton(
-          style: FilledButton.styleFrom(minimumSize: minSize, shape: shape, backgroundColor: scheme.error, foregroundColor: scheme.onError),
+          style: FilledButton.styleFrom(minimumSize: minSize, shape: shape, padding: pad, textStyle: text, tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.standard, backgroundColor: scheme.error, foregroundColor: scheme.onError),
           onPressed: cb,
           child: child,
         ),
-      AppButtonVariant.secondary => OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: minSize, shape: shape), onPressed: cb, child: child),
-      AppButtonVariant.ghost => TextButton(style: TextButton.styleFrom(minimumSize: minSize, shape: shape), onPressed: cb, child: child),
+      AppButtonVariant.secondary => OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: minSize, shape: shape, padding: pad, textStyle: text, tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.standard), onPressed: cb, child: child),
+      AppButtonVariant.ghost => TextButton(style: TextButton.styleFrom(minimumSize: minSize, shape: shape, padding: pad, textStyle: text, tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.standard), onPressed: cb, child: child),
     };
     final sized = block ? SizedBox(width: double.infinity, child: button) : button;
     return Semantics(

@@ -4,6 +4,7 @@ import '../../core/scoring_config.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// What the user typed in "Kiểu đánh khác".
 class NewBetType {
@@ -77,7 +78,7 @@ class _AddBetTypeDialogState extends State<_AddBetTypeDialog> {
       title: 'Thêm vào "${widget.groupLabel}" (${widget.regionName})',
       body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.restorable.isNotEmpty) ...[
-          DropdownButtonFormField<String>(
+          AppDropdown<String>(
             initialValue: _pick,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Chọn'),
@@ -106,7 +107,7 @@ class _AddBetTypeDialogState extends State<_AddBetTypeDialog> {
         const SizedBox(height: 10),
         TextField(controller: _symbol, maxLength: 12, decoration: const InputDecoration(labelText: 'Ký hiệu', hintText: 'Ví dụ: tx', counterText: '')),
         const SizedBox(height: 10),
-        DropdownButtonFormField<bool>(
+        AppDropdown<bool>(
           initialValue: _allTiers,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'So với'),
@@ -114,7 +115,7 @@ class _AddBetTypeDialogState extends State<_AddBetTypeDialog> {
           onChanged: (v) => setState(() => _allTiers = v ?? false),
         ),
         const SizedBox(height: 10),
-        DropdownButtonFormField<int>(
+        AppDropdown<int>(
           initialValue: _digits,
           decoration: const InputDecoration(labelText: 'Số cuối'),
           items: const [DropdownMenuItem(value: 2, child: Text('2 số')), DropdownMenuItem(value: 3, child: Text('3 số')), DropdownMenuItem(value: 4, child: Text('4 số'))],

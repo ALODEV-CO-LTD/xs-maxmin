@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' show Color;
 
 /// Message status as in e2ee/chat.js: sending -> sent (relayed) -> delivered (friend's ack) | failed.
 class MsgStatus {
@@ -41,6 +42,67 @@ class ChatAttachment {
   bool get isImage => type.startsWith('image/') && type != 'image/svg+xml';
 }
 
+/// A group conversation has the id `g-<random>` (the same key every per-conversation thing uses: messages, unread, pins, ...).
+const groupIdPrefix = 'g-';
+bool isGroupId(String id) => id.startsWith(groupIdPrefix);
+
+/// A member of a group: the account id and the name the group was created with.
+class GroupMember {
+  const GroupMember(this.id, this.name);
+  final String id;
+  final String name;
+}
+
+/// A group chat. It lives only on the devices of its members (the server stores nothing): the creator sends the first message with
+/// the group's name and members, and every group message carries them again, so a device that missed the first one still learns the group.
+class ChatGroup {
+  const ChatGroup({required this.id, required this.name, required this.members, required this.creatorId, required this.updatedAt});
+  final String id; // g-<random>
+  final String name;
+  final List<GroupMember> members; // everyone, the creator included
+  final String creatorId;
+  final int updatedAt;
+
+  String get convId => id;
+
+  Map<String, dynamic> toHeader() => {
+        'i': id,
+        'n': name,
+        'c': creatorId,
+        'u': updatedAt,
+        'm': [for (final m in members) [m.id, m.name]],
+      };
+
+  String toJson() => jsonEncode(toHeader());
+
+  static ChatGroup? fromHeader(Object? h) {
+    if (h is! Map) return null;
+    final id = h['i'];
+    final name = h['n'];
+    final c = h['c'];
+    final m = h['m'];
+    if (id is! String || !isGroupId(id) || id.length > 64 || name is! String || c is! String || m is! List) return null;
+    final members = <GroupMember>[];
+    for (final x in m) {
+      if (x is List && x.length >= 2 && x[0] is String && x[1] is String) members.add(GroupMember(x[0] as String, (x[1] as String).length > 80 ? (x[1] as String).substring(0, 80) : x[1] as String));
+    }
+    if (members.length < 2 || members.length > 50) return null;
+    final u = h['u'];
+    return ChatGroup(id: id, name: name.length > 60 ? name.substring(0, 60) : name, members: members, creatorId: c, updatedAt: u is num ? u.toInt() : 0);
+  }
+
+  static ChatGroup? tryParse(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return fromHeader(jsonDecode(raw));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ChatGroup copyWith({String? name, List<GroupMember>? members, int? updatedAt}) => ChatGroup(id: id, name: name ?? this.name, members: members ?? this.members, creatorId: creatorId, updatedAt: updatedAt ?? this.updatedAt);
+}
+
 class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -52,6 +114,7 @@ class ChatMessage {
     this.att,
     this.sys,
     this.reason,
+    this.fromId,
   });
   final String id;
   final String peerId;
@@ -63,6 +126,9 @@ class ChatMessage {
   final String? sys;
   final String? reason;
 
+  /// Who wrote it (account id); set on group messages, where [mine] alone does not say who spoke.
+  final String? fromId;
+
   ChatMessage copyWith({String? status, String? reason, bool clearReason = false}) => ChatMessage(
         id: id,
         peerId: peerId,
@@ -73,6 +139,7 @@ class ChatMessage {
         att: att,
         sys: sys,
         reason: clearReason ? null : (reason ?? this.reason),
+        fromId: fromId,
       );
 
   /// Text for the friend-list preview (chat.js `previews`).
@@ -242,4 +309,28 @@ String anonymousName(String type, [int Function()? byte]) {
   final b = byte ?? (() => DateTime.now().microsecondsSinceEpoch & 0xff);
   final hex = List.generate(5, (_) => b().toRadixString(16).padLeft(2, '0')).join();
   return 'anh-$hex.${imageExt(type)}';
+}
+
+/// Time shown at the right of a conversation row: HH:mm today, "Hôm qua", dd/MM this year, dd/MM/yy before. Empty when there is no message.
+String chatListTime(int ms, DateTime now) {
+  if (ms <= 0) return '';
+  final t = DateTime.fromMillisecondsSinceEpoch(ms);
+  String two(int n) => n.toString().padLeft(2, '0');
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(t.year, t.month, t.day);
+  final diff = today.difference(day).inDays;
+  if (diff == 0) return '${two(t.hour)}:${two(t.minute)}';
+  if (diff == 1) return 'Hôm qua';
+  if (t.year == now.year) return '${two(t.day)}/${two(t.month)}';
+  return '${two(t.day)}/${two(t.month)}/${two(t.year % 100)}';
+}
+
+/// Avatar colour from the name (stable, a few calm colours, white letter on top).
+Color avatarColor(String name) {
+  const palette = [Color(0xFF4CAF7A), Color(0xFF5B8DEF), Color(0xFFE0885B), Color(0xFFB06AB3), Color(0xFF3FA7B5), Color(0xFFC9973A), Color(0xFF7A8FA6)];
+  var h = 0;
+  for (final u in name.trim().toLowerCase().codeUnits) {
+    h = (h * 31 + u) & 0x7fffffff;
+  }
+  return palette[h % palette.length];
 }

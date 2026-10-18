@@ -54,9 +54,12 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
       initialLocation: homeRoute,
       refreshListenable: auth,
       redirect: (context, state) {
-        if (!auth.ready) return null;
         final loc = state.matchedLocation;
+        // Until the saved session is read no screen may be built (it would load its data without a token and keep the
+        // "Chưa đăng nhập" error); /splash is an empty page that the redirect below leaves as soon as the session is known.
+        if (!auth.ready) return loc == '/splash' ? null : '/splash';
         if (!auth.signedIn) return _authRoutes.contains(loc) ? null : '/login';
+        if (loc == '/splash') return auth.isAdmin ? '/admin' : homeRoute;
         if (auth.isAdmin) return (loc == '/admin' || loc == '/admin/account') ? null : '/admin';
         if (_authRoutes.contains(loc) || loc == '/admin' || loc == '/admin/account' || loc == '/' || loc == '/more') return homeRoute;
         final legacy = _legacyCalc[loc];
@@ -67,6 +70,7 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
         return null;
       },
       routes: [
+        GoRoute(path: '/splash', builder: (_, _) => const SizedBox.shrink()),
         GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
         GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
         GoRoute(path: '/recover', builder: (_, _) => const RecoverScreen()),

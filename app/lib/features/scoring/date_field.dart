@@ -42,13 +42,12 @@ class DateField extends StatelessWidget {
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
-          isDense: dense,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: dense ? 12 : 14),
+          isDense: true,
           suffixIcon: clearable && value.isNotEmpty
-              ? IconButton(tooltip: 'Bỏ ngày', icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(''))
+              ? IconButton(tooltip: 'Bỏ ngày', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 32, height: 32), icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(''))
               : const Icon(Icons.calendar_today_outlined, size: 18),
         ),
-        child: Text(value.isEmpty ? 'Chọn ngày' : viDate(value), style: theme.textTheme.bodyLarge?.copyWith(color: value.isEmpty ? theme.hintColor : null)),
+        child: Text(value.isEmpty ? 'Chọn ngày' : viDate(value), style: TextStyle(fontSize: 15, color: value.isEmpty ? theme.hintColor : Colors.black)),
       ),
     );
   }

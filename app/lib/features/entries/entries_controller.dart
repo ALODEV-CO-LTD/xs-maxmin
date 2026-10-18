@@ -96,12 +96,11 @@ class EntriesController extends ChangeNotifier {
 
   // ---- list ----
   final EntryFilter filter = EntryFilter();
-  bool confirmCopy = false;
 
   Future<void> init() async {
     _store ??= await OfflineStore.open(api, auth);
     try {
-      confirmCopy = (await SharedPreferences.getInstance()).getBool(confirmCopyKey) ?? false;
+      (await SharedPreferences.getInstance()).remove(confirmCopyKey); // "Hỏi trước khi sao chép" was removed: forget the old setting
     } catch (_) {}
     rows.add(RowDraft(type: 'de'));
     _timer = Timer.periodic(const Duration(seconds: 20), (_) {
@@ -536,17 +535,22 @@ class EntriesController extends ChangeNotifier {
 
   List<Entry> get customerEntries => selectedName.isEmpty ? const [] : [for (final e in entries) if (e.customerName == selectedName) e];
 
-  List<Entry> filtered({required bool masked}) => filterEntries(entries, filter, customerName: selectedName, masked: masked);
+  /// The day the list shows: the one picked in its own filter, else the day being entered in the form ('' = every day).
+  String get listDate => filter.anyDate ? '' : (filter.date.isNotEmpty ? filter.date : entryDate);
+
+  /// True while the list simply follows the form (the day and, for one customer, the đài chosen above it).
+  bool get followsForm => !filter.anyDate && filter.date.isEmpty;
+
+  /// What the list shows: the chosen customer's entries of the chosen day and đài (not every day), until "Mọi ngày" is picked.
+  List<Entry> filtered({required bool masked}) {
+    final byDay = EntryFilter(q: filter.q, type: filter.type, all: filter.all, date: listDate);
+    final list = filterEntries(entries, byDay, customerName: selectedName, masked: masked);
+    if (!followsForm || filter.all || station.isEmpty) return list;
+    return [for (final e in list) if ((e.station ?? '').isEmpty ? station == 'mb' : e.station == station) e];
+  }
 
   void touchFilter() => _notify();
 
-  Future<void> setConfirmCopy(bool on) async {
-    confirmCopy = on;
-    _notify();
-    try {
-      (await SharedPreferences.getInstance()).setBool(confirmCopyKey, on);
-    } catch (_) {}
-  }
 
   // ---- syntax templates (paste importer) ----------------------------------------------------------------------------
 

@@ -145,8 +145,6 @@ class _CustomersBodyState extends State<_CustomersBody> {
               InfoBox(c.error),
               AppButton(label: 'Thử lại', variant: AppButtonVariant.primary, onPressed: c.load),
             ] else ...[
-              const Align(alignment: Alignment.centerLeft, child: MaskBar()),
-              const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 AppButton(label: 'Thêm khách hàng', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: () => _add(c)),
               ]),
@@ -166,6 +164,14 @@ class _CustomersBodyState extends State<_CustomersBody> {
       ),
     );
   }
+
+  Widget _iconAction(IconData icon, String tooltip, VoidCallback onPressed, {Color? color}) => IconButton(
+        tooltip: tooltip,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+        icon: Icon(icon, size: 21, color: color),
+        onPressed: onPressed,
+      );
 
   Widget _tile(BuildContext context, CustomersController c, CustomerSummary s, int stt) {
     final cu = s.customer;
@@ -187,23 +193,32 @@ class _CustomersBodyState extends State<_CustomersBody> {
               child: Text('$stt', style: TextStyle(color: context.mutedColor, fontWeight: FontWeight.w600)),
             ),
             const SizedBox(width: 6),
-            Expanded(child: Text(s.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
-            if (s.phone.isNotEmpty) Text(s.phone, style: TextStyle(color: context.mutedColor)),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(s.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+                if (s.phone.isNotEmpty) Text(s.phone, style: TextStyle(fontSize: 13, color: context.mutedColor)),
+                if (cu == null) Text('Chưa thêm vào danh sách', style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
+              ]),
+            ),
+            // The actions as icons (the label is the tooltip): edit, scoring config (filled when this customer has its own), remove.
+            if (cu != null) ...[
+              _iconAction(Icons.edit_outlined, 'Sửa', () => _editPhone(c, cu)),
+              _iconAction(
+                cu.scoringRates != null ? Icons.tune : Icons.tune_outlined,
+                cu.scoringRates != null ? 'Cấu hình tính điểm (riêng)' : 'Cấu hình tính điểm',
+                () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CustomerConfigScreen(controller: c, customer: cu))),
+                color: cu.scoringRates != null ? Theme.of(context).colorScheme.primary : null,
+              ),
+              _busyId == cu.id
+                  ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+                  : _iconAction(Icons.delete_outline, 'Xoá khỏi danh sách', () => _remove(c, cu), color: context.badColor),
+            ],
           ]),
           const SizedBox(height: 10),
           Row(children: [
             stat('Điểm vào', formatNumber(s.vao), context.okColor),
             stat('Điểm ra', formatNumber(s.ra), context.badColor),
             stat('Lợi nhuận', formatNumber(s.chenhLech), s.chenhLech >= 0 ? context.okColor : context.badColor),
-          ]),
-          const SizedBox(height: 6),
-          Wrap(spacing: 4, runSpacing: 0, children: [
-            if (cu != null) AppButton(label: 'Sửa', variant: AppButtonVariant.ghost, onPressed: () => _editPhone(c, cu)),
-            if (cu != null)
-              AppButton(label: cu.scoringRates != null ? 'Cấu hình tính điểm (riêng)' : 'Cấu hình tính điểm', variant: AppButtonVariant.ghost, onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CustomerConfigScreen(controller: c, customer: cu)))),
-            if (cu != null)
-              AppButton(label: 'Xoá khỏi danh sách', variant: AppButtonVariant.danger, loading: _busyId == cu.id, onPressed: _busyId == cu.id ? null : () => _remove(c, cu)),
-            if (cu == null) Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text('Chưa thêm vào danh sách', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
           ]),
         ]),
       ),

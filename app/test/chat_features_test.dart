@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
 import 'package:mamba_app/core/auth_store.dart';
+import 'package:mamba_app/features/chat_calc/chat_prefill.dart';
 import 'package:mamba_app/features/friends/chat_models.dart';
 import 'package:mamba_app/features/friends/chat_page.dart';
 import 'package:mamba_app/features/friends/chat_service.dart';
@@ -169,31 +170,46 @@ void main() {
       expect(await hub.chat!.pinsOf('f1'), ['b']);
     });
 
-    testWidgets('select mode: ticks, button turns into Tính toán, only text messages can be picked', (t) async {
+    testWidgets('select mode: ticks, the button becomes "Nhập số (N)" and sends the picked text to Nhập số; only text messages can be picked', (t) async {
       await t.runAsync(() => boot(t, [msg('a', 'một'), msg('b', 'hai', mine: true, at: 2000)]));
       await t.pumpWidget(host(ChatPage(controller: hub, friend: hub.friends.first)));
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await t.pump();
-      expect(find.text('Nhập số liệu'), findsOneWidget);
-      await t.tap(find.text('Nhập số liệu'));
+      expect(find.text('Nhập số'), findsOneWidget);
+      await t.tap(find.text('Nhập số'));
       await t.pump();
       expect(find.byType(Checkbox), findsNWidgets(2));
       expect(find.text('Đã chọn 0'), findsOneWidget);
-      expect(find.text('Nhập số liệu'), findsOneWidget); // nothing picked yet
+      expect(find.text('Nhập số'), findsOneWidget); // nothing picked yet
       await t.tap(find.byType(Checkbox).first);
       await t.pump();
       expect(find.text('Đã chọn 1'), findsOneWidget);
-      expect(find.text('Tính toán'), findsOneWidget);
+      expect(find.text('Nhập số (1)'), findsOneWidget);
       await t.tap(find.text('Chọn tất cả'));
       await t.pump();
       expect(find.text('Đã chọn 2'), findsOneWidget);
+      expect(find.text('Nhập số (2)'), findsOneWidget);
+      // the picked messages (display order) go to the Nhập số quick-entry box
+      await t.tap(find.text('Nhập số (2)'));
+      await t.pump();
+      expect(ChatPrefillHub.instance.take()?.text, 'một\nhai');
+      ChatPrefillHub.instance.take();
+    });
+
+    testWidgets('select mode: "Hủy" leaves select mode', (t) async {
+      await t.runAsync(() => boot(t, [msg('a', 'một')]));
+      await t.pumpWidget(host(ChatPage(controller: hub, friend: hub.friends.first)));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+      await t.tap(find.text('Nhập số'));
+      await t.pump();
       await t.tap(find.text('Hủy'));
       await t.pump();
       expect(find.byType(Checkbox), findsNothing);
-      expect(find.text('Nhập số liệu'), findsOneWidget);
+      expect(find.text('Nhập số'), findsOneWidget);
     });
 
-    testWidgets('message list: Sửa, Mới menu, avatar initial, archive hides the chat', (t) async {
+    testWidgets('message list: Sửa, Thêm menu, avatar initial, archive hides the chat', (t) async {
       await t.runAsync(() => boot(t, [msg('a', 'chào')]));
       await t.pumpWidget(host(const FriendsScreen()));
       await t.pumpAndSettle();
@@ -201,9 +217,9 @@ void main() {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await t.pumpAndSettle();
       expect(find.text('Sửa'), findsOneWidget);
-      expect(find.text('Mới'), findsOneWidget);
+      expect(find.text('Thêm'), findsOneWidget);
       expect(find.text('B'), findsOneWidget); // round avatar with the initial
-      await t.tap(find.text('Mới'));
+      await t.tap(find.text('Thêm'));
       await t.pumpAndSettle();
       for (final l in ['Tin nhắn mới', 'Nhóm mới', 'Danh bạ mới']) {
         expect(find.text(l), findsOneWidget);

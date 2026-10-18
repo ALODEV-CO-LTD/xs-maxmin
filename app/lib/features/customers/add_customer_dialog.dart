@@ -7,6 +7,7 @@ import '../../core/widgets/app_dialog.dart';
 import '../entries/dialogs.dart';
 import 'customer_model.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 const offlineWriteMessage = 'Đang offline: thêm/xoá khách hàng cần có mạng, vui lòng thử lại khi kết nối lại.';
 
@@ -90,7 +91,7 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
           const SizedBox(height: 12),
           TextField(controller: _phone, enabled: !_busy, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại', hintText: 'Không bắt buộc')),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
+          AppDropdown<String>(
             initialValue: options.any((o) => o.value == _station) ? _station : 'mb',
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Đài xổ số mặc định khi nhập số'),

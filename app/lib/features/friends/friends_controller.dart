@@ -15,13 +15,17 @@ import 'realtime_socket.dart';
 import 'screenshot_bridge.dart';
 
 class Friend {
-  Friend({required this.id, required this.name, required this.username, this.isAdmin = false, this.lastMessage, this.lastMessageAt = 0});
+  Friend({required this.id, required this.name, required this.username, this.isAdmin = false, this.lastMessage, this.lastMessageAt = 0, this.isGroup = false, this.memberCount = 0});
   final String id;
   final String name;
   final String username;
   final bool isAdmin;
   String? lastMessage;
   int lastMessageAt;
+
+  /// A group chat shown in the same list (id `g-…`): its name is the group's name.
+  final bool isGroup;
+  final int memberCount;
 
   factory Friend.fromJson(Map<String, dynamic> j) => Friend(id: j['id'] as String, name: (j['name'] ?? '') as String, username: (j['username'] ?? '') as String, isAdmin: j['isAdmin'] == true);
 }
@@ -104,6 +108,9 @@ class FriendsController extends ChangeNotifier {
   bool loading = true;
   String loadError = '';
   List<Friend> friends = [];
+
+  /// Group chats of this device as list rows (built from the stored groups; the server knows none).
+  List<Friend> groups = [];
   String myCode = '';
   bool noMyCode = false;
   Map<String, int> unseenMissed = {};
@@ -401,6 +408,18 @@ class FriendsController extends ChangeNotifier {
         f.lastMessageAt = prev[f.id]?.createdAt ?? 0;
       }
       friends.sort((a, b) => b.lastMessageAt != a.lastMessageAt ? b.lastMessageAt.compareTo(a.lastMessageAt) : foldVi(a.name).compareTo(foldVi(b.name)));
+      groups = [
+        for (final g in c.groups.values)
+          Friend(
+            id: g.id,
+            name: g.name,
+            username: '',
+            isGroup: true,
+            memberCount: g.members.length,
+            lastMessage: prev[g.id] == null ? null : '${prev[g.id]!.mine ? 'Bạn' : c.memberName(g, prev[g.id]!.fromId ?? '')}: ${prev[g.id]!.preview}',
+            lastMessageAt: prev[g.id]?.createdAt ?? g.updatedAt,
+          ),
+      ]..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
       loadError = '';
     } catch (e) {
       if (!quiet) loadError = e is ApiError ? e.message : 'Không tải được danh sách bạn bè';
@@ -457,11 +476,14 @@ class FriendsController extends ChangeNotifier {
 
   // ---- search / add / remove -------------------------------------------------------------------------------------------
 
+  /// Every conversation of the list: friends and groups, the most recent first.
+  List<Friend> get conversations => [...friends, ...groups]..sort((a, b) => b.lastMessageAt != a.lastMessageAt ? b.lastMessageAt.compareTo(a.lastMessageAt) : foldVi(a.name).compareTo(foldVi(b.name)));
+
   List<Friend> get filteredFriends {
     final q = foldVi(searchQuery.trim());
-    if (q.isEmpty) return friends;
+    if (q.isEmpty) return conversations;
     final byId = results.where((r) => r.isFriend).map((r) => r.id).toSet();
-    return friends.where((f) => foldVi(f.name).contains(q) || foldVi(f.username).contains(q) || byId.contains(f.id)).toList();
+    return conversations.where((f) => foldVi(f.name).contains(q) || foldVi(f.username).contains(q) || byId.contains(f.id)).toList();
   }
 
   /// Name shown for [f]: the own display name set on this device, else the real name.

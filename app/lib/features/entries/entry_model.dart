@@ -123,16 +123,20 @@ EntryTotals totalsOf(Iterable<Entry> entries) {
 
 /// The list filters of Nhập số (K17), run locally so they work offline too.
 class EntryFilter {
-  EntryFilter({this.q = '', this.date = '', this.type = '', this.all = false});
+  EntryFilter({this.q = '', this.date = '', this.type = '', this.all = false, this.anyDate = false});
   String q;
+
+  /// '' = follow the day chosen in the entry form (the list shows that day only); a date = that day; [anyDate] = every day.
   String date;
+  bool anyDate;
   String type;
   bool all;
 
-  bool get active => date.isNotEmpty || type.isNotEmpty || q.trim().isNotEmpty || all;
+  bool get active => date.isNotEmpty || anyDate || type.isNotEmpty || q.trim().isNotEmpty || all;
   void clear() {
     q = '';
     date = '';
+    anyDate = false;
     type = '';
     all = false;
   }

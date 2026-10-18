@@ -6,6 +6,7 @@ import '../../../core/theme.dart';
 import 'settings_logic.dart';
 import 'settings_ui.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_dropdown.dart';
 
 Widget _editBar({required bool editing, required bool saving, required VoidCallback onEdit, required VoidCallback onCancel, required VoidCallback? onSave, required String saveLabel}) {
   if (!editing) {
@@ -98,7 +99,7 @@ class _BankSectionState extends State<BankSection> {
       children: [
         if (_error != null) Banner2(_error!),
         if (_saved) const Banner2('Đã lưu cấu hình thanh toán', error: false),
-        DropdownButtonFormField<String>(
+        AppDropdown<String>(
           key: ValueKey('bank-${_form.bin}-$editing'),
           initialValue: known ? _form.bin : null,
           isExpanded: true,

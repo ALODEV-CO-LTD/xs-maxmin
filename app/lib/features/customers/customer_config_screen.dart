@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import 'customer_model.dart';
 import 'customers_controller.dart';
 import 'scoring_config_editor.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// The customer's own region: decides how "Đầu" is scored on a Miền Bắc result (Bắc 1 lô = 1 điểm, Nam/Trung ×4 giải bảy).
 const homeRegionOptions = {'': 'Chưa chọn (tính như khách Bắc)', 'mb': 'Khách Miền Bắc', 'mn': 'Khách Miền Nam / Miền Trung'};
@@ -69,7 +70,7 @@ class _CustomerConfigScreenState extends State<CustomerConfigScreen> {
       appBar: AppBar(title: Text(cu.name)),
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.all(16), children: [
-          DropdownButtonFormField<String>(
+          AppDropdown<String>(
             key: ValueKey('station-$cur-${options.length}'),
             initialValue: cur,
             isExpanded: true,
@@ -78,7 +79,7 @@ class _CustomerConfigScreenState extends State<CustomerConfigScreen> {
             onChanged: _saving ? null : (v) => v == null ? null : _saveStation(v),
           ),
           const SizedBox(height: 14),
-          DropdownButtonFormField<String>(
+          AppDropdown<String>(
             key: ValueKey('region-${cu.homeRegion}'),
             initialValue: cu.homeRegion ?? '',
             isExpanded: true,

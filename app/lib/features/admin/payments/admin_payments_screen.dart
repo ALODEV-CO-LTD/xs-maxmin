@@ -9,6 +9,7 @@ import '../../../core/theme.dart';
 import '../settings/settings_ui.dart';
 import 'payments_logic.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_dropdown.dart';
 
 /// Admin - Thanh toán & gia hạn (right payments.manage). Body only (the admin shell draws the AppBar and drawer).
 class AdminPaymentsScreen extends StatefulWidget {
@@ -283,7 +284,7 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
         Row(
           children: [
             Expanded(
-              child: DropdownButtonFormField<String>(
+              child: AppDropdown<String>(
                 key: const ValueKey('status-filter'),
             isExpanded: true,
                 initialValue: _f.status,

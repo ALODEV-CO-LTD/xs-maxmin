@@ -216,7 +216,9 @@ void main() {
     final f = FakeServer();
     f.saved['mn-dongnai'] = {'dacBiet': '123456', 'giaiNhat': '11111', 'giaiNhi': ['22222'], 'giaiBa': ['33331', '33332'], 'giaiTu': List.filled(7, '44444'), 'giaiNam': ['5555'], 'giaiSau': List.filled(3, '6666'), 'giaiBay': ['777'], 'giaiTam': ['47']};
     final c = ScoringController(client(f), testStations(), today: '2026-10-08');
+    expect((c.preset, c.dateFrom, c.dateTo), ('today', '2026-10-08', '2026-10-08')); // opens on today
     await c.load();
+    c.setPreset('all');
     c.selectCustomer('An');
     await Future<void>.delayed(const Duration(milliseconds: 100));
     // 2026-10-07 has a result, 2026-10-06 does not
@@ -240,5 +242,23 @@ void main() {
     expect(c.isOpen('2026-10-07'), isTrue);
     expect(c.isOpen('2026-10-06'), isFalse);
     expect(f.patches['e1'], '35');
+  });
+
+  test('Tính điểm picks up a result saved AFTER it first looked (stale "no result" is forgotten when the tab is opened again)', () async {
+    final f = FakeServer();
+    final c = ScoringController(client(f), testStations(), today: '2026-10-08');
+    await c.load();
+    c.selectCustomer('An');
+    c.setDay('2026-10-07');
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    // nothing saved yet: the day shows "no result" and that is remembered in memory
+    expect(c.allDays.single.lottery, 'no');
+    // the result is saved in the Kết quả tab
+    f.saved['mn-dongnai'] = {'dacBiet': '123456', 'giaiNhat': '11111', 'giaiNhi': ['22222'], 'giaiBa': ['33331', '33332'], 'giaiTu': List.filled(7, '44444'), 'giaiNam': ['5555'], 'giaiSau': List.filled(3, '6666'), 'giaiBay': ['777'], 'giaiTam': ['47']};
+    // before the fix the cached "no result" stayed until nobody knows when
+    await c.syncFrom(customer: 'An', date: '2026-10-07');
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(c.allDays.single.lottery, 'yes');
+    expect(c.total.wonMoney, greaterThan(0));
   });
 }

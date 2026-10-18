@@ -9,6 +9,7 @@ import 'dialogs.dart';
 import 'entries_controller.dart';
 import 'quick_entry_box.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// "Thêm số liệu mới": đài, ngày, the quick-entry box (message or photo), several rows (hạng mục / số / điểm vào) and a note.
 class EntryFormCard extends StatefulWidget {
@@ -72,7 +73,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               flex: 5,
-              child: DropdownButtonFormField<String>(
+              child: AppDropdown<String>(
                 key: ValueKey('station-${c.entryDate}-${c.selectedName}-${c.station}-${stations.loaded}'),
                 initialValue: stationValue,
                 isExpanded: true,
@@ -92,20 +93,22 @@ class _EntryFormCardState extends State<EntryFormCard> {
           ]),
           const SizedBox(height: 12),
           QuickEntryBox(controller: c),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           _rowsHeader(context),
           if (c.selectedRowCount > 0) _bulkBar(types),
           for (var i = 0; i < c.rows.length; i++) _rowTile(context, i, types),
-          Align(alignment: Alignment.centerLeft, child: AppButton(label: 'Thêm số', variant: AppButtonVariant.ghost, icon: Icons.add, onPressed: c.addRow)),
           const SizedBox(height: 4),
-          TextField(controller: c.note, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Ghi chú', hintText: 'Tuỳ chọn')),
-          const SizedBox(height: 12),
           if (_deleteAllError.isNotEmpty) InfoBox(_deleteAllError),
           if (!c.canAdd) const InfoBox('Gói của bạn đã hết hạn. Vui lòng gia hạn để tiếp tục nhập số liệu.', kind: InfoKind.warning),
           if (c.addedMessage.isNotEmpty) InfoBox(c.addedMessage, kind: InfoKind.success),
-          AppButton(label: 'Thêm số liệu', variant: AppButtonVariant.primary, loading: c.submitting, onPressed: c.submitting || !c.canAdd ? null : c.submit),
-          const SizedBox(height: 8),
-          AppButton(label: 'Xoá tất cả số liệu của khách này', variant: AppButtonVariant.danger, loading: _deletingAll, onPressed: _deletingAll || c.customerEntries.isEmpty ? null : _deleteAll),
+          // One row: add a line (+), save (Thêm số liệu), delete all.
+          Row(children: [
+            AppButton.icon(label: 'Thêm số', variant: AppButtonVariant.secondary, icon: Icons.add, onPressed: c.addRow),
+            const SizedBox(width: 8),
+            Expanded(child: AppButton(label: 'Thêm số liệu', variant: AppButtonVariant.primary, loading: c.submitting, onPressed: c.submitting || !c.canAdd ? null : c.submit)),
+            const SizedBox(width: 8),
+            AppButton(label: 'Xoá tất cả', variant: AppButtonVariant.danger, loading: _deletingAll, onPressed: _deletingAll || c.customerEntries.isEmpty ? null : _deleteAll),
+          ]),
         ]),
       ),
     );
@@ -113,7 +116,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
 
   Widget _rowsHeader(BuildContext context) {
     return Row(children: [
-      Checkbox(value: c.allRowsSelected, onChanged: (_) => c.toggleAllRows(), visualDensity: VisualDensity.compact),
+      const SizedBox(width: 40), // (where the per-row tick boxes are; the select-all tick beside "Hạng mục" is gone)
       Expanded(flex: 3, child: Text('Hạng mục', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
       Expanded(flex: 2, child: Text('Số', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
       Expanded(flex: 2, child: Text('Điểm vào', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
@@ -129,7 +132,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
       child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
         SizedBox(
           width: 130,
-          child: DropdownButtonFormField<String>(
+          child: AppDropdown<String>(
             initialValue: _bulkType.isEmpty ? null : _bulkType,
             isExpanded: true,
             hint: const Text('Đổi hạng mục'),
@@ -153,50 +156,57 @@ class _EntryFormCardState extends State<EntryFormCard> {
     );
   }
 
+  // keeps the "Số" field (and its focus) when a row switches between the one-line and the stacked layout while typing
+  final Map<Object, GlobalKey> _valueKeys = {};
+
   Widget _rowTile(BuildContext context, int i, List<String> types) {
     final r = c.rows[i];
     final typeList = types.contains(r.type) ? types : [...types, r.type];
+    const pad = EdgeInsets.symmetric(horizontal: 8, vertical: 12);
+    // A xiên with 3+ numbers: "Số" gets its own full-width line under the row so every number shows.
+    final stacked = valueFieldFlex(r.value.text) > 3;
+    final type = AppDropdown<String>(
+      initialValue: r.type,
+      isExpanded: true,
+      decoration: const InputDecoration(isDense: true, contentPadding: pad),
+      items: [for (final t in typeList) DropdownMenuItem(value: t, child: Text(betTypeLabel(t), overflow: TextOverflow.ellipsis))],
+      onChanged: (v) {
+        r.type = v ?? r.type;
+        c.touchRows();
+      },
+    );
+    final value = TextField(key: _valueKeys.putIfAbsent(r.uid, () => GlobalKey()), controller: r.value, keyboardType: TextInputType.number, onChanged: (_) => c.touchRows(), decoration: const InputDecoration(isDense: true, hintText: 'Số', contentPadding: pad));
+    final score = TextField(controller: r.score, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(isDense: true, hintText: 'Điểm', contentPadding: pad));
+    final tick = Checkbox(value: r.selected, visualDensity: VisualDensity.compact, onChanged: (v) {
+      r.selected = v ?? false;
+      c.touchRows();
+    });
+    final remove = SizedBox(
+      width: 40,
+      child: IconButton(
+        visualDensity: VisualDensity.compact,
+        tooltip: 'Xoá dòng',
+        icon: const Icon(Icons.close, size: 20),
+        onPressed: c.rows.length == 1 && r.isBlank ? null : () => c.removeRow(r),
+      ),
+    );
     return Padding(
       key: ValueKey(r.uid),
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: [
-        Checkbox(value: r.selected, visualDensity: VisualDensity.compact, onChanged: (v) {
-          r.selected = v ?? false;
-          c.touchRows();
-        }),
-        Expanded(
-          flex: 3,
-          child: DropdownButtonFormField<String>(
-            initialValue: r.type,
-            isExpanded: true,
-            decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12)),
-            items: [for (final t in typeList) DropdownMenuItem(value: t, child: Text(betTypeLabel(t), overflow: TextOverflow.ellipsis))],
-            onChanged: (v) {
-              r.type = v ?? r.type;
-              c.touchRows();
-            },
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          flex: 2,
-          child: TextField(controller: r.value, keyboardType: TextInputType.number, decoration: const InputDecoration(isDense: true, hintText: 'Số', contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12))),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          flex: 2,
-          child: TextField(controller: r.score, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(isDense: true, hintText: 'Điểm', contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12))),
-        ),
-        SizedBox(
-          width: 40,
-          child: IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: 'Xoá dòng',
-            icon: const Icon(Icons.close, size: 20),
-            onPressed: c.rows.length == 1 && r.isBlank ? null : () => c.removeRow(r),
-          ),
-        ),
-      ]),
+      padding: const EdgeInsets.only(bottom: 6),
+      child: stacked
+          ? Column(children: [
+              Row(children: [tick, Expanded(flex: 3, child: type), const SizedBox(width: 6), Expanded(flex: 2, child: score), remove]),
+              Padding(padding: const EdgeInsets.fromLTRB(48, 6, 40, 0), child: value),
+            ])
+          : Row(children: [
+              tick,
+              Expanded(flex: 3, child: type),
+              const SizedBox(width: 6),
+              Expanded(flex: valueFieldFlex(r.value.text), child: value),
+              const SizedBox(width: 6),
+              Expanded(flex: 2, child: score),
+              remove,
+            ]),
     );
   }
 }

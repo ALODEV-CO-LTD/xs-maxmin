@@ -10,7 +10,7 @@ import 'add_bet_type_dialog.dart';
 import 'customer_model.dart';
 import 'scoring_editor_model.dart';
 import '../../core/widgets/app_button.dart';
-import '../../core/widgets/action_bar.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// Cấu hình tính điểm, one editor for both places:
 ///  - [customer] == null: the account-wide default (GET/PUT /me/scoring-settings);
@@ -186,6 +186,18 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                 _notice = '';
               })),
       ]),
+      // While editing, the actions sit in ONE row right under the regions (where "Sửa" is when viewing).
+      if (_editing)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(children: [
+            AppButton(label: _isCustomer ? 'Bỏ riêng' : 'Đặt lại mặc định', variant: AppButtonVariant.secondary, size: AppButtonSize.small, onPressed: _saving ? null : () => setState(_m.resetAll)),
+            const SizedBox(width: 6),
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, size: AppButtonSize.small, onPressed: _saving ? null : _cancelEdit),
+            const SizedBox(width: 6),
+            Expanded(child: AppButton(label: _isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !_m.dirty ? null : _save)),
+          ]),
+        ),
       const SizedBox(height: 8),
       for (final g in _m.groupsOf(all: _editing)) ...[
         Container(
@@ -208,14 +220,6 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
       if (_editing) ...[
         const SizedBox(height: 8),
         Text(!_isCustomer ? '' : (_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định'), style: muted),
-        const SizedBox(height: 8),
-        ActionBar(
-          start: [AppButton(label: _isCustomer ? 'Bỏ cấu hình riêng' : 'Đặt lại mặc định', variant: AppButtonVariant.secondary, onPressed: _saving ? null : () => setState(_m.resetAll))],
-          children: [
-            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _saving ? null : _cancelEdit),
-            AppButton(label: (_isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình'), variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !_m.dirty ? null : _save),
-          ],
-        ),
       ] else if (_isCustomer)
         Padding(padding: const EdgeInsets.only(top: 4), child: Text(_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định', style: muted)),
     ]);
@@ -362,7 +366,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
           if (f.position)
             SizedBox(
               width: 150,
-              child: DropdownButtonFormField<String>(
+              child: AppDropdown<String>(
                 key: ValueKey('pos-$k'),
                 initialValue: r.srcPos,
                 isExpanded: true,
@@ -374,7 +378,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
           if (f.digits)
             SizedBox(
               width: 120,
-              child: DropdownButtonFormField<int>(
+              child: AppDropdown<int>(
                 key: ValueKey('dig-$k'),
                 initialValue: r.srcDigits,
                 isExpanded: true,

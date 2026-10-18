@@ -34,6 +34,8 @@ ThemeData _build(Brightness b) {
   OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
   return ThemeData(
     useMaterial3: true,
+    visualDensity: VisualDensity.compact,
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     brightness: b,
     colorScheme: scheme,
     scaffoldBackgroundColor: bg,
@@ -46,13 +48,30 @@ ThemeData _build(Brightness b) {
       enabledBorder: ob(inputBorder),
       focusedBorder: ob(primary, 2),
       errorBorder: ob(scheme.error),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      labelStyle: const TextStyle(fontSize: 14),
+      hintStyle: const TextStyle(fontSize: 14),
     ),
-    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
-    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48), side: BorderSide(color: inputBorder), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, 36), textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), side: BorderSide(color: inputBorder), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
     chipTheme: ChipThemeData(shape: const StadiumBorder(), side: BorderSide(color: border)),
     navigationBarTheme: NavigationBarThemeData(backgroundColor: card, indicatorColor: primary.withValues(alpha: dark ? 0.2 : 0.14)),
     dividerTheme: DividerThemeData(color: border),
+    // Pop-ups (dropdown lists, menus, dialogs, sheets, date pickers) follow the same palette: white, thin green line, light-green highlight
+    // (the Material default is a grey-tinted surface with a grey selected row).
+    canvasColor: card,
+    focusColor: primary.withValues(alpha: 0.12),
+    hoverColor: primary.withValues(alpha: 0.08),
+    highlightColor: primary.withValues(alpha: 0.10),
+    splashColor: primary.withValues(alpha: 0.12),
+    popupMenuTheme: PopupMenuThemeData(color: card, surfaceTintColor: Colors.transparent, elevation: 3, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: border))),
+    dropdownMenuTheme: DropdownMenuThemeData(menuStyle: MenuStyle(backgroundColor: WidgetStatePropertyAll(card), surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent), shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: border))))),
+    menuTheme: MenuThemeData(style: MenuStyle(backgroundColor: WidgetStatePropertyAll(card), surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent))),
+    dialogTheme: DialogThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: border))),
+    bottomSheetTheme: BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent, modalBackgroundColor: card, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16)))),
+    datePickerTheme: DatePickerThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent),
+    timePickerTheme: TimePickerThemeData(backgroundColor: card),
   );
 }
 

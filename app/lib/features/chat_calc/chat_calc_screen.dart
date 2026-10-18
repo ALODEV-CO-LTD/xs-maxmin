@@ -302,22 +302,48 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
   Widget _reportStep(BuildContext context, ChatReport rep) {
     final cs = Theme.of(context).colorScheme;
     final neg = rep.totals.profit != null && rep.totals.profit! < 0;
-    Widget card(String n, List<Widget> children, {Color? border, Color? fill, bool other = false}) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: fill ?? (other ? cs.surfaceContainerHighest : null), border: Border.all(color: border ?? cs.outlineVariant, width: border == null ? 1 : 2), borderRadius: BorderRadius.circular(12)),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 24, height: 24, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: cs.primary)), child: Text(n, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: cs.primary))),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children)),
-          ]),
+    final muted = TextStyle(fontSize: 14, color: context.mutedColor);
+    // A result card: thin green frame, soft shadow (the "Kết quả tính toán" layout of the customer's sample).
+    Widget card(List<Widget> children, {Color? border, Color? fill}) => Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: fill ?? Colors.white,
+            border: Border.all(color: border ?? cs.primary, width: 1.5),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: cs.primary.withValues(alpha: 0.12), blurRadius: 6, offset: const Offset(0, 2))],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
         );
+    // "label ........ amount" on one line.
+    Widget amountRow(String label, String amount, {Color? color, double size = 17, bool bold = true}) => Row(children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: size, fontWeight: bold ? FontWeight.w700 : FontWeight.w400))),
+          const SizedBox(width: 8),
+          Text(amount, style: TextStyle(fontSize: size, fontWeight: FontWeight.w700, color: color)),
+        ]);
+    Widget groupCard(ReportGroup g) {
+      if (g.stake == 0) return card([amountRow(g.label, money(0)), Text('0 điểm', style: muted)]);
+      return card([
+        Text(g.label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(rep.missingResult ? '${points(g.stake)} (chưa có kết quả xổ số)' : '${points(g.stake)} − ${points(g.winPoints).replaceFirst(' điểm', '')} điểm trúng = ${points(g.rest)}', style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 2),
+        amountRow('Đánh ${_pt(g.stake)} × ${viInt(g.price)}', money(g.stakeMoney), size: 14.5),
+        if (!rep.missingResult) amountRow('Trúng ${_pt(g.winPoints)} điểm', money(g.winMoney), size: 14.5, color: g.winMoney > 0 ? context.badColor : null),
+      ]);
+    }
+
     return Column(children: [
       Expanded(
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8), children: [
-          Text('Đài ${rep.stationName}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          Text('Ngày ${viDate(rep.date)}', style: TextStyle(color: context.mutedColor)),
-          const SizedBox(height: 8),
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 8), children: [
+          Center(
+            child: Column(children: [
+              Text('Đài ${rep.stationName}', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.primary)),
+              Text('Ngày: ${viDate(rep.date)}', style: TextStyle(fontSize: 15, color: cs.primary)),
+            ]),
+          ),
+          const SizedBox(height: 12),
           if (_error.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -326,15 +352,21 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
                 if (rep.missingResult) AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: _busy ? null : _confirmStation),
               ]),
             ),
-          for (var i = 0; i < rep.groups.length; i++)
-            card('${i + 1}', [
-              for (final (j, l) in groupLines(rep.groups[i], rep.missingResult).indexed) Text(l, style: TextStyle(fontWeight: j == 0 ? FontWeight.w700 : FontWeight.w400)),
-            ]),
+          for (final g in rep.groups) groupCard(g),
           if (rep.other.stake != 0)
-            card('+', [Text('Kiểu đánh khác (${rep.other.kinds.join(', ')}): đánh ${money(rep.other.stakeMoney)}${rep.missingResult ? '' : ', trúng ${money(rep.other.winMoney)}'} (đã tính vào tổng)')], other: true),
-          card('6', [Text('Tổng tiền khách đánh: ${money(rep.totals.stake)}', style: const TextStyle(fontWeight: FontWeight.w700))]),
-          card('7', [Text('Tổng tiền khách trúng: ${rep.missingResult ? 'Chưa đủ dữ liệu' : money(rep.totals.won)}', style: const TextStyle(fontWeight: FontWeight.w700))]),
-          card('8', [Text('Tổng lợi nhuận: ${fmtProfit(rep.totals.profit)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: neg ? context.badColor : null))], border: neg ? context.badColor : cs.primary, fill: neg ? context.badColor.withValues(alpha: 0.08) : cs.primaryContainer.withValues(alpha: 0.3)),
+            card([
+              Text('Kiểu đánh khác (${rep.other.kinds.join(', ')})', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              amountRow('Đánh', money(rep.other.stakeMoney), size: 14.5),
+              if (!rep.missingResult) amountRow('Trúng', money(rep.other.winMoney), size: 14.5),
+              Text('Đã tính vào tổng', style: muted),
+            ], fill: cs.surfaceContainerHighest),
+          card([amountRow('Tổng tiền khách đánh', money(rep.totals.stake))]),
+          card([amountRow('Tổng tiền khách trúng', rep.missingResult ? 'Chưa đủ dữ liệu' : money(rep.totals.won))]),
+          card(
+            [amountRow('Tổng lợi nhuận', fmtProfit(rep.totals.profit), color: neg ? context.badColor : null)],
+            border: neg ? context.badColor : cs.primary,
+            fill: neg ? context.badColor.withValues(alpha: 0.08) : cs.primaryContainer.withValues(alpha: 0.3),
+          ),
           if (rep.skipped.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -347,15 +379,20 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: Row(children: [
-            Expanded(child: AppButton(label: 'Lưu', variant: AppButtonVariant.secondary, icon: Icons.save_outlined, onPressed: _save)),
-            const SizedBox(width: 8),
-            Expanded(child: AppButton(label: 'Copy', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: _copy)),
-            const SizedBox(width: 8),
-            Expanded(flex: 2, child: AppButton(label: 'Gửi cho khách', variant: AppButtonVariant.primary, icon: Icons.send, loading: _sending, onPressed: _sending ? null : _send)),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Expanded(child: AppButton(label: 'Lưu', variant: AppButtonVariant.secondary, onPressed: _save)),
+              const SizedBox(width: 10),
+              Expanded(child: AppButton(label: 'Copy', variant: AppButtonVariant.secondary, onPressed: _copy)),
+            ]),
+            const SizedBox(height: 8),
+            AppButton(label: 'Gửi cho khách hàng', variant: AppButtonVariant.primary, loading: _sending, onPressed: _sending ? null : _send),
           ]),
         ),
       ),
     ]);
   }
+
+  /// A point count without the unit: 2500 -> "2.500", 2.5 -> "2,5".
+  static String _pt(double n) => points(n).replaceFirst(' điểm', '');
 }

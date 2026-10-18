@@ -33,10 +33,10 @@ void main() {
     expect(taps, 0);
   });
 
-  testWidgets('AppButton.icon: tooltip + semantics label, 44dp target', (tester) async {
+  testWidgets('AppButton.icon: tooltip + semantics label, compact 34dp target', (tester) async {
     await tester.pumpWidget(_wrap(AppButton.icon(label: 'Đóng', icon: Icons.close, onPressed: () {})));
     expect(find.byTooltip('Đóng'), findsOneWidget);
-    expect(tester.getSize(find.byType(TextButton)).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(find.byType(TextButton)).height, greaterThanOrEqualTo(34));
   });
 
   testWidgets('ActionBar (wide): start left, children right with the primary last', (tester) async {

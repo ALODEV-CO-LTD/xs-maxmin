@@ -83,7 +83,7 @@ void main() {
     expect(find.text('Thêm số liệu mới'), findsOneWidget);
     expect(find.text('Thêm số liệu'), findsOneWidget);
     // quick-entry box (message or photo): parse -> preview (nothing is saved)
-    expect(find.text('Chọn ảnh'), findsOneWidget);
+    expect(find.byTooltip('Chọn ảnh'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextField, 'Nhập nhanh: tin nhắn hoặc ảnh của khách'), 'de 12 34 x 10\n56 x 3\n77');
     await tester.pump();
     await tester.ensureVisible(find.text('Phân tích'));
@@ -113,7 +113,7 @@ void main() {
     expect(find.text('An'), findsNothing);
     expect(find.text('Bình'), findsOneWidget);
 
-    await tester.tap(find.text('Cấu hình tính điểm'));
+    await tester.tap(find.byTooltip('Cấu hình tính điểm'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Khách thuộc miền nào'), findsOneWidget);
     expect(find.text('Chưa chọn (tính như khách Bắc)'), findsOneWidget);
@@ -146,7 +146,7 @@ void main() {
     expect(find.byKey(const ValueKey('group-other')), findsOneWidget); // empty groups show while editing
     expect(find.text('+ Thêm cách đánh'), findsWidgets);
     expect(find.byKey(const ValueKey('add-de')), findsOneWidget);
-    expect(find.text('Bỏ cấu hình riêng'), findsOneWidget);
+    expect(find.text('Bỏ riêng'), findsOneWidget);
     expect(find.text('Lưu cấu hình khách này'), findsOneWidget);
     final price = find.widgetWithText(TextFormField, 'Giá tiền / 1 điểm').first;
     await tester.enterText(price, '15000');

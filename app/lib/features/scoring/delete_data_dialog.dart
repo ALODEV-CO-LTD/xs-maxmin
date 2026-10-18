@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/app_dialog.dart';
 import 'date_field.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 /// "Xóa số liệu": delete saved entries now - one customer or everyone, an optional date range, optionally keeping the
 /// newest N days. Shows how many entries would go (dry run, no password) and needs the account password.
@@ -140,7 +141,7 @@ class _DeleteDataDialogState extends State<DeleteDataDialog> {
       body: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Chọn phạm vi cần xóa. Số liệu đã xóa không thể khôi phục.', style: TextStyle(color: context.mutedColor, fontSize: 13)),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
+        AppDropdown<String>(
           initialValue: _scope,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Phạm vi'),

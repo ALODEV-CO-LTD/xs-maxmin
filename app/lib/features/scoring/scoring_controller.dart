@@ -47,9 +47,10 @@ class ScoringController extends ChangeNotifier {
 
   String selectedCustomer = '';
   String regionFilter = 'all';
-  String preset = 'all';
-  String dateFrom = '';
-  String dateTo = '';
+  // The list opens on today (Thời gian: Hôm nay); "Tất cả" / 7 / 30 ngày are one pick away.
+  late String preset = 'today';
+  late String dateFrom = _today;
+  late String dateTo = _today;
   bool onlyMissing = false;
   int shownDays = pageDays;
 
@@ -167,6 +168,30 @@ class ScoringController extends ChangeNotifier {
   void setTo(String v) {
     dateTo = v;
     preset = 'custom';
+    _filtersChanged();
+  }
+
+  /// One day for the whole screen ('' = every day).
+  void setDay(String v) {
+    dateFrom = dateTo = v;
+    preset = v.isEmpty ? 'all' : 'custom';
+    _filtersChanged();
+  }
+
+  /// The Tính điểm tab was opened (or Tính lại was pressed): forget the lottery results and calculations kept in memory (a result may
+  /// have been saved in Kết quả, numbers added or changed in Nhập số), read everything again and open the customer and day chosen in
+  /// Nhập số. Without this the screen kept showing "no result" for a day whose result was saved afterwards.
+  Future<void> syncFrom({String customer = '', String date = ''}) async {
+    lotteryCache.clear();
+    _calculated.clear();
+    status.clear();
+    calcVersion++;
+    await load();
+    if (customer.isNotEmpty && customers.any((c) => c.name == customer)) selectedCustomer = customer;
+    if (date.isNotEmpty) {
+      dateFrom = dateTo = date;
+      preset = 'custom';
+    }
     _filtersChanged();
   }
 

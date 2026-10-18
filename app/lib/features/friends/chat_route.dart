@@ -16,7 +16,7 @@ class ChatRoutePage extends StatelessWidget {
     return ListenableBuilder(
       listenable: hub,
       builder: (context, _) {
-        final Friend? f = hub.friends.where((x) => x.id == friendId).firstOrNull;
+        final Friend? f = hub.friends.where((x) => x.id == friendId).firstOrNull ?? hub.groups.where((x) => x.id == friendId).firstOrNull;
         if (f != null && hub.chat != null) return ChatPage(controller: hub, friend: f);
         if (hub.loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
         return Scaffold(appBar: AppBar(), body: const Center(child: Text('Không tìm thấy cuộc trò chuyện này.')));

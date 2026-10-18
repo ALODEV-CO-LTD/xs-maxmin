@@ -300,10 +300,92 @@ void main() {
       expect(t.profit, 1149 - 50);
     });
     test('shortNum', () {
-      expect(shortNum(1500), '1.5K');
-      expect(shortNum(2000000), '2M');
-      expect(shortNum(-3000), '-3K');
+      expect(shortNum(1500), '1,5k');
+      expect(shortNum(2000000), '2tr');
+      expect(shortNum(-3000), '-3k');
+      expect(shortNum(3200000000), '3,2 tỷ');
       expect(shortNum(12), '12');
+      expect(shortNum(0), '0');
+    });
+    test('ISO weeks start on Monday', () {
+      // 2026-03-02 is a Monday; 2026-03-01 (Sunday) belongs to the week of 2026-02-23.
+      expect(keyOf('2026-03-02', StatUnit.week), '2026-03-02');
+      expect(keyOf('2026-03-01', StatUnit.week), '2026-02-23');
+      expect(keyOf('2026-03-08T10:00:00Z', StatUnit.week), '2026-03-02');
+      expect(keyOf('bad', StatUnit.week), '');
+      expect(isoWeek(DateTime.utc(2026, 1, 1)), 1);
+      expect(isoWeek(DateTime.utc(2024, 12, 30)), 1);
+      expect(isoWeek(DateTime.utc(2021, 1, 3)), 53);
+      final k = periodKeys(StatUnit.week, DateTime(2026, 3, 4));
+      expect(k.length, 12);
+      expect(k.last, '2026-03-02');
+      expect(k[10], '2026-02-23');
+      expect(labelOf('2026-03-02', StatUnit.week), '02/03');
+      expect(fullLabelOf('2026-02-23', StatUnit.week), 'Tuần 9 (23/02 – 01/03/2026)');
+    });
+    test('series by week, month, year with empty periods = 0', () {
+      const es = [
+        StatEntry(customerName: 'A', entryDate: '2026-03-01', score: '10', result: '4'),
+        StatEntry(customerName: 'A', entryDate: '2026-03-02', score: '100', result: '30'),
+        StatEntry(customerName: 'A', entryDate: '2026-03-08', score: '1', result: ''),
+      ];
+      final now = DateTime(2026, 3, 4);
+      final w = buildSeries(es, StatUnit.week, StatMetric.vao, now);
+      expect(w.map((p) => p.key).last, '2026-03-02');
+      expect(w.last.value, 101);
+      expect(w[w.length - 2].value, 10);
+      expect(w.first.value, 0);
+      expect(buildSeries(es, StatUnit.week, StatMetric.profit, now).last.value, 71);
+      final m = buildSeries(es, StatUnit.month, StatMetric.ra, now);
+      expect(m.length, 12);
+      expect(m.last.label, '03/26');
+      expect(m.last.full, 'Tháng 03/2026');
+      expect(m.last.value, 34);
+      expect(m.first.value, 0);
+      expect(buildSeries(es, StatUnit.year, StatMetric.vao, now).map((p) => p.label).toList(), ['2022', '2023', '2024', '2025', '2026']);
+      expect(buildSeries(es, StatUnit.year, StatMetric.vao, now).last.full, 'Năm 2026');
+    });
+    test('previous window and percent change', () {
+      const es = [
+        StatEntry(customerName: 'A', entryDate: '2026-03-02', score: '100', result: ''),
+        StatEntry(customerName: 'A', entryDate: '2026-01-20', score: '50', result: ''),
+      ];
+      final now = DateTime(2026, 3, 2);
+      final cur = sumOf(buildSeries(es, StatUnit.day, StatMetric.vao, now));
+      final prev = sumOf(buildSeries(es, StatUnit.day, StatMetric.vao, previousAnchor(StatUnit.day, now)));
+      expect(cur, 100);
+      expect(prev, 50);
+      expect(percentChange(cur, prev), 100);
+      expect(percentChange(5, 0), isNull);
+      expect(percentChange(-50, -100), 50);
+      expect(previousAnchor(StatUnit.month, now).month, 3);
+      expect(previousAnchor(StatUnit.month, now).year, 2025);
+    });
+    test('label step and indices never overlap, keep first and last', () {
+      expect(labelStep(30, 300, 30), 4);
+      expect(labelStep(5, 300, 30), 1);
+      for (final n in [5, 12, 30]) {
+        for (final step in [1, 2, 3, 4, 7]) {
+          final idx = labelIndices(n, step);
+          expect(idx.first, 0);
+          expect(idx.last, n - 1);
+          for (var i = 1; i < idx.length; i++) {
+            expect(idx[i] - idx[i - 1] >= (step / 2).floor().clamp(1, 99), isTrue, reason: 'n=$n step=$step $idx');
+          }
+        }
+      }
+    });
+    test('niceAxis contains zero and data, with round ticks', () {
+      final a = niceAxis(-130, 870);
+      expect(a.min <= -130 && a.max >= 870, isTrue);
+      expect(a.ticks.contains(0.0), isTrue);
+      expect(a.ticks.first, a.min);
+      expect(a.ticks.last, a.max);
+      final z = niceAxis(0, 0);
+      expect(z.max, 1);
+      final p = niceAxis(0, 1234567);
+      expect(p.min, 0);
+      expect(p.max, 1500000);
     });
   });
 }

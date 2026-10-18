@@ -96,6 +96,23 @@ void main() {
     expect(find.descendant(of: find.byType(AppBar), matching: find.text('Tổng quan')), findsOneWidget);
   });
 
+  testWidgets('Tính điểm opens on the customer and day chosen in Nhập số (no second pick)', (tester) async {
+    await _pump(tester);
+    await tester.tap(_nav('Tính toán'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('-- Chọn khách hàng --'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('An').last);
+    await tester.pumpAndSettle();
+    await tester.tap(_tab('Tính điểm'));
+    await _settle(tester);
+    await tester.pumpAndSettle();
+    // the customer is already chosen there: the "pick a customer" hint is gone, only customer + day are asked
+    expect(find.text('Chọn khách hàng ở trên để xem điểm ra của họ.'), findsNothing);
+    expect(find.text('Xổ số'), findsNothing);
+    expect(find.text('Thời gian'), findsNothing);
+  });
+
   testWidgets('Tính toán has the four sub-tabs in order and each keeps its state', (tester) async {
     await _pump(tester);
     await tester.tap(_nav('Tính toán'));
@@ -114,7 +131,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Thêm khách hàng'), findsOneWidget);
     expect(find.text('Cấu hình tính điểm mặc định'), findsNothing); // moved to the Cấu hình tab
-    expect(find.text('Cấu hình tính điểm'), findsOneWidget); // the customer's own config stays
+    expect(find.byTooltip('Cấu hình tính điểm'), findsOneWidget); // the customer's own config stays (an icon button)
 
     await tester.tap(_tab('Nhập số'));
     await tester.pumpAndSettle();
@@ -153,7 +170,7 @@ void main() {
     await _pump(tester);
     await tester.tap(_nav('Bạn bè'));
     await _settle(tester);
-    expect(find.text('Bạn bè & tin nhắn'), findsOneWidget);
+    expect(find.text('Tin nhắn'), findsOneWidget);
     expect(find.byType(BackButton), findsNothing);
 
     await tester.tap(_nav('Cấu hình'));

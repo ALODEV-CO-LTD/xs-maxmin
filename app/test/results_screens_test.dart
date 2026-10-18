@@ -35,11 +35,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Nhập kết quả xổ số rồi bấm'), findsOneWidget); // (the heading is the Kết quả tab of Tính toán)
     expect(find.text('Lưu kết quả', skipOffstage: false), findsOneWidget);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -1500));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Điểm ra ngày'), findsWidgets);
-    await tester.drag(find.byType(ListView).first, const Offset(0, 3000));
-    await tester.pumpAndSettle();
+    expect(find.textContaining('Điểm ra ngày'), findsNothing); // the tab only enters and shows results
     await tester.tap(find.text('Miền Nam'));
     await tester.pumpAndSettle();
     expect(find.text('Đồng Nai', skipOffstage: false), findsOneWidget);
@@ -60,11 +56,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('An').last);
     await tester.pumpAndSettle();
+    expect(find.text('Ngày'), findsWidgets); // only the customer and the day are chosen here
+    expect(find.text('Xổ số'), findsNothing);
+    expect(find.text('Thời gian'), findsNothing);
+    // the day opens on today; "Bỏ ngày" shows every day
+    await tester.tap(find.byTooltip('Bỏ ngày'));
+    await tester.pumpAndSettle();
     // (with the heading gone the summary and the first day are already on screen)
     expect(find.text('(1) Tiền khách gửi', skipOffstage: false), findsWidgets);
     expect(find.text('(2) Tiền khách trúng', skipOffstage: false), findsWidgets);
     expect(find.text('(3) Còn lại = (1) − (2)', skipOffstage: false), findsWidgets);
-    expect(find.text('Tất cả các miền', skipOffstage: false), findsWidgets);
     await tester.scrollUntilVisible(find.text('Số lô'), 200, scrollable: find.byType(Scrollable).first);
     expect(tester.takeException(), isNull);
   });

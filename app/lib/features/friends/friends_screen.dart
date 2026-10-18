@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
+import 'chat_models.dart';
 import 'chat_page.dart';
 import 'friends_controller.dart';
 import 'messaging_host.dart';
@@ -20,6 +21,7 @@ class FriendsScreen extends StatefulWidget {
 
 class _FriendsScreenState extends State<FriendsScreen> {
   final _search = TextEditingController();
+  bool _searching = false;
   final _searchFocus = FocusNode();
   bool _copied = false;
   bool _edit = false; // Sửa: pick conversations to archive / delete
@@ -49,10 +51,20 @@ class _FriendsScreenState extends State<FriendsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Bật thông báo?'),
-        content: const Text('Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ, nên chỉ nhận được khi ứng dụng đang chạy. Bật thông báo để biết khi có tin nhắn hoặc cuộc gọi đến. Thông báo chỉ ghi "Tin nhắn mới từ <tên>", không hiện nội dung.'),
+        content: const Text(
+          'Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ, nên chỉ nhận được khi ứng dụng đang chạy. Bật thông báo để biết khi có tin nhắn hoặc cuộc gọi đến. Thông báo chỉ ghi "Tin nhắn mới từ <tên>", không hiện nội dung.',
+        ),
         actions: [
-          AppButton(label: 'Để sau', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
-          AppButton(label: 'Bật thông báo', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, true)),
+          AppButton(
+            label: 'Để sau',
+            variant: AppButtonVariant.ghost,
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          AppButton(
+            label: 'Bật thông báo',
+            variant: AppButtonVariant.primary,
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
         ],
       ),
     );
@@ -72,10 +84,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   void _openChat(Friend? f) {
     if (f == null || _c == null) return;
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ChatPage(controller: _c!, friend: f)));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatPage(controller: _c!, friend: f),
+      ),
+    );
   }
 
-  void _toggleEdit() => setState(() { _edit = !_edit; _picked.clear(); });
+  void _toggleEdit() => setState(() {
+    _edit = !_edit;
+    _picked.clear();
+  });
 
   Future<void> _archivePicked(FriendsController c) async {
     await c.chat?.setArchived(_picked.toList(), !_showArchived);
@@ -89,45 +108,89 @@ class _FriendsScreenState extends State<FriendsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xoá cuộc trò chuyện'),
-        content: Text('Xoá ${ids.length} cuộc trò chuyện khỏi máy này? Tin nhắn và ảnh trong đó sẽ mất trên máy này (người kia vẫn giữ bản của họ). Bạn bè vẫn còn trong danh bạ.'),
+        content: Text(
+          'Xoá ${ids.length} cuộc trò chuyện khỏi máy này? Tin nhắn và ảnh trong đó sẽ mất trên máy này (người kia vẫn giữ bản của họ). Bạn bè vẫn còn trong danh bạ; nhóm thì bạn sẽ rời khỏi nhóm.',
+        ),
         actions: [
-          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
-          AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+          AppButton(
+            label: 'Huỷ',
+            variant: AppButtonVariant.ghost,
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          AppButton(
+            label: 'Xoá',
+            variant: AppButtonVariant.danger,
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
         ],
       ),
     );
     if (ok != true) return;
     for (final id in ids) {
-      await c.chat?.deleteConversation(id);
+      // A group is left (the members are told); a friend's conversation is only cleared on this device.
+      if (isGroupId(id)) {
+        await c.chat?.leaveGroup(id);
+      } else {
+        await c.chat?.deleteConversation(id);
+      }
     }
     await c.refreshFriendList(quiet: true);
     if (mounted) _toggleEdit();
   }
 
-  /// "Mới": Tin nhắn mới / Nhóm mới / Danh bạ mới.
+  /// "Thêm": Tin nhắn mới / Nhóm mới / Danh bạ mới.
   Future<void> _newMenu(FriendsController c) async {
     final pick = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Padding(padding: EdgeInsets.all(12), child: Text('Tạo mới', style: TextStyle(fontWeight: FontWeight.w700))),
-          ListTile(title: const Text('Tin nhắn mới'), onTap: () => Navigator.pop(ctx, 'message')),
-          ListTile(title: const Text('Nhóm mới'), onTap: () => Navigator.pop(ctx, 'group')),
-          ListTile(title: const Text('Danh bạ mới'), onTap: () => Navigator.pop(ctx, 'contact')),
-        ]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Tạo mới',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            ListTile(
+              title: const Text('Tin nhắn mới'),
+              onTap: () => Navigator.pop(ctx, 'message'),
+            ),
+            ListTile(
+              title: const Text('Nhóm mới'),
+              onTap: () => Navigator.pop(ctx, 'group'),
+            ),
+            ListTile(
+              title: const Text('Danh bạ mới'),
+              onTap: () => Navigator.pop(ctx, 'contact'),
+            ),
+          ],
+        ),
       ),
     );
     if (!mounted || pick == null) return;
     switch (pick) {
       case 'message':
-        final friends = [...c.friends]..sort((a, b) => foldVi(c.nameOf(a)).compareTo(foldVi(c.nameOf(b))));
+        final friends = [...c.friends]
+          ..sort((a, b) => foldVi(c.nameOf(a)).compareTo(foldVi(c.nameOf(b))));
         final f = await showDialog<Friend>(
           context: context,
           builder: (ctx) => SimpleDialog(
             title: const Text('Tin nhắn mới'),
             children: [
-              if (friends.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Chưa có bạn bè. Chọn Danh bạ mới để tìm người và kết bạn.')),
-              for (final f in friends) SimpleDialogOption(onPressed: () => Navigator.pop(ctx, f), child: Text(c.nameOf(f))),
+              if (friends.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Chưa có bạn bè. Chọn Danh bạ mới để tìm người và kết bạn.',
+                  ),
+                ),
+              for (final f in friends)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, f),
+                  child: Text(c.nameOf(f)),
+                ),
             ],
           ),
         );
@@ -136,10 +199,32 @@ class _FriendsScreenState extends State<FriendsScreen> {
           _openChat(f);
         }
       case 'group':
-        await showDialog<void>(context: context, builder: (ctx) => _GroupDialog(friends: c.friends, nameOf: c.nameOf));
+        final gid = await showDialog<String>(
+          context: context,
+          builder: (ctx) => _GroupDialog(controller: c),
+        );
+        if (gid != null && mounted) {
+          await c.refreshFriendList(quiet: true);
+          setState(() => _showArchived = false);
+          _openChat(c.groups.where((g) => g.id == gid).firstOrNull);
+        }
       default:
-        _searchFocus.requestFocus();
+        _openSearch();
     }
+  }
+
+  /// The search box lives in the top bar: opened by the magnifier (or by "Danh bạ mới"), closed by the X (clears the filter).
+  void _openSearch() {
+    setState(() => _searching = true);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _searchFocus.requestFocus(),
+    );
+  }
+
+  void _closeSearch(FriendsController c) {
+    _search.clear();
+    c.setSearch('');
+    setState(() => _searching = false);
   }
 
   Future<void> _copyCode(String code) async {
@@ -150,13 +235,121 @@ class _FriendsScreenState extends State<FriendsScreen> {
     });
   }
 
+  /// The ID used to be a card at the top of the list; now it is shown only when the person asks (the badge icon in the top bar).
+  Future<void> _showMyId(FriendsController c) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: StatefulBuilder(
+          builder: (sheet, setSheet) => Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'ID của bạn',
+                  style: Theme.of(sheet).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Đưa ID này cho người muốn kết bạn với bạn.',
+                  style: Theme.of(sheet).textTheme.bodySmall
+                      ?.copyWith(color: sheet.mutedColor),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                if (c.myCode.isNotEmpty) ...[
+                  SelectableText(
+                    c.myCode,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(sheet).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 4,
+                      color: Theme.of(sheet).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  AppButton(
+                    label: _copied ? 'Đã chép' : 'Sao chép',
+                    icon: Icons.copy,
+                    variant: AppButtonVariant.primary,
+                    onPressed: () async {
+                      await _copyCode(c.myCode);
+                      if (sheet.mounted) setSheet(() {});
+                    },
+                  ),
+                ] else
+                  Text(
+                    'Chưa có ID. Tạo ID trong Tài khoản.',
+                    style: Theme.of(sheet).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _c;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bạn bè & tin nhắn'),
-        actions: [if (c != null) IconButton(icon: const Icon(Icons.settings_outlined), tooltip: 'Cài đặt tin nhắn', onPressed: () => showMessagingSettings(context, c))],
+        title: _searching && c != null
+            ? TextField(
+                controller: _search,
+                focusNode: _searchFocus,
+                onChanged: c.setSearch,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: 'Tìm kiếm',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                ),
+              )
+            : const Text('Tin nhắn'),
+        actions: [
+          if (c != null && _searching)
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Đóng tìm kiếm',
+              onPressed: () => _closeSearch(c),
+            )
+          else if (c != null) ...[
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: 'Tìm kiếm',
+              onPressed: _openSearch,
+            ),
+            AppButton(
+              label: _edit ? 'Xong' : 'Sửa',
+              variant: AppButtonVariant.ghost,
+              onPressed: _toggleEdit,
+            ),
+            AppButton(
+              label: 'Thêm',
+              variant: AppButtonVariant.ghost,
+              onPressed: () => _newMenu(c),
+            ),
+            IconButton(
+              icon: const Icon(Icons.badge_outlined),
+              tooltip: 'ID của bạn',
+              onPressed: () => _showMyId(c),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Cài đặt tin nhắn',
+              onPressed: () => showMessagingSettings(context, c),
+            ),
+          ],
+        ],
       ),
       body: c == null
           ? const Center(child: CircularProgressIndicator())
@@ -172,125 +365,175 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final q = c.searchQuery.trim();
     final all = c.filteredFriends;
     final archived = c.chat?.archived ?? const <String>{};
-    final friends = [for (final f in all) if (archived.contains(f.id) == _showArchived) f];
-    final archivedCount = c.friends.where((f) => archived.contains(f.id)).length;
+    final friends = [
+      for (final f in all)
+        if (archived.contains(f.id) == _showArchived) f,
+    ];
+    final archivedCount = c.conversations
+        .where((f) => archived.contains(f.id))
+        .length;
     return RefreshIndicator(
       onRefresh: () async {
         await c.chat?.loadFriendKeys();
         await c.refreshFriendList();
         await c.pollUnread();
       },
+      // The conversation rows run edge to edge (like a messenger list); everything else keeps the 16 dp side margin.
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          if (c.myCode.isNotEmpty)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('ID của bạn', style: theme.textTheme.labelLarge?.copyWith(color: context.mutedColor)),
-                      Text(c.myCode, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 3, color: theme.colorScheme.primary)),
-                    ]),
-                  ),
-                  AppButton(label: _copied ? 'Đã chép' : 'Sao chép', variant: AppButtonVariant.secondary, onPressed: () => _copyCode(c.myCode)),
-                ]),
-              ),
-            )
-          else if (c.noMyCode)
-            Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Chưa có ID. Tạo ID trong Tài khoản.', style: theme.textTheme.bodyMedium))),
-          if (c.supportUnread > 0) ...[
-            const SizedBox(height: 8),
-            Card(child: ListTile(leading: const Icon(Icons.support_agent), title: Text('Có ${c.supportUnread} phản hồi mới từ Admin'), subtitle: const Text('Chạm để xem Hỗ trợ từ Admin'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/support'))),
-          ],
-          const SizedBox(height: 12),
-          Row(children: [
-            AppButton(label: _edit ? 'Xong' : 'Sửa', variant: AppButtonVariant.ghost, onPressed: _toggleEdit),
-            const SizedBox(width: 4),
-            Expanded(
-              child: TextField(
-                controller: _search,
-                focusNode: _searchFocus,
-                onChanged: c.setSearch,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Tìm kiếm',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: q.isEmpty ? null : IconButton(icon: const Icon(Icons.close), tooltip: 'Xoá', onPressed: () { _search.clear(); c.setSearch(''); }),
+          if (c.supportUnread > 0)
+            _side(
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.support_agent),
+                  title: Text('Có ${c.supportUnread} phản hồi mới từ Admin'),
+                  subtitle: const Text('Chạm để xem Hỗ trợ từ Admin'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/support'),
                 ),
               ),
             ),
-            const SizedBox(width: 4),
-            TextButton(onPressed: () => _newMenu(c), child: const Text('Mới', style: TextStyle(fontWeight: FontWeight.w700))),
-          ]),
-          Padding(padding: const EdgeInsets.only(top: 6, left: 4), child: Text('Lọc bạn bè của bạn và tìm người mới để kết bạn.', style: theme.textTheme.bodySmall?.copyWith(color: context.mutedColor))),
-          if (c.searchError.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(c.searchError, style: TextStyle(color: context.badColor))),
+          if (c.searchError.isNotEmpty) _side(Text(c.searchError, style: TextStyle(color: context.badColor))),
           if (q.isNotEmpty && (c.searching || c.newPeople.isNotEmpty)) ...[
-            const SizedBox(height: 12),
-            Text('Người mới', style: theme.textTheme.titleSmall),
-            if (c.searching && c.newPeople.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Đang tìm…')),
+            _side(Text('Người mới', style: theme.textTheme.titleSmall)),
+            if (c.searching && c.newPeople.isEmpty) _side(const Text('Đang tìm…')),
             for (final r in c.newPeople)
-              Card(
-                margin: const EdgeInsets.only(top: 8),
-                child: ListTile(
-                  title: Text(r.name),
-                  subtitle: Text('@${r.username}'),
-                  trailing: AppButton(label: c.addingId == r.id ? '…' : 'Kết bạn', variant: AppButtonVariant.secondary, onPressed: c.addingId == r.id ? null : () => c.addFriend(r)),
+              _side(
+                Card(
+                  margin: const EdgeInsets.only(top: 8),
+                  child: ListTile(
+                    title: Text(r.name),
+                    subtitle: Text('@${r.username}'),
+                    trailing: AppButton(
+                      label: c.addingId == r.id ? '…' : 'Kết bạn',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: c.addingId == r.id ? null : () => c.addFriend(r),
+                    ),
+                  ),
                 ),
               ),
+            const SizedBox(height: 8),
           ],
-          const SizedBox(height: 16),
           if (c.loading)
-            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+            _side(const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())))
           else if (c.loadError.isNotEmpty)
-            Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [Text(c.loadError, style: TextStyle(color: context.badColor)), AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: c.refreshFriendList)])))
+            _side(
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(c.loadError, style: TextStyle(color: context.badColor)),
+                      AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, onPressed: c.refreshFriendList),
+                    ],
+                  ),
+                ),
+              ),
+            )
           else ...[
-            if (q.isNotEmpty && friends.isNotEmpty) Text('Bạn bè', style: theme.textTheme.titleSmall),
-            if (c.friends.isEmpty)
-              const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Chưa có bạn bè nào. Bấm Mới > Danh bạ mới để tìm và kết bạn.')))
+            if (q.isNotEmpty && friends.isNotEmpty) _side(Text('Bạn bè', style: theme.textTheme.titleSmall)),
+            if (c.conversations.isEmpty)
+              _side(const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Chưa có bạn bè nào. Bấm Thêm > Danh bạ mới để tìm và kết bạn.'))))
             else if (friends.isEmpty)
               if (q.isNotEmpty)
                 (!c.searching && c.newPeople.isEmpty)
-                    ? Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Không tìm thấy ai khớp với "$q". Nếu là mã ID, hãy kiểm tra lại các chữ số.')))
+                    ? _side(Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Không tìm thấy ai khớp với "$q". Nếu là mã ID, hãy kiểm tra lại các chữ số.'))))
                     : const SizedBox.shrink()
               else
-                Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(_showArchived ? 'Chưa lưu trữ cuộc trò chuyện nào.' : 'Chưa có cuộc trò chuyện nào. Bấm Mới > Tin nhắn mới để bắt đầu.')))
+                _side(Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(_showArchived ? 'Chưa lưu trữ cuộc trò chuyện nào.' : 'Chưa có cuộc trò chuyện nào. Bấm Thêm > Tin nhắn mới để bắt đầu.'))))
             else
               for (final f in friends) _friendTile(context, c, f),
             if (_edit)
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                AppButton(label: '${_showArchived ? 'Bỏ lưu trữ' : 'Lưu trữ'}${_picked.isEmpty ? '' : ' (${_picked.length})'}', variant: AppButtonVariant.ghost, onPressed: _picked.isEmpty ? null : () => _archivePicked(c)),
-                TextButton(onPressed: _picked.isEmpty ? null : () => _deletePicked(c), child: Text('Xoá${_picked.isEmpty ? '' : ' (${_picked.length})'}', style: TextStyle(color: _picked.isEmpty ? null : context.badColor))),
-              ])
+              _side(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppButton(
+                      label: '${_showArchived ? 'Bỏ lưu trữ' : 'Lưu trữ'}${_picked.isEmpty ? '' : ' (${_picked.length})'}',
+                      variant: AppButtonVariant.ghost,
+                      onPressed: _picked.isEmpty ? null : () => _archivePicked(c),
+                    ),
+                    TextButton(
+                      onPressed: _picked.isEmpty ? null : () => _deletePicked(c),
+                      child: Text('Xoá${_picked.isEmpty ? '' : ' (${_picked.length})'}', style: TextStyle(color: _picked.isEmpty ? null : context.badColor)),
+                    ),
+                  ],
+                ),
+              )
             else if (archivedCount > 0 || _showArchived)
-              Center(child: AppButton(label: _showArchived ? '← Về tin nhắn' : 'Đã lưu trữ ($archivedCount)', variant: AppButtonVariant.ghost, onPressed: () => setState(() => _showArchived = !_showArchived))),
+              _side(
+                Center(
+                  child: AppButton(
+                    label: _showArchived ? '← Về tin nhắn' : 'Đã lưu trữ ($archivedCount)',
+                    variant: AppButtonVariant.ghost,
+                    onPressed: () => setState(() => _showArchived = !_showArchived),
+                  ),
+                ),
+              ),
           ],
         ],
       ),
     );
   }
 
+  Widget _side(Widget w) => Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), child: w);
+
+  /// One conversation row in the style of a messenger list: round avatar, bold name, one-line preview, the time of the last
+  /// message at the right (with the unread badge under it) and a thin line between rows (no card around each row).
   Widget _friendTile(BuildContext context, FriendsController c, Friend f) {
     final theme = Theme.of(context);
     final unread = c.chat?.unread[f.id] ?? 0;
     final missed = c.unseenMissed[f.id] ?? 0;
     final name = c.nameOf(f);
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
-      child: ListTile(
-        onTap: _edit ? () => setState(() => _picked.contains(f.id) ? _picked.remove(f.id) : _picked.add(f.id)) : () => _openChat(f),
-        leading: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (_edit) Checkbox(value: _picked.contains(f.id), onChanged: (_) => setState(() => _picked.contains(f.id) ? _picked.remove(f.id) : _picked.add(f.id))),
-          CircleAvatar(backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2), child: Text(initialOf(name))),
-        ]),
-        title: Row(children: [
-          Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
-          if (unread > 0) ...[const SizedBox(width: 8), _Badge(text: unread > 99 ? '99+' : '$unread', color: theme.colorScheme.primary)],
-          if (missed > 0) ...[const SizedBox(width: 6), _Badge(text: '☎ $missed', color: context.badColor)],
-        ]),
-        subtitle: Text(f.lastMessage ?? 'Chưa có tin nhắn', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: unread > 0 ? FontWeight.w700 : null)),
-      ),
+    final time = chatListTime(f.lastMessageAt, DateTime.now());
+    void toggle() => setState(() => _picked.contains(f.id) ? _picked.remove(f.id) : _picked.add(f.id));
+    return Column(
+      children: [
+        InkWell(
+          onTap: _edit ? toggle : () => _openChat(f),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Row(
+              children: [
+                if (_edit) Padding(padding: const EdgeInsets.only(right: 4), child: Checkbox(value: _picked.contains(f.id), onChanged: (_) => toggle())),
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: avatarColor(name),
+                  child: f.isGroup ? const Icon(Icons.groups, color: Colors.white, size: 28) : Text(initialOf(name), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                        f.lastMessage ?? 'Chưa có tin nhắn',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 15, color: unread > 0 ? Colors.black : context.mutedColor, fontWeight: unread > 0 ? FontWeight.w600 : null),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(time, style: TextStyle(fontSize: 13, color: unread > 0 ? theme.colorScheme.primary : context.mutedColor)),
+                    if (unread > 0 || missed > 0) const SizedBox(height: 4),
+                    if (unread > 0) _Badge(text: unread > 99 ? '99+' : '$unread', color: theme.colorScheme.primary),
+                    if (missed > 0) _Badge(text: '☎ $missed', color: context.badColor),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        Divider(height: 1, thickness: 1, indent: 16 + 52 + 14.0 + (_edit ? 44 : 0), color: theme.colorScheme.outlineVariant),
+      ],
     );
   }
 }
@@ -301,45 +544,97 @@ String initialOf(String name) {
   return t.isEmpty ? '?' : t.characters.first.toUpperCase();
 }
 
-/// "Nhóm mới": the sheet exists like on the web, but group chat is not on the server yet so "Tạo nhóm" stays disabled.
+/// "Nhóm mới": name + friends to add. The group exists only on the members' devices (end-to-end encrypted, nothing on the server).
 class _GroupDialog extends StatefulWidget {
-  const _GroupDialog({required this.friends, required this.nameOf});
-  final List<Friend> friends;
-  final String Function(Friend) nameOf;
+  const _GroupDialog({required this.controller});
+  final FriendsController controller;
   @override
   State<_GroupDialog> createState() => _GroupDialogState();
 }
 
 class _GroupDialogState extends State<_GroupDialog> {
   final Set<String> _members = {};
+  final _name = TextEditingController();
+  bool _busy = false;
+  String _error = '';
+
   @override
-  Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Tạo nhóm'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const TextField(decoration: InputDecoration(hintText: 'Tên nhóm')),
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  List<Friend> get _friends {
+    final c = widget.controller;
+    // Friends only: an Admin account is not part of chats, and the relay only carries messages between friends.
+    return [...c.friends.where((f) => !f.isAdmin && (c.chat?.friendKeys.containsKey(f.id) ?? false))]..sort((a, b) => foldVi(c.nameOf(a)).compareTo(foldVi(c.nameOf(b))));
+  }
+
+  bool get _canCreate => !_busy && _name.text.trim().isNotEmpty && _members.length >= 2;
+
+  Future<void> _create() async {
+    final c = widget.controller;
+    setState(() {
+      _busy = true;
+      _error = '';
+    });
+    try {
+      final byId = {for (final f in c.friends) f.id: f};
+      final g = await c.chat!.createGroup(_name.text, c.userName, [for (final id in _members) GroupMember(id, c.nameOf(byId[id]!))]);
+      if (mounted) Navigator.pop(context, g.id);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.controller;
+    final friends = _friends;
+    return AlertDialog(
+      title: const Text('Tạo nhóm'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(controller: _name, maxLength: 60, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'Tên nhóm', counterText: '')),
+            const SizedBox(height: 8),
+            Text('Chọn ít nhất 2 bạn bè (${_members.length} đã chọn)', style: TextStyle(fontSize: 13, color: context.mutedColor)),
             Flexible(
-              child: ListView(shrinkWrap: true, children: [
-                if (widget.friends.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Chưa có bạn bè nào để thêm vào nhóm.')),
-                for (final f in widget.friends)
-                  CheckboxListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    value: _members.contains(f.id),
-                    title: Text(widget.nameOf(f)),
-                    onChanged: (_) => setState(() => _members.contains(f.id) ? _members.remove(f.id) : _members.add(f.id)),
-                  ),
-              ]),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  if (friends.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Chưa có bạn bè nào dùng được để thêm vào nhóm.')),
+                  for (final f in friends)
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: _members.contains(f.id),
+                      title: Text(c.nameOf(f)),
+                      onChanged: _busy ? null : (_) => setState(() => _members.contains(f.id) ? _members.remove(f.id) : _members.add(f.id)),
+                    ),
+                ],
+              ),
             ),
-            const Text('Nhóm chat chưa có trên máy chủ nên chưa tạo được nhóm thật.', style: TextStyle(fontSize: 12)),
-          ]),
+            if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error, style: TextStyle(fontSize: 13, color: context.badColor))),
+            const SizedBox(height: 6),
+            Text('Nhóm chỉ nằm trên máy của các thành viên, tin nhắn mã hoá 2 đầu, máy chủ không lưu. Bạn chỉ gửi được cho thành viên là bạn bè của bạn.', style: TextStyle(fontSize: 12, color: context.mutedColor)),
+          ],
         ),
-        actions: [
-          AppButton(label: 'Đóng', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
-          const AppButton(label: 'Tạo nhóm', variant: AppButtonVariant.primary, onPressed: null),
-        ],
-      );
+      ),
+      actions: [
+        AppButton(label: 'Đóng', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
+        AppButton(label: 'Tạo nhóm', variant: AppButtonVariant.primary, loading: _busy, onPressed: _canCreate ? _create : null),
+      ],
+    );
+  }
 }
 
 class _Badge extends StatelessWidget {
@@ -348,8 +643,18 @@ class _Badge extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }

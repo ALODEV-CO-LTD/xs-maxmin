@@ -17,6 +17,7 @@ import 'chat_calc_services.dart';
 import 'chat_decode_model.dart';
 import 'chat_prefill.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 const chatCalcRouteName = 'chat_calc';
 
@@ -173,7 +174,7 @@ class _ChatDecodeScreenState extends State<ChatDecodeScreen> {
           : ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
               Text('Mỗi tin có bản gốc (giữ nguyên) và nội dung giải mã bên dưới. Sửa từng dòng nếu giải mã chưa đúng; dòng có dấu ! cần kiểm tra.', style: TextStyle(fontSize: 13.5, color: context.mutedColor)),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
+              AppDropdown<String>(
                 key: ValueKey('customer-$_customerId-${_customers.length}'),
                 initialValue: _customerId.isEmpty ? null : _customerId,
                 isExpanded: true,
@@ -202,7 +203,7 @@ class _ChatDecodeScreenState extends State<ChatDecodeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 6,
-                  child: DropdownButtonFormField<String>(
+                  child: AppDropdown<String>(
                     key: ValueKey('station-$_date-${stations.loaded}'),
                     initialValue: stationValue,
                     isExpanded: true,

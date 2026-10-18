@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
 import 'package:mamba_app/core/auth_store.dart';
+import 'package:mamba_app/core/widgets/app_dropdown.dart';
 import 'package:mamba_app/core/lottery_stations.dart';
 import 'package:mamba_app/core/mask_store.dart';
 import 'package:mamba_app/features/calc/calc_screen.dart';
@@ -138,7 +139,7 @@ void main() {
     await _pumpScreen(tester, _svc(data, meta, sender), messages: const [DecodeSource('m1', '20lo10\n99xx')], date: '2026-10-15');
 
     // chọn khách (ngày 15/10/2026)
-    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.tap(find.byType(AppDropdown<String>).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('An').last);
     await tester.pumpAndSettle();
@@ -160,8 +161,8 @@ void main() {
     expect(find.text('Kết quả tính toán'), findsOneWidget);
     expect(find.textContaining('Chưa có kết quả đài Thừa Thiên Huế'), findsOneWidget); // không tự đặt số
     expect(find.text('Thử lại'), findsOneWidget);
-    expect(find.text('Tổng tiền khách trúng: Chưa đủ dữ liệu'), findsOneWidget);
-    expect(find.text('Tổng lợi nhuận: Chưa đủ dữ liệu'), findsOneWidget);
+    expect(find.text('Tổng tiền khách trúng'), findsOneWidget);
+    expect(find.text('Chưa đủ dữ liệu'), findsNWidgets(2)); // tiền trúng và lợi nhuận
     expect(find.textContaining('1 dòng cần kiểm tra chưa được tính: 99'), findsOneWidget);
 
     await tester.tap(find.text('Lưu'));
@@ -175,7 +176,7 @@ void main() {
     expect(find.text('Đã sao chép báo cáo'), findsOneWidget);
     expect(clip, startsWith('BÁO CÁO KẾT QUẢ\nĐài: Thừa Thiên Huế\nNgày: 15/10/2026'));
 
-    await tester.tap(find.text('Gửi cho khách'));
+    await tester.tap(find.text('Gửi cho khách hàng'));
     await tester.pumpAndSettle();
     expect(find.text('Gửi cho Khách A'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Gửi'));
@@ -200,7 +201,7 @@ void main() {
   testWidgets('Tính toán có kết quả của đúng đài và ngày: hiện tiền trúng và lợi nhuận', (tester) async {
     final data = _Data(results: {'2026-10-15|mn-dongnai': _result});
     await _pumpScreen(tester, _svc(data, MemoryChatMeta(), null), messages: const [DecodeSource('m1', '20lo10')], date: '2026-10-15');
-    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.tap(find.byType(AppDropdown<String>).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bình').last);
     await tester.pumpAndSettle();
@@ -211,10 +212,11 @@ void main() {
     await tester.tap(find.text('Xác nhận chọn đài'));
     await tester.pumpAndSettle();
     expect(data.asked.single, '2026-10-15|mn-dongnai');
-    expect(find.textContaining('Trúng 50 điểm = 3.500.000đ'), findsOneWidget);
-    expect(find.text('Tổng tiền khách đánh: 126.000đ'), findsOneWidget);
-    expect(find.text('Tổng tiền khách trúng: 3.500.000đ'), findsOneWidget);
-    expect(find.text('Tổng lợi nhuận: -3.374.000đ'), findsOneWidget);
+    expect(find.text('Trúng 50 điểm'), findsOneWidget);
+    expect(find.text('3.500.000đ'), findsNWidgets(2)); // dòng trúng của nhóm và tổng tiền khách trúng
+    expect(find.text('Tổng tiền khách đánh'), findsOneWidget);
+    expect(find.text('126.000đ'), findsWidgets);
+    expect(find.text('-3.374.000đ'), findsOneWidget); // tổng lợi nhuận
     expect(find.textContaining('Chưa có kết quả'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
@@ -330,7 +332,7 @@ void main() {
     expect(find.text('Hãy chọn khách hàng cho số liệu đã nhập trước khi tiếp tục.'), findsOneWidget);
     expect(ChatPrefillHub.instance.hasPending, isFalse);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.tap(find.byType(AppDropdown<String>).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bình').last);
     await tester.pumpAndSettle();

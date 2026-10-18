@@ -6,7 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
-import '../chat_calc/chat_calc_entry.dart';
+import 'package:go_router/go_router.dart';
+
+import '../calc/calc_screen.dart' show calcLocation;
+import '../chat_calc/chat_prefill.dart';
 import 'call_service.dart';
 import 'chat_models.dart';
 import 'chat_service.dart';
@@ -15,6 +18,7 @@ import 'friends_screen.dart' show initialOf;
 import 'image_scrub.dart';
 import 'realtime_socket.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_dropdown.dart';
 
 sealed class _Item {
   _Item(this.at);
@@ -127,7 +131,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _loadCalls() async {
-    _calls = await _c.callsWith(_f.id);
+    _calls = _f.isGroup ? const [] : await _c.callsWith(_f.id);
     _rebuildItems(await _chat.messages(_f.id));
   }
 
@@ -278,8 +282,8 @@ class _ChatPageState extends State<ChatPage> {
       builder: (ctx) => SimpleDialog(
         title: const Text('Chuyển tiếp tới'),
         children: [
-          for (final f in _c.friends.where((x) => !x.isAdmin)) SimpleDialogOption(onPressed: () => Navigator.pop(ctx, f), child: Text(_c.nameOf(f))),
-          if (_c.friends.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Chưa có bạn bè.')),
+          for (final f in [..._c.friends.where((x) => !x.isAdmin), ..._c.groups]) SimpleDialogOption(onPressed: () => Navigator.pop(ctx, f), child: Text(f.isGroup ? '👥 ${_c.nameOf(f)}' : _c.nameOf(f))),
+          if (_c.friends.isEmpty && _c.groups.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Chưa có bạn bè.')),
         ],
       ),
     );
@@ -331,8 +335,14 @@ class _ChatPageState extends State<ChatPage> {
       return;
     }
     if (_picked.isEmpty) return;
-    final chosen = [for (final m in _msgs) if (_picked.contains(m.id)) m]; // original display order
-    openChatDecode(context, friendId: _f.id, friendName: _c.nameOf(_f), messages: chosen);
+    // "Nhập số" here IS the Nhập số screen: the picked messages (original display order) go straight into its quick-entry box.
+    final text = [for (final m in _msgs) if (_picked.contains(m.id)) quoteOf(m.text).body].where((t) => t.isNotEmpty).join('\n');
+    if (text.isEmpty) return;
+    final router = GoRouter.maybeOf(context);
+    ChatPrefillHub.instance.offer(ChatPrefill(text: text));
+    _cancelPick();
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    router?.go(calcLocation('entries'));
   }
 
   void _pickAll() => setState(() => _picked
@@ -341,6 +351,7 @@ class _ChatPageState extends State<ChatPage> {
 
   /// ⚙: own display name (this device only), security code, auto-delete, remove friend.
   Future<void> _openSettings() async {
+    if (_f.isGroup) return _openGroupSettings();
     final r = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -385,22 +396,141 @@ class _ChatPageState extends State<ChatPage> {
     if (mounted) setState(() {});
   }
 
+  /// ⚙ of a group: members, rename, auto-delete, leave.
+  Future<void> _openGroupSettings() async {
+    final g = _chat.groups[_f.id];
+    if (g == null) return;
+    final r = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _GroupSettingsSheet(group: g, myId: _chat.userId, nameOf: (id) => _chat.memberName(g, id), hasRule: _rule != null, isCreator: g.creatorId == _chat.userId),
+    );
+    if (!mounted || r == null) return;
+    switch (r) {
+      case 'add':
+        await _addMembers(g);
+      case final String s when s.startsWith('remove:'):
+        final id = s.substring(7);
+        final who = _chat.memberName(g, id);
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Xoá khỏi nhóm'),
+            content: Text('Xoá $who khỏi nhóm "${g.name}"? Họ sẽ không còn nhận tin của nhóm.'),
+            actions: [
+              AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+              AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+            ],
+          ),
+        );
+        if (ok == true) {
+          try {
+            await _chat.removeGroupMember(g.id, id);
+          } catch (e) {
+            if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+          }
+        }
+      case 'rename':
+        final name = await _askName(g.name);
+        if (name != null && name.trim().isNotEmpty) await _chat.renameGroup(g.id, name);
+      case 'retention':
+        await _openRetention();
+      case 'retention-off':
+        await _chat.setRetention(_f.id, null);
+        if (mounted) setState(() => _rule = null);
+      case 'leave':
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Rời nhóm'),
+            content: Text('Rời nhóm "${g.name}"? Tin nhắn của nhóm sẽ bị xoá khỏi máy này và các thành viên được báo là bạn đã rời.'),
+            actions: [
+              AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+              AppButton(label: 'Rời nhóm', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        await _chat.leaveGroup(g.id);
+        await _c.refreshFriendList(quiet: true);
+        if (mounted) Navigator.of(context).pop();
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// Creator only: pick friends (with a key, not yet in the group) to add.
+  Future<void> _addMembers(ChatGroup g) async {
+    final inGroup = {for (final m in g.members) m.id};
+    final candidates = [for (final f in _c.friends) if (!f.isAdmin && !inGroup.contains(f.id) && _chat.friendKeys.containsKey(f.id)) f];
+    if (candidates.isEmpty) {
+      setState(() => _error = 'Không còn bạn bè nào (đã bật mã hoá 2 đầu) để thêm vào nhóm.');
+      return;
+    }
+    final picked = <String>{};
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Thêm thành viên'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final f in candidates)
+                  CheckboxListTile(dense: true, contentPadding: EdgeInsets.zero, value: picked.contains(f.id), title: Text(_c.nameOf(f)), onChanged: (_) => setS(() => picked.contains(f.id) ? picked.remove(f.id) : picked.add(f.id))),
+              ],
+            ),
+          ),
+          actions: [
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+            AppButton(label: 'Thêm', variant: AppButtonVariant.primary, onPressed: picked.isEmpty ? null : () => Navigator.pop(ctx, true)),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || picked.isEmpty) return;
+    try {
+      final byId = {for (final f in candidates) f.id: f};
+      await _chat.addGroupMembers(g.id, [for (final id in picked) GroupMember(id, _c.nameOf(byId[id]!))]);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<String?> _askName(String current) {
+    final ctrl = TextEditingController(text: current);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Đổi tên nhóm'),
+        content: TextField(controller: ctrl, maxLength: 60, autofocus: true, decoration: const InputDecoration(hintText: 'Tên nhóm')),
+        actions: [
+          AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx)),
+          AppButton(label: 'Lưu', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx, ctrl.text)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final call = _c.call;
-    final info = _chat.peerInfo[_f.id];
-    final hasKey = _chat.friendKeys.containsKey(_f.id);
-    final canCall = call != null && call.canCall && !_f.isAdmin;
+    final group = _chat.groups[_f.id];
+    final info = _f.isGroup ? null : _chat.peerInfo[_f.id];
+    // A group can be written to as long as at least one other member is a friend with a key.
+    final hasKey = _f.isGroup ? (group?.members.any((m) => m.id != _chat.userId && _chat.friendKeys.containsKey(m.id)) ?? false) : _chat.friendKeys.containsKey(_f.id);
+    final canCall = call != null && call.canCall && !_f.isAdmin && !_f.isGroup;
     return Scaffold(
       appBar: AppBar(
         title: Row(children: [
-          CircleAvatar(radius: 14, backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2), child: Text(initialOf(_c.nameOf(_f)), style: const TextStyle(fontSize: 13))),
+          CircleAvatar(radius: 14, backgroundColor: avatarColor(_c.nameOf(_f)), child: _f.isGroup ? const Icon(Icons.groups, size: 18, color: Colors.white) : Text(initialOf(_c.nameOf(_f)), style: const TextStyle(fontSize: 13, color: Colors.white))),
           const SizedBox(width: 8),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_c.nameOf(_f), overflow: TextOverflow.ellipsis),
-              _ConnChip(state: _c.socket.state),
+              if (_f.isGroup) Text('${group?.members.length ?? _f.memberCount} thành viên', style: TextStyle(fontSize: 12, color: context.mutedColor)) else _ConnChip(state: _c.socket.state),
             ]),
           ),
         ]),
@@ -421,12 +551,13 @@ class _ChatPageState extends State<ChatPage> {
                   AppButton(label: 'Đã hiểu', variant: AppButtonVariant.ghost, onPressed: () => _chat.acceptKeyChange(_f.id)),
                 ]),
               ),
-            if (!hasKey) _Banner(color: Brand.warning, child: Text('${_f.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.')),
+            if (!hasKey)
+              _Banner(color: Brand.warning, child: Text(_f.isGroup ? 'Chưa có thành viên nào là bạn bè của bạn dùng mã hoá 2 đầu nên chưa nhắn được trong nhóm này.' : '${_f.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.')),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Row(children: [
                 const Text('🔒 '),
-                Expanded(child: Text('Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.', style: theme.textTheme.bodySmall?.copyWith(color: context.mutedColor))),
+                Expanded(child: Text(_f.isGroup ? 'Mã hoá 2 đầu, không lưu trên máy chủ. Mỗi tin được gửi riêng cho từng thành viên là bạn bè của bạn đang online.' : 'Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.', style: theme.textTheme.bodySmall?.copyWith(color: context.mutedColor))),
               ]),
             ),
             if (_showSecurity && info != null)
@@ -502,8 +633,8 @@ class _ChatPageState extends State<ChatPage> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: _picked.isNotEmpty && _selecting
-                    ? AppButton(label: 'Tính toán', variant: AppButtonVariant.primary, onPressed: _onAction)
-                    : AppButton(label: 'Nhập số liệu', variant: AppButtonVariant.secondary, onPressed: _onAction),
+                    ? AppButton(label: 'Nhập số (${_picked.length})', variant: AppButtonVariant.primary, onPressed: _onAction)
+                    : AppButton(label: 'Nhập số', variant: AppButtonVariant.secondary, onPressed: _onAction),
               ),
             ),
             Padding(
@@ -597,6 +728,7 @@ class _ChatPageState extends State<ChatPage> {
               decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 if (pinned) Text('📌', style: TextStyle(fontSize: 11, color: fg)),
+                if (_f.isGroup && !mine && m.fromId != null) Text(_chat.groups[_f.id] == null ? 'Thành viên' : _chat.memberName(_chat.groups[_f.id]!, m.fromId!), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: avatarColor(m.fromId!))),
                 if (q.quote.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(bottom: 4),
@@ -735,14 +867,14 @@ class _RetentionSheetState extends State<_RetentionSheet> {
         const SizedBox(height: 6),
         Text('Tin nhắn/ảnh cũ hơn thời gian chọn sẽ bị xoá khỏi thiết bị này. Máy chủ không lưu tin nhắn, và thiết bị của ${widget.friendName} có cài đặt riêng.', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 12),
-        DropdownButtonFormField<int>(
+        AppDropdown<int>(
           initialValue: retentionTtls.containsKey(_ttl) ? _ttl : 86400,
           decoration: const InputDecoration(labelText: 'Thời gian tự xoá'),
           items: [for (final e in retentionTtls.entries) DropdownMenuItem(value: e.key, child: Text('Sau ${e.value}'))],
           onChanged: (v) => setState(() => _ttl = v ?? _ttl),
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
+        AppDropdown<String>(
           initialValue: _scope,
           decoration: const InputDecoration(labelText: 'Phạm vi tự xoá'),
           items: const [DropdownMenuItem(value: 'all', child: Text('Tin nhắn và tệp đính kèm')), DropdownMenuItem(value: 'images', child: Text('Chỉ ảnh'))],
@@ -807,6 +939,51 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 if (context.mounted) Navigator.pop(context, 'saved');
               }),
           ]),
+        ]),
+      ),
+    );
+  }
+}
+
+/// ⚙ sheet of a group: the member list and the group tools.
+class _GroupSettingsSheet extends StatelessWidget {
+  const _GroupSettingsSheet({required this.group, required this.myId, required this.nameOf, required this.hasRule, required this.isCreator});
+  final ChatGroup group;
+  final String myId;
+  final String Function(String id) nameOf;
+  final bool hasRule;
+  final bool isCreator;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(child: CircleAvatar(radius: 32, backgroundColor: avatarColor(group.name), child: const Icon(Icons.groups, size: 34, color: Colors.white))),
+          const SizedBox(height: 6),
+          Center(child: Text(group.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17))),
+          Center(child: Text('${group.members.length} thành viên', style: TextStyle(color: context.mutedColor))),
+          const SizedBox(height: 10),
+          for (final m in group.members)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(radius: 16, backgroundColor: avatarColor(m.name), child: Text(initialOf(m.name), style: const TextStyle(color: Colors.white, fontSize: 14))),
+              title: Text(nameOf(m.id)),
+              trailing: m.id == group.creatorId
+                  ? Text('Người tạo', style: TextStyle(fontSize: 12, color: context.mutedColor))
+                  : (isCreator ? IconButton(tooltip: 'Xoá khỏi nhóm', icon: Icon(Icons.person_remove_outlined, size: 20, color: context.badColor), onPressed: () => Navigator.pop(context, 'remove:${m.id}')) : null),
+            ),
+          const SizedBox(height: 4),
+          Wrap(spacing: 8, children: [
+            if (isCreator) AppButton(label: 'Thêm thành viên', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'add')),
+            if (isCreator) AppButton(label: 'Đổi tên nhóm', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'rename')),
+            AppButton(label: 'Cài đặt tự xoá', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'retention')),
+            if (hasRule) AppButton(label: 'Tắt tự xoá', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context, 'retention-off')),
+            AppButton(label: 'Rời nhóm', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, 'leave')),
+          ]),
+          Align(alignment: Alignment.centerLeft, child: AppButton(label: 'Đóng', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context))),
         ]),
       ),
     );

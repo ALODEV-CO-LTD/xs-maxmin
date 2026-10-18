@@ -8,6 +8,7 @@ import '../payments/payments_logic.dart' show viDateTime;
 import '../settings/settings_ui.dart';
 import 'notices_logic.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_dropdown.dart';
 
 /// Admin - Thông báo & bảo trì (rights announcements.manage / maintenance.manage). Body only (the shell draws the AppBar).
 class AdminNoticesScreen extends StatefulWidget {
@@ -223,7 +224,7 @@ class _AdminNoticesScreenState extends State<AdminNoticesScreen> {
     title: 'Gửi thông báo mới',
     children: [
       if (_composeError != null) Banner2(_composeError!),
-      DropdownButtonFormField<String>(
+      AppDropdown<String>(
         initialValue: _kind,
         decoration: const InputDecoration(labelText: 'Loại'),
         items: [for (final k in noticeKinds) DropdownMenuItem(value: k.$1, child: Text(k.$2))],
