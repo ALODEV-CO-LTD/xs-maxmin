@@ -273,12 +273,10 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
 /// Miền Bắc photo: sorts the all-digit words of the recognised text into the 27 boxes (port of applyLrOcrGuess).
 /// [form] holds tier -> numbers ('' = empty) and only EMPTY boxes are filled. 5-digit words in reading order are
 /// đặc biệt, nhất, nhì (2), ba (6); 4-digit tư (4), năm (6); 3-digit sáu (3); 2-digit bảy (4).
-/// The digit-only words of a photo in TABLE reading order: top to bottom by row, left to right inside a row. ML Kit's own
-/// text order follows its text blocks (often column by column), which scatters one prize over several; using the positions
-/// keeps every row together, so "Giải nhì 21143 52941" and the two lines of "Giải ba" come out in the printed order.
-String orderedDigitText(List<OcrWord> words) {
+/// Digit-only words grouped into table ROWS (top to bottom), each row left to right.
+List<List<OcrWord>> _digitRows(List<OcrWord> words) {
   final digits = words.where((w) => RegExp(r'^\d+$').hasMatch(w.text.trim())).toList();
-  if (digits.isEmpty) return '';
+  if (digits.isEmpty) return [];
   final heights = digits.map((w) => w.y1 - w.y0).toList()..sort();
   final tol = math.max(4.0, heights[heights.length ~/ 2] * 0.6);
   digits.sort((a, b) => a.cy.compareTo(b.cy));
@@ -293,7 +291,74 @@ String orderedDigitText(List<OcrWord> words) {
       rowCy = rows.last.map((x) => x.cy).reduce((a, b) => a + b) / rows.last.length;
     }
   }
-  return [for (final r in rows) ...(r..sort((a, b) => a.cx.compareTo(b.cx))).map((w) => w.text.trim())].join(' ');
+  for (final r in rows) {
+    r.sort((a, b) => a.cx.compareTo(b.cx));
+  }
+  return rows;
+}
+
+/// The digit-only words of a photo in TABLE reading order: top to bottom by row, left to right inside a row. ML Kit's own
+/// text order follows its text blocks (often column by column), which scatters one prize over several; using the positions
+/// keeps every row together, so "Giải nhì 21143 52941" and the two lines of "Giải ba" come out in the printed order.
+String orderedDigitText(List<OcrWord> words) =>
+    [for (final r in _digitRows(words)) ...r.map((w) => w.text.trim())].join(' ');
+
+/// A photo can reach the reader turned (a phone held sideways or upside down): then "top to bottom" runs the other way,
+/// which shows up as the table being read right to left / bottom to top. This tries the four turns of the picture and keeps
+/// the one where the table looks like a result table: the numbers get SHORTER going down in Miền Bắc (đặc biệt 5 digits
+/// ... giải bảy 2 digits) and LONGER going down in Miền Nam / Miền Trung (giải tám 2 digits ... đặc biệt 6 digits).
+/// Returns the words with their positions turned upright (the same words when the photo is already upright).
+List<OcrWord> uprightWords(List<OcrWord> words, {required bool lengthsDecreaseDownward}) {
+  OcrWord t(OcrWord w, int k) {
+    // k quarter turns: 0 = as is, 1 = (x, y) -> (-y, x), 2 = (-x, -y), 3 = (y, -x). Boxes are re-made around the new centre.
+    final hw = (w.x1 - w.x0) / 2, hh = (w.y1 - w.y0) / 2;
+    final cx = w.cx, cy = w.cy;
+    final (nx, ny, nhw, nhh) = switch (k) {
+      1 => (-cy, cx, hh, hw),
+      2 => (-cx, -cy, hw, hh),
+      3 => (cy, -cx, hh, hw),
+      _ => (cx, cy, hw, hh),
+    };
+    return OcrWord(w.text, nx - nhw, ny - nhh, nx + nhw, ny + nhh);
+  }
+
+  double score(List<OcrWord> ws) {
+    // correlation between the row number and the length of the numbers in it (2-6 digit prizes only)
+    final rows = _digitRows(ws);
+    final xs = <double>[], ys = <double>[];
+    for (var r = 0; r < rows.length; r++) {
+      for (final w in rows[r]) {
+        final n = w.text.trim().length;
+        if (n >= 2 && n <= 6) {
+          xs.add(r.toDouble());
+          ys.add(n.toDouble());
+        }
+      }
+    }
+    if (rows.length < 4 || xs.length < 8) return 0;
+    final mx = xs.reduce((a, b) => a + b) / xs.length, my = ys.reduce((a, b) => a + b) / ys.length;
+    var sxy = 0.0, sxx = 0.0, syy = 0.0;
+    for (var i = 0; i < xs.length; i++) {
+      sxy += (xs[i] - mx) * (ys[i] - my);
+      sxx += (xs[i] - mx) * (xs[i] - mx);
+      syy += (ys[i] - my) * (ys[i] - my);
+    }
+    if (sxx == 0 || syy == 0) return 0;
+    final corr = sxy / math.sqrt(sxx * syy);
+    return lengthsDecreaseDownward ? -corr : corr;
+  }
+
+  var best = 0;
+  var bestScore = score(words);
+  for (var k = 1; k < 4; k++) {
+    final sc = score([for (final w in words) t(w, k)]);
+    // a turn must be clearly better than the picture as it is, so a normal photo is never turned by noise
+    if (sc > bestScore + 0.25) {
+      best = k;
+      bestScore = sc;
+    }
+  }
+  return best == 0 ? words : [for (final w in words) t(w, best)];
 }
 
 void guessNorthForm(String text, Map<String, List<String>> form) {

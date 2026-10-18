@@ -665,7 +665,7 @@ class ResultsController extends ChangeNotifier {
   void _applyNorth(OcrResult res) {
     final before = filledCount(mbForm);
     // Rows from the word positions (the plain text order of the reader can run down the columns).
-    final ordered = orderedDigitText(res.words);
+    final ordered = orderedDigitText(uprightWords(res.words, lengthsDecreaseDownward: true));
     guessNorthForm(ordered.isEmpty ? res.text : ordered, mbForm);
     mbLocked = true;
     if (filledCount(mbForm) == before) {
@@ -677,7 +677,8 @@ class ResultsController extends ChangeNotifier {
 
   Future<void> _applySouthCentral(OcrResult res) async {
     await stations.load(api);
-    final parsed = parseColumns(res.words, stations);
+    final upright = uprightWords(res.words, lengthsDecreaseDownward: false);
+    final parsed = parseColumns(upright, stations);
     if (parsed.columns.isEmpty) {
       ocrError = 'Không nhận ra bảng kết quả (cần thấy giải đặc biệt 6 số của từng đài). Hãy chụp rõ cả bảng hoặc nhập tay.';
       return;
