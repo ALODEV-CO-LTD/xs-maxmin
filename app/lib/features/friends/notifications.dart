@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-enum NoticeKind { message, incomingCall, missedCall, support }
+enum NoticeKind { message, incomingCall, missedCall, support, friendRequest, friendAccepted }
 
 /// One Android notification, described without any plugin types so it can be tested.
 ///
@@ -74,6 +74,22 @@ NoticeContent supportNotice() => const NoticeContent(
       payload: 'support',
     );
 
+NoticeContent friendRequestNotice(String fromId, String fromName) => NoticeContent(
+      kind: NoticeKind.friendRequest,
+      id: noticeIdFor('freq:$fromId'),
+      title: 'Lời mời kết bạn',
+      body: '${_shortName(fromName)} muốn kết bạn với bạn',
+      payload: 'freq:$fromId',
+    );
+
+NoticeContent friendAcceptedNotice(String friendId, String friendName) => NoticeContent(
+      kind: NoticeKind.friendAccepted,
+      id: noticeIdFor('facc:$friendId'),
+      title: 'MAMBA',
+      body: '${_shortName(friendName)} đã chấp nhận lời mời',
+      payload: 'facc:$friendId',
+    );
+
 /// What a tapped notification points at.
 class NoticeTarget {
   const NoticeTarget(this.kind, [this.friendId]);
@@ -92,6 +108,8 @@ NoticeTarget? parseNoticePayload(String? payload) {
     'chat' => NoticeTarget(NoticeKind.message, id),
     'missed' => NoticeTarget(NoticeKind.missedCall, id),
     'call' => NoticeTarget(NoticeKind.incomingCall, id),
+    'freq' => NoticeTarget(NoticeKind.friendRequest, id),
+    'facc' => NoticeTarget(NoticeKind.friendAccepted, id),
     _ => null,
   };
 }
@@ -101,6 +119,7 @@ NoticeTarget? parseNoticePayload(String? payload) {
 String? routeForTarget(NoticeTarget t) => switch (t.kind) {
       NoticeKind.message || NoticeKind.missedCall => '/friends/chat/${Uri.encodeComponent(t.friendId ?? '')}',
       NoticeKind.support => '/support',
+      NoticeKind.friendRequest || NoticeKind.friendAccepted => '/friends',
       NoticeKind.incomingCall => null,
     };
 
@@ -264,6 +283,8 @@ class LocalNotifier implements AppNotifier {
         return const AndroidNotificationDetails(_missedChannel, 'Cuộc gọi nhỡ', importance: Importance.high, priority: Priority.high, category: AndroidNotificationCategory.missedCall, visibility: NotificationVisibility.private);
       case NoticeKind.message:
       case NoticeKind.support:
+      case NoticeKind.friendRequest:
+      case NoticeKind.friendAccepted:
         return const AndroidNotificationDetails(_msgChannel, 'Tin nhắn mới', importance: Importance.high, priority: Priority.high, category: AndroidNotificationCategory.message, visibility: NotificationVisibility.private);
     }
   }

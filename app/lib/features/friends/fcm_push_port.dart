@@ -80,7 +80,7 @@ class FcmPushPort implements PushPort {
   static PushOpened? openedFromData(Map<String, dynamic>? data) {
     final id = data?['friendId'];
     if (id is! String || id.isEmpty) return null;
-    return PushOpened(id, data?['kind'] == 'call' ? 'call' : 'message');
+    return PushOpened(id, pushKindOf(data?['kind']));
   }
 
   @override
