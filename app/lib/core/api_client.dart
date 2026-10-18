@@ -69,7 +69,7 @@ class ApiClient {
     }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       if (res.statusCode == 401 && !_isReauth(path, method)) auth.clear();
-      final msg = data is Map && data['error'] is String ? data['error'] as String : 'Lỗi máy chủ (${res.statusCode})';
+      final msg = data is Map && data['error'] is String ? data['error'] as String : statusFallbackMessage(res.statusCode);
       throw ApiError(res.statusCode, msg, data is Map<String, dynamic> ? data : null);
     }
     return data;
@@ -91,8 +91,15 @@ class ApiClient {
     }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       if (res.statusCode == 401) auth.clear();
-      throw ApiError(res.statusCode, 'Lỗi máy chủ (${res.statusCode})');
+      throw ApiError(res.statusCode, statusFallbackMessage(res.statusCode));
     }
     return res.bodyBytes;
   }
+}
+
+/// Vietnamese text for responses without our JSON body (e.g. nginx answering 413/429 before the backend).
+String statusFallbackMessage(int status) {
+  if (status == 413) return 'Dữ liệu gửi lên quá lớn';
+  if (status == 429) return 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút';
+  return 'Lỗi máy chủ ($status)';
 }

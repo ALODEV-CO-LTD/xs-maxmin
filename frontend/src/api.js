@@ -81,11 +81,19 @@ async function apiFetch(path, { method = 'GET', body, headers = {} } = {}) {
       // only means the password was wrong, and must not log the user out.)
       auth.clear()
     }
-    const message = data && typeof data.error === 'string' ? data.error : `Lỗi máy chủ (${res.status})`
+    const message = data && typeof data.error === 'string' ? data.error : statusFallback(res.status)
     throw new ApiError(res.status, message, data)
   }
 
   return data
+}
+
+// Vietnamese text for responses without our JSON body (e.g. nginx answering
+// 413/429 before the backend sees the request).
+export function statusFallback(status) {
+  if (status === 413) return 'Dữ liệu gửi lên quá lớn'
+  if (status === 429) return 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút'
+  return `Lỗi máy chủ (${status})`
 }
 
 // Authenticated download of a binary response (chat attachments): <img>/<a>
@@ -103,7 +111,7 @@ async function apiBlob(path) {
   }
   if (!res.ok) {
     if (res.status === 401) auth.clear()
-    let message = `Lỗi máy chủ (${res.status})`
+    let message = statusFallback(res.status)
     try {
       const data = await res.json()
       if (data && typeof data.error === 'string') message = data.error
