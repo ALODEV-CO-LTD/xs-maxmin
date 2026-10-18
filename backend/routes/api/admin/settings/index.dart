@@ -5,6 +5,28 @@ import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+/// The only keys `settings.manage` may write or delete here: the bank-transfer info, the Mã ID cap and the legacy
+/// per-package price overrides. Everything else (`policy.*` = security.policy, `maintenance_*` = maintenance.manage,
+/// `app_*` = the app-version page, internal markers such as `perm_split_maintenance`) is refused. Keys are compared
+/// case-insensitively and must match exactly (SQLite LIKE, used to read `policy.%`, is case-insensitive).
+const editableSettingKeys = {'bank_name', 'bank_bin', 'bank_account_number', 'bank_account_holder', 'max_virtual_ids'};
+final _priceKey = RegExp(r'^package_price_[a-z0-9_]{1,40}$');
+
+bool isEditableSettingKey(String key) {
+  final k = key.toLowerCase();
+  return key == k && (editableSettingKeys.contains(k) || _priceKey.hasMatch(k));
+}
+
+Response? _rejectKeys(Iterable<String> keys) {
+  final bad = keys.where((k) => !isEditableSettingKey(k)).toList();
+  if (bad.isEmpty) return null;
+  final policy = bad.any((k) => k.toLowerCase().startsWith('policy.'));
+  return Response.json(
+    statusCode: policy ? 403 : 400,
+    body: {'error': policy ? 'Chính sách bảo mật chỉnh ở trang Chính sách bảo mật.' : 'Không được chỉnh khoá cài đặt: ${bad.take(3).join(', ')}'},
+  );
+}
+
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
@@ -52,8 +74,12 @@ Future<Response> _put(RequestContext context) async {
     body['max_virtual_ids'] = n;
   }
 
-  if (body.keys.any((k) => k.startsWith('policy.'))) {
-    return Response.json(statusCode: 403, body: {'error': 'Chính sách bảo mật chỉnh ở trang Chính sách bảo mật.'});
+  final rejected = _rejectKeys(body.keys);
+  if (rejected != null) return rejected;
+  for (final v in body.values) {
+    if ((v is! String && v is! num) || v.toString().length > 200) {
+      return Response.json(statusCode: 400, body: {'error': 'Giá trị cài đặt không hợp lệ'});
+    }
   }
 
   final db = context.read<Database>();
@@ -78,14 +104,13 @@ Future<Response> _delete(RequestContext context) async {
     return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
   }
 
-  final keys = (body['keys'] as List?)?.cast<String>();
-  if (keys == null || keys.isEmpty) {
+  final raw = body['keys'];
+  if (raw is! List || raw.isEmpty || raw.any((k) => k is! String)) {
     return Response.json(statusCode: 400, body: {'error': 'Thiếu danh sách key cần xoá'});
   }
-
-  if (keys.any((k) => k.startsWith('policy.'))) {
-    return Response.json(statusCode: 403, body: {'error': 'Chính sách bảo mật chỉnh ở trang Chính sách bảo mật.'});
-  }
+  final keys = raw.cast<String>();
+  final rejected = _rejectKeys(keys);
+  if (rejected != null) return rejected;
 
   final db = context.read<Database>();
   for (final key in keys) {
