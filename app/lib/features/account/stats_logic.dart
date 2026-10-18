@@ -1,4 +1,7 @@
-/// Pure logic of the Thống kê tab (port of frontend AccountStats.vue); no Flutter imports so it is unit-testable.
+import '../../core/number_text.dart';
+
+// Pure logic of the Thống kê tab (port of frontend AccountStats.vue); no Flutter imports so it is unit-testable.
+
 enum StatUnit { day, week, month, year }
 
 enum StatMetric { vao, ra, profit }
@@ -50,7 +53,7 @@ final _prefix = RegExp(r'^-?(\d+\.?\d*|\.\d+)');
 /// Same as the web's `parseFloat(String(s).replace(/[^\d.-]/g, ''))`, 0 when it is not a number.
 double toNumber(String? s) {
   if (s == null || s.isEmpty) return 0;
-  final m = _prefix.firstMatch(s.replaceAll(_junk, ''));
+  final m = _prefix.firstMatch(normalizeNumberText(s).replaceAll(_junk, ''));
   if (m == null) return 0;
   return double.tryParse(m.group(0)!) ?? 0;
 }

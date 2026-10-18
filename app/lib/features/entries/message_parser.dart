@@ -104,8 +104,9 @@ class ParseResult {
 }
 
 // ---- Compact ("liền") notation: number + symbol + điểm, no spaces ------------------------------
-const _pointsRe = r'(\d+(?:[.,]\d+)?)';
-const _bareX = ['x', '×']; // as a symbol = bao lô; the legacy parser reads it as "× điểm" with the customer's type
+const _pointsRe = r'(\d+(?:\.\d+|,\d{1,2})?)'; // a decimal comma has 1-2 digits; "1,500" is not a decimal
+final _commaSeparator = RegExp(r'(?<=[^\d.,]\d+),(?=\d{2,4}[^\d.,\s])');
+const _bareX =['x', '×']; // as a symbol = bao lô; the legacy parser reads it as "× điểm" with the customer's type
 const _typeLabel = {'lo': 'Lô', 'dau': 'Đầu', 'duoi': 'Đuôi', 'cang3': '3 càng', 'cang4': '4 càng', 'xien2': 'Xiên 2', 'xien3': 'Xiên 3', 'xien4': 'Xiên 4'};
 const _canonSymbol = {'lo': 'lô', 'dau': 'đầu', 'duoi': 'đuôi', 'cang': 'càng', 'xien': 'xiên'};
 String typeLabel(String t) => _typeLabel[t] ?? t;
@@ -376,7 +377,8 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
 
     // Compact notation: only when EVERY space-separated token of the line is one ("20lo100 70lo500 54lo300").
     // A line that mixes in anything else goes through the legacy path below, exactly as before.
-    var toks = f.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    // "20lo100,70lo500": a comma between a điểm and the next number group is a separator, not a decimal point.
+    var toks = [for (final t in f.split(RegExp(r'\s+'))) ...t.split(_commaSeparator)].where((t) => t.isNotEmpty).toList();
     final ctxType = stickyType.isNotEmpty ? stickyType : cfg.defaultType;
     var parsed = [for (final t in toks) compact(t, ctxType)];
     if (!parsed.every((p) => p != null)) {

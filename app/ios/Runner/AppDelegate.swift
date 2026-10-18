@@ -23,7 +23,31 @@ import UserNotifications
     // Needed to receive taps / foreground presentation callbacks. Non-remote (local) notifications are passed on to
     // super so flutter_local_notifications keeps working.
     UNUserNotificationCenter.current().delegate = self
+    excludeChatDataFromBackup()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  /// Chat stays on the device: keep the sqflite databases (Documents = sqflite's getDatabasesPath on iOS) and the
+  /// attachment directory (Application Support/chat) out of iCloud / iTunes backups.
+  private func excludeChatDataFromBackup() {
+    let fm = FileManager.default
+    var dirs: [URL] = []
+    if let d = fm.urls(for: .documentDirectory, in: .userDomainMask).first { dirs.append(d) }
+    if let a = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+      dirs.append(a.appendingPathComponent("chat", isDirectory: true))
+    }
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    for var url in dirs {
+      try? fm.createDirectory(at: url, withIntermediateDirectories: true)
+      try? url.setResourceValues(values)
+      // Also mark existing database files explicitly.
+      if let items = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) {
+        for var item in items where item.lastPathComponent.hasPrefix("mamba-e2ee-") {
+          try? item.setResourceValues(values)
+        }
+      }
+    }
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {

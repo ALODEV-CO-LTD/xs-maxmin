@@ -20,6 +20,9 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application
         android:label="MAMBA"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

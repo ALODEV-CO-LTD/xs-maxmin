@@ -16,6 +16,7 @@ class _Relay {
   final Map<String, ChatService> services = {};
   final Map<String, Map<String, dynamic>> keys = {};
   final List<String> sentTo = [];
+  final List<String> acks = [];
 }
 
 class _Sock extends RealtimeSocket {
@@ -35,6 +36,7 @@ class _Sock extends RealtimeSocket {
       relay.sentTo.add('$me>$to');
       Future(() => target.onFrame({...frame, 'from': me, 'fromName': 'Tên $me'}));
     } else if (frame['type'] == 'e2ee-ack') {
+      relay.acks.add('$me>$to:${frame['id']}');
       Future(() => target.onFrame({'type': 'e2ee-ack', 'id': frame['id'], 'from': me}));
     }
   }
@@ -201,6 +203,53 @@ void main() {
     for (final s in [a, b]) {
       expect(s.groups[g.id]!.members.map((m) => m.id).toSet(), {'A', 'B'});
     }
+  });
+
+  test('a removed member cannot inject messages by declaring themselves in the header', () async {
+    final g = await a.createGroup('Nhóm', 'An', [const GroupMember('B', 'Bình'), const GroupMember('C', 'Cường')]);
+    await _settle();
+    await a.removeGroupMember(g.id, 'C');
+    await _settle();
+    final forged = ChatGroup(id: g.id, name: 'Nhóm', members: const [GroupMember('A', 'An'), GroupMember('B', 'Bình'), GroupMember('C', 'Cường')], creatorId: 'A', updatedAt: 1);
+    await c.debugSendGroupFrame(forged, 'B', 'tôi vẫn còn đây');
+    await _settle();
+    expect((await b.messages(g.id)).where((m) => m.text.contains('vẫn còn')), isEmpty);
+  });
+
+  test('group-left: the list must be exactly the old one minus the sender; a huge updatedAt does not freeze updates', () async {
+    final g = await a.createGroup('Nhóm', 'An', [const GroupMember('B', 'Bình'), const GroupMember('C', 'Cường')]);
+    await _settle();
+    // B claims to leave but also drops C from the list
+    final bad = ChatGroup(id: g.id, name: 'Nhóm', members: const [GroupMember('A', 'An'), GroupMember('X', 'X')], creatorId: 'A', updatedAt: DateTime.now().millisecondsSinceEpoch + 1000);
+    await b.debugSendGroupFrame(bad, 'C', '', kind: 'group-left');
+    await _settle();
+    expect(c.groups[g.id]!.members.map((m) => m.id).toSet(), {'A', 'B', 'C'});
+    // an honest leave with an absurd updatedAt is applied but clamped, so the creator's next update still wins
+    final ok = ChatGroup(id: g.id, name: 'Nhóm', members: const [GroupMember('A', 'An'), GroupMember('C', 'Cường')], creatorId: 'A', updatedAt: 1 << 60);
+    await b.debugSendGroupFrame(ok, 'C', '', kind: 'group-left');
+    await _settle();
+    expect(c.groups[g.id]!.members.map((m) => m.id).toSet(), {'A', 'C'});
+    expect(c.groups[g.id]!.updatedAt, lessThan(DateTime.now().millisecondsSinceEpoch + 120000));
+  });
+
+  test('a duplicate is shown once but acknowledged again (the first ack may have been lost)', () async {
+    final g = await a.createGroup('Nhóm', 'An', [const GroupMember('B', 'Bình'), const GroupMember('C', 'Cường')]);
+    await _settle();
+    await a.debugSendGroupFrame(g, 'B', 'một lần', id: 'dup-1');
+    await _settle();
+    await a.debugSendGroupFrame(g, 'B', 'một lần', id: 'dup-1');
+    await _settle();
+    expect((await b.messages(g.id)).where((m) => m.text == 'một lần').length, 1);
+    expect(relay.acks.where((x) => x == 'B>A:dup-1').length, 2);
+  });
+
+  test('a hostile old timestamp cannot bury a message', () async {
+    final g = await a.createGroup('Nhóm', 'An', [const GroupMember('B', 'Bình'), const GroupMember('C', 'Cường')]);
+    await _settle();
+    await a.debugSendGroupFrame(g, 'B', 'cổ xưa', ts: 1000);
+    await _settle();
+    final got = (await b.messages(g.id)).singleWhere((m) => m.text == 'cổ xưa');
+    expect(got.createdAt, greaterThan(DateTime.now().millisecondsSinceEpoch - 10 * 60000));
   });
 
   test('a member who is not the creator cannot change the group by sending a forged newer header', () async {

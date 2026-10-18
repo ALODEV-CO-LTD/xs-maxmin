@@ -16,7 +16,7 @@ abstract class KeyVault {
 }
 
 class SecureKeyVault implements KeyVault {
-  const SecureKeyVault([this._s = const FlutterSecureStorage()]);
+  const SecureKeyVault([this._s = const FlutterSecureStorage(iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device))]);
   final FlutterSecureStorage _s;
   @override
   Future<String?> read(String key) => _s.read(key: key);
@@ -281,8 +281,9 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> _setStatus(String id, String status, [String? reason]) async {
+    if (_disposed) return; // a send that fails after dispose (closed store) must not write
     final m = await store.message(id);
-    if (m == null) return;
+    if (m == null || _disposed) return;
     if (status != MsgStatus.sent) {
       _ackTimers.remove(id)?.cancel();
     }
@@ -341,7 +342,12 @@ class ChatService extends ChangeNotifier {
     final frame = _assembler.add(parsed);
     if (frame == null) return;
     try {
-      if (await store.message(frame.id) != null) return; // duplicate
+      final seen = await store.message(frame.id);
+      if (seen != null) {
+        // duplicate: shown once, but the sender may have missed our ack (lost on the way), so confirm again
+        if (!seen.mine) socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+        return;
+      }
       if (!friendKeys.containsKey(frame.from)) await loadFriendKeys(); // new friend / new device
       var key = await _session(frame.from);
       if (key == null) return;
@@ -356,7 +362,9 @@ class ChatService extends ChangeNotifier {
         plain = await decryptBytes(key, env, from: frame.from, to: userId, id: frame.id);
       }
       final m = unpackMessage(plain);
-      final createdAt = m.ts < DateTime.now().millisecondsSinceEpoch ? m.ts : DateTime.now().millisecondsSinceEpoch;
+      // The sender's clock is not trusted: never in the future, never older than 5 minutes before it was received.
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final createdAt = m.ts > now ? now : (m.ts < now - 300000 ? now - 300000 : m.ts);
       if (m.group != null) {
         await _handleGroupMessage(frame, m, createdAt);
         return;
@@ -544,9 +552,15 @@ class ChatService extends ChangeNotifier {
 
   /// A message (or creation / rename / "left" notice) of a group chat from [frame].from.
   Future<void> _handleGroupMessage(E2eeFrame frame, PackedMessage m, int createdAt) async {
-    final incoming = ChatGroup.fromHeader(m.group);
-    if (incoming == null) return;
+    final parsedHeader = ChatGroup.fromHeader(m.group);
+    if (parsedHeader == null) return;
+    // The sender-supplied clock must not freeze later legitimate updates: never more than a little in the future.
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final incoming = parsedHeader.updatedAt > nowMs + 60000 ? parsedHeader.copyWith(updatedAt: nowMs + 60000) : parsedHeader;
     final known = groups[incoming.id];
+    // A group we already know: only OUR list of members decides who may speak (a removed member, or a friend who merely
+    // knows the group id, cannot inject messages by declaring themselves in the header).
+    if (known != null && m.kind != 'group-removed' && !known.members.any((x) => x.id == frame.from)) return;
     if (m.kind == 'group-removed') {
       // The creator removed me: forget the group (its messages go with it).
       if (known == null || known.creatorId != frame.from || incoming.members.any((x) => x.id == userId)) return;
@@ -570,7 +584,9 @@ class ChatService extends ChangeNotifier {
     if (known == null) {
       await _saveGroup(incoming);
     } else if (incoming.updatedAt > known.updatedAt) {
-      final leftOk = m.kind == 'group-left' && incoming.members.length == known.members.length - 1;
+      final expected = {for (final x in known.members) if (x.id != frame.from) x.id};
+      final got = incoming.members.map((x) => x.id).toList();
+      final leftOk = m.kind == 'group-left' && got.length == expected.length && got.toSet().length == got.length && got.toSet().containsAll(expected);
       if (fromCreator || leftOk) await _saveGroup(incoming);
     }
     final g = groups[incoming.id]!;
@@ -590,12 +606,12 @@ class ChatService extends ChangeNotifier {
 
   /// Test hook: sends a group message of [g] to [to] as this device, without checking that it belongs to the group.
   @visibleForTesting
-  Future<void> debugSendGroupFrame(ChatGroup g, String to, String text) async {
-    final id = newMessageId();
-    final ts = DateTime.now().millisecondsSinceEpoch;
+  Future<void> debugSendGroupFrame(ChatGroup g, String to, String text, {String? kind, String? id, int? ts}) async {
+    id ??= newMessageId();
+    ts ??= DateTime.now().millisecondsSinceEpoch;
     final key = await _session(to);
     if (key == null) return;
-    final env = await encryptBytes(key, packMessage(text: text, ts: ts, group: g.toHeader()), from: userId, to: to, id: id);
+    final env = await encryptBytes(key, packMessage(text: text, ts: ts, kind: kind, group: g.toHeader()), from: userId, to: to, id: id);
     socket.send({'type': 'e2ee-msg', 'to': to, 'id': id, 'iv': env.iv, 'ct': env.ct, 'part': 0, 'parts': 1, 'ts': ts});
   }
 

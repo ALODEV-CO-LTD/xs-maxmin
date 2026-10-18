@@ -1,0 +1,5 @@
+# Copy to key.properties (gitignored) and fill in. Never commit the keystore or this file with real values.
+storeFile=/absolute/path/to/mamba-upload.jks
+storePassword=CHANGE_ME
+keyAlias=mamba
+keyPassword=CHANGE_ME

@@ -49,3 +49,8 @@ app.*.map.json
 
 # Firebase client config (not committed: the repo is public; copy it in for each build)
 android/app/google-services.json
+
+# Release signing (real keystore + passwords)
+android/key.properties
+*.jks
+*.keystore

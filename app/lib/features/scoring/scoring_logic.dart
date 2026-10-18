@@ -2,6 +2,7 @@
 // ("Tổng kết tiền") of a customer over several days.
 import '../../core/lottery_stations.dart';
 import '../../core/scoring_config.dart';
+import '../../core/number_text.dart';
 import '../entries/message_parser.dart' show foldText;
 import 'entry_model.dart';
 
@@ -10,7 +11,7 @@ typedef LotteryResult = Map<String, dynamic>;
 
 /// parseFloat of the digits, dots and minus signs of [v]; 0 when there is nothing numeric.
 double toNumber(Object? v) {
-  final cleaned = '${v ?? ''}'.replaceAll(RegExp(r'[^\d.\-]'), '');
+  final cleaned = normalizeNumberText('${v ?? ''}').replaceAll(RegExp(r'[^\d.\-]'), '');
   final m = RegExp(r'^-?(\d+\.?\d*|\.\d+)').firstMatch(cleaned);
   if (m == null) return 0;
   final n = double.tryParse(m.group(0)!);
