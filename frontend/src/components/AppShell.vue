@@ -26,6 +26,7 @@ import SupportChat from './SupportChat.vue'
 import SyncStatus from './SyncStatus.vue'
 import AnnouncementBanner from './AnnouncementBanner.vue'
 import { startSync } from '../offline'
+import { teardownSession } from '../session'
 
 const auth = useAuthStore()
 const call = useCallStore()
@@ -146,9 +147,7 @@ function onVisible() {
 
 async function logout() {
   if (!(await showConfirm({ title: 'Đăng xuất', message: 'Bạn có chắc muốn đăng xuất?', confirmText: 'Đăng xuất' }))) return
-  call.disconnect()
-  chat.reset()
-  notify.clearAll()
+  teardownSession() // also run by App.vue's watcher on every session end
   auth.logout()
   router.push('/login')
 }

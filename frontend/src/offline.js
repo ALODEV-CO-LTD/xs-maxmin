@@ -17,6 +17,7 @@
 import { reactive } from 'vue'
 import { api, ApiError } from './api'
 import { useAuthStore } from './stores/auth'
+import { shouldKeepForRetry, changesDuringFlight } from './offlineRules'
 
 export const syncState = reactive({
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
@@ -311,12 +312,27 @@ export async function flushQueue() {
     for (const op of await userOps()) {
       if (op.conflict) continue
       try {
+        const sent = { ...op.payload }
+        let result
         if (op.type === 'create') {
-          await api.post('/me/entries', { ...op.payload, clientId: op.entryId })
+          result = await api.post('/me/entries', { ...sent, clientId: op.entryId })
         } else {
-          await api.patch(`/me/entries/${op.entryId}`, { ...op.payload, baseUpdatedAt: op.baseUpdatedAt })
+          result = await api.patch(`/me/entries/${op.entryId}`, { ...sent, baseUpdatedAt: op.baseUpdatedAt })
         }
-        await queueDelete(op.opId)
+        // An edit may have been merged into this op while the request was in flight:
+        // keep it as a follow-up patch instead of deleting it.
+        const fresh = (await queueAll()).find((o) => o.opId === op.opId)
+        const extra = fresh ? changesDuringFlight(sent, fresh.payload) : null
+        if (extra) {
+          await queuePut({
+            ...fresh,
+            type: 'patch',
+            baseUpdatedAt: result?.updatedAt ?? fresh.baseUpdatedAt,
+            payload: extra,
+          })
+        } else {
+          await queueDelete(op.opId)
+        }
         changed = true
         syncState.online = true
       } catch (err) {
@@ -325,7 +341,7 @@ export async function flushQueue() {
           break
         }
         // 401 (session gone) / 5xx (server hiccup): keep the queue, retry later
-        if (err instanceof ApiError && (err.status === 401 || err.status >= 500)) break
+        if (err instanceof ApiError && shouldKeepForRetry(err.status)) break
         if (err instanceof ApiError && err.status === 409 && err.data?.conflict) {
           op.conflict = true
           await queuePut(op)
