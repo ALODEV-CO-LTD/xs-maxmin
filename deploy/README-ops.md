@@ -10,3 +10,7 @@
   `/var/log/xs-maxmin/backup.log`.
 - Restore: stop xs-maxmin-backend, copy a backup over `xoso.db`, chmod 600, start the service.
 - Permissions: DB dir contents are 600 (backend runs as root).
+
+## Đăng APK để app tự nhắc cập nhật (chỉ khi chủ dự án đã đồng ý)
+
+`tools/publish_apk.sh <apk> [--notes "…"]` chạy thử và in kế hoạch, **không gửi gì**. Chỉ khi chủ dự án đã nói đồng ý đăng mới chạy thêm `--yes`: tệp được chép lên `/opt/xs-maxmin/web/downloads/MAMBA-<phiên bản>.apk` (nginx phục vụ ở `https://xs.massagehomeriyadh.com/downloads/…`, **công khai**, giữ 3 bản mới nhất), tải lại để so SHA-256, rồi mới đặt `app_latest_version`, `app_download_url`, `app_release_notes` trong bảng `settings` (app đọc từ `GET /api/app-version`). Các lần deploy web không xoá thư mục `downloads/`. Lưu ý: APK ký bằng khoá debug (chưa có khoá phát hành) chỉ cập nhật đè được lên bản đã cài cùng khoá.
