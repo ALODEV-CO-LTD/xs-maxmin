@@ -50,6 +50,6 @@ Future<Response> onRequest(RequestContext context) async {
   if (label != null && label is! String) {
     return Response.json(statusCode: 400, body: {'error': 'Dữ liệu không hợp lệ'});
   }
-  upsertPushToken(db, auth.userId, platform, token, deviceLabel: (label as String?)?.trim());
+  upsertPushToken(db, auth.userId, platform, token, deviceLabel: (label as String?)?.trim(), sessionId: auth.sessionId);
   return Response.json(body: {'ok': true});
 }

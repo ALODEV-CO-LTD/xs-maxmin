@@ -84,6 +84,7 @@ void main() {
         CREATE TABLE device_sessions (id TEXT PRIMARY KEY, user_id TEXT, device_label TEXT, user_agent TEXT, ip TEXT,
           created_at TEXT, last_seen TEXT, revoked_at TEXT, revoked_by TEXT);
         CREATE TABLE security_events (id TEXT PRIMARY KEY, type TEXT, user_id TEXT, username TEXT, ip TEXT, detail TEXT, created_at TEXT);
+        CREATE TABLE push_tokens (id TEXT PRIMARY KEY, user_id TEXT, platform TEXT, token TEXT UNIQUE, device_label TEXT, created_at TEXT, updated_at TEXT, session_id TEXT);
         INSERT INTO users (id) VALUES ('u1'), ('u2');
         INSERT INTO device_sessions (id, user_id, created_at, last_seen) VALUES
           ('s1', 'u1', 'x', '2099-01-01T00:00:00Z'), ('s2', 'u1', 'x', '2099-01-01T00:00:00Z'),

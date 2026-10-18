@@ -256,7 +256,8 @@ CREATE TABLE IF NOT EXISTS push_tokens (
   token        TEXT NOT NULL UNIQUE,
   device_label TEXT,
   created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
+  updated_at   TEXT NOT NULL,
+  session_id   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
 

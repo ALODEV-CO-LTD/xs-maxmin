@@ -8,6 +8,31 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// specific users without persisting any of it - calls aren't stored data,
 /// just a live relay. A user can only have one call socket open at a time;
 /// a second connection replaces the first (e.g. a page reload).
+/// One inbound WebSocket frame, already checked to be a JSON object. `to`/`type` are null unless they really are strings
+/// (a client sending `{"to":5}` must never raise a TypeError inside the stream listener).
+class SignalFrame {
+  SignalFrame(this.msg)
+      : to = msg['to'] is String ? msg['to'] as String : null,
+        type = msg['type'] is String ? msg['type'] as String : null,
+        reason = msg['reason'] is String ? msg['reason'] as String : null;
+  final Map<String, dynamic> msg;
+  final String? to;
+  final String? type;
+  final String? reason;
+}
+
+/// Parses a raw frame; null for anything that is not a JSON object text frame within [maxChars].
+SignalFrame? parseSignalFrame(Object? raw, {required int maxChars}) {
+  if (raw is! String || raw.length > maxChars) return null;
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    return SignalFrame(Map<String, dynamic>.from(decoded));
+  } catch (_) {
+    return null;
+  }
+}
+
 class CallSignalingRegistry {
   CallSignalingRegistry._();
   static final CallSignalingRegistry instance = CallSignalingRegistry._();
@@ -37,7 +62,12 @@ class CallSignalingRegistry {
   // friend over and over.
   final Map<String, List<DateTime>> _recentInvites = {};
 
-  void register(String userId, WebSocketChannel channel) {
+  // The device session each open connection was authenticated with, so revoking a session (or all of them) can close
+  // exactly those sockets (the handshake is the only time the token is checked otherwise).
+  final Map<WebSocketChannel, String?> _sessionOf = {};
+
+  void register(String userId, WebSocketChannel channel, {String? sessionId}) {
+    _sessionOf[channel] = sessionId;
     _sockets[userId] = channel;
     final list = _all.putIfAbsent(userId, () => []);
     if (!list.contains(channel)) list.add(channel);
@@ -47,6 +77,7 @@ class CallSignalingRegistry {
   /// against a stale disconnect handler clearing a newer connection that
   /// already replaced it for the same user.
   void unregister(String userId, WebSocketChannel channel) {
+    _sessionOf.remove(channel);
     if (_sockets[userId] == channel) {
       _sockets.remove(userId);
       // The newest connection is gone: fall back to the most recent one still open (if any), so calls keep working.
@@ -58,6 +89,26 @@ class CallSignalingRegistry {
       list.remove(channel);
       if (list.isEmpty) _all.remove(userId);
     }
+  }
+
+  /// Closes the open connections of [userId] that were opened with [sessionId].
+  int closeSession(String userId, String sessionId) => _close(userId, (s) => s == sessionId);
+
+  /// Closes every open connection of [userId] except those opened with [exceptSessionId].
+  int closeUser(String userId, {String? exceptSessionId}) => _close(userId, (s) => exceptSessionId == null || s != exceptSessionId);
+
+  int _close(String userId, bool Function(String? sessionId) test) {
+    var n = 0;
+    for (final channel in List.of(_all[userId] ?? const <WebSocketChannel>[])) {
+      if (!test(_sessionOf[channel])) continue;
+      n++;
+      try {
+        // 4401: application close code, "session ended". Errors (already closed) are not interesting.
+        channel.sink.close(4401, 'session revoked').catchError((_) {});
+      } catch (_) {}
+      unregister(userId, channel);
+    }
+    return n;
   }
 
   /// Number of connections [userId] has open right now.

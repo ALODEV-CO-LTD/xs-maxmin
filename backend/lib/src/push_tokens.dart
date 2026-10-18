@@ -20,20 +20,20 @@ bool isValidPushTokenFor(String platform, String t) => switch (platform) {
 
 /// Registers [token] for [userId]. A token is unique: if it was registered for
 /// another account it moves to this one.
-void upsertPushToken(Database db, String userId, String platform, String token, {String? deviceLabel}) {
+void upsertPushToken(Database db, String userId, String platform, String token, {String? deviceLabel, String? sessionId}) {
   final now = DateTime.now().toUtc().toIso8601String();
   final label = (deviceLabel == null || deviceLabel.isEmpty) ? null : (deviceLabel.length > 80 ? deviceLabel.substring(0, 80) : deviceLabel);
   final t = platform == 'ios' ? token.toLowerCase() : token;
   final existing = db.select('SELECT id FROM push_tokens WHERE token = ?', [t]);
   if (existing.isEmpty) {
     db.execute(
-      'INSERT INTO push_tokens (id, user_id, platform, token, device_label, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [const Uuid().v4(), userId, platform, t, label, now, now],
+      'INSERT INTO push_tokens (id, user_id, platform, token, device_label, created_at, updated_at, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [const Uuid().v4(), userId, platform, t, label, now, now, sessionId],
     );
   } else {
     db.execute(
-      'UPDATE push_tokens SET user_id = ?, platform = ?, device_label = ?, updated_at = ? WHERE token = ?',
-      [userId, platform, label, now, t],
+      'UPDATE push_tokens SET user_id = ?, platform = ?, device_label = ?, updated_at = ?, session_id = ? WHERE token = ?',
+      [userId, platform, label, now, sessionId, t],
     );
   }
 }
@@ -93,5 +93,23 @@ void ensurePushTokensTable(Database db) {
     db.execute('INSERT INTO push_tokens SELECT id, user_id, platform, token, device_label, created_at, updated_at FROM push_tokens_old');
     db.execute('DROP TABLE push_tokens_old');
   }
+  // The device session a token was registered from, so revoking that session also stops its pushes.
+  final cols = db.select('PRAGMA table_info(push_tokens)').map((r) => r['name']).toSet();
+  if (!cols.contains('session_id')) db.execute('ALTER TABLE push_tokens ADD COLUMN session_id TEXT');
   db.execute('CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id)');
+}
+
+/// Removes the push tokens registered from [sessionId] (that session was revoked).
+void deletePushTokensOfSession(Database db, String sessionId) {
+  db.execute('DELETE FROM push_tokens WHERE session_id = ?', [sessionId]);
+}
+
+/// Removes every push token of [userId] except those registered from [exceptSessionId]. Tokens with no recorded
+/// session (registered before this column existed) are removed too; the app registers its token again when it opens.
+void deletePushTokensOfUser(Database db, String userId, {String? exceptSessionId}) {
+  if (exceptSessionId == null) {
+    db.execute('DELETE FROM push_tokens WHERE user_id = ?', [userId]);
+  } else {
+    db.execute('DELETE FROM push_tokens WHERE user_id = ? AND (session_id IS NULL OR session_id != ?)', [userId, exceptSessionId]);
+  }
 }

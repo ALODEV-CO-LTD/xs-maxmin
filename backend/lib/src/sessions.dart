@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'call_signaling.dart';
 import 'database.dart' show newId;
+import 'push_tokens.dart';
 import 'security_policy.dart';
 
 // ---------------------------------------------------------------------------
@@ -230,6 +232,9 @@ bool revokeSession(Database db, String userId, String sessionId, {required Strin
   );
   final changed = db.updatedRows > 0;
   if (changed) {
+    // The session's open call/chat socket and its push token die with it.
+    CallSignalingRegistry.instance.closeSession(userId, sessionId);
+    deletePushTokensOfSession(db, sessionId);
     logSecurityEvent(db, 'session_revoked', userId: userId, ip: ip, detail: by == userId ? 'Người dùng tự đăng xuất thiết bị' : 'Admin thu hồi phiên');
   }
   return changed;
@@ -242,6 +247,8 @@ int revokeAllSessions(Database db, String userId, {required String by, String? e
     [DateTime.now().toUtc().toIso8601String(), by, userId, exceptSessionId ?? ''],
   );
   final n = db.updatedRows;
+  CallSignalingRegistry.instance.closeUser(userId, exceptSessionId: exceptSessionId);
+  deletePushTokensOfUser(db, userId, exceptSessionId: exceptSessionId);
   // Tokens issued before device sessions existed have no row to revoke; this
   // marker revokes them instead (checked in sessionIsActive).
   db.execute('UPDATE users SET tokens_valid_after = ? WHERE id = ?', [DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000, userId]);
