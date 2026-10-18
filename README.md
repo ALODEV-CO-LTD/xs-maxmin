@@ -8,3 +8,4 @@ Vue 3 + Vite (frontend) · Dart Frog + SQLite (backend).
 - Bản đang chạy: https://xs.massagehomeriyadh.com/
 
 Chạy nhanh trên máy: xem mục 4 của tài liệu bàn giao.
+- Dữ liệu lưu ở đâu, thông báo, kết nối tin nhắn và cuộc gọi: [`docs/LUU_TRU_THONG_BAO_KET_NOI.md`](docs/LUU_TRU_THONG_BAO_KET_NOI.md).
