@@ -113,21 +113,32 @@ Internet ── Cloudflare Tunnel (cloudflared-xs-massage) ── nginx :80 (xs-
 - **Container này còn chạy các site khác** (`demo3`, `henho`, `mamba-xs`, `mamba-api`, `hh-mamba`). Chỉ động vào `xs-maxmin-backend`, `cloudflared-xs-massage` và `xs-maxmin.conf`.
 - Backend: service systemd `xs-maxmin-backend` (`WorkingDirectory=/opt/xs-maxmin/backend/build`, `PORT=9091`), log ở `/var/log/xs-maxmin/backend.log`.
 
+**Nguyên tắc: luôn build từ một bản checkout SẠCH** (không lấy thẳng thư mục làm việc đang sửa dở), để gói triển khai khớp đúng commit:
+```bash
+rm -rf /tmp/mamba-src && mkdir /tmp/mamba-src && git archive HEAD | tar -x -C /tmp/mamba-src && cd /tmp/mamba-src
+```
+
 **Deploy chỉ web** (không đăng xuất ai):
 ```bash
-cd frontend && npm run build
+cd frontend && npm ci && npm test && npm run build
 COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata --exclude='._*' -czf /tmp/web_dist.tar.gz -C dist .
 scp /tmp/web_dist.tar.gz deploy/deploy-web.sh root@10.5.100.5:/tmp/
 ssh root@10.5.100.5 'pct push 501 /tmp/web_dist.tar.gz /root/web_dist.tar.gz; pct push 501 /tmp/deploy-web.sh /root/deploy-web.sh; pct exec 501 -- bash /root/deploy-web.sh'
 ```
 
-**Deploy cả backend** (từ 13/10/2026 `XOSO_JWT_SECRET` đã đặt cố định trên máy chủ nên khởi động lại không còn đăng xuất mọi người; lần đặt đầu tiên thì có):
+**Deploy cả backend** (từ 13/10/2026 `XOSO_JWT_SECRET` đã đặt cố định trên máy chủ nên khởi động lại không còn đăng xuất mọi người; lần đặt đầu tiên thì có). Gói phải có `backend/pubspec.lock` (file này nay đã được git theo dõi; thiếu nó máy chủ sẽ kéo phiên bản thư viện không ghim):
 ```bash
-cd backend && tar --no-xattrs --no-mac-metadata --exclude='._*' -czf /tmp/backend_deploy.tar.gz lib routes pubspec.yaml pubspec.lock schema.sql
+cd backend && test -f pubspec.lock && tar --no-xattrs --no-mac-metadata --exclude='._*' -czf /tmp/backend_deploy.tar.gz lib routes pubspec.yaml pubspec.lock schema.sql
 # gửi backend_deploy.tar.gz + web_dist.tar.gz + deploy/deploy.sh vào /root của container 501 như trên, rồi:
 ssh root@10.5.100.5 'pct exec 501 -- bash /root/deploy.sh'
 ```
 `deploy.sh` tự sao lưu `backend`, `web` và DB trước khi làm, build lại bằng `dart_frog build`, khởi động lại, kiểm tra và **tự quay lại bản cũ nếu lỗi**. Lưu ý đã gặp: file `._*` của macOS làm hỏng gói (đã lọc bằng cờ ở trên), và thư mục `.dart_tool` chứa cache native của `sqlite3` được sao chép từ bản trước vì máy chủ không tải được từ GitHub.
+
+**Ứng dụng (app/)**:
+- Android: đặt tên APK theo dạng `MAMBA-<phiên bản>.apk` (ví dụ `MAMBA-1.4.13.apk`).
+- iPhone: cài đè bằng `tools/install_ios.sh <device id>` (giữ lịch sử chat, khoá mã hoá, hàng đợi offline). **Quy tắc: KHÔNG dùng `flutter install`** vì nó gỡ app cũ trước và xoá sạch dữ liệu trên máy.
+
+**Sao lưu DB theo lịch, header bảo mật nginx, dọn thư mục sao lưu cũ**: xem `deploy/README-ops.md`.
 
 Quay lại thủ công: `systemctl stop xs-maxmin-backend; rm -rf /opt/xs-maxmin/backend; cp -a /opt/xs-maxmin/backend.bak-<mã giờ> /opt/xs-maxmin/backend; (tương tự cho web); systemctl start xs-maxmin-backend`. Các thư mục `*.bak-*` và `/root/xoso-*.db` đang tích luỹ, nên dọn định kỳ.
 
@@ -148,7 +159,7 @@ TURN của Cloudflare: tạo khoá ở Dashboard → Realtime → TURN (hoặc A
 - Giao diện/API: `tools/e2e/*.mjs` (puppeteer + Chrome cài trên máy). Cách dựng môi trường cô lập ở `tools/e2e/README.md`. Mỗi lần kiểm thử nên chạy backend riêng (bản sao thư mục `backend` + `XOSO_JWT_SECRET` riêng) để không đụng DB thật.
 - App Flutter: `cd app && flutter test` (176 test lúc viết mục 9c) và `flutter analyze`. Đã cài thử APK trên Android và iPhone; các mục chưa thử trên máy thật được liệt kê ở 9c và 9g.
 - Bộ đọc tin nhắn: `cd frontend && npm test` (16 test `node:test` trong `frontend/tests/messageParser.test.mjs`, không cần cài thêm).
-- Chưa có CI.
+- CI: `.github/workflows/ci.yml` chạy frontend (`npm ci`, `npm test`, `npm run build`), backend (`dart test`), app (`flutter analyze`, `flutter test`) trên push/pull_request.
 
 ## 9. Tình trạng công việc
 
