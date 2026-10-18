@@ -1,5 +1,6 @@
 import '../../core/bet_types.dart';
 import '../../core/format.dart';
+import '../../core/number_text.dart';
 import 'message_parser.dart';
 
 /// One saved line of Nhập số (a row of `data_entries`).
@@ -91,7 +92,7 @@ class Entry {
 /// so an empty or odd value counts as 0.
 double toNumber(String? s) {
   if (s == null || s.isEmpty) return 0;
-  final cleaned = s.replaceAll(RegExp(r'[^\d.-]'), '');
+  final cleaned = normalizeNumberText(s).replaceAll(RegExp(r'[^\d.-]'), '');
   final m = RegExp(r'^[-+]?(\d+\.?\d*|\.\d+)').firstMatch(cleaned);
   if (m == null) return 0;
   final n = double.tryParse(m.group(0)!);

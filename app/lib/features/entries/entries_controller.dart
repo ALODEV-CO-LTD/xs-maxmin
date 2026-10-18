@@ -8,6 +8,7 @@ import '../../core/auth_store.dart';
 import '../../core/bet_types.dart';
 import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
+import '../../core/number_text.dart';
 import '../../core/scoring_config.dart';
 import '../customers/customer_model.dart';
 import '../chat_calc/chat_prefill.dart';
@@ -396,7 +397,7 @@ class EntriesController extends ChangeNotifier {
         'customerName': selectedName.trim(),
         'value': value.trim(),
         'entryDate': entryDate,
-        'score': score.trim().isEmpty ? null : score.trim(),
+        'score': score.trim().isEmpty ? null : normalizeNumberText(score.trim()),
         'betType': type,
         'station': station,
         'note': note.text.trim().isEmpty ? null : note.text.trim(),
@@ -479,7 +480,7 @@ class EntriesController extends ChangeNotifier {
       'customerName': base.customerName,
       'value': value.trim(),
       'entryDate': base.entryDate,
-      'score': score.trim(),
+      'score': normalizeNumberText(score.trim()),
       'betType': base.type,
       'note': note.trim(),
     };
