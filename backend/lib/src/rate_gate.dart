@@ -113,6 +113,11 @@ class _Fails {
 /// Shared instances used by the friends routes.
 final friendSearchPerUser = SlidingWindowGate(limit: 30, window: const Duration(minutes: 1));
 final friendSearchPerIp = SlidingWindowGate(limit: 90, window: const Duration(minutes: 1));
+/// Support (Phản hồi) messages a customer may send: 30 per hour.
+final supportMessagesPerUser = SlidingWindowGate(limit: 30, window: const Duration(hours: 1));
+
+/// Registrations per client IP: 10 per hour.
+final registerPerIp = SlidingWindowGate(limit: 10, window: const Duration(hours: 1));
 final friendAddFailPerUser = FailureGate();
 final friendAddFailPerIp = FailureGate(freeFailures: 30);
 

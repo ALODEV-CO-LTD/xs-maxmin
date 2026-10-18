@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -14,19 +13,17 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   switch (context.request.method) {
     case HttpMethod.delete:
-      final mine = db.select('SELECT code FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
+      final mine = db.select('SELECT code, used_at FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
       if (mine.isEmpty) return Response.json(statusCode: 404, body: {'error': 'Không tìm thấy mã ID'});
-      // Quarantine the number (90 days) before freeing it, so it cannot be re-registered by someone else.
-      retireCode(db, mine.first['code'] as String, auth.userId);
+      // Quarantine the number (90 days) before freeing it, so it cannot be re-registered by someone else - but only
+      // when somebody ever found it; a code created and deleted unused has nobody who could be misdirected.
+      if (mine.first['used_at'] != null) retireCode(db, mine.first['code'] as String, auth.userId);
       db.execute('DELETE FROM customer_codes WHERE id = ? AND user_id = ?', [id, auth.userId]);
       return Response.json(body: {'ok': true});
     case HttpMethod.patch:
-      final Map<String, dynamic> body;
-      try {
-        body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-      } catch (_) {
-        return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-      }
+      final read = await readJsonBody(context, smallBodyMaxBytes);
+      if (read.error != null) return read.error!;
+      final body = read.body!;
       final rawLabel = body['label'];
       if (rawLabel != null && rawLabel is! String) {
         return Response.json(statusCode: 400, body: {'error': 'Nhãn phải là chuỗi'});

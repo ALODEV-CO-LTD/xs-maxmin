@@ -102,13 +102,13 @@ void main() {
       platform TEXT NOT NULL CHECK (platform IN ('ios')), token TEXT NOT NULL UNIQUE,
       device_label TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''');
     db.execute('CREATE INDEX idx_push_tokens_user ON push_tokens(user_id)');
-    upsertPushToken(db, 'u1', 'ios', 'ab' * 32, deviceLabel: 'iPhone');
+    db.execute("INSERT INTO push_tokens VALUES ('t1', 'u1', 'ios', '${'ab' * 32}', 'iPhone', 'a', 'b')");
     ensurePushTokensTable(db);
     ensurePushTokensTable(db);
     expect(pushTokensOf(db, 'u1'), ['ab' * 32]);
     upsertPushToken(db, 'u1', 'android', _tok);
     expect(pushTokensOf(db, 'u1', platform: 'android'), [_tok]);
-    expect(() => db.execute("INSERT INTO push_tokens VALUES ('x','u1','web','t','l','a','b')"), throwsA(anything));
+    expect(() => db.execute("INSERT INTO push_tokens (id, user_id, platform, token, device_label, created_at, updated_at) VALUES ('x','u1','web','t','l','a','b')"), throwsA(anything));
     db.execute("DELETE FROM users WHERE id = 'u1'");
     expect(pushTokensOf(db, 'u1'), isEmpty);
   });

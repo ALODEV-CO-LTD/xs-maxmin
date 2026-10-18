@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
@@ -66,128 +67,28 @@ Future<Response> onRequest(RequestContext context) async {
 
   final handler = webSocketHandler(
     (channel, protocol) {
-      registry.register(userId, channel);
+      registry.register(userId, channel, sessionId: auth!.sessionId);
+
+      // The session is checked by the handshake; also re-check it now and then so a revoked or locked account whose
+      // socket was somehow not closed right away still loses it within half a minute.
+      final recheck = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (!sessionIsActive(appDatabase, userId, auth!.sessionId, issuedAtSeconds: auth.issuedAt)) {
+          registry.closeSession(userId, auth.sessionId ?? '');
+          if (auth.sessionId == null) registry.closeUser(userId);
+        }
+      });
 
       channel.stream.listen(
         (raw) {
-          // Signaling messages are tiny (an SDP is a few KB); anything big is
-          // abuse, not a call.
-          if (raw is! String || raw.length > _maxE2eeChars) return;
-          final Map<String, dynamic> msg;
           try {
-            msg = jsonDecode(raw) as Map<String, dynamic>;
+            _onFrame(raw, db, registry, channel, userId);
           } catch (_) {
-            return;
+            // A malformed or unexpected frame must never take the server down.
           }
-          final to = msg['to'] as String?;
-          final type = msg['type'] as String?;
-          if (type != null && _e2eeTypes.contains(type)) {
-            _relayE2ee(db, registry, channel, userId, to, type, msg);
-            return;
-          }
-          if (raw.length > _maxMessageChars) return;
-          if (to == null || type == null || !_relayedTypes.contains(type)) return;
-
-          // Same trust boundary as text messages: only confirmed friends
-          // can signal each other (see /me/friends/:friendId/messages.dart).
-          final isFriend = db.select(
-            'SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?',
-            [userId, to],
-          ).isNotEmpty;
-          if (!isFriend) {
-            channel.sink.add(jsonEncode({'type': 'call-error', 'error': 'Không phải bạn bè'}));
-            return;
-          }
-
-          // Business rule: calls exist only between customers. Admin can
-          // chat with everyone but neither places nor receives calls, so a
-          // customer can never ring Admin. Enforced here - not just by
-          // hiding the buttons - because the client is untrusted; every
-          // signaling type is blocked (not only call-invite) so offer/ice
-          // can't be pushed at an admin either.
-          final involvesAdmin = db.select(
-            "SELECT 1 FROM users WHERE id IN (?, ?) AND role = 'admin'",
-            [userId, to],
-          ).isNotEmpty;
-          if (involvesAdmin) {
-            channel.sink.add(jsonEncode({
-              'type': 'call-error',
-              'error': 'Chỉ khách hàng gọi được cho nhau, không gọi cho Admin. Hãy nhắn tin để được hỗ trợ.',
-            }));
-            return;
-          }
-
-          // Voice-only rule (K31): enforced here because the client is
-          // untrusted - hiding the video button is not enough.
-          if (_wantsVideo(msg)) {
-            channel.sink.add(jsonEncode({'type': 'call-error', 'error': 'Chỉ hỗ trợ gọi thoại, không hỗ trợ gọi video.'}));
-            return;
-          }
-
-          final payload = Map<String, dynamic>.from(msg)
-            ..remove('to')
-            ..['from'] = userId;
-
-          if (type == 'call-invite') {
-            // The caller's display name is read from the account, never
-            // taken from the client - otherwise anyone could ring a friend
-            // while showing up under someone else's name.
-            final nameRow = db.select('SELECT name FROM users WHERE id = ?', [userId]);
-            payload['fromName'] = nameRow.isEmpty ? 'Người dùng' : nameRow.first['name'];
-
-            if (!registry.allowInvite(userId)) {
-              channel.sink.add(jsonEncode({
-                'type': 'call-error',
-                'error': 'Bạn gọi quá nhiều lần liên tiếp, vui lòng thử lại sau ít phút.',
-              }));
-              return;
-            }
-            // Busy line: either side already ringing/talking. Answered here
-            // (not by the callee's client) so a callee in a call is never
-            // disturbed, and the missed call is still recorded for them.
-            if (registry.activePeerOf(to) != null || registry.activePeerOf(userId) != null) {
-              startCallLog(db, userId, to, status: 'busy');
-              channel.sink.add(jsonEncode({'type': 'call-reject', 'from': to, 'reason': 'busy'}));
-              return;
-            }
-            final delivered = registry.sendTo(to, payload);
-            if (!delivered) {
-              // Offline callee: no ring, but they will see a missed call.
-              startCallLog(db, userId, to, status: 'missed');
-              notifyOfflineRecipient(kind: PushKind.call, fromUserId: userId, fromName: payload['fromName'] as String, toUserId: to);
-              channel.sink.add(jsonEncode({'type': 'call-unavailable', 'from': to}));
-              return;
-            }
-            // A delivered invite already makes both sides part of the same
-            // call attempt, so pair them from that point - not just once they
-            // reach `connected` - otherwise a caller who vanishes while the
-            // other side is still ringing would leave them hanging until the
-            // client's own ring timeout, instead of right away.
-            registry.setActivePeer(userId, to, logId: startCallLog(db, userId, to));
-            // Tells the caller the other phone is ringing (UI: "Đang đổ chuông").
-            channel.sink.add(jsonEncode({'type': 'call-ringing', 'from': to}));
-            return;
-          }
-
-          // Everything else only means something inside a call between these
-          // two people; a stray accept/offer/ice from a stranger is dropped.
-          final inCallWithTo = registry.activePeerOf(userId) == to;
-          if (!inCallWithTo && type != 'call-end') return;
-
-          final logId = registry.activeLogOf(userId);
-          switch (type) {
-            case 'call-accept':
-              applyCallEvent(db, logId, 'accept');
-            case 'call-reject':
-              applyCallEvent(db, logId, 'reject', reason: msg['reason'] as String?);
-            case 'call-end':
-              if (inCallWithTo) applyCallEvent(db, logId, 'end', reason: msg['reason'] as String?);
-          }
-
-          registry.sendTo(to, payload);
-          if (inCallWithTo && (type == 'call-end' || type == 'call-reject')) registry.clearActivePeer(userId);
         },
+        onError: (_) {},
         onDone: () {
+          recheck.cancel();
           // The client didn't get a chance to send call-end (closed tab,
           // crashed, lost network, dev server restart...) - if they were
           // mid-call with someone, that person would otherwise be stuck on
@@ -210,6 +111,122 @@ Future<Response> onRequest(RequestContext context) async {
   );
 
   return handler(context);
+}
+
+/// Handles one inbound frame. Any exception is caught by the caller.
+void _onFrame(Object? raw, Database db, CallSignalingRegistry registry, dynamic channel, String userId) {
+  // Signaling messages are tiny (an SDP is a few KB); anything big is
+  // abuse, not a call. Non-JSON-object frames and non-string fields are ignored.
+  final frame = parseSignalFrame(raw, maxChars: _maxE2eeChars);
+  if (frame == null) return;
+  final msg = frame.msg;
+  final to = frame.to;
+  final type = frame.type;
+  if (type != null && _e2eeTypes.contains(type)) {
+    _relayE2ee(db, registry, channel, userId, to, type, msg);
+    return;
+  }
+  if ((raw as String).length > _maxMessageChars) return;
+  if (to == null || type == null || !_relayedTypes.contains(type)) return;
+
+  // Same trust boundary as text messages: only confirmed friends
+  // can signal each other (see /me/friends/:friendId/messages.dart).
+  final isFriend = db.select(
+    'SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?',
+    [userId, to],
+  ).isNotEmpty;
+  if (!isFriend) {
+    channel.sink.add(jsonEncode({'type': 'call-error', 'error': 'Không phải bạn bè'}));
+    return;
+  }
+
+  // Business rule: calls exist only between customers. Admin can
+  // chat with everyone but neither places nor receives calls, so a
+  // customer can never ring Admin. Enforced here - not just by
+  // hiding the buttons - because the client is untrusted; every
+  // signaling type is blocked (not only call-invite) so offer/ice
+  // can't be pushed at an admin either.
+  final involvesAdmin = db.select(
+    "SELECT 1 FROM users WHERE id IN (?, ?) AND role = 'admin'",
+    [userId, to],
+  ).isNotEmpty;
+  if (involvesAdmin) {
+    channel.sink.add(jsonEncode({
+      'type': 'call-error',
+      'error': 'Chỉ khách hàng gọi được cho nhau, không gọi cho Admin. Hãy nhắn tin để được hỗ trợ.',
+    }));
+    return;
+  }
+
+  // Voice-only rule (K31): enforced here because the client is
+  // untrusted - hiding the video button is not enough.
+  if (_wantsVideo(msg)) {
+    channel.sink.add(jsonEncode({'type': 'call-error', 'error': 'Chỉ hỗ trợ gọi thoại, không hỗ trợ gọi video.'}));
+    return;
+  }
+
+  final payload = Map<String, dynamic>.from(msg)
+    ..remove('to')
+    ..['from'] = userId;
+
+  if (type == 'call-invite') {
+    // The caller's display name is read from the account, never
+    // taken from the client - otherwise anyone could ring a friend
+    // while showing up under someone else's name.
+    final nameRow = db.select('SELECT name FROM users WHERE id = ?', [userId]);
+    payload['fromName'] = nameRow.isEmpty ? 'Người dùng' : nameRow.first['name'];
+
+    if (!registry.allowInvite(userId)) {
+      channel.sink.add(jsonEncode({
+        'type': 'call-error',
+        'error': 'Bạn gọi quá nhiều lần liên tiếp, vui lòng thử lại sau ít phút.',
+      }));
+      return;
+    }
+    // Busy line: either side already ringing/talking. Answered here
+    // (not by the callee's client) so a callee in a call is never
+    // disturbed, and the missed call is still recorded for them.
+    if (registry.activePeerOf(to) != null || registry.activePeerOf(userId) != null) {
+      startCallLog(db, userId, to, status: 'busy');
+      channel.sink.add(jsonEncode({'type': 'call-reject', 'from': to, 'reason': 'busy'}));
+      return;
+    }
+    final delivered = registry.sendTo(to, payload);
+    if (!delivered) {
+      // Offline callee: no ring, but they will see a missed call.
+      startCallLog(db, userId, to, status: 'missed');
+      notifyOfflineRecipient(kind: PushKind.call, fromUserId: userId, fromName: payload['fromName'] as String, toUserId: to);
+      channel.sink.add(jsonEncode({'type': 'call-unavailable', 'from': to}));
+      return;
+    }
+    // A delivered invite already makes both sides part of the same
+    // call attempt, so pair them from that point - not just once they
+    // reach `connected` - otherwise a caller who vanishes while the
+    // other side is still ringing would leave them hanging until the
+    // client's own ring timeout, instead of right away.
+    registry.setActivePeer(userId, to, logId: startCallLog(db, userId, to));
+    // Tells the caller the other phone is ringing (UI: "Đang đổ chuông").
+    channel.sink.add(jsonEncode({'type': 'call-ringing', 'from': to}));
+    return;
+  }
+
+  // Everything else only means something inside a call between these
+  // two people; a stray accept/offer/ice from a stranger is dropped.
+  final inCallWithTo = registry.activePeerOf(userId) == to;
+  if (!inCallWithTo && type != 'call-end') return;
+
+  final logId = registry.activeLogOf(userId);
+  switch (type) {
+    case 'call-accept':
+      applyCallEvent(db, logId, 'accept');
+    case 'call-reject':
+      applyCallEvent(db, logId, 'reject', reason: frame.reason);
+    case 'call-end':
+      if (inCallWithTo) applyCallEvent(db, logId, 'end', reason: frame.reason);
+  }
+
+  registry.sendTo(to, payload);
+  if (inCallWithTo && (type == 'call-end' || type == 'call-reject')) registry.clearActivePeer(userId);
 }
 
 /// True when a signaling message asks for video: an explicit `video: true`

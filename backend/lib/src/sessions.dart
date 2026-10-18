@@ -1,9 +1,12 @@
+import 'dart:io' show InternetAddress;
 import 'dart:math';
 
 import 'package:dart_frog/dart_frog.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'call_signaling.dart';
 import 'database.dart' show newId;
+import 'push_tokens.dart';
 import 'security_policy.dart';
 
 // ---------------------------------------------------------------------------
@@ -30,15 +33,46 @@ void logSecurityEvent(
   );
 }
 
-/// Remote address of the caller (the direct socket peer; X-Forwarded-For is
-/// deliberately ignored so a client cannot dodge the per-IP counter by
-/// spoofing it).
+/// Remote address of the caller. The direct socket peer is used, EXCEPT when that peer is a loopback address (production:
+/// nginx on 127.0.0.1 fed by a Cloudflare tunnel, so every request has peer 127.0.0.1): then the proxy's view of the
+/// client is trusted - `CF-Connecting-IP`, else the first `X-Forwarded-For` value, else `X-Real-IP` - provided it is a
+/// valid IP. From any non-loopback peer these headers are ignored, so a direct client cannot spoof its address.
 String clientIp(RequestContext context) {
   try {
-    return context.request.connectionInfo.remoteAddress.address;
+    final peer = context.request.connectionInfo.remoteAddress.address;
+    return resolveClientIp(peer, context.request.headers);
   } catch (_) {
     return 'unknown';
   }
+}
+
+/// Pure part of [clientIp] (unit-tested): [peer] is the socket peer, [headers] the request headers (any case).
+String resolveClientIp(String peer, Map<String, String> headers) {
+  if (!_isLoopback(peer)) return peer;
+  String? header(String name) {
+    for (final e in headers.entries) {
+      if (e.key.toLowerCase() == name) return e.value;
+    }
+    return null;
+  }
+
+  final candidates = [
+    header('cf-connecting-ip'),
+    header('x-forwarded-for')?.split(',').first,
+    header('x-real-ip'),
+  ];
+  for (final c in candidates) {
+    final v = c?.trim();
+    if (v == null || v.isEmpty) continue;
+    final ip = InternetAddress.tryParse(v);
+    if (ip != null) return ip.address;
+  }
+  return peer;
+}
+
+bool _isLoopback(String peer) {
+  final ip = InternetAddress.tryParse(peer.startsWith('::ffff:') ? peer.substring(7) : peer);
+  return ip != null && ip.isLoopback;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +264,9 @@ bool revokeSession(Database db, String userId, String sessionId, {required Strin
   );
   final changed = db.updatedRows > 0;
   if (changed) {
+    // The session's open call/chat socket and its push token die with it.
+    CallSignalingRegistry.instance.closeSession(userId, sessionId);
+    deletePushTokensOfSession(db, sessionId);
     logSecurityEvent(db, 'session_revoked', userId: userId, ip: ip, detail: by == userId ? 'Người dùng tự đăng xuất thiết bị' : 'Admin thu hồi phiên');
   }
   return changed;
@@ -242,6 +279,8 @@ int revokeAllSessions(Database db, String userId, {required String by, String? e
     [DateTime.now().toUtc().toIso8601String(), by, userId, exceptSessionId ?? ''],
   );
   final n = db.updatedRows;
+  CallSignalingRegistry.instance.closeUser(userId, exceptSessionId: exceptSessionId);
+  deletePushTokensOfUser(db, userId, exceptSessionId: exceptSessionId);
   // Tokens issued before device sessions existed have no row to revoke; this
   // marker revokes them instead (checked in sessionIsActive).
   db.execute('UPDATE users SET tokens_valid_after = ? WHERE id = ?', [DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000, userId]);

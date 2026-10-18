@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/customer_codes.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/rate_gate.dart';
 import 'package:server/src/text_fold.dart';
@@ -50,6 +51,7 @@ Response onRequest(RequestContext context) {
         r,
   ]..sort((a, b) => foldVi(a['name'] as String).compareTo(foldVi(b['name'] as String)));
   final rows = matched.take(20).toList();
+  if (rows.any((r) => (r['by_code'] as int) == 1)) markCodeUsed(db, q);
 
   return Response.json(
     body: {

@@ -1,11 +1,11 @@
-import 'dart:convert';
-
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/attachments.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/permissions.dart';
 import 'package:server/src/database.dart';
 import 'package:server/src/push.dart';
+import 'package:server/src/rate_gate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// A customer's own thread with admin support - the Phản hồi (feedback)
@@ -14,6 +14,9 @@ import 'package:sqlite3/sqlite3.dart';
 /// Backed by `direct_messages` between the customer and an admin account,
 /// shared with routes/api/admin/messages so both ends see the same thread.
 /// `sender` is derived as 'user'/'admin' from who sent each row.
+/// Longest support message text.
+const maxMessageChars = 4000;
+
 Future<Response> onRequest(RequestContext context) async {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();
@@ -53,12 +56,11 @@ Response _list(RequestContext context, String userId) {
 }
 
 Future<Response> _send(RequestContext context, String userId) async {
-  final Map<String, dynamic> body;
-  try {
-    body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-  }
+  final read = await readJsonBody(context, messageBodyMaxBytes);
+  if (read.error != null) return read.error!;
+  final body = read.body!;
+  final badText = checkTextFields(body, {'content': maxMessageChars});
+  if (badText != null) return badText;
   final content = (body['content'] as String?)?.trim() ?? '';
   final parsed = parseAttachment(body['attachment']);
   if (parsed.error != null) {
@@ -68,6 +70,10 @@ Future<Response> _send(RequestContext context, String userId) async {
   if (content.isEmpty && att == null) {
     return Response.json(statusCode: 400, body: {'error': 'Nội dung trống'});
   }
+
+  // Per-account throttle: the support inbox of every admin is notified (and pushed) for each message.
+  final wait = supportMessagesPerUser.hit('u:$userId');
+  if (wait > 0) return tooManyRequests(wait, 'gửi tin nhắn hỗ trợ');
 
   final db = context.read<Database>();
   final adminRows = db.select("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1");

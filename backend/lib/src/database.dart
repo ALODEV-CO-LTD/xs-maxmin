@@ -35,7 +35,7 @@ Database _openAppDatabase() {
   _createSchema(db);
   _migrateSchema(db);
   if (isNew) {
-    _seed(db);
+    seedDatabase(db, Platform.environment);
   }
   // Admin is reached through the Phản hồi (feedback) page only, never as a
   // friend. Earlier builds friended every account with Admin (and sending
@@ -158,6 +158,13 @@ void _migrateSchema(Database db) {
   backfillPaymentReferences(db);
   // Optional label on a Mã ID ("ID ảo"), e.g. "Cho khách quen" (K23).
   _ensureColumn(db, 'customer_codes', 'label', 'TEXT');
+  // First time somebody found the code; a code deleted without ever being found is not quarantined. Codes that exist
+  // when the column is first added count as used (we cannot know), so their quarantine behaves as before.
+  final codeCols = db.select('PRAGMA table_info(customer_codes)').map((r) => r['name'] as String);
+  if (!codeCols.contains('used_at')) {
+    db.execute('ALTER TABLE customer_codes ADD COLUMN used_at TEXT');
+    db.execute('UPDATE customer_codes SET used_at = created_at');
+  }
   // Last-change timestamp of an entry (ISO-8601 UTC). The offline client
   // sends the value it last saw when it replays an edit; a mismatch means the
   // entry was changed elsewhere meanwhile (conflict, see entries/[id].dart).
@@ -518,19 +525,37 @@ void _createSchema(Database db) {
   _ensureColumn(db, 'deletion_schedules', 'first_run_at', 'TEXT');
 }
 
-void _seed(Database db) {
+/// Random password for the first admin (no fixed default ever): 16 characters, ambiguous ones left out.
+String generateAdminPassword([Random? rng]) {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  final r = rng ?? Random.secure();
+  return List.generate(16, (_) => alphabet[r.nextInt(alphabet.length)]).join();
+}
+
+/// First-boot seeding of an EMPTY database (existing databases are never touched).
+///  * the root admin, username `1`; password from `XOSO_ADMIN_PASSWORD`, otherwise a random one printed ONCE through
+///    [log] (stderr by default) as `[seed] admin password: ...`. There is no fixed default password.
+///  * the demo customers (usernames 2-6, weak passwords) ONLY when `XOSO_SEED_DEMO=1`.
+/// Local development: `XOSO_SEED_DEMO=1 XOSO_ADMIN_PASSWORD=<something> dart_frog dev` (on a fresh data/ folder).
+void seedDatabase(Database db, Map<String, String> env, {void Function(String line)? log}) {
   final now = DateTime.now().toUtc();
 
   String hash(String pw) => BCrypt.hashpw(pw, BCrypt.gensalt());
 
+  var adminPassword = env['XOSO_ADMIN_PASSWORD'];
+  final generated = adminPassword == null || adminPassword.isEmpty;
+  if (generated) adminPassword = generateAdminPassword();
   final adminId = _uuid.v4();
   db.execute(
     '''
     INSERT INTO users (id, name, username, password_hash, role, package_type, status, created_at)
     VALUES (?, ?, ?, ?, 'admin', 'none', 'active', ?)
     ''',
-    [adminId, 'Admin', '1', hash('1234'), now.toIso8601String()],
+    [adminId, 'Admin', '1', hash(adminPassword), now.toIso8601String()],
   );
+  if (generated) (log ?? stderr.writeln)('[seed] admin password: $adminPassword');
+
+  if (env['XOSO_SEED_DEMO'] != '1') return;
 
   final sampleUsers = [
     ('Nguyễn Văn A', '2', '1235', PackageType.oneMonth, 15),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -25,12 +26,9 @@ Future<Response> onRequest(RequestContext context) async {
     return Response(statusCode: 405, body: 'Method not allowed');
   }
 
-  final Map<String, dynamic> body;
-  try {
-    body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
-  } catch (_) {
-    return Response.json(statusCode: 400, body: {'error': 'Body không hợp lệ'});
-  }
+  final read = await readJsonBody(context, smallBodyMaxBytes);
+  if (read.error != null) return read.error!;
+  final body = read.body!;
   final key = normalizePublicKey(body['publicKey']);
   if (key == null) {
     return Response.json(statusCode: 400, body: {'error': 'Khoá công khai không hợp lệ'});
