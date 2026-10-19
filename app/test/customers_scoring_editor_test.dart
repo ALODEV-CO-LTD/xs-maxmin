@@ -166,15 +166,12 @@ void main() {
       expect(m.resultMap(), isEmpty);
     });
 
-    test('an older account (Đề / Lô) reads as a table: lô = 23.000 / 460.000, Đề as an extra row', () {
+    test('an older account (Đề / Lô) reads as a table: lô = 23.000 / 460.000, the old Đề is not a second row (Đuôi stands for it)', () {
       final m = customerModel(null, legacyAccount());
       expect(row(m, 'lo').price, '23000');
       expect(row(m, 'lo').payout, '460000');
-      final de = row(m, 'de');
-      expect(de.extra, isTrue);
-      expect(de.label, 'Đề');
-      expect(de.price, '1');
-      expect(de.payout, '70');
+      expect(m.rows.where((r) => r.type == 'de'), isEmpty);
+      expect(m.rows.where((r) => r.type == 'duoi'), hasLength(1));
     });
   });
 
@@ -355,7 +352,7 @@ void main() {
       m.addCustom(name: 'Tài xỉu', symbol: 'tx', allTiers: false, digits: 2, price: '1000', payout: '2000');
       expect(m.groups.last.group.label, 'Kiểu đánh khác');
       expect(m.groups.last.rows.single.type, 'tx');
-      expect(row(customerModel(null, legacyAccount()), 'de').group, 'other');
+      expect(customerModel(null, legacyAccount()).rows.where((r) => r.type == 'de'), isEmpty);
     });
   });
 

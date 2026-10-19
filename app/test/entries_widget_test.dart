@@ -163,7 +163,7 @@ void main() {
     await tester.tap(find.text('Thêm'));
     await tester.pumpAndSettle();
     expect(find.textContaining('5 cách đánh'), findsOneWidget); // Đề: 4 standard + the new one
-    expect(find.text('Xoá'), findsNWidgets(2)); // only the custom rows (the older Đề and the new one) can be removed by a customer
+    expect(find.text('Xoá'), findsOneWidget); // only the custom rows can be removed by a customer (the older Đề is not shown: Đuôi stands for it)
 
     // "Chỉnh lấy số" of Bao lô 2 số: the panel with the prizes of Miền Nam
     final srcBtn = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('srcbtn-') && (w.key! as ValueKey<String>).value.endsWith('-lo'));
