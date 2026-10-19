@@ -467,3 +467,7 @@ Trước đây Tổng quan cộng thẳng "điểm vào/ra" của mọi kiểu �
 - Web: `frontend/src/statsMoney.js` (+ `components/AccountStats.vue`), test `frontend/tests/statsMoney.test.mjs`.
 - Kiểm chứng trên dữ liệu thật của tài khoản demo "2" (bảng giá thật): tổng tiền gửi 32.070.475.343 đ và ngày 18/10 1.545.658.000 đ, khớp từng đồng với tab Tính điểm; cả 8 số liệu đều không trúng nên tiền trúng 0.
 - Tổng quan cần tải kết quả xổ số của mọi ngày có số liệu (4 yêu cầu song song, có lưu bản sao trên máy); offline dùng bản đã lưu.
+
+## Kiểm thử chat giữa hai thiết bị bằng mã thật (19/10/2026)
+
+`tools/test_chat_e2e.sh` (~1 phút): dựng một máy chủ THỬ cô lập (bản sao backend, DB mới, cổng 8597, không đụng dữ liệu thật), tạo hai tài khoản, kết bạn, rồi chạy `app/test_e2e/chat_two_devices_test.dart` với mã app thật: hai "thiết bị" (mỗi bên có kho khoá, kho tin nhắn và WebSocket riêng; Android và iOS dùng chung mã Dart nên không khác nhau về giao thức) gửi/nhận/xác nhận hai chiều, tin dài có dấu và emoji, bạn offline rồi "Gửi lại", và giới hạn "cùng một tài khoản trên hai máy" (máy thứ hai thay khoá, máy thứ nhất không đọc được tin mới).
