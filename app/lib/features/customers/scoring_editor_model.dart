@@ -176,7 +176,7 @@ class ScoringEditorModel {
   List<String> get extraTypes {
     final keys = <String>{...typesIn(work, region)};
     if (isCustomer) keys.addAll(typesIn(_base, region));
-    return keys.where((k) => !isTableKind(k)).toList();
+    return keys.where((k) => !isTableKind(k) && !legacyTypeAlias.containsKey(k)).toList();
   }
 
   /// The rows by group (empty groups left out): one group = one kiểu đánh, its rows = the cách đánh.

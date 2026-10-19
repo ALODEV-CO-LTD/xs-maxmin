@@ -373,4 +373,16 @@ void main() {
       expect(effectiveConfig(defaultRates, null, 'de', 'mb'), fallbackDe);
     });
   });
+  test('kiểu đánh cũ "de" / "3-càng" trùng chuẩn mới thì chỉ hiện một, dữ liệu cũ vẫn tính điểm', () {
+    final acc = <String, dynamic>{
+      'de': {'rate': 70, 'tiers': ['dacBiet'], 'digits': 2},
+      'lo': {'rate': 20, 'tiers': ['dacBiet'], 'digits': 2},
+      '3-càng': {'rate': 400, 'tiers': ['dacBiet'], 'digits': 3},
+      'duoi@mb': defaultRow('duoi', 'mb'),
+      'cang3@mb': defaultRow('cang3', 'mb'),
+    };
+    expect(customerBetTypes(acc, null, 'mb'), ['lo', 'duoi', 'cang3']);
+    expect(effectiveConfig(acc, null, 'de', 'mb')['rate'], 70);
+    expect(customerBetTypes({'de': acc['de'], 'lo': acc['lo']}, null, 'mb'), ['de', 'lo']);
+  });
 }

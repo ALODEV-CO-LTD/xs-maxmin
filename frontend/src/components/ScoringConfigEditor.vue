@@ -19,7 +19,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, ApiError } from '../api'
 import { showConfirm } from '../confirm'
 import { betTypeLabel } from '../betTypes'
-import { baseKey, defaultRow, defaultSource, defaultSymbols, DEFAULT_RATES, describeSource, effectiveSource, kindSource, normalizeSource, prizeInfo, sameSource, sourceFields, makeRow, parseSymbols, regionKey, sameConfig, symbolsText, TABLE_GROUPS, TABLE_KINDS, TABLE_KIND_KEYS, toTableRow, typesIn } from '../scoringConfig'
+import { baseKey, defaultRow, defaultSource, defaultSymbols, DEFAULT_RATES, describeSource, effectiveSource, kindSource, normalizeSource, prizeInfo, sameSource, sourceFields, makeRow, parseSymbols, regionKey, sameConfig, symbolsText, TABLE_GROUPS, TABLE_KINDS, TABLE_KIND_KEYS, LEGACY_TYPE_ALIAS, toTableRow, typesIn } from '../scoringConfig'
 import { REGION_IDS } from '../lotteryStations'
 import AppButton from './AppButton.vue'
 import ActionBar from './ActionBar.vue'
@@ -102,7 +102,7 @@ function shownRow(type) {
 const extraTypes = computed(() => {
   const keys = new Set(typesIn(work, region.value))
   if (isCustomer.value) for (const k of typesIn(base.value, region.value)) keys.add(k)
-  return [...keys].filter((k) => !TABLE_KIND_KEYS.includes(k))
+  return [...keys].filter((k) => !TABLE_KIND_KEYS.includes(k) && !LEGACY_TYPE_ALIAS[k])
 })
 
 // A standard row removed from the table: by the account (default scope), or by the account for every customer.

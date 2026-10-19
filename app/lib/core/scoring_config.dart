@@ -349,6 +349,13 @@ Cfg effectiveConfig(RatesMap? account, RatesMap? customer, String? betType, [Str
   return Map<String, dynamic>.from(acc as Map);
 }
 
+/// Old account-made types that mean the same as a standard kind ("Đề" = 2 số cuối giải đặc biệt = Đuôi, "3-càng" = 3 càng).
+/// Shown once: the standard row; the old key stays in the data so entries already saved with it are scored as before.
+const legacyTypeAlias = {'de': 'duoi', '3-càng': 'cang3'};
+
+/// [types] without the old types whose standard kind is there too.
+List<String> withoutLegacyDuplicates(List<String> types) => [for (final t in types) if (!(legacyTypeAlias.containsKey(t) && types.contains(legacyTypeAlias[t]))) t];
+
 /// Bet types this customer can use in [region]: the account's types minus the ones switched off for them, plus the
 /// types only they have.
 List<String> customerBetTypes(RatesMap? account, RatesMap? customer, [String region = 'mb']) {
@@ -357,7 +364,7 @@ List<String> customerBetTypes(RatesMap? account, RatesMap? customer, [String reg
   for (final k in typesIn(customer, region)) {
     if (!off(k) && !out.contains(k)) out.add(k);
   }
-  return out;
+  return withoutLegacyDuplicates(out);
 }
 
 /// 'point' (điểm × 1 điểm = pointValue đồng) or 'money'. Lô defaults to points, everything else to money.

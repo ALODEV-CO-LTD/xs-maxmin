@@ -138,3 +138,12 @@ test('lấy số tuỳ chỉnh: giải nào, vị trí đầu/cuối, bao nhiêu
   const d = entryDetail(entry('20', 1), MB, custom, { region: 'mb', customerRegion: 'mn' })
   assert.equal(d.stakeFactor, 1)
 })
+
+test('Kiểu đánh cũ "de" / "3-càng" trùng chuẩn mới thì chỉ hiện một (giữ dữ liệu cũ để tính điểm)', async () => {
+  const { customerBetTypes, effectiveConfig } = await import('../src/scoringConfig.js')
+  const acc = { de: { rate: 70, tiers: ['dacBiet'], digits: 2 }, lo: { rate: 20, tiers: ['dacBiet'], digits: 2 }, '3-càng': { rate: 400, tiers: ['dacBiet'], digits: 3 }, 'duoi@mb': { ...defaultRow('duoi', 'mb') }, 'cang3@mb': { ...defaultRow('cang3', 'mb') } }
+  assert.deepEqual(customerBetTypes(acc, null, 'mb'), ['lo', 'duoi', 'cang3'])
+  assert.equal(effectiveConfig(acc, null, 'de', 'mb').rate, 70) // an old entry typed "de" is still scored with its own config
+  const only = { de: acc.de, lo: acc.lo }
+  assert.deepEqual(customerBetTypes(only, null, 'mb'), ['de', 'lo']) // no standard duplicate, so it stays
+})

@@ -239,13 +239,18 @@ export function effectiveConfig(accountRates, customerRates, betType, region = '
   return acc ?? accountRates?.de ?? FALLBACK_DE
 }
 
+// Old account-made types that mean the same as a standard kind ("Đề" = 2 số cuối giải đặc biệt = Đuôi, "3-càng" = 3 càng).
+// Shown once, as the standard row; the old key stays in the data so entries already saved with it are scored as before.
+export const LEGACY_TYPE_ALIAS = { de: 'duoi', '3-càng': 'cang3' }
+export const withoutLegacyDuplicates = (types) => types.filter((t) => !(LEGACY_TYPE_ALIAS[t] && types.includes(LEGACY_TYPE_ALIAS[t])))
+
 // Bet types this customer can use in `region`: the account's types minus the ones switched off for them (in every
 // region or just this one), plus the types only they have.
 export function customerBetTypes(accountRates, customerRates, region = 'mb') {
   const off = (k) => customerRates?.[k]?.disabled || customerRates?.[regionKey(k, region)]?.disabled
   const out = typesIn(accountRates, region).filter((k) => !off(k))
   for (const k of typesIn(customerRates, region)) if (!off(k) && !out.includes(k)) out.push(k)
-  return out
+  return withoutLegacyDuplicates(out)
 }
 
 // Same config? (rate, digits and the SET of prize groups)
