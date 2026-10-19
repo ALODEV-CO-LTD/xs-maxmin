@@ -24,3 +24,19 @@ Các script đăng nhập admin (`integ.mjs`, `recov.mjs`, `sup.mjs`) đọc m�
 `E2E_ADMIN_PASSWORD='<cùng mật khẩu>' node tools/e2e/recov.mjs`
 
 Lưu ý: mật khẩu trong script (`Smoke#Test123`, `2468`) chỉ là dữ liệu thử cho backend cô lập.
+
+## Bản Next.js (web-next) — QA luồng thật bằng 2–3 trình duyệt
+Dựng `BE=8621 WEB=8622 VM=8625 tools/e2e/next-stack.sh start` (và bản Vue để đối chiếu: `node tools/e2e/serve.mjs frontend/dist 8623 8621`), rồi chạy với `PPT=<thư mục chứa node_modules/puppeteer-core>`; `SITE_A`/`SITE_B` chọn bản Next (8622) hoặc Vue (8623) cho từng người dùng để thử chéo giao thức. Backend thử giới hạn 10 lần đăng ký/giờ/IP nên các script đặt `x-forwarded-for` ngẫu nhiên (backend tin header này từ loopback).
+| File | Kiểm tra |
+|---|---|
+| `next-chat.mjs` | kết bạn có chấp nhận, nhắn 2 chiều, ghim/trả lời/chuyển tiếp/xoá/chọn, ảnh, offline + Gửi lại, nhóm, toast, huy hiệu |
+| `next-chat2.mjs` | nhóm (đổi tên, xoá/rời), Nhập số từ chat, từ chối/huỷ lời mời, Mã ID, tên riêng, xoá bạn |
+| `next-chat3.mjs` | ảnh 2 MB nhiều phần giữa các bản |
+| `next-chat4.mjs` | đổi khoá bảo mật (máy mới), bấm toast, bạn chưa bật mã hoá |
+| `next-list.mjs` | lưu trữ/xoá hội thoại, tìm kiếm, sắp xếp, lời mời chéo |
+| `next-session.mjs` | đăng nhập/đăng xuất qua form, không rò chat giữa người dùng cùng trình duyệt |
+| `next-mobile.mjs` | 390px: danh sách↔hội thoại, nhấn giữ, tràn ngang |
+| `next-call.mjs` | cuộc gọi thoại (micro giả): gọi, nghe, từ chối, huỷ/nhỡ, nhật ký, người offline |
+| `next-support.mjs` | Phản hồi Admin: khách (chữ+ảnh) ↔ admin (giao diện), huy hiệu, popover |
+| `next-account.mjs` | Tài khoản: hồ sơ, mật khẩu, lớp hai, Mã ID, mã khôi phục dùng thật, thiết bị, riêng tư, gói → admin duyệt |
+| `next-stats-parity.mjs` | số liệu tab Thống kê Next so với Vue trên cùng dữ liệu |
