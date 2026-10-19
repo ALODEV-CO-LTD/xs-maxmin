@@ -7,7 +7,7 @@ import AppSelect from '@/components/AppSelect'
 import ModalDialog from '@/components/ModalDialog'
 import PasswordInput from '@/components/PasswordInput'
 import { api } from '@/lib/api'
-import { deleteBody, deleteProblem, hasLimit as hasLimitOf, keepOf, scopeText as scopeTextOf } from './deleteLogic'
+import { deleteBody, deleteProblem, hasLimit as hasLimitOf, scopeText as scopeTextOf } from './deleteLogic'
 
 // "Xóa số liệu": xoá ngay số liệu đã lưu - một khách hoặc tất cả, khoảng ngày tuỳ chọn, tuỳ chọn giữ lại N ngày gần nhất.
 // Hiện số dòng sẽ bị xoá (chạy thử, không cần mật khẩu) và cần mật khẩu đăng nhập.
@@ -40,26 +40,23 @@ function Inner({ customerName = '', dateFrom = '', dateTo = '', singleDay = '', 
   const [busy, setBusy] = useState(false)
 
   const st = { scope, customerName, from, to, keepDays }
-  const keep = keepOf(keepDays)
   const hasLimit = hasLimitOf(st)
 
   // Đếm số liệu sẽ bị xoá, chờ 200ms sau lần đổi cuối; bỏ kết quả của lần gọi cũ.
   const seq = useRef(0)
-  const bodyNow = useRef(st)
-  bodyNow.current = st
   useEffect(() => {
     const timer = setTimeout(async () => {
       const mine = ++seq.current
       setCount(null)
       try {
-        const r = await api.post('/me/entries/bulk-delete', deleteBody(bodyNow.current, { dryRun: true }))
+        const r = await api.post('/me/entries/bulk-delete', deleteBody({ scope, customerName, from, to, keepDays }, { dryRun: true }))
         if (mine === seq.current) setCount(r.count)
       } catch (err) {
         if (mine === seq.current) setError((err as Error).message || 'Không đếm được số liệu sẽ bị xoá')
       }
     }, 200)
     return () => clearTimeout(timer)
-  }, [scope, from, to, keep])
+  }, [scope, customerName, from, to, keepDays])
 
   const change = <T,>(set: (v: T) => void) => (v: T) => {
     setError('')

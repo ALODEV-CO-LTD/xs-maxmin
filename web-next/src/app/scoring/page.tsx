@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import ScoringScreen from '@/features/scoring/ScoringScreen'
 
 export default function Page() {
-  return <ScreenStub vue="ScoringView.vue" />
+  return <ScoringScreen />
 }
