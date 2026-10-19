@@ -1,7 +1,7 @@
 // Service worker: keeps the app shell (index.html + hashed JS/CSS assets)
 // available offline. API calls are never cached here - offline data lives in
 // IndexedDB (see src/offline.js).
-const CACHE = 'mamba-shell-v5'
+const CACHE = 'mamba-shell-v6'
 
 // Files at fixed (un-hashed) URLs: pre-cached for offline, but always fetched
 // network-first so a replaced manifest/icon is never stuck behind the cache.
@@ -46,11 +46,12 @@ self.addEventListener('fetch', (event) => {
         .then((res) => {
           if (res.ok) {
             const copy = res.clone()
-            caches.open(CACHE).then((c) => c.put('/', copy))
+            // each page (/results, /scoring...) is its own HTML file in the static export: keep every visited one
+            caches.open(CACHE).then((c) => { c.put(req, copy.clone()); c.put('/', copy) })
           }
           return res
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match(req).then((hit) => hit || caches.match('/'))),
     )
     return
   }

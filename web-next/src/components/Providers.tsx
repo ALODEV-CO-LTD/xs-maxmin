@@ -23,7 +23,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     initTheme()
     useAuthStore.getState().init()
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+      // the effect usually runs after `load` has already fired, so register at once in that case
+      const register = () => navigator.serviceWorker.register('/sw.js').catch(() => {})
+      if (document.readyState === 'complete') register()
+      else window.addEventListener('load', register, { once: true })
     }
   }, [])
   useEffect(() => setNavigator((to: string) => router.push(to)), [router])
