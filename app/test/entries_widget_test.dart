@@ -42,6 +42,9 @@ Future<http.Response> _handler(http.Request r) async {
           'lo': {'rate': 20, 'tiers': ['dacBiet', 'giaiNhat'], 'digits': 2},
         },
       });
+    case 'PATCH /api/me/customers/c1':
+    case 'PATCH /api/me/customers/c2':
+      return _j({'id': r.url.pathSegments.last, 'name': 'Bình', 'phone': '0912345678'});
     case 'GET /api/me/syntax-templates':
       return _j({'templates': []});
     case 'GET /api/me':
@@ -184,6 +187,22 @@ void main() {
     expect(find.text('Sửa'), findsOneWidget);
     expect(find.text('15.000'), findsNothing);
     expect(find.text('Huỷ'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('Khách hàng: sửa số điện thoại rồi Lưu, đóng hộp thoại không lỗi', (tester) async {
+    tester.view.physicalSize = const Size(360 * 3, 800 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_app(const CustomersScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sửa').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(AppDialog), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '0912345678');
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppDialog), findsNothing);
+    expect(find.text('0912345678'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

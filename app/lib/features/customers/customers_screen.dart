@@ -65,50 +65,8 @@ class _CustomersBodyState extends State<_CustomersBody> {
     if (created != null) c.addLocal(created);
   }
 
-  Future<void> _editPhone(CustomersController c, Customer cu) async {
-    final ctrl = TextEditingController(text: cu.phone);
-    String error = '';
-    bool busy = false;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AppDialog(
-          title: 'Sửa ${cu.name}',
-          closeEnabled: !busy,
-          body: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: ctrl, autofocus: true, enabled: !busy, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại', hintText: 'Chưa có')),
-            if (error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(error)),
-          ]),
-          actions: [
-            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: busy ? null : () => Navigator.pop(ctx)),
-            AppButton(
-              label: 'Lưu',
-              variant: AppButtonVariant.primary,
-              loading: busy,
-              onPressed: busy
-                  ? null
-                  : () async {
-                      setS(() {
-                        busy = true;
-                        error = '';
-                      });
-                      final err = await c.savePhone(cu, ctrl.text);
-                      if (err.isEmpty) {
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      } else {
-                        setS(() {
-                          busy = false;
-                          error = err;
-                        });
-                      }
-                    },
-            ),
-          ],
-        ),
-      ),
-    );
-    ctrl.dispose();
-  }
+  Future<void> _editPhone(CustomersController c, Customer cu) =>
+      showDialog<void>(context: context, builder: (_) => _EditPhoneDialog(controller: c, customer: cu));
 
   Future<void> _remove(CustomersController c, Customer cu) async {
     final ok = await confirmDialog(context, title: 'Xoá khách hàng', message: 'Xoá "${cu.name}" khỏi danh sách khách hàng? Số liệu đã nhập của khách này vẫn được giữ nguyên.', confirmText: 'Xoá', danger: true);
@@ -223,6 +181,61 @@ class _CustomersBodyState extends State<_CustomersBody> {
           ]),
         ]),
       ),
+    );
+  }
+}
+
+/// "Sửa" a customer: the phone number. A widget of its own so the text controller lives (and is disposed) with the dialog,
+/// not right after showDialog returns while the dialog is still animating out.
+class _EditPhoneDialog extends StatefulWidget {
+  const _EditPhoneDialog({required this.controller, required this.customer});
+  final CustomersController controller;
+  final Customer customer;
+  @override
+  State<_EditPhoneDialog> createState() => _EditPhoneDialogState();
+}
+
+class _EditPhoneDialogState extends State<_EditPhoneDialog> {
+  late final TextEditingController _phone = TextEditingController(text: widget.customer.phone);
+  String _error = '';
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _busy = true;
+      _error = '';
+    });
+    final err = await widget.controller.savePhone(widget.customer, _phone.text);
+    if (!mounted) return;
+    if (err.isEmpty) {
+      Navigator.pop(context);
+    } else {
+      setState(() {
+        _busy = false;
+        _error = err;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDialog(
+      title: 'Sửa ${widget.customer.name}',
+      closeEnabled: !_busy,
+      body: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: _phone, autofocus: true, enabled: !_busy, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại', hintText: 'Chưa có')),
+        if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(_error)),
+      ]),
+      actions: [
+        AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
+        AppButton(label: 'Lưu', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _save),
+      ],
     );
   }
 }
