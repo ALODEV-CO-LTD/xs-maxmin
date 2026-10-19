@@ -14,12 +14,13 @@ const stats = ref(null)
 
 // Two charts over the same range: revenue (bars) and new accounts (line).
 const RANGES = [
-  { key: '7', label: '7 ngày' },
-  { key: '30', label: '30 ngày' },
-  { key: '90', label: '90 ngày' },
-  { key: '12m', label: '12 tháng' },
+  { key: 'day', label: 'Ngày', span: '30 ngày gần nhất' },
+  { key: 'week', label: 'Tuần', span: '12 tuần gần nhất' },
+  { key: 'month', label: 'Tháng', span: '12 tháng gần nhất' },
+  { key: 'year', label: 'Năm', span: '5 năm gần nhất' },
 ]
-const range = ref('30')
+const range = ref('day')
+const rangeSpan = computed(() => RANGES.find((r) => r.key === range.value)?.span || '')
 const hasRevenue = computed(() => !!stats.value?.canRevenue)
 const revenuePoints = computed(() => (stats.value?.series || []).map((d) => ({ date: d.date, value: d.revenue || 0 })))
 const userPoints = computed(() => (stats.value?.series || []).map((d) => ({ date: d.date, value: d.newUsers })))
@@ -88,9 +89,10 @@ onMounted(() => {
           </button>
         </div>
       </div>
+      <p class="chart-span">{{ rangeSpan }}</p>
       <div class="chart-grid">
-        <StatsChart v-if="hasRevenue" :points="revenuePoints" kind="bar" color="var(--primary)" label="Thu nhập" money />
-        <StatsChart :points="userPoints" kind="line" color="var(--success)" label="Người dùng mới" />
+        <StatsChart v-if="hasRevenue" :points="revenuePoints" kind="bar" color="var(--primary)" label="Thu nhập" money :unit="range" />
+        <StatsChart :points="userPoints" kind="line" color="var(--success)" label="Người dùng mới" :unit="range" />
       </div>
 
       <h2 class="section-title">Theo gói dịch vụ</h2>
@@ -217,6 +219,11 @@ onMounted(() => {
 }
 .chart-title {
   margin: 0;
+}
+.chart-span {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .range-tabs {
   display: flex;

@@ -29,7 +29,7 @@ class _StatsBodyState extends State<StatsBody> {
   Map<String, String> _labels = {};
   bool _loading = true;
   String? _error;
-  String _range = '30';
+  String _range = 'day';
 
   @override
   void initState() {
@@ -108,12 +108,14 @@ class _StatsBodyState extends State<StatsBody> {
             },
           ),
       ]),
-      const SizedBox(height: 12),
+      const SizedBox(height: 4),
+      Text('${statsRangeSpans[_range]}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
+      const SizedBox(height: 8),
       if (s.canRevenue) ...[
-        AdminSeriesChart(points: [for (final p in s.series) ChartPoint(p.date, p.revenue)], line: false, color: Theme.of(context).colorScheme.primary, label: 'Thu nhập', money: true),
+        AdminSeriesChart(points: [for (final p in s.series) ChartPoint(p.date, p.revenue)], line: false, color: Theme.of(context).colorScheme.primary, label: 'Thu nhập', money: true, unit: _range),
         const SizedBox(height: 12),
       ],
-      AdminSeriesChart(points: [for (final p in s.series) ChartPoint(p.date, p.newUsers)], line: true, color: context.okColor, label: 'Người dùng mới'),
+      AdminSeriesChart(points: [for (final p in s.series) ChartPoint(p.date, p.newUsers)], line: true, color: context.okColor, label: 'Người dùng mới', unit: _range),
       const SizedBox(height: 20),
       const Text('Theo gói dịch vụ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       const SizedBox(height: 8),

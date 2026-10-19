@@ -51,6 +51,10 @@ void main() {
     expect(shortDate('2026-10-11'), '11/10');
     expect(shortDate('2026-10'), '10/26');
     expect(longDate('2026-10'), 'Tháng 10/2026');
+    expect(shortDate('2026'), '2026');
+    expect(longDate('2026', 'year'), 'Năm 2026');
+    expect(longDate('2026-10-05', 'week'), 'Tuần 05/10 – 11/10/2026');
+    expect(longDate('2026-12-28', 'week'), 'Tuần 28/12 – 03/01/2027');
     expect(shortAxis(1500000, money: true), '1,5tr');
     expect(shortAxis(200000, money: true), '200k');
     expect(packageLabelOf('trial', {}), 'Dùng thử 30 ngày');
@@ -82,12 +86,15 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    expect(seen, contains('/admin/stats?range=30'));
+    expect(seen, contains('/admin/stats?range=day'));
     expect(find.text('Tổng khách hàng'), findsOneWidget);
     expect(find.text('Gói 1 tháng'), findsOneWidget);
-    await t.tap(find.text('12 tháng'));
-    await t.pumpAndSettle();
-    expect(seen, contains('/admin/stats?range=12m'));
+    for (final (label, key) in [('Tuần', 'week'), ('Tháng', 'month'), ('Năm', 'year')]) {
+      await t.tap(find.text(label));
+      await t.pumpAndSettle();
+      expect(seen, contains('/admin/stats?range=$key'));
+    }
+    expect(find.text('5 năm gần nhất'), findsOneWidget);
     await t.binding.setSurfaceSize(null);
   });
 

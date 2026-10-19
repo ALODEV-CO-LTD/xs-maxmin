@@ -12,9 +12,12 @@ class ChartPoint {
 
 /// One time-series chart (bars or line) drawn with CustomPaint; tap/drag to read a bucket.
 class AdminSeriesChart extends StatefulWidget {
-  const AdminSeriesChart({super.key, required this.points, required this.line, required this.color, required this.label, this.money = false});
+  const AdminSeriesChart({super.key, required this.points, required this.line, required this.color, required this.label, this.money = false, this.unit = 'day'});
   final List<ChartPoint> points;
   final bool line, money;
+
+  /// day | week | month | year: how the bucket keys read on the axis and in the tooltip.
+  final String unit;
   final Color color;
   final String label;
   @override
@@ -42,7 +45,7 @@ class _AdminSeriesChartState extends State<AdminSeriesChart> {
           ]),
           SizedBox(
             height: 18,
-            child: Text(sel == null ? 'Chạm vào biểu đồ để xem từng mốc' : '${longDate(sel.date)}: ${_full(sel.value)}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
+            child: Text(sel == null ? 'Chạm vào biểu đồ để xem từng mốc' : '${longDate(sel.date, widget.unit)}: ${_full(sel.value)}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
           ),
           const SizedBox(height: 4),
           LayoutBuilder(builder: (context, c) {

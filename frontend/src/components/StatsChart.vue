@@ -11,6 +11,8 @@ const props = defineProps({
   color: { type: String, default: 'var(--primary)' },
   label: { type: String, required: true },
   money: { type: Boolean, default: false },
+  // day | week | month | year: how the bucket keys read in the tooltip (week keys are the Monday)
+  unit: { type: String, default: 'day' },
 })
 
 const W = ref(720)
@@ -57,10 +59,19 @@ const xLabels = computed(() => {
 })
 
 function shortDate(k) {
+  if (k.length === 4) return k
   return k.length === 7 ? `${k.slice(5)}/${k.slice(2, 4)}` : `${k.slice(8)}/${k.slice(5, 7)}`
 }
 function longDate(k) {
-  return k.length === 7 ? `Tháng ${k.slice(5)}/${k.slice(0, 4)}` : `${k.slice(8)}/${k.slice(5, 7)}/${k.slice(0, 4)}`
+  if (k.length === 4) return `Năm ${k}`
+  if (k.length === 7) return `Tháng ${k.slice(5)}/${k.slice(0, 4)}`
+  if (props.unit === 'week') {
+    const mon = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10))
+    const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6)
+    const f = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+    return `Tuần ${f(mon)} – ${f(sun)}/${sun.getFullYear()}`
+  }
+  return `${k.slice(8)}/${k.slice(5, 7)}/${k.slice(0, 4)}`
 }
 function short(v) {
   if (!props.money) return String(+v.toFixed(1))

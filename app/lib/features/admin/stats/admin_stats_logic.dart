@@ -13,7 +13,9 @@ class StatsRange {
   final String key, label;
 }
 
-const statsRanges = [StatsRange('7', '7 ngày'), StatsRange('30', '30 ngày'), StatsRange('90', '90 ngày'), StatsRange('12m', '12 tháng')];
+/// Ngày (30 ngày), Tuần (12 tuần), Tháng (12 tháng), Năm (5 năm): the server's `?range=` values.
+const statsRanges = [StatsRange('day', 'Ngày'), StatsRange('week', 'Tuần'), StatsRange('month', 'Tháng'), StatsRange('year', 'Năm')];
+const statsRangeSpans = {'day': '30 ngày gần nhất', 'week': '12 tuần gần nhất', 'month': '12 tháng gần nhất', 'year': '5 năm gần nhất'};
 
 class AdminStats {
   const AdminStats({required this.total, required this.active, required this.expired, required this.byPackage, required this.series, required this.canRevenue});
@@ -53,11 +55,26 @@ double niceMax(double v) {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
 }
 
-/// "2026-10-11" -> "11/10", "2026-10" -> "10/26".
-String shortDate(String k) => k.length == 7 ? '${k.substring(5)}/${k.substring(2, 4)}' : (k.length >= 10 ? '${k.substring(8, 10)}/${k.substring(5, 7)}' : k);
+/// Axis label of a bucket key: day "11/10", week "11/10" (Monday), month "10/26", year "2026".
+String shortDate(String k, [String unit = 'day']) {
+  if (unit == 'year' || k.length == 4) return k;
+  if (unit == 'month' || k.length == 7) return '${k.substring(5)}/${k.substring(2, 4)}';
+  return k.length >= 10 ? '${k.substring(8, 10)}/${k.substring(5, 7)}' : k;
+}
 
-/// "2026-10-11" -> "11/10/2026", "2026-10" -> "Tháng 10/2026".
-String longDate(String k) => k.length == 7 ? 'Tháng ${k.substring(5)}/${k.substring(0, 4)}' : (k.length >= 10 ? '${k.substring(8, 10)}/${k.substring(5, 7)}/${k.substring(0, 4)}' : k);
+/// Tooltip label: "11/10/2026", "Tuần 05/10 – 11/10/2026", "Tháng 10/2026", "Năm 2026".
+String longDate(String k, [String unit = 'day']) {
+  if (unit == 'year' || k.length == 4) return 'Năm $k';
+  if (unit == 'month' || k.length == 7) return 'Tháng ${k.substring(5)}/${k.substring(0, 4)}';
+  if (k.length < 10) return k;
+  if (unit == 'week') {
+    final mon = DateTime.utc(int.parse(k.substring(0, 4)), int.parse(k.substring(5, 7)), int.parse(k.substring(8, 10)));
+    final sun = mon.add(const Duration(days: 6));
+    String f(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+    return 'Tuần ${f(mon)} – ${f(sun)}/${sun.year}';
+  }
+  return '${k.substring(8, 10)}/${k.substring(5, 7)}/${k.substring(0, 4)}';
+}
 
 /// Compact axis label: 1,5tr / 200k / 12.
 String shortAxis(num v, {bool money = false}) {
