@@ -4,7 +4,7 @@ import AppButton from '@/components/AppButton'
 import { api } from '@/lib/api'
 import { showConfirm } from '@/lib/confirm'
 import { WIPE_DELETES, WIPE_KEEPS, deleteAllMessage } from './accountLogic'
-import DeletionSchedules from './DeletionSchedules'
+import DeletionSchedules from '@/features/scoring/DeletionSchedules'
 
 // Tài khoản > Dữ liệu: scheduled deletion (K35/K36/S05) and "Xoá toàn bộ dữ liệu". API: POST /me/delete-data { password }
 export default function DataTab() {
