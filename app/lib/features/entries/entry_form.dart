@@ -21,18 +21,10 @@ class EntryFormCard extends StatefulWidget {
 }
 
 class _EntryFormCardState extends State<EntryFormCard> {
-  String _bulkType = '';
-  final _bulkScore = TextEditingController();
   bool _deletingAll = false;
   String _deleteAllError = '';
 
   EntriesController get c => widget.controller;
-
-  @override
-  void dispose() {
-    _bulkScore.dispose();
-    super.dispose();
-  }
 
   Future<void> _deleteAll() async {
     final list = c.customerEntries.where((e) => !e.pending).toList();
@@ -87,7 +79,6 @@ class _EntryFormCardState extends State<EntryFormCard> {
           QuickEntryBox(controller: c),
           const SizedBox(height: 10),
           _rowsHeader(context),
-          if (c.selectedRowCount > 0) _bulkBar(types),
           for (var i = 0; i < c.rows.length; i++) _rowTile(context, i, types),
           const SizedBox(height: 4),
           if (_deleteAllError.isNotEmpty) InfoBox(_deleteAllError),
@@ -108,44 +99,11 @@ class _EntryFormCardState extends State<EntryFormCard> {
 
   Widget _rowsHeader(BuildContext context) {
     return Row(children: [
-      const SizedBox(width: 40), // (where the per-row tick boxes are; the select-all tick beside "Hạng mục" is gone)
       Expanded(flex: 3, child: Text('Hạng mục', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
       Expanded(flex: 2, child: Text('Số', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
       Expanded(flex: 2, child: Text('Điểm vào', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
       const SizedBox(width: 40),
     ]);
-  }
-
-  Widget _bulkBar(List<String> types) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
-      child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        SizedBox(
-          width: 130,
-          child: AppDropdown<String>(
-            initialValue: _bulkType.isEmpty ? null : _bulkType,
-            isExpanded: true,
-            hint: const Text('Đổi hạng mục'),
-            decoration: const InputDecoration(isDense: true),
-            items: [for (final t in types) DropdownMenuItem(value: t, child: Text(betTypeLabel(t), overflow: TextOverflow.ellipsis))],
-            onChanged: (v) => setState(() => _bulkType = v ?? ''),
-          ),
-        ),
-        SizedBox(width: 110, child: TextField(controller: _bulkScore, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(isDense: true, hintText: 'Đổi điểm vào'), onChanged: (_) => setState(() {}))),
-        AppButton(label: 'Áp dụng', variant: AppButtonVariant.secondary, onPressed: _bulkType.isEmpty && _bulkScore.text.trim().isEmpty
-              ? null
-              : () {
-                  c.applyBulk(type: _bulkType, score: _bulkScore.text);
-                  setState(() {
-                    _bulkType = '';
-                    _bulkScore.clear();
-                  });
-                }),
-        AppButton(label: 'Xoá ${c.selectedRowCount} dòng', variant: AppButtonVariant.danger, size: AppButtonSize.small, onPressed: c.deleteSelectedRows),
-      ]),
-    );
   }
 
   // keeps the "Số" field (and its focus) when a row switches between the one-line and the stacked layout while typing
@@ -169,10 +127,6 @@ class _EntryFormCardState extends State<EntryFormCard> {
     );
     final value = TextField(key: _valueKeys.putIfAbsent(r.uid, () => GlobalKey()), controller: r.value, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, onChanged: (_) => c.touchRows(), decoration: const InputDecoration(isDense: true, hintText: 'Số', contentPadding: pad));
     final score = TextField(controller: r.score, keyboardType: kNumbersKeyboard, inputFormatters: kNumberCharsOnly, decoration: const InputDecoration(isDense: true, hintText: 'Điểm', contentPadding: pad));
-    final tick = Checkbox(value: r.selected, visualDensity: VisualDensity.compact, onChanged: (v) {
-      r.selected = v ?? false;
-      c.touchRows();
-    });
     final remove = SizedBox(
       width: 40,
       child: IconButton(
@@ -187,11 +141,10 @@ class _EntryFormCardState extends State<EntryFormCard> {
       padding: const EdgeInsets.only(bottom: 6),
       child: stacked
           ? Column(children: [
-              Row(children: [tick, Expanded(flex: 3, child: type), const SizedBox(width: 6), Expanded(flex: 2, child: score), remove]),
-              Padding(padding: const EdgeInsets.fromLTRB(48, 6, 40, 0), child: value),
+              Row(children: [Expanded(flex: 3, child: type), const SizedBox(width: 6), Expanded(flex: 2, child: score), remove]),
+              Padding(padding: const EdgeInsets.fromLTRB(0, 6, 40, 0), child: value),
             ])
           : Row(children: [
-              tick,
               Expanded(flex: 3, child: type),
               const SizedBox(width: 6),
               Expanded(flex: valueFieldFlex(r.value.text), child: value),
