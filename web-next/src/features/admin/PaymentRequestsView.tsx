@@ -262,13 +262,16 @@ export default function PaymentRequestsView() {
                 </>
               }
             >
-              <label className="r-label" htmlFor="reject-reason">Lý do (người dùng sẽ nhìn thấy)</label>
-              <div className="r-quick">
-                {REASONS.map((x) => (
-                  <button key={x} type="button" className="r-chip" onClick={() => setRejectReason(x)}>{x}</button>
-                ))}
+              {/* ModalDialog renders in a portal outside .adm-pay, so the scoped rules need their own wrapper */}
+              <div className="adm-pay">
+                <label className="r-label" htmlFor="reject-reason">Lý do (người dùng sẽ nhìn thấy)</label>
+                <div className="r-quick">
+                  {REASONS.map((x) => (
+                    <button key={x} type="button" className="r-chip" onClick={() => setRejectReason(x)}>{x}</button>
+                  ))}
+                </div>
+                <textarea id="reject-reason" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="f-input r-text" rows={3} maxLength={200} data-autofocus placeholder="Không bắt buộc" />
               </div>
-              <textarea id="reject-reason" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="f-input r-text" rows={3} maxLength={200} data-autofocus placeholder="Không bắt buộc" />
             </ModalDialog>
           </>
         )}
