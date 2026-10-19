@@ -1,0 +1,28 @@
+fieldset.avp-ro {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+fieldset.avp-ro:disabled input,
+fieldset.avp-ro:disabled textarea {
+  opacity: 1;
+  cursor: default;
+  color: var(--text-primary);
+}
+.avp-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  resize: vertical;
+}
+.avp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}

@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import NoticesView from '@/features/admin/NoticesView'
 
 export default function Page() {
-  return <ScreenStub vue="admin/NoticesView.vue" />
+  return <NoticesView />
 }

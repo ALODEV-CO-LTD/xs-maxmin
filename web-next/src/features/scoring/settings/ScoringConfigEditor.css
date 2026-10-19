@@ -1,0 +1,368 @@
+.sce {
+  font-size: 14.5px;
+}
+.sce-note {
+  color: var(--muted);
+}
+.sce-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sce-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sce-tab {
+  min-height: 38px;
+  min-width: 110px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sce-tab.on {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.sce-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 7px;
+  vertical-align: middle;
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0.8;
+}
+.sce-table-wrap {
+  /* No fixed height: the table is as long as its rows and the page (or the dialog) scrolls. */
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.sce-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.sce-table th {
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--muted);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.sce-table td {
+  padding: 7px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+.sce-table tbody:last-child tr:last-child td {
+  border-bottom: 0;
+}
+.sce-table tr.grp th {
+  position: static;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  border-bottom: 1px solid var(--border);
+}
+.sce .c-kind strong {
+  font-weight: 600;
+  padding-left: 10px;
+}
+.sce-table tr.own td {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+.sce-table tr.off {
+  opacity: 0.6;
+}
+.sce .c-use {
+  width: 52px;
+  text-align: center;
+}
+.sce .c-kind {
+  min-width: 130px;
+}
+.sce .c-sym {
+  min-width: 150px;
+  font-size: 13px;
+}
+.sce .c-num {
+  width: 170px;
+}
+.sce .c-act {
+  width: 150px;
+  text-align: right;
+  white-space: nowrap;
+}
+.sce .c-num input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 15px;
+  text-align: right;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+.sce .sym-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+.sce .val {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+}
+.sce .val.warn {
+  color: var(--danger-text);
+}
+.sce .c-num input.warn {
+  border-color: var(--danger-text);
+}
+.sce-warn {
+  display: block;
+  font-size: 12px;
+  color: var(--danger-text);
+}
+.sce .c-use input {
+  width: 18px;
+  height: 18px;
+}
+.sce-muted {
+  color: var(--muted);
+}
+.sce-tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.sce-tag.own {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.sce-src {
+  display: block;
+  margin: 2px 0 0 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sce .link-btn {
+  margin-left: 8px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--primary);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sce .src-row td {
+  padding: 0 10px 10px;
+  background: color-mix(in srgb, var(--primary) 4%, var(--card));
+}
+.sce .src-panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--primary);
+  border-radius: 12px;
+}
+.sce .src-field strong {
+  font-size: 13px;
+}
+.sce .src-tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 4px 12px;
+  margin-top: 4px;
+}
+.sce .src-tier {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.sce .src-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 14px;
+}
+.sce .src-line label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sce .src-line select,
+.sce .src-line input {
+  height: 34px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+}
+.sce .grp-add {
+  float: right;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.sce-table tr.grp th .grp-name {
+  line-height: 30px;
+}
+.sce .grp-form td {
+  padding: 8px 10px;
+  background: var(--card);
+}
+.sce-pick {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sce-pick select {
+  height: 34px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+}
+.sce .name-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+.sce-del {
+  color: var(--danger-text);
+}
+.sce-add {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.sce-add-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.sce-add-grid label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sce-add-grid input,
+.sce-add-grid select {
+  height: 38px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+.sce-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .sce-table thead {
+    display: none;
+  }
+  .sce-table tr.grp {
+    padding: 0;
+  }
+  .sce-table tr.grp th {
+    display: block;
+  }
+  .sce-table,
+  .sce-table tbody,
+  .sce-table tr,
+  .sce-table td {
+    display: block;
+  }
+  .sce-table tr {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sce-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+  }
+  .sce-table td::before {
+    content: attr(data-label);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .sce .c-kind::before,
+  .sce .c-act::before {
+    content: none !important;
+  }
+  .sce .c-num,
+  .sce .c-use,
+  .sce .c-sym,
+  .sce .c-act {
+    width: auto;
+  }
+  .sce .c-num input {
+    width: 150px;
+  }
+  .sce-add-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

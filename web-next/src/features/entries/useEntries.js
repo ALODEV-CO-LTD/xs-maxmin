@@ -75,11 +75,9 @@ export function useEntries() {
     loadStations()
     loadAll()
     ;(async () => {
-      let rates = null
       try {
         const r = (await cachedGet('/me/scoring-settings')).rates
         if (r && Object.keys(r).length) {
-          rates = r
           if (alive) setAccountRates(r)
         }
       } catch { /* keep the fallback list */ }
@@ -106,7 +104,6 @@ export function useEntries() {
         if (pre.station) setStation(pre.station)
         setBoxPrefill(pre.text)
       }
-      void rates
     })()
     const stop = onEntriesChanged(loadAll)
     return () => {
@@ -138,7 +135,7 @@ export function useEntries() {
 
   const payloadOf = (item) => entryPayload({ customerName, type: item.type, value: item.value, score: item.score, station, note, date })
 
-  const afterSaving = (saved, failed) => {
+  const afterSaving = (saved) => {
     if (saved.length) {
       setEntries((list) => [...saved.map((s) => s.entry).reverse(), ...list])
       bumpUsed(saved.filter((s) => !s.queued).length)
@@ -147,7 +144,6 @@ export function useEntries() {
     if (queued) setNotice(queuedNotice(queued))
     if (saved.length) flashAdded(addedText(saved.length, customerName, queued))
     return queued
-    void failed
   }
 
   async function submit() {
@@ -157,7 +153,7 @@ export function useEntries() {
     setSubmitting(true)
     try {
       const { saved, failed } = await saveItems(check.started, payloadOf)
-      afterSaving(saved, failed)
+      afterSaving(saved)
       const done = new Set(saved.map((s) => s.item.uid))
       setRows((r) => {
         const left = r.filter((x) => !done.has(x.uid))
@@ -173,7 +169,7 @@ export function useEntries() {
   /** Saves the ticked rows of the message / photo preview. Resolves { savedUids, error }. */
   async function saveDrafts(picked) {
     const { saved, failed } = await saveItems(picked, payloadOf)
-    afterSaving(saved, failed)
+    afterSaving(saved)
     return { savedUids: saved.map((s) => s.item.uid), error: failed.join(' · '), savedCount: saved.length }
   }
   /** Once numbers that came from the chat are all saved: on to Tính điểm, open on that customer and day. */

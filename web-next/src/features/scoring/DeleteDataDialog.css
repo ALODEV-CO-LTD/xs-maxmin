@@ -1,0 +1,60 @@
+/* Chép từ <style scoped> của DeleteDataDialog.vue; mọi luật nằm dưới .dd-root để không đụng màn khác. */
+.dd-root .dd-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dd-root .dd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+.dd-root .dd-chip {
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.dd-root .dd-chip.on {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.dd-root .dd-count {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--danger-text);
+  background: var(--danger-soft);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.dd-root .dd-count.zero {
+  color: var(--text-secondary);
+  background: var(--surface);
+}
+.dd-root .dd-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.dd-root .dd-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--danger-strong);
+}
+@media (max-width: 480px) {
+  .dd-root .dd-dates {
+    grid-template-columns: 1fr;
+  }
+}

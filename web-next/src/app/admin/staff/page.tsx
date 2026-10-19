@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import StaffView from '@/features/admin/StaffView'
 
 export default function Page() {
-  return <ScreenStub vue="admin/StaffView.vue" />
+  return <StaffView />
 }

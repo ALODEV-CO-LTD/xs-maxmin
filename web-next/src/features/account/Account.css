@@ -1,0 +1,286 @@
+/* Tài khoản (port of the <style scoped> of AccountView.vue). Class names are prefixed acct- (global CSS). */
+.page.acct-page {
+  max-width: var(--page-max);
+  padding: 32px 24px 96px;
+}
+.acct-page .page-title {
+  font-size: 28px;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+.acct-page > .page-subtitle {
+  font-size: 15px;
+}
+
+/* cards that are direct children of a tab panel / of the two-column grid (what the scoped Vue rule reached) */
+.acct-page .acct-panel > .card,
+.acct-page .acct-top > .card {
+  padding: 20px;
+  border-radius: 14px;
+}
+.acct-page .acct-h3 {
+  margin-top: 0;
+  margin-bottom: 12px !important;
+  font-size: 17px;
+}
+.acct-page .acct-sub {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px !important;
+}
+
+.acct-top {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.acct-page .acct-top > .card {
+  margin-bottom: 0;
+}
+
+/* ---- Info card ---- */
+.acct-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.acct-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.acct-row span:first-child {
+  color: var(--muted);
+}
+
+.acct-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.acct-profile-form {
+  max-width: 420px;
+}
+.acct-profile-form .field {
+  margin-bottom: 12px;
+}
+.acct-profile-form .field input {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+.acct-profile-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.acct-profile-actions .btn {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.acct-page .acct-logout {
+  display: none;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+@media (max-width: 859px) {
+  .acct-page .acct-logout {
+    display: inline-flex;
+  }
+}
+
+.acct-pkg-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- Friend codes / devices ---- */
+.acct-code-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.acct-code-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.acct-code-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.acct-code-form input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.acct-code-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.acct-code-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acct-code-value {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.acct-code-actions {
+  display: flex;
+  gap: 4px;
+}
+.acct-label-edit {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 8px;
+  padding: 0 6px 6px 0;
+}
+.acct-label-edit input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ---- Security forms ---- */
+.acct-sec-form {
+  display: flex;
+  flex-direction: column;
+}
+.acct-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.acct-sec-form .field {
+  margin-bottom: 12px;
+}
+.acct-sec-form .field label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.acct-sec-form .field input {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+}
+.acct-sec-form .field input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.acct-sec-form .alert {
+  font-size: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+}
+.acct-sec-form .acct-sub {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.acct-sec-submit {
+  align-self: flex-start;
+  margin-top: auto;
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+/* ---- Danger zone ---- */
+.acct-page .acct-danger {
+  border-color: var(--danger-text);
+  border-left-width: 4px;
+  background: color-mix(in srgb, var(--danger) 5%, var(--card));
+}
+.acct-danger .btn-danger {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.acct-page .btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .page.acct-page {
+    padding: 24px 16px 96px;
+  }
+  .acct-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+.acct-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+/* each tab is its own button (not one stretched bar) */
+.acct-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.acct-tab:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+.acct-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.acct-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

@@ -1,0 +1,287 @@
+/* Thống kê (AccountStats.vue) and the generic time-series chart (StatsChart.vue). Prefixes st- / sch-. */
+.st-card {
+  padding: 14px;
+  border-radius: 14px;
+}
+.st-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+.st-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.st-ctl-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.st-seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.st-seg-opt {
+  position: relative;
+  display: flex;
+}
+.st-seg-opt input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.st-seg-opt span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.st-seg-opt + .st-seg-opt span {
+  border-left: 1px solid var(--border);
+}
+.st-seg-opt input:checked + span {
+  color: var(--on-primary, #fff);
+  background: var(--primary);
+  font-weight: 600;
+}
+.st-seg-opt input:focus-visible + span {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+@media (max-width: 420px) {
+  .st-controls,
+  .st-ctl,
+  .st-seg {
+    width: 100%;
+  }
+  .st-seg-opt {
+    flex: 1;
+  }
+  .st-seg-opt span {
+    width: 100%;
+    padding: 0 6px;
+    font-size: 13px;
+  }
+}
+.st-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 14px 0 6px;
+}
+.st-sum-main {
+  display: flex;
+  flex-direction: column;
+}
+.st-sum-label,
+.st-sum-prev {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.st-sum-value {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.st-pos {
+  color: var(--success-text);
+}
+.st-neg {
+  color: var(--danger-text);
+}
+.st-chart-masked {
+  padding: 36px 0;
+  text-align: center;
+  color: var(--muted);
+}
+.st-chart-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 210px;
+}
+.st-chart {
+  display: block;
+  max-width: 100%;
+  touch-action: pan-y;
+}
+.st-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.st-zero {
+  stroke: var(--text-primary);
+  stroke-width: 1.25;
+  opacity: 0.55;
+}
+.st-axis {
+  font-size: 10.5px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.st-hit {
+  fill: transparent;
+}
+.st-bar {
+  transition: opacity 0.15s;
+}
+.st-bar.still {
+  transition: none;
+}
+.st-bar-main {
+  fill: var(--primary);
+}
+.st-bar-pos {
+  fill: var(--success-text);
+}
+.st-bar-neg {
+  fill: var(--danger-text);
+}
+.st-dim {
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-bar,
+  .st-seg-opt span {
+    transition: none;
+  }
+}
+.st-tip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+}
+.st-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.st-facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+@media (min-width: 640px) {
+  .st-facts {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+.st-fact {
+  min-width: 0;
+}
+.st-fact-wide {
+  grid-column: 1 / -1;
+}
+@media (min-width: 640px) {
+  .st-fact-wide {
+    grid-column: auto;
+  }
+}
+.st-fact dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.st-fact dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- StatsChart ---- */
+.sch {
+  padding: 16px 16px 8px;
+  border-radius: 14px;
+}
+.sch-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
+.sch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sch-total {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.sch-sw-bar {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.sch-sw-line {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+.sch-wrap {
+  position: relative;
+}
+.sch-wrap svg {
+  display: block;
+  max-width: 100%;
+}
+.sch-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.sch-tick {
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sch-tip {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+}

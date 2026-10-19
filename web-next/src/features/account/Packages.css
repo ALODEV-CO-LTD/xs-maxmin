@@ -1,0 +1,252 @@
+/* Gói & Thanh toán (port of PackagesView.vue styles; pk- prefix, the page-only rules sit under .pk-page) */
+.pk-current {
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border-left: 4px solid var(--border);
+}
+.pk-current:has(.chip-accent) {
+  border-left-color: var(--success);
+}
+.pk-current:has(.chip-danger) {
+  border-left-color: var(--danger);
+}
+.pk-current h3 {
+  margin-top: 0;
+  margin-bottom: 8px !important;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.pk-current-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.pk-current-row .chip {
+  font-size: 15px;
+  padding: 6px 16px;
+}
+.pk-current-detail {
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.pk-current .alert {
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.pk-embedded > .alert,
+.pk-page > .alert {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+.pk-current,
+.pk-page > .alert,
+.pk-plans,
+.pk-bank,
+.pk-req-list,
+.pk-page > .card {
+  max-width: 1100px;
+}
+.pk-page > h3,
+.pk-embedded > h3 {
+  margin: 24px 0 12px;
+  font-size: 18px;
+}
+
+.pk-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.pk-plan {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 16px;
+  border-radius: 14px;
+}
+.pk-plan-label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.pk-plan-price {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.pk-plan-detail {
+  margin: 6px 0 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.pk-plan .btn {
+  margin-top: auto !important;
+  min-height: 44px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+/* Payment area: bank details left, QR + hint right */
+.pk-bank {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  /* trailing 1fr row absorbs the QR's extra height so bank rows stay compact */
+  grid-template-rows: auto auto auto auto 1fr;
+  column-gap: 32px;
+  align-items: start;
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  border-radius: 14px;
+}
+.pk-bank > h3 {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  margin-bottom: 12px !important;
+  font-size: 18px;
+}
+.pk-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.pk-row:last-child {
+  border-bottom: none;
+}
+.pk-bank > .pk-row {
+  grid-column: 1;
+  gap: 16px;
+  padding: 12px 0;
+  font-size: 15px;
+}
+.pk-row span {
+  color: var(--text-secondary);
+}
+.pk-row strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.pk-qr {
+  grid-column: 2;
+  grid-row: 2 / span 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 0;
+  border-radius: 12px;
+}
+.pk-qr-img {
+  width: 228px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.pk-qr .page-subtitle {
+  margin: 12px 0 0 !important;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.pk-bank > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.pk-req-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pk-req {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+.pk-req-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.pk-req .chip {
+  font-size: 14px;
+  padding: 3px 12px;
+}
+.pk-req-detail {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.pk-empty {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px dashed var(--input-border);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .pk-bank {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .pk-qr {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 16px;
+  }
+  .pk-req-detail {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+.pk-pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.pk-pending-actions {
+  display: flex;
+  gap: 8px;
+}
+.pk-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+.pk-req-reason {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--danger-text);
+}

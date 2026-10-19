@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import EntriesScreen from '@/features/entries/EntriesScreen'
 
 export default function Page() {
-  return <ScreenStub vue="EntriesView.vue" />
+  return <EntriesScreen />
 }

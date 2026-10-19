@@ -1,0 +1,104 @@
+
+.adm-notices .notice-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.adm-notices .notice-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.adm-notices .notice-tab:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+
+.adm-notices .notice-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.adm-notices .notice-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.adm-notices .block {
+  margin-bottom: 16px;
+}
+
+.adm-notices .block-title {
+  margin: 0 0 12px;
+}
+
+.adm-notices .check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.adm-notices .check-row input {
+  width: 20px;
+  height: 20px;
+}
+
+.adm-notices .empty {
+  color: var(--muted);
+}
+
+.adm-notices .ann-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adm-notices .ann-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.adm-notices .ann-title {
+  margin-left: 8px;
+}
+
+.adm-notices .ann-body {
+  margin-top: 4px;
+  white-space: pre-line;
+}
+
+.adm-notices .ann-date {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.adm-notices .ann-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
