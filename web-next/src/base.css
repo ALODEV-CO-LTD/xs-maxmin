@@ -1,0 +1,382 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  margin: 0 0 0.5em;
+  color: var(--text);
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+a {
+  color: var(--accent-strong);
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+input,
+select,
+textarea {
+  font-weight: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* ---- Shared component classes (used across the whole app) ---- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  padding: 11px 22px;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  color: var(--on-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--primary-soft);
+  border-color: var(--input-border-hover);
+}
+
+.btn-danger {
+  background: var(--danger-strong);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: transparent;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-sm {
+  padding: 7px 14px;
+  font-size: 14px;
+}
+
+.field {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.field .input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field .input-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.field input:hover:not(:disabled),
+.field select:hover:not(:disabled),
+.field textarea:hover:not(:disabled) {
+  border-color: var(--input-border-hover);
+}
+
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.field.has-icon input,
+.field.has-icon select {
+  padding-left: 42px;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-color: var(--focus);
+}
+
+.field .hint {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.field .error {
+  font-size: 14px;
+  color: var(--danger-text);
+  margin-top: 4px;
+}
+
+.alert {
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.alert-error {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.alert-warning {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.alert-success {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--surface);
+  /* text-secondary on --surface is only 4.3:1 in light; nudge toward primary */
+  color: color-mix(in srgb, var(--text-secondary) 80%, var(--text-primary));
+}
+
+/* chip-accent = positive/active status (success green, not the brand colour) */
+.chip-accent {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+/* chip-brand = non-status highlight (role badge, unread count...) in the primary (green) colour */
+.chip-brand {
+  background: var(--primary-soft);
+  color: var(--link);
+}
+
+.chip-danger {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.chip-warning {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 24px 16px 32px;
+}
+
+.page-title {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+table.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+table.table th {
+  text-align: left;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---- Phones: tables marked .stack-table become one card per row ----
+   Each <td data-label="..."> shows its column name on the left. */
+@media (max-width: 640px) {
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr,
+  .stack-table td {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  .stack-table thead {
+    display: none;
+  }
+  .stack-table tbody tr {
+    margin: 0 0 12px;
+    padding: 6px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .stack-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0 !important;
+    border: 0 !important;
+    text-align: right !important;
+    white-space: normal !important;
+  }
+  .stack-table td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    color: var(--text-secondary);
+  }
+  .stack-table td:not([data-label])::before {
+    display: none;
+  }
+  .stack-table td[colspan] {
+    display: block;
+    text-align: center !important;
+  }
+}
+
+/* ---- Phones: 44px touch targets (NFR-09) ----
+   Buttons and form controls reach 44px; checkbox/radio labels become the 44px
+   tappable area (the tick box itself stays small). Inline links inside running
+   text get .tap-link: vertical padding with a negative margin, so the line
+   spacing does not change but the tappable area does. */
+@media (max-width: 640px) {
+  .btn,
+  .btn-sm {
+    min-height: 44px !important;
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='file']):not(.app-select-native),
+  select,
+  .dp-trigger,
+  .app-select-trigger {
+    min-height: 44px !important;
+  }
+  label:has(> input[type='checkbox']),
+  label:has(> input[type='radio']) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px !important;
+  }
+  .tap-link {
+    display: inline-block;
+    padding: 13px 4px;
+    margin: -13px 0;
+  }
+}
