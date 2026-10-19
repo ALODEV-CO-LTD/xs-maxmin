@@ -1,0 +1,9 @@
+.screen-watermark {
+  user-select: none;
+  -webkit-user-select: none;
+}
+@media print {
+  .screen-watermark {
+    display: block !important;
+  }
+}

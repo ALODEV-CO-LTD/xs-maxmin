@@ -1,0 +1,36 @@
+.app-btn {
+  position: relative;
+  min-height: 44px; /* vùng chạm tối thiểu trên điện thoại */
+}
+.app-btn.btn-sm {
+  min-height: 36px;
+}
+.btn-icon {
+  width: 44px;
+  padding: 0;
+  font-size: 18px;
+}
+.btn-icon.btn-sm {
+  width: 36px;
+}
+.app-btn-spin {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: app-btn-turn 0.7s linear infinite;
+}
+.is-loading {
+  cursor: progress;
+}
+@keyframes app-btn-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-btn-spin {
+    animation-duration: 2s;
+  }
+}

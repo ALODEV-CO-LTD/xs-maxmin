@@ -1,0 +1,6 @@
+/* Blur the whole app while the page is hidden / unfocused (K32). */
+html.privacy-away #app {
+  filter: blur(18px);
+  pointer-events: none;
+  user-select: none;
+}
