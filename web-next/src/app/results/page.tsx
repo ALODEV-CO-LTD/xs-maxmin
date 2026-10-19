@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import ResultsScreen from '@/features/results/ResultsScreen'
 
 export default function Page() {
-  return <ScreenStub vue="ResultsView.vue" />
+  return <ResultsScreen />
 }

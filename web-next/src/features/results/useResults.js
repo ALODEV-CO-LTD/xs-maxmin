@@ -1,0 +1,335 @@
+/* eslint-disable react-hooks/refs */
+'use client'
+// State + actions of the Nhập kết quả screen.
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api } from '../../lib/api'
+import { loadAllEntries } from '../../lib/offline'
+import { loadStations, regionList, regionOf, stationName, stationsOn } from '../../lib/lotteryStations'
+import { useStations } from '../../lib/useStations'
+import { assignStations, parseColumns } from '../../lib/lotteryColumns'
+import { showConfirm } from '../../lib/confirm'
+import { today } from '../../lib/dates'
+import {
+  MB_COL, addCell, blankForm, buildBoard, columnsOf, extraStationsOf, filledCount, guessFromText, isIsoDate, planSave, planScoreSync,
+  removeCell, setCell, shapeForm, shiftDay, stationChoices as joinStations, totalBoxes, viDay,
+} from './logic'
+
+const DEFAULT_RATES = {
+  de: { rate: 70, tiers: ['dacBiet'], digits: 2 },
+  lo: { rate: 20, tiers: ['dacBiet', 'giaiNhat', 'giaiNhi', 'giaiBa', 'giaiTu', 'giaiNam', 'giaiSau', 'giaiBay'], digits: 2 },
+}
+
+export function useResults() {
+  useStations()
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [customers, setCustomers] = useState([])
+  const [rates, setRates] = useState(DEFAULT_RATES)
+  const [date, setDate] = useState(() => {
+    const q = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('date')
+    return isIsoDate(q) ? q : today()
+  })
+  const [region, setRegionState] = useState('mb')
+  const [extra, setExtra] = useState([])
+  const [forms, setForms] = useState({})
+  const [saved, setSaved] = useState({})
+  const [read, setRead] = useState({}) // column filled from a photo
+  const [edit, setEdit] = useState({}) // saved / read column unlocked with "Sửa"
+  const [, setByStation] = useState({}) // kept for later screens that show the day's results
+  const [activeCol, setActiveCol] = useState('')
+  const [boardLoading, setBoardLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [saveMsg, setSaveMsg] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState('')
+  const [ocr, setOcr] = useState({ running: false, progress: 0, error: '', note: '', warnings: [], previewUrl: '' })
+  const [syncMsg, setSyncMsg] = useState('')
+  const [syncError, setSyncError] = useState('')
+  const [undo, setUndo] = useState(null) // { date, items: [{ id, prev }] }
+  const [undoing, setUndoing] = useState(false)
+  const skipReload = useRef(false)
+  const ctx = useRef({ customers, rates })
+  ctx.current = { customers, rates }
+  const entriesRef = useRef(entries)
+  entriesRef.current = entries
+
+  const structure = regionOf(region).structure
+  const scheduled = stationsOn(region, date)
+  const choices = joinStations(scheduled, extra)
+  const cols = columnsOf(region, choices)
+  const curCol = cols.includes(activeCol) ? activeCol : cols[0] || ''
+  const otherStations = Object.keys(regionOf(region).stations || {}).filter((id) => !choices.includes(id)).map((id) => ({ value: id, label: stationName(id) }))
+
+  const fetchDay = useCallback(async (d) => {
+    const { results } = await api.get(`/lottery-results?date=${d}&all=1`)
+    return results
+  }, [])
+
+  /** Loads what is saved for (region, day) into the table. */
+  const loadBoard = useCallback(async (reg, d, results) => {
+    setError('')
+    setSaveMsg('')
+    setBoardLoading(true)
+    try {
+      const list = results || (await fetchDay(d))
+      const struct = regionOf(reg).structure
+      const sched = stationsOn(reg, d)
+      const ex = reg === 'mb' ? [] : extraStationsOf(list, reg, sched, (id) => regionOf(id).id)
+      const board = buildBoard({ structure: struct, cols: columnsOf(reg, joinStations(sched, ex)), results: list })
+      setExtra(ex)
+      setForms(board.forms)
+      setSaved(board.saved)
+      setRead({})
+      setEdit({})
+      setByStation(board.by)
+      return board.by
+    } catch (err) {
+      setError(err.message || 'Không tải được kết quả xổ số')
+      return null
+    } finally {
+      setBoardLoading(false)
+    }
+  }, [fetchDay])
+
+  // first load
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      await loadStations()
+      try {
+        const [list, cu, st] = await Promise.all([
+          loadAllEntries({ overlay: false }),
+          api.get('/me/customers').catch(() => ({ customers: [] })),
+          api.get('/me/scoring-settings').catch(() => ({})),
+        ])
+        if (!alive) return
+        setEntries(list.entries)
+        setCustomers(cu.customers)
+        if (st.rates && Object.keys(st.rates).length) setRates(st.rates)
+      } catch (err) {
+        if (alive) setLoadError(err.message || 'Không tải được số liệu')
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  // region or day changed: reshape the table and load what is saved (a photo that switches them loads by itself)
+  useEffect(() => {
+    if (skipReload.current) {
+      skipReload.current = false
+      return
+    }
+    loadBoard(region, date)
+  }, [region, date, loadBoard])
+
+  const setRegion = (id) => {
+    if (id === region) return
+    setOcr((o) => ({ ...o, error: '', note: '', warnings: [] }))
+    setSyncMsg('')
+    setSyncError('')
+    setRegionState(id)
+  }
+
+  const locked = (c) => !!(saved[c] || read[c]) && !edit[c]
+  const formOf = (c) => forms[c] || shapeForm(structure, null)
+  const patchForm = (c, fn) => setForms((all) => ({ ...all, [c]: fn(formOf(c)) }))
+  const editCell = (c, p, index, value) => patchForm(c, (f) => setCell(f, p, index, value))
+  const plusCell = (c, p) => patchForm(c, (f) => addCell(f, p))
+  const minusCell = (c, p) => patchForm(c, (f) => removeCell(f, p))
+  const unlock = (c) => setEdit((e) => ({ ...e, [c]: true }))
+  function addStation(id) {
+    if (!id) return
+    setExtra((x) => (x.includes(id) ? x : [...x, id]))
+    setForms((all) => ({ ...all, [id]: shapeForm(structure, null) }))
+    setSaved((s) => ({ ...s, [id]: false }))
+    setActiveCol(id)
+  }
+  function clearForm() {
+    setForms((all) => Object.fromEntries(cols.map((c) => [c, shapeForm(structure, null)]).concat(Object.entries(all).filter(([k]) => !cols.includes(k)))))
+    setRead({})
+    setEdit(Object.fromEntries(cols.map((c) => [c, true])))
+    setOcr((o) => {
+      if (region === 'mb' && o.previewUrl) URL.revokeObjectURL(o.previewUrl)
+      return { ...o, warnings: [], error: '', previewUrl: region === 'mb' ? '' : o.previewUrl }
+    })
+  }
+
+  // ---- Điểm ra
+  async function syncScores(by) {
+    setSyncMsg('')
+    setSyncError('')
+    const { changes, overwrites } = planScoreSync(entriesRef.current, date, by, ctx.current)
+    if (!changes.length) return
+    if (overwrites.length) {
+      const ok = await showConfirm({
+        title: 'Cập nhật Điểm ra',
+        message:
+          `Kết quả vừa lưu sẽ cập nhật Điểm ra của ${changes.length} số liệu ngày ${viDay(date)}, ` +
+          `trong đó ${overwrites.length} số liệu đã có Điểm ra khác sẽ bị ghi đè. Bạn có thể bấm "Hoàn tác" ngay sau đó. Tiếp tục?`,
+        confirmText: 'Cập nhật',
+      })
+      if (!ok) return setSyncMsg('Đã lưu kết quả xổ số, chưa cập nhật Điểm ra (bạn chọn không ghi đè).')
+    }
+    const done = []
+    let failed = 0
+    for (const c of changes) {
+      try {
+        const updated = await api.patch(`/me/entries/${c.e.id}`, { result: c.value })
+        setEntries((list) => list.map((x) => (x.id === c.e.id ? updated : x)))
+        done.push({ id: c.e.id, prev: c.prev })
+      } catch {
+        failed++
+      }
+    }
+    setUndo(done.length ? { date, items: done } : null)
+    if (done.length) setSyncMsg(`Đã tính và lưu điểm ra cho ${done.length} số liệu.`)
+    if (failed) setSyncError(`${failed} số liệu chưa lưu được điểm ra, lưu lại kết quả để thử lại.`)
+  }
+  async function undoScores() {
+    if (!undo || undoing) return
+    setUndoing(true)
+    setSyncError('')
+    let back = 0
+    let failed = 0
+    for (const it of undo.items) {
+      try {
+        const updated = await api.patch(`/me/entries/${it.id}`, { result: it.prev })
+        setEntries((list) => list.map((x) => (x.id === it.id ? updated : x)))
+        back++
+      } catch {
+        failed++
+      }
+    }
+    setUndo(null)
+    setSyncMsg(`Đã hoàn tác Điểm ra của ${back} số liệu.`)
+    if (failed) setSyncError(`${failed} số liệu chưa hoàn tác được.`)
+    setUndoing(false)
+  }
+
+  async function save() {
+    setError('')
+    setSaveMsg('')
+    const plan = planSave({ region, cols, forms, structure, date, nameOf: stationName })
+    if (plan.error) return setError(plan.error)
+    setSaving(true)
+    try {
+      for (const { body } of plan.bodies) await api.post('/lottery-results', body)
+      const savedCols = plan.bodies.map((b) => b.col)
+      setSaved((s) => ({ ...s, ...Object.fromEntries(savedCols.map((c) => [c, true])) }))
+      setRead((s) => ({ ...s, ...Object.fromEntries(savedCols.map((c) => [c, false])) }))
+      setEdit((s) => ({ ...s, ...Object.fromEntries(savedCols.map((c) => [c, false])) }))
+      setSaveMsg(plan.message)
+      // entries of this day can span several stations: score them with every result saved that day
+      const by = Object.fromEntries((await fetchDay(date)).map((r) => [r.station, r]))
+      setByStation(by)
+      await syncScores(by)
+    } catch (err) {
+      setError(err.message || 'Không lưu được kết quả xổ số')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteColumn(c) {
+    const name = c === MB_COL ? regionOf('mb').name : stationName(c)
+    if (!(await showConfirm({ title: 'Xoá kết quả', message: `Xoá kết quả xổ số ${name} ngày ${date}? Không thể hoàn tác.`, confirmText: 'Xoá', danger: true }))) return
+    setError('')
+    setSaveMsg('')
+    setDeleting(c)
+    try {
+      await api.del(`/lottery-results?date=${date}&station=${encodeURIComponent(c)}`)
+      setForms((all) => ({ ...all, [c]: shapeForm(structure, null) }))
+      setSaved((s) => ({ ...s, [c]: false }))
+      setRead((s) => ({ ...s, [c]: false }))
+      setEdit((s) => ({ ...s, [c]: false }))
+      setByStation((by) => { const n = { ...by }; delete n[c]; return n })
+      setSaveMsg(`Đã xoá kết quả xổ số ${name} ngày ${date}.`)
+    } catch (err) {
+      setError(err.message || 'Không xoá được')
+    } finally {
+      setDeleting('')
+    }
+  }
+
+  // ---- reading a photo
+  const patchOcr = (p) => setOcr((o) => ({ ...o, ...p }))
+  async function processImage(file) {
+    if (region === 'mb') return processMb(file)
+    return processMulti(file)
+  }
+  async function processMb(file) {
+    patchOcr({ error: '' })
+    if (ocr.previewUrl) URL.revokeObjectURL(ocr.previewUrl)
+    patchOcr({ previewUrl: URL.createObjectURL(file), running: true, progress: 0 })
+    try {
+      const { recognizeLotteryTable } = await import('../../lib/ocr')
+      const { text } = await recognizeLotteryTable(file, { onProgress: (p) => patchOcr({ progress: p }) })
+      setForms((all) => ({ ...all, [MB_COL]: guessFromText(all[MB_COL] || blankForm(structure), text) }))
+      setRead((r) => ({ ...r, [MB_COL]: true }))
+      setEdit((e) => ({ ...e, [MB_COL]: false }))
+    } catch (err) {
+      const { describeOcrError } = await import('../../lib/ocr')
+      patchOcr({ error: describeOcrError(err) })
+    } finally {
+      patchOcr({ running: false })
+    }
+  }
+  async function processMulti(file) {
+    patchOcr({ error: '', note: '', warnings: [], running: true, progress: 0 })
+    try {
+      await loadStations()
+      const { recognizeLotteryWords } = await import('../../lib/ocr')
+      const { words } = await recognizeLotteryWords(file, { onProgress: (p) => patchOcr({ progress: p }) })
+      const parsed = parseColumns(words)
+      if (!parsed.columns.length) return patchOcr({ error: 'Không nhận ra bảng kết quả (cần thấy giải đặc biệt 6 số của từng đài). Hãy chụp rõ cả bảng hoặc nhập tay.' })
+      // which region and day the photo is of: from its title ("XSMT ... 09/10/2026"), else what is selected now
+      const text = words.map((w) => String(w.text)).join(' ').toLowerCase()
+      const seenRegion = /xsmt/.test(text) ? 'mt' : /xsmn/.test(text) ? 'mn' : region
+      const day = parsed.date || date
+      assignStations(parsed.columns, stationsOn(seenRegion, day))
+      let note = ''
+      if (seenRegion !== region || day !== date) {
+        skipReload.current = true
+        setRegionState(seenRegion)
+        setDate(day)
+        note = `Ảnh là kết quả ${regionOf(seenRegion).name} ngày ${viDay(day)}; đã chuyển sang miền và ngày này.`
+      }
+      const by = await loadBoard(seenRegion, day)
+      if (by === null) return
+      const struct = regionOf(seenRegion).structure
+      const warnings = []
+      const nextForms = {}
+      const nextRead = {}
+      const known = columnsOf(seenRegion, joinStations(stationsOn(seenRegion, day), extraStationsOf(Object.values(by), seenRegion, stationsOn(seenRegion, day), (id) => regionOf(id).id)))
+      for (const c of parsed.columns) {
+        if (!c.station || !known.includes(c.station)) {
+          warnings.push('Có một cột chưa xác định được đài, nên chưa điền vào bảng.')
+          continue
+        }
+        nextForms[c.station] = shapeForm(struct, c.values)
+        nextRead[c.station] = true
+        if (!c.complete) warnings.push(`${stationName(c.station)}: ${c.issues.join('; ')}`)
+      }
+      setForms((all) => ({ ...all, ...nextForms }))
+      setRead(nextRead)
+      patchOcr({ note, warnings })
+      setSaveMsg('Đã điền bảng từ ảnh. Kiểm tra các ô (ô đỏ là chưa đủ hoặc sai độ dài) rồi bấm "Lưu kết quả".')
+    } catch (err) {
+      const { describeOcrError } = await import('../../lib/ocr')
+      patchOcr({ error: describeOcrError(err) })
+    } finally {
+      patchOcr({ running: false })
+    }
+  }
+
+  return {
+    loading, loadError, region, setRegion, regions: regionList(), date, setDate, shift: (d) => setDate((cur) => shiftDay(cur, d)),
+    structure, cols, curCol, setActiveCol, otherStations, addStation, forms, formOf, locked, saved, read, edit, unlock,
+    editCell, plusCell, minusCell, clearForm, boardLoading, error, saveMsg, saving, deleting, save, deleteColumn,
+    ocr, patchOcr, processImage, syncMsg, syncError, undo, undoing, undoScores,
+    filled: curCol ? filledCount(structure, formOf(curCol)) : 0, total: totalBoxes(structure),
+  }
+}
