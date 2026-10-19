@@ -13,8 +13,8 @@ const statUnitLabels = {
   StatUnit.year: 'Năm',
 };
 const statMetricLabels = {
-  StatMetric.vao: 'Điểm vào',
-  StatMetric.ra: 'Điểm ra',
+  StatMetric.vao: 'Tiền gửi',
+  StatMetric.ra: 'Tiền trúng',
   StatMetric.profit: 'Lợi nhuận',
 };
 const statSpan = {

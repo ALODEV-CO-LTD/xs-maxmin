@@ -8,10 +8,12 @@ import '../../core/theme.dart';
 import '../../core/widgets/masked_text.dart';
 import 'account_widgets.dart';
 import 'stats_chart.dart';
+import '../../core/lottery_stations.dart';
 import 'stats_logic.dart';
+import 'stats_money.dart';
 import '../../core/widgets/app_button.dart';
 
-/// Thống kê: one card with metric (vào/ra/lợi nhuận) + period (ngày/tuần/tháng/năm) selectors, period total, bar chart and all-time figures (all masked by "Ẩn số liệu").
+/// Thống kê: one card with metric (tiền gửi / tiền trúng / lợi nhuận, in đồng) + period (ngày/tuần/tháng/năm) selectors, period total, bar chart and all-time figures (all masked by "Ẩn số liệu").
 class AccountStatsTab extends StatefulWidget {
   const AccountStatsTab({super.key});
   @override
@@ -21,8 +23,7 @@ class AccountStatsTab extends StatefulWidget {
 class _AccountStatsTabState extends State<AccountStatsTab> {
   bool _loading = true;
   String? _error;
-  List<String> _roster = const [];
-  List<StatEntry> _entries = const [];
+  MoneyStats? _money;
   StatUnit _unit = StatUnit.day;
   StatMetric _metric = StatMetric.profit;
 
@@ -34,35 +35,14 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
 
   Future<void> _load() async {
     final api = context.read<ApiClient>();
+    final stations = context.read<LotteryStations>();
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final cust = await api.get('/me/customers');
-      final names = [
-        for (final c
-            in (cust is Map ? cust['customers'] as List? : null) ?? const [])
-          (c as Map)['name'] as String,
-      ];
-      final all = <String, StatEntry>{};
-      var offset = 0;
-      for (;;) {
-        final page =
-            await api.get('/me/entries?limit=1000&offset=$offset') as Map;
-        final list = (page['entries'] as List?) ?? const [];
-        for (final e in list) {
-          final m = (e as Map).cast<String, dynamic>();
-          all[(m['id'] ?? '${all.length}').toString()] = StatEntry.fromJson(m);
-        }
-        offset += list.length;
-        if (page['hasMore'] != true || list.isEmpty) break;
-      }
-      if (!mounted) return;
-      setState(() {
-        _roster = names;
-        _entries = all.values.toList();
-      });
+      final m = await loadMoneyStats(api, stations);
+      if (mounted) setState(() => _money = m);
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
@@ -92,17 +72,17 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
         ],
       );
     }
-    final totals = computeTotals(_roster, _entries);
+    final money = _money!;
     final now = DateTime.now().toUtc().add(
       const Duration(hours: 7),
     ); // Vietnam date, like the rest of the app
-    final series = buildSeries(_entries, _unit, _metric, now);
+    final series = buildMoneySeries(money.byDate, _unit, _metric, now);
     final masked = context.select<MaskStore, bool>((m) => m.masked);
     final ok = context.okColor, bad = context.badColor;
     final cs = Theme.of(context).colorScheme;
     final sum = sumOf(series);
     final prevSum = sumOf(
-      buildSeries(_entries, _unit, _metric, previousAnchor(_unit, now)),
+      buildMoneySeries(money.byDate, _unit, _metric, previousAnchor(_unit, now)),
     );
     final pct = percentChange(sum, prevSum);
     final isProfit = _metric == StatMetric.profit;
@@ -214,7 +194,7 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                 ),
                 const SizedBox(height: 2),
                 MaskedText(
-                  signed(sum),
+                  '${signed(sum)} đ',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
@@ -226,7 +206,7 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                   MaskedText(
                     prevSum == 0
                         ? 'Kỳ trước ($span liền trước): chưa có số liệu'
-                        : '${delta >= 0 ? '▲' : '▼'} ${delta >= 0 ? '+' : '−'}${formatNumber(delta.abs())} (${pct! >= 0 ? '+' : '−'}${pct.abs().toStringAsFixed(1).replaceAll('.', ',')}%) so với $span liền trước',
+                        : '${delta >= 0 ? '▲' : '▼'} ${delta >= 0 ? '+' : '−'}${formatNumber(delta.abs())} đ (${pct! >= 0 ? '+' : '−'}${pct.abs().toStringAsFixed(1).replaceAll('.', ',')}%) so với $span liền trước',
                     style: TextStyle(
                       fontSize: 12,
                       color: prevSum == 0
@@ -267,20 +247,25 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                     children: [
                       fixed(
                         'Số lượng khách hàng',
-                        formatNumber(totals.customers),
+                        formatNumber(money.customerNames.length),
                       ),
-                      fixed('Số lượt chơi', formatNumber(totals.plays)),
-                      fixed('Tổng điểm vào', formatNumber(totals.vao)),
-                      fixed('Tổng điểm ra', formatNumber(totals.ra)),
+                      fixed('Số lượt chơi', formatNumber(money.plays)),
+                      fixed('Tổng tiền khách gửi', '${formatNumber(money.sent)} đ'),
+                      fixed('Tổng tiền khách trúng', '${formatNumber(money.won)} đ'),
                       fixed(
                         'Lợi nhuận toàn bộ',
-                        signedAll(totals.profit),
-                        color: totals.profit > 0
+                        '${signedAll(money.profit)} đ',
+                        color: money.profit > 0
                             ? ok
-                            : totals.profit < 0
+                            : money.profit < 0
                             ? bad
                             : null,
                       ),
+                      if (money.pendingLots > 0)
+                        fixed(
+                          'Chưa có kết quả xổ số (chưa tính lợi nhuận)',
+                          '${formatNumber(money.pendingLots)} lô · ${formatNumber(money.pending)} đ',
+                        ),
                     ],
                   ),
                 ),

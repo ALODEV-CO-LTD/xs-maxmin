@@ -10,22 +10,47 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cachedGet, loadAllEntries } from '../offline'
+import { api } from '../api'
+import { DEFAULT_RATES } from '../scoringConfig'
+import { loadStations } from '../lotteryStations'
+import { moneyByDate, moneyTotals, neededResults, pseudoEntries } from '../statsMoney'
 import MaskedValue from './MaskedValue.vue'
 import { mask } from '../stores/mask'
-import { buildSeries, compactNumber, rangeTotals, tickEvery, tickIndices, toNumber } from '../statsSeries'
+import { buildSeries, compactNumber, rangeTotals, tickEvery, tickIndices } from '../statsSeries'
 
 const loading = ref(true)
 const error = ref('')
-const roster = ref([])
-const entries = ref([])
+const money = ref({ byDate: {}, customers: 0, plays: 0 })
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n)
 
+// Everything Tính điểm uses: entries, customers (own rates / region), the account's rates and the day's lottery results.
+async function loadResult(cache, date, station) {
+  try {
+    const { result } = await api.get(`/lottery-results?date=${date}&station=${encodeURIComponent(station)}`)
+    cache.set(`${date}|${station}`, result || null)
+  } catch (_) {
+    cache.set(`${date}|${station}`, null) // not known: counted as "chưa tính"
+  }
+}
+
 onMounted(async () => {
   try {
-    const [{ customers }, list] = await Promise.all([cachedGet('/me/customers'), loadAllEntries()])
-    roster.value = customers
-    entries.value = list.entries
+    const [{ customers }, list, rates] = await Promise.all([
+      cachedGet('/me/customers'),
+      loadAllEntries(),
+      api.get('/me/scoring-settings').then((r) => (r.rates && Object.keys(r.rates).length ? r.rates : DEFAULT_RATES)).catch(() => DEFAULT_RATES),
+      loadStations().catch(() => null),
+    ])
+    const cache = new Map()
+    const queue = neededResults(list.entries)
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      while (queue.length) {
+        const [date, st] = queue.pop()
+        await loadResult(cache, date, st)
+      }
+    }))
+    money.value = moneyByDate(list.entries, customers, rates, (date, st) => cache.get(`${date}|${st}`) || null)
   } catch (err) {
     error.value = err.message || 'Không tải được thống kê'
   } finally {
@@ -41,8 +66,8 @@ const UNITS = [
   { key: 'year', label: 'Năm', range: '5 năm gần nhất', prev: '5 năm trước đó' },
 ]
 const METRICS = [
-  { key: 'vao', label: 'Điểm vào' },
-  { key: 'ra', label: 'Điểm ra' },
+  { key: 'vao', label: 'Tiền gửi' },
+  { key: 'ra', label: 'Tiền trúng' },
   { key: 'profit', label: 'Lợi nhuận' },
 ]
 const unit = ref('day')
@@ -51,8 +76,8 @@ const hover = ref(-1)
 const unitInfo = computed(() => UNITS.find((u) => u.key === unit.value))
 const metricInfo = computed(() => METRICS.find((m) => m.key === metric.value))
 
-const series = computed(() => buildSeries(entries.value, { unit: unit.value, metric: metric.value }))
-const totals = computed(() => rangeTotals(entries.value, { unit: unit.value, metric: metric.value }))
+const series = computed(() => buildSeries(pseudoEntries(money.value.byDate, metric.value), { unit: unit.value, metric: metric.value }))
+const totals = computed(() => rangeTotals(pseudoEntries(money.value.byDate, metric.value), { unit: unit.value, metric: metric.value }))
 const delta = computed(() => (totals.value.previous === null ? null : totals.value.current - totals.value.previous))
 const deltaPct = computed(() => {
   const p = totals.value.previous
@@ -113,17 +138,7 @@ const hovered = computed(() => plot.value.bars[hover.value] || null)
 const tipLeft = computed(() => (hovered.value ? `${Math.min(Math.max((hovered.value.cx / W.value) * 100, 16), 84)}%` : null))
 const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-const stats = computed(() => {
-  const names = new Set(roster.value.map((c) => c.name))
-  let vao = 0
-  let ra = 0
-  for (const e of entries.value) {
-    names.add(e.customerName || '(Không tên)')
-    vao += toNumber(e.score)
-    ra += toNumber(e.result)
-  }
-  return { customers: names.size, plays: entries.value.length, vao, ra, profit: vao - ra }
-})
+const stats = computed(() => ({ customers: money.value.customers, plays: money.value.plays, ...moneyTotals(money.value.byDate) }))
 </script>
 
 <template>
@@ -131,7 +146,7 @@ const stats = computed(() => {
     <div v-if="loading" class="card">Đang tải...</div>
     <div v-else-if="error" class="alert alert-error">{{ error }}</div>
     <template v-else>
-      <p class="page-subtitle">Tổng hợp trên toàn bộ số liệu của bạn (điểm vào/ra để trống được tính là 0).</p>
+      <p class="page-subtitle">Tổng hợp trên toàn bộ số liệu của bạn (tiền quy đổi như tab Tính điểm; ngày chưa có kết quả xổ số chưa tính vào lợi nhuận).</p>
 
       <section class="card stats-card" aria-label="Thống kê">
         <div class="stats-controls">
@@ -158,11 +173,11 @@ const stats = computed(() => {
         <div class="summary" aria-live="polite">
           <div class="sum-main">
             <span class="sum-label">{{ metricInfo.label }} · {{ unitInfo.range }}</span>
-            <strong class="sum-value" :class="tone(totals.current)"><MaskedValue :text="fmt(totals.current)" /></strong>
+            <strong class="sum-value" :class="tone(totals.current)"><MaskedValue :text="(metric === 'profit' ? signed(totals.current) : fmt(totals.current)) + ' đ'" /></strong>
           </div>
           <div v-if="delta !== null" class="sum-prev">
             So với {{ unitInfo.prev }}:
-            <b :class="tone(delta)"><MaskedValue :text="signed(delta) + (deltaPct !== null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct}%)` : '')" /></b>
+            <b :class="tone(delta)"><MaskedValue :text="signed(delta) + ' đ' + (deltaPct !== null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct}%)` : '')" /></b>
           </div>
         </div>
 
@@ -212,9 +227,10 @@ const stats = computed(() => {
         <dl class="facts">
           <div class="fact"><dt>Số lượng khách hàng</dt><dd><MaskedValue :text="fmt(stats.customers)" /></dd></div>
           <div class="fact"><dt>Số lượt chơi</dt><dd><MaskedValue :text="fmt(stats.plays)" /></dd></div>
-          <div class="fact"><dt>Tổng điểm vào</dt><dd><MaskedValue :text="fmt(stats.vao)" /></dd></div>
-          <div class="fact"><dt>Tổng điểm ra</dt><dd><MaskedValue :text="fmt(stats.ra)" /></dd></div>
-          <div class="fact fact-wide"><dt>Lợi nhuận toàn bộ</dt><dd :class="stats.profit >= 0 ? 'pos' : 'neg'"><MaskedValue :text="fmt(stats.profit)" /></dd></div>
+          <div class="fact"><dt>Tổng tiền khách gửi</dt><dd><MaskedValue :text="fmt(stats.sent) + ' đ'" /></dd></div>
+          <div class="fact"><dt>Tổng tiền khách trúng</dt><dd><MaskedValue :text="fmt(stats.won) + ' đ'" /></dd></div>
+          <div class="fact fact-wide"><dt>Lợi nhuận toàn bộ</dt><dd :class="stats.profit >= 0 ? 'pos' : 'neg'"><MaskedValue :text="signed(stats.profit) + ' đ'" /></dd></div>
+          <div v-if="stats.pendingLots > 0" class="fact fact-wide"><dt>Chưa có kết quả xổ số (chưa tính lợi nhuận)</dt><dd><MaskedValue :text="fmt(stats.pendingLots) + ' lô · ' + fmt(stats.pending) + ' đ'" /></dd></div>
         </dl>
       </section>
     </template>

@@ -459,3 +459,11 @@ Chi tiết từng mục và trạng thái: `docs/KIEM_TOAN_18-10-2026.md`. Mọi
 - `tools/test_all.sh` chạy MỘT lệnh: app (`dart analyze` + `flutter test`), web (`npm test` + build), backend (`dart test`) rồi in bảng đạt/lỗi; `tools/test_all.sh app|web|backend` chạy từng phần. Log ở `/tmp/mamba-test-<phần>.log`. Không cần simulator hay điện thoại.
 - `app/test/flows_test.dart`: các luồng chạy trên máy chủ giả có trạng thái: Nhập số → lưu → ghi đúng ngày hôm nay; mất mạng → chờ đồng bộ → có mạng → Đồng bộ ngay; Cấu hình tính điểm → Sửa → đổi giá → Huỷ. Luồng sửa số điện thoại khách và kết bạn nằm ở `entries_widget_test.dart` và `friend_requests_test.dart`.
 - Việc vẫn phải thử trên thiết bị thật: đọc số từ ảnh (ML Kit không chạy trên simulator), thông báo đẩy, cuộc gọi giữa hai máy, chế độ máy bay thật.
+
+## Thống kê (Tổng quan) tính bằng TIỀN (19/10/2026)
+
+Trước đây Tổng quan cộng thẳng "điểm vào/ra" của mọi kiểu đánh nên lệch hẳn con số tiền ở Tính điểm. Nay dùng đúng cách tính của Tính điểm (`summarize`, bảng giá của từng khách, miền của khách): **Tiền gửi**, **Tiền trúng**, **Lợi nhuận = tiền gửi − tiền trúng, chỉ trên các ngày đã có kết quả xổ số**. Ngày chưa có kết quả hiện riêng ở dòng "Chưa có kết quả xổ số (chưa tính lợi nhuận)", không tính là lãi hay lỗ.
+- App: `app/lib/features/account/stats_money.dart` (+ `account_stats_tab.dart`), test `app/test/stats_money_test.dart`.
+- Web: `frontend/src/statsMoney.js` (+ `components/AccountStats.vue`), test `frontend/tests/statsMoney.test.mjs`.
+- Kiểm chứng trên dữ liệu thật của tài khoản demo "2" (bảng giá thật): tổng tiền gửi 32.070.475.343 đ và ngày 18/10 1.545.658.000 đ, khớp từng đồng với tab Tính điểm; cả 8 số liệu đều không trúng nên tiền trúng 0.
+- Tổng quan cần tải kết quả xổ số của mọi ngày có số liệu (4 yêu cầu song song, có lưu bản sao trên máy); offline dùng bản đã lưu.
