@@ -1,0 +1,105 @@
+.adm-rr {
+  display: contents;
+}
+
+
+.adm-rr .rr-card {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.adm-rr .rr-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.adm-rr .rr-sub,
+.adm-rr .rr-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.adm-rr .rr-issued {
+  margin-bottom: 12px;
+}
+
+.adm-rr .rr-issued p {
+  margin: 0 0 8px;
+}
+
+.adm-rr .rr-code {
+  letter-spacing: 0.06em;
+}
+
+.adm-rr .rr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adm-rr .rr-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.adm-rr .rr-main {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.adm-rr .rr-name {
+  font-weight: 600;
+}
+
+.adm-rr .rr-user {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.adm-rr .rr-status {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.adm-rr .st-pending {
+  color: var(--danger-text);
+}
+
+.adm-rr .st-approved {
+  color: var(--success-text);
+}
+
+.adm-rr .rr-meta,
+.adm-rr .rr-note {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.adm-rr .rr-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-rr .rr-reject {
+  color: var(--danger-text);
+}
+
