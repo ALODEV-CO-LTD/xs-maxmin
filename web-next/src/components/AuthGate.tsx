@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/authStore'
 import { safeRedirect } from '@/lib/authFlow'
@@ -14,8 +14,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const search = useSearchParams()
   const { token, role, user, fetchMe, adminHome, can } = useAuthStore()
   const route = routeOf(path)
+  // admin permissions (hence adminHome) come from the profile: wait for it once before any admin redirect (router.beforeEach awaits fetchMe the same way)
+  const [meTried, setMeTried] = useState(false)
 
   useEffect(() => {
+    if (token && role === 'admin' && !user && !meTried) {
+      fetchMe().catch(() => {}).finally(() => setMeTried(true))
+      return
+    }
     const old = REDIRECTS[path]
     if (old) return router.replace(old)
     // Old Phản hồi address (bookmarks): open the popover on the page the person lands on.
@@ -43,7 +49,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (route.kind === 'user' && role === 'admin') return router.replace(adminHome())
     if (route.kind === 'admin' && role !== 'admin') return router.replace('/')
     if (route.kind === 'admin' && user && ((route.rootOnly && !user.isRoot) || (route.perm && !can(route.perm)))) router.replace(adminHome())
-  }, [path, token, role, user, route, router, search, fetchMe, adminHome, can])
+  }, [path, token, role, user, meTried, route, router, search, fetchMe, adminHome, can])
 
   return <>{children}</>
 }
