@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import SettingsView from '@/features/admin/SettingsView'
 
 export default function Page() {
-  return <ScreenStub vue="admin/SettingsView.vue" />
+  return <SettingsView />
 }

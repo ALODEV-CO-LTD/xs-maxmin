@@ -1,0 +1,114 @@
+.adm-settings {
+  display: contents;
+}
+
+
+.adm-settings .pkg-bar {
+  margin-bottom: 12px;
+}
+
+.adm-settings .pkg-card,
+.adm-settings .pkg-form {
+  margin-bottom: 10px;
+  padding: 14px 16px;
+}
+
+.adm-settings .pkg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.adm-settings .pkg-meta {
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.adm-settings .pkg-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.adm-settings .pkg-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.adm-settings .pkg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.adm-settings .pkg-danger {
+  color: var(--danger-text);
+}
+
+.adm-settings .set-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.adm-settings .set-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.adm-settings .set-tab:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+
+.adm-settings .set-tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.adm-settings .set-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.adm-settings fieldset.ro {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.adm-settings fieldset.ro:disabled input,
+.adm-settings fieldset.ro:disabled button,
+.adm-settings fieldset.ro:disabled .app-select-trigger {
+  opacity: 1;
+  cursor: default;
+  color: var(--text-primary);
+}
+
+.adm-settings .edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+

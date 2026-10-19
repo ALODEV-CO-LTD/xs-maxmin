@@ -1,0 +1,13 @@
+.adm-backups {
+  display: contents;
+}
+
+
+.adm-backups .gap {
+  margin-top: 16px;
+}
+
+.adm-backups .muted {
+  color: var(--muted);
+}
+
