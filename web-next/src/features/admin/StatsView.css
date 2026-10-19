@@ -1,3 +1,7 @@
+.adm-stats {
+  display: contents;
+}
+
 
 /* Spacing rhythm (8px grid): header 24 -> cards 32 -> section title 16 -> table */
 .adm-stats .page {

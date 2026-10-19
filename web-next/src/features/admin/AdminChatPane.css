@@ -1,0 +1,119 @@
+.adm-pane {
+  display: contents;
+}
+
+
+.adm-pane .pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.adm-pane .thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.adm-pane .empty {
+  margin: auto;
+  color: var(--text-secondary);
+}
+
+.adm-pane .day {
+  align-self: center;
+  margin: 8px 0 4px;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+}
+
+.adm-pane .msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: min(72%, 560px);
+}
+
+.adm-pane .msg-user {
+  align-self: flex-start;
+}
+
+.adm-pane .msg-admin {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.adm-pane .msg-bubble {
+  padding: 9px 13px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 14px 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.adm-pane .msg-admin .msg-bubble {
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 14px 14px 4px 14px;
+}
+
+.adm-pane .msg-time {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.adm-pane .composer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.adm-pane .composer .alert {
+  margin: 0 0 8px;
+}
+
+.adm-pane .reply-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-pane .reply-row input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+
+.adm-pane .reply-row input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.adm-pane .reply-row .btn {
+  flex: none;
+  min-height: 44px;
+  padding: 0 20px;
+}
+

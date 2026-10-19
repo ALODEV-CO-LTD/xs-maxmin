@@ -1,3 +1,7 @@
+.adm-staff {
+  display: contents;
+}
+
 
 .adm-staff .bar {
   display: flex;

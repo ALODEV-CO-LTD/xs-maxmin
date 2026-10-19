@@ -1,3 +1,7 @@
+.adm-notices {
+  display: contents;
+}
+
 
 .adm-notices .notice-tabs {
   display: flex;

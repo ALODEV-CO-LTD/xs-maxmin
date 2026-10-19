@@ -1,5 +1,10 @@
-import ScreenStub from '@/components/ScreenStub'
+import { Suspense } from 'react'
+import MessagesView from '@/features/admin/MessagesView'
 
 export default function Page() {
-  return <ScreenStub vue="admin/MessagesView.vue" />
+  return (
+    <Suspense fallback={null}>
+      <MessagesView />
+    </Suspense>
+  )
 }
