@@ -13,7 +13,13 @@ cd "$WORK/be" || exit 1
 XOSO_JWT_SECRET=e2e-secret-0123456789abcdef XOSO_ADMIN_PASSWORD='E2e-admin-pass-1' \
   dart_frog dev --port "$PORT" --dart-vm-service-port $((PORT + 1)) >"$WORK/server.log" 2>&1 &
 SERVER=$!
-cleanup() { kill "$SERVER" 2>/dev/null; sleep 1; pkill -P "$SERVER" 2>/dev/null; rm -rf "$WORK"; }
+cleanup() {
+  kill "$SERVER" 2>/dev/null
+  # dart_frog starts the real server as a child: stop whatever still listens on the test ports (only those)
+  for p in "$PORT" $((PORT + 1)); do lsof -ti "tcp:$p" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null; done
+  sleep 1
+  rm -rf "$WORK"
+}
 trap cleanup EXIT
 for _ in $(seq 1 90); do curl -s -o /dev/null "http://localhost:$PORT/api/auth/login" && break; sleep 1; done
 curl -s -o /dev/null "http://localhost:$PORT/api/auth/login" || { echo "máy chủ thử không khởi động được:"; tail -20 "$WORK/server.log"; exit 1; }
