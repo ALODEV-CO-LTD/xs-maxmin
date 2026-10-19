@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import AppButton from './AppButton'
 import { betTypeLabel } from '@/lib/betTypes'
-import { dismissFailure, flushQueue, resolveConflict, useSyncStore } from '@/lib/offline'
+import { dismissFailure, flushQueue, resolveConflict, syncLabel, useSyncStore } from '@/lib/offline'
 
 // Connection / sync indicator for the top bar (Offline, Đang đồng bộ, n chờ đồng bộ) + the dialog that asks the user
 // what to do when the same record was edited elsewhere while this device was offline (see lib/offline.js).
@@ -16,13 +16,6 @@ const FIELDS = [
   { key: 'score', label: 'Điểm vào' },
   { key: 'note', label: 'Ghi chú' },
 ]
-
-export function syncLabel(s: { syncing: boolean; online: boolean; pending: number }) {
-  if (s.syncing) return 'Đang đồng bộ...'
-  if (!s.online) return s.pending ? `Offline · ${s.pending} chờ đồng bộ` : 'Offline'
-  if (s.pending) return `${s.pending} chờ đồng bộ`
-  return ''
-}
 
 function show(src: Record<string, unknown> | undefined, key: string) {
   const v = src?.[key]

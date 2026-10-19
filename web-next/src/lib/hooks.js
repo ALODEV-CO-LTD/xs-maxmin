@@ -4,6 +4,9 @@
 //   hooks.inCall()      - true while a voice call is on (the call store installs it)
 //   hooks.markFriendRead(friendId) - clears the on-device unread counter of a friend chat (chat store installs it)
 //   registerTeardown(fn) - extra cleanup run by teardownSession() when the session ends
+//   registerShellStart(fn) - run once when the signed-in app shell mounts (call store: connect(); returns a cleanup)
+//   registerUserReady(fn)  - run with the account object once GET /me has loaded (chat store: init())
+//   registerShellOverlay(Component) - a component mounted once inside the shell (CallOverlay)
 let navigator_ = null
 export const setNavigator = (fn) => {
   navigator_ = fn
@@ -18,6 +21,14 @@ export const hooks = {
   markFriendRead: () => {},
   teardowns: [],
 }
+const shellStart = []
+const userReady = []
+const shellOverlays = []
+export const registerShellStart = (fn) => void shellStart.push(fn)
+export const registerUserReady = (fn) => void userReady.push(fn)
+export const registerShellOverlay = (C) => void shellOverlays.push(C)
+export const shellRegistry = { shellStart, userReady, shellOverlays }
+
 export const registerTeardown = (fn) => {
   hooks.teardowns.push(fn)
   return () => {

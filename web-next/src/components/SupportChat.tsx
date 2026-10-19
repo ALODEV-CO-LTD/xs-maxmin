@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- the popover reacts to store events (push, toast tap) by opening and loading */
 'use client'
 import './SupportChat.css'
 import { useCallback, useEffect, useRef, useState } from 'react'

@@ -17,6 +17,12 @@ import { currentLocation, hooks, navigate } from './hooks'
 const TOAST_MS = 7000
 export const FEEDBACK = '/feedback'
 
+// A toast / desktop notification target: '/feedback' opens the Phản hồi popover on the current page instead of leaving it.
+export function goTo(to) {
+  if (to === FEEDBACK) useNotifyStore.setState({ supportOpen: true })
+  else navigate(to)
+}
+
 function keyOf(msg) {
   if (msg.source === 'friend') return `friend:${msg.from}`
   return msg.toAdmin ? `support:${msg.from}` : 'support'
@@ -64,7 +70,7 @@ export const useNotifyStore = create((set, get) => ({
           : FEEDBACK
     const toast = { title: event.fromName || 'Tin nhắn mới', body: event.preview || 'Tin nhắn mới', to }
     get()._pushToast(toast.title, toast.body, toast.to)
-    notifyMessage(toast.title, toast.body, () => navigate(to))
+    notifyMessage(toast.title, toast.body, () => goTo(to))
   },
 
   // Admin approved / rejected the user's payment request (WebSocket push).
@@ -108,7 +114,7 @@ export const useNotifyStore = create((set, get) => ({
 
   open(toast) {
     get().dismiss(toast.id)
-    navigate(toast.to)
+    goTo(toast.to)
   },
 
   // Loads the real counts from the server (page load, reconnect, tab focus).

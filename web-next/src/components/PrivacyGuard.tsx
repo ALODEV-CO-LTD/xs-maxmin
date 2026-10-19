@@ -41,8 +41,10 @@ export default function PrivacyGuard() {
 
   useEffect(() => {
     if (!locked) return
+    /* eslint-disable react-hooks/set-state-in-effect -- the unlock form starts empty each time the app locks */
     setPassword('')
     setError('')
+    /* eslint-enable react-hooks/set-state-in-effect */
     // drop focus from any field underneath so typing can't reach it
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     field.current?.querySelector('input')?.focus()

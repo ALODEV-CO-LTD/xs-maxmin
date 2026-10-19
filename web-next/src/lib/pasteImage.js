@@ -19,7 +19,9 @@ export function imageFromPasteEvent(e) {
 // Calls `handler(file)` for every image pasted while `isActive()` is true. Registers on mount, removes on unmount.
 export function usePasteImage(handler, isActive = () => true) {
   const latest = useRef({ handler, isActive })
-  latest.current = { handler, isActive }
+  useEffect(() => {
+    latest.current = { handler, isActive }
+  })
   useEffect(() => {
     const onPaste = (e) => {
       if (!latest.current.isActive()) return

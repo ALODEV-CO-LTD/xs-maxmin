@@ -438,3 +438,12 @@ export function stopSync() {
   timer = null
   started = false
 }
+
+/** Text of the top-bar sync chip ('' = nothing to show). */
+export function syncLabel(s) {
+  if (s.syncing) return 'Đang đồng bộ...'
+  if (!s.online) return s.pending ? `Offline · ${s.pending} chờ đồng bộ` : 'Offline'
+  if (s.pending) return `${s.pending} chờ đồng bộ`
+  return ''
+}
+

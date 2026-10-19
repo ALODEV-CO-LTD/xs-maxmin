@@ -40,6 +40,7 @@ function collect(nodes: React.ReactNode, out: OptionDef[]): OptionDef[] {
 
 type Props = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'value' | 'onChange'> & {
   value?: unknown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onChange?: (value: any) => void
   required?: boolean
   children?: React.ReactNode

@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import RegisterScreen from '@/components/RegisterScreen'
 
 export default function Page() {
-  return <ScreenStub vue="RegisterView.vue" />
+  return <RegisterScreen />
 }

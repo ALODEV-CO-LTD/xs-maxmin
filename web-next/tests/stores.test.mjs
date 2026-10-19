@@ -314,3 +314,15 @@ test('offline: tạo bản ghi online gửi kèm clientId', async () => {
   replies['POST /me/entries'] = { status: 403, body: { error: 'Hết hạn mức' } }
   await assert.rejects(offline.createEntry({ value: '1' }), /Hết hạn mức/)
 })
+
+test('notify: toast "Phản hồi" mở popover thay vì chuyển trang', async () => {
+  const { goTo, FEEDBACK } = await import('../src/lib/notifyStore.js')
+  const pushed = []
+  setNavigator((to) => pushed.push(to))
+  useNotifyStore.setState({ supportOpen: false })
+  goTo(FEEDBACK)
+  assert.equal(useNotifyStore.getState().supportOpen, true)
+  assert.deepEqual(pushed, [])
+  goTo('/friends')
+  assert.deepEqual(pushed, ['/friends'])
+})

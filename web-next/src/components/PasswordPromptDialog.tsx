@@ -28,9 +28,11 @@ export default function PasswordPromptDialog({
 
   useEffect(() => {
     if (open) {
+      /* eslint-disable react-hooks/set-state-in-effect -- the form starts empty on every open */
       setPassword('')
       setError('')
       setBusy(false)
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open])
 

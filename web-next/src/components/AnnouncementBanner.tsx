@@ -25,6 +25,7 @@ export default function AnnouncementBanner() {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
     setDismissed(readDismissed())
     let alive = true
     const load = async () => {

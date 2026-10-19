@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import LoginScreen from '@/components/LoginScreen'
 
 export default function Page() {
-  return <ScreenStub vue="LoginView.vue" />
+  return <LoginScreen />
 }

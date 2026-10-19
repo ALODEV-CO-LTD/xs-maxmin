@@ -9,6 +9,7 @@ export default function AttachmentPreview({ file, onRemove }: { file: File; onRe
   const isImage = file.type.startsWith('image/') && file.type !== 'image/svg+xml'
   const [previewUrl, setPreviewUrl] = useState('')
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URL lives with the chosen file
     if (!isImage) return setPreviewUrl('')
     const url = URL.createObjectURL(file)
     setPreviewUrl(url)

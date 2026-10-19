@@ -36,3 +36,9 @@ export const REDIRECTS: Record<string, string> = {
 }
 
 export const routeOf = (path: string) => ROUTES.find((r) => path === r.path || path.startsWith(r.path + '/'))
+
+// Back button (K44): the parent screen of a child screen. /customers opened from Nhập số (?from=entries) goes back there.
+export function backTargetOf(path: string, search: URLSearchParams): { path: string; title: string } | null {
+  if (path === '/customers' && search.get('from') === 'entries') return { path: '/entries', title: routeOf('/entries')?.title ?? '' }
+  return null
+}
