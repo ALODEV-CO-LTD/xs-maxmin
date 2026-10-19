@@ -1,0 +1,729 @@
+.friends-page {
+  --background: #fff; --card: #fff; --surface: #fff; --surface-2: #fff; --bg: #fff;
+  --text: #000; --text-primary: #000; --text-secondary: #8a8f8a; --muted: #8a8f8a;
+  --border: #d9e8dd; --input-border: #16a34a; --input-border-hover: #15803d;
+  --primary: #16a34a; --primary-hover: #15803d; --on-primary: #fff; --on-primary-hover: #fff;
+  --primary-soft: #f0fdf4; --accent: #16a34a; --accent-strong: #16a34a; --accent-soft: #f0fdf4; --link: #16a34a;
+  --shadow-sm: none; --shadow-md: none; --shadow-lg: none; --overlay: rgba(0, 0, 0, 0.25);
+  background: #fff; color: #000; color-scheme: light; border-radius: 10px; padding: 12px;
+}
+.friends-page .btn-primary { background: #16a34a; border-color: #16a34a; color: #fff; background-image: none; }
+
+/* everything else is scoped by nesting (the Vue file used <style scoped>) */
+.friends-page {
+.req-block { padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--border, #e5e7eb); }
+.req-title { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
+.req-sub { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border, #e5e7eb); font-size: 14px; color: var(--text-secondary, #6b7280); }
+.req-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; flex-wrap: wrap; }
+.req-row .friend-info { flex: 1; min-width: 120px; }
+.req-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.req-actions .btn { min-height: 44px; padding: 0 14px; font-size: 14px; font-weight: 600; border-radius: 10px; }
+.req-notice { margin: 8px 0 0; }
+/* Giao diện sáng theo yêu cầu khách: nền trắng, viền xanh mảnh, chữ đen, phụ xám nhạt; không nền tối, không xanh dương, không gradient. */
+.search-row { display: flex; align-items: center; gap: 8px; }
+.search-row input { flex: 1; border: 1px solid #16a34a !important; border-radius: 18px !important; padding: 7px 12px !important; background: #fff !important; color: #000 !important; }
+.tb-link { background: none; border: 0; color: #000; font-size: 15px; cursor: pointer; padding: 4px; }
+.tb-link.strong { color: #16a34a; font-weight: 600; }
+.tb-link:disabled { color: #8a8f8a; cursor: default; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; border: 1px solid #16a34a; color: #16a34a; display: grid; place-items: center; font-weight: 600; flex: none; background: #fff; }
+.avatar.sm { width: 28px; height: 28px; font-size: 13px; }
+.avatar.big { width: 64px; height: 64px; font-size: 26px; }
+.friend-item { gap: 10px; }
+.friend-item .friend-info { flex: 1; }
+.pick { accent-color: #16a34a; width: 18px; height: 18px; margin-right: 8px; align-self: center; }
+.msg.picking { display: flex; align-items: flex-start; }
+.msg.picking.mine { flex-direction: row-reverse; }
+.selbar { display: flex; align-items: center; gap: 10px; padding: 6px 4px; font-size: 13px; }
+.selbar span { flex: 1; color: #8a8f8a; }
+.calc-note { color: #8a8f8a; font-size: 13px; margin: 2px 4px; }
+.calc-btn { padding: 7px 12px; border: 1px solid #16a34a; border-radius: 16px; background: #fff; color: #16a34a; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.calc-btn.ready { background: #16a34a; color: #fff; }
+.set-head { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.set-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #8a8f8a; }
+.set-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.group-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: grid; place-items: center; z-index: 50; }
+.group-sheet { width: min(380px, 92vw); display: flex; flex-direction: column; gap: 10px; }
+.group-sheet input[type='text'] { width: 100%; box-sizing: border-box; }
+.group-members { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.group-members label { display: flex; gap: 8px; padding: 5px 0; }
+.group-actions { display: flex; justify-content: space-between; }
+.my-id-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.my-id-code {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+.split {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+}
+.search-form {
+  margin-bottom: 10px;
+}
+.search-form input {
+  width: 100%;
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+.search-results {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.search-hint {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 6px 2px;
+}
+.search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.bottom-nav { position: sticky; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 12px; background: #fff; border-top: 1px solid #d9e8dd; }
+.bottom-nav button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; background: none; border: 0; color: #8a8f8a; font-size: 12px; cursor: pointer; }
+.bottom-nav button.on { color: #16a34a; font-weight: 600; }
+.edit-bar { display: flex; justify-content: space-between; padding: 10px 4px; border-top: 1px solid #d9e8dd; }
+.tb-link.danger { color: #b91c1c; }
+.archive-link { display: block; margin: 8px auto 0; color: #16a34a; }
+.new-opt { display: block; width: 100%; text-align: left; padding: 10px 4px; }
+.chat-settings { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.missed-name { color: #b91c1c; }
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.friend-item {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  gap: 8px;
+}
+.friend-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.friend-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.friend-last {
+  font-size: 14px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.thread-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.thread-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.thread-title {
+  flex: 1;
+}
+.sys-line {
+  align-self: center;
+  margin: 6px 0;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  color: var(--danger-text);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.sys-line.failed {
+  color: var(--text-secondary);
+}
+.thread-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px 4px;
+}
+.thread-tools .btn {
+  white-space: nowrap;
+}
+/* Narrow screens: name + call icon on the first row, the tools on their own row below. */
+@media (max-width: 640px) {
+  .thread-header {
+    flex-wrap: wrap;
+  }
+  .thread-tools {
+    order: 5;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+  }
+}
+.call-buttons {
+  display: flex;
+  gap: 4px;
+}
+.back-btn {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #000;
+  background: #fff;
+  border: 1px solid #16a34a;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.who { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; }
+.msg-menu-overlay { position: fixed; inset: 0; z-index: 80; }
+.msg-menu { position: fixed; min-width: 170px; padding: 6px; display: flex; flex-direction: column; background: #fff; border: 1px solid #d9e8dd; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.msg-menu .tb-link { text-align: left; padding: 10px 12px; font-size: 15px; }
+.quote { margin-bottom: 4px; padding: 3px 8px; font-size: 13px; color: #6b716c; border-left: 3px solid #16a34a; background: #f6faf7; border-radius: 4px; }
+.pin-mark { margin-right: 4px; font-size: 12px; }
+.pin-bar, .reply-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 6px; padding: 4px 10px; font-size: 13.5px; background: #f0fdf4; border-left: 3px solid #16a34a; border-radius: 6px; }
+.pin-bar span, .reply-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.send-tools { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.thread-body {
+  flex: 1;
+  min-height: 300px;
+  max-height: 480px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+.empty-thread {
+  color: var(--muted);
+  text-align: center;
+  padding: 24px 0;
+}
+.e2ee-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.e2ee-line span:not([aria-hidden]) {
+  flex: 1;
+}
+.e2ee-warn {
+  margin-bottom: 8px;
+}
+.e2ee-codes {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.e2ee-codes code {
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+.e2ee-hint {
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+.msg-state {
+  padding: 2px 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.msg-failed {
+  color: var(--danger-text);
+}
+.unread-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--danger, #ef4444);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.friend-last.has-unread {
+  color: var(--text);
+  font-weight: 600;
+}
+.missed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--danger, #d64545);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.call-line {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+}
+.call-line.missed {
+  color: var(--danger, #d64545);
+}
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.msg.mine {
+  align-items: flex-end;
+}
+.msg-bubble {
+  max-width: 75%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: 14px;
+}
+.msg.mine .msg-bubble {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.send-row {
+  display: flex;
+  gap: 8px;
+}
+.send-row input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+@media (max-width: 800px) {
+  .split {
+    /* minmax(0, ...) lets the column shrink to the screen; a plain 1fr stretched to the
+       widest content inside it and pushed the cards past the right edge on phones. */
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .list-pane,
+  .thread-pane {
+    min-width: 0;
+  }
+  .list-pane {
+    display: block;
+  }
+  .thread-pane {
+    display: none;
+  }
+  .split.show-thread .list-pane {
+    display: none;
+  }
+  /* Điện thoại: màn hình trò chuyện chiếm trọn màn hình, tin nhắn cuộn ở giữa, ô nhập và bàn phím sát đáy */
+  .split.show-thread .thread-pane {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    height: 100dvh;
+    padding: 10px 10px env(safe-area-inset-bottom);
+    background: #fff;
+    border: 0;
+    border-radius: 0;
+  }
+  .split.show-thread .thread-pane .thread-body {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
+}
+/* ---- One unified left panel (ID, search, add by ID, friend list) ---- */
+/* wide screens only: on phones the single-column rule in the media query above must win */
+@media (min-width: 801px) {
+  .split {
+    grid-template-columns: 380px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+}
+.list-pane {
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+/* the former small cards become flat sections separated by hairlines */
+.list-pane > .search-form {
+  margin: 0 0 16px;
+  padding: 0 0 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ID + copy */
+.my-id-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.my-id-code {
+  font-size: 22px;
+  letter-spacing: 2px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.my-id-corner .btn,
+.search-item .btn {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+/* labels + consistent 44px inputs */
+.search-form > label,
+.add-form > summary {
+  display: block;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+}
+.add-form > summary {
+  cursor: pointer;
+}
+.list-pane input {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.list-pane input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+.list-pane input:hover {
+  border-color: var(--input-border-hover);
+}
+.list-pane input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.list-pane .field {
+  margin-bottom: 8px !important;
+}
+.add-row {
+  margin-top: 8px !important;
+}
+
+.search-hint {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.search-item {
+  background: var(--surface);
+}
+
+/* Friend list: flat rows, not stacked cards */
+.friend-list {
+  gap: 2px;
+}
+.list-pane .friend-item.card {
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.list-pane .friend-item.card:hover {
+  background: var(--surface);
+}
+.list-pane .friend-item.card.active {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.friend-info strong {
+  font-size: 15px;
+}
+.friend-last {
+  font-size: 14px;
+  color: var(--text-secondary);
+  max-width: none;
+}
+.friend-item .btn-ghost {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.friend-item .btn-ghost:hover {
+  color: var(--danger-text);
+  background: var(--danger-soft);
+}
+/* empty states in the left panel */
+.list-pane > .card:not(.my-id):not(.search-form):not(.add-form):not(.friend-item) {
+  padding: 24px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--input-border);
+  border-radius: 12px;
+  box-shadow: none;
+  color: var(--text-secondary);
+  font-size: 15px;
+  text-align: center;
+}
+
+/* ---- Chat panel: a clear card; empty state centred both ways ---- */
+.thread-pane {
+  min-height: 560px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.thread-pane > .empty-thread {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+.thread-header {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.thread-title {
+  font-size: 16px;
+}
+.thread-pane .thread-body {
+  min-height: 320px;
+  max-height: 60vh;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.thread-body .empty-thread {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.msg-bubble {
+  font-size: 15px;
+  background: var(--surface);
+  white-space: pre-wrap; /* giữ xuống dòng của tin (vd. báo cáo kết quả) */
+  overflow-wrap: anywhere;
+}
+.msg.mine .msg-bubble {
+  background: var(--primary-soft);
+  color: var(--text-primary);
+}
+.send-row input {
+  /* min-width:0 lets the box shrink; otherwise its intrinsic width pushed "Gửi" off a phone screen */
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+.send-row input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.send-row .btn {
+  flex: none;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
+}
+
+@media (max-width: 800px) {
+  .thread-pane {
+    min-height: 0;
+  }
+}
+
+/* call buttons: icons the same 20px as the rest of the app's icons */
+.call-buttons .btn,
+.thread-header .gear {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 20px;
+  color: var(--text-secondary);
+  border-radius: 10px;
+}
+.call-buttons .btn:hover:not(:disabled),
+.thread-header .gear:hover {
+  color: var(--text-primary);
+  background: var(--surface);
+}
+.call-buttons .btn:disabled {
+  opacity: 0.45;
+}
+
+/* Page header: title on the left, own ID in the top-right corner */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.page-head .page-subtitle {
+  margin-bottom: 0;
+}
+.my-id-corner {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+.my-id-corner .my-id-code {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1.15;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+.my-id-corner .btn {
+  margin-top: 4px;
+}
+@media (max-width: 480px) {
+  .my-id-corner .my-id-code {
+    font-size: 19px;
+    letter-spacing: 1px;
+  }
+}
+
+/* the single search box: short explanation, and small group headings for its two kinds of results */
+.search-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.search-group {
+  margin: 12px 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.list-group {
+  margin-top: 0;
+}
+
+.my-id-wrap {
+  position: relative;
+  flex: none;
+}
+.my-id-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  min-width: 240px;
+  padding: 14px 16px;
+  text-align: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+.my-id-pop .my-id-code {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: var(--primary);
+}
+.head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.head-search { min-width: 200px; border: 1px solid #16a34a !important; border-radius: 18px !important; padding: 7px 12px !important; background: #fff !important; color: #000 !important; }
+.avatar-group { background: #16a34a; color: #fff; }
+.msg-sender { font-size: 12px; font-weight: 700; color: #16a34a; margin-bottom: 2px; }
+.thread-sub { margin-left: 8px; font-size: 12px; color: #8a8f8a; font-weight: 400; }
+}
+
+.friends-page .conn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; }
+.friends-page .conn::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.friends-page .conn-ok { color: #16a34a; }
+.friends-page .conn-warn { color: #b45309; }
+.friends-page .conn-bad { color: #b91c1c; }

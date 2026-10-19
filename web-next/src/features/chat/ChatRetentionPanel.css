@@ -1,0 +1,34 @@
+.retention {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.retention-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.retention-state {
+  flex: 1;
+  color: var(--text-primary);
+}
+.retention-state.muted {
+  color: var(--text-secondary);
+}
+.retention-form {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.retention-hint {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+}
+.retention-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

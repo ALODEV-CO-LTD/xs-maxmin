@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import FriendsScreen from '@/features/chat/FriendsScreen'
 
 export default function Page() {
-  return <ScreenStub vue="FriendsView.vue" />
+  return <FriendsScreen />
 }

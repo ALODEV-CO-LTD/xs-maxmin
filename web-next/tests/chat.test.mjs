@@ -270,3 +270,31 @@ test('frameParts: cắt theo 1.000.000 ký tự, tối đa 8 phần', () => {
   assert.equal(frames.map((f) => f.ct).join(''), ct)
   assert.equal(frameParts('u', 'id', 'iv', 'a'.repeat(LIMITS.PART_CHARS * 8 + 1), 7), null)
 })
+
+// ---- giao diện: hàm thuần của màn Tin nhắn ----
+const { quoteOf, quoteText, peerOfflineLabel, callLine, isMissedCall, REPLY_MARK } = await import('../src/features/chat/chatView.js')
+
+test('trả lời: tách dòng trích dẫn "↪" khỏi nội dung; chuyển tiếp chỉ lấy nội dung', () => {
+  assert.deepEqual(quoteOf(`${REPLY_MARK}câu cũ\nđồng ý`), { quote: 'câu cũ', body: 'đồng ý' })
+  assert.deepEqual(quoteOf('không trích dẫn'), { quote: '', body: 'không trích dẫn' })
+  assert.equal(quoteOf(`${REPLY_MARK}chỉ một dòng`).quote, '', 'một dòng thì không phải trích dẫn')
+  assert.equal(quoteText({ content: `${REPLY_MARK}a\nb` }), 'b')
+  assert.equal(quoteText({ content: '', attachment: {} }), '[Ảnh]')
+})
+
+test('nhãn đầu chat: tin cuối của mình lỗi "offline" thì "Bạn bè đang offline", ngược lại "Đã kết nối"', () => {
+  const failed = { mine: true, status: 'failed', reason: 'offline' }
+  assert.equal(peerOfflineLabel([failed], true).text, 'Bạn bè đang offline')
+  assert.equal(peerOfflineLabel([failed, { mine: true, status: 'delivered' }], true).text, 'Đã kết nối')
+  assert.equal(peerOfflineLabel([{ mine: false, status: 'failed', reason: 'offline' }], true).text, 'Đã kết nối')
+  assert.equal(peerOfflineLabel([{ mine: true, status: 'failed', reason: 'timeout' }], true).text, 'Đã kết nối')
+  assert.equal(peerOfflineLabel([], true).text, 'Đã kết nối')
+  assert.equal(peerOfflineLabel([failed], false).text, 'Mất kết nối')
+})
+
+test('dòng cuộc gọi trong cuộc trò chuyện', () => {
+  assert.equal(callLine({ status: 'completed', direction: 'outgoing', durationSeconds: 75 }), 'Cuộc gọi thoại đi · 1:15')
+  assert.equal(callLine({ status: 'missed', direction: 'incoming' }), 'Cuộc gọi nhỡ')
+  assert.equal(isMissedCall({ status: 'busy', direction: 'incoming' }), true)
+  assert.equal(isMissedCall({ status: 'missed', direction: 'outgoing' }), false)
+})
