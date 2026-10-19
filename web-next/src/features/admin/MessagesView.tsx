@@ -61,7 +61,7 @@ export default function MessagesView() {
   }, [incomingTick, load])
 
   const selected = conversations.find((c) => c.userId === selectedId) || null
-  const filtered = filterConversations(conversations, query, onlyAwaiting)
+  const filtered: Conversation[] = filterConversations(conversations, query, onlyAwaiting)
   const awaiting = awaitingCountOf(conversations)
   const subtitle = threadSubtitle(selected, packageLabel)
   const open = (id: string) => id !== selectedId && navigate(`/admin/messages?user=${encodeURIComponent(id)}`)

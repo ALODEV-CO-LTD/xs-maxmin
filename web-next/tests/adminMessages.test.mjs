@@ -18,7 +18,7 @@ test('nhãn thời gian: hôm nay giờ, hôm qua, ngày/tháng', () => {
   const now = new Date(2026, 9, 19, 15, 0)
   assert.match(shortTime(new Date(2026, 9, 19, 9, 5).toISOString(), now), /09:05|9:05/)
   assert.equal(shortTime(new Date(2026, 9, 18, 23, 0).toISOString(), now), 'Hôm qua')
-  assert.match(shortTime(new Date(2026, 9, 10, 8, 0).toISOString(), now), /10\/10/)
+  assert.match(shortTime(new Date(2026, 9, 10, 8, 0).toISOString(), now), /10.10/)
   assert.equal(shortTime('', now), '')
 })
 test('phụ đề và huy hiệu', () => {
