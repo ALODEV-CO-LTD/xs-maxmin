@@ -10,6 +10,7 @@ import 'core/lottery_stations.dart';
 import 'core/mask_store.dart';
 import 'core/scoring_config_bus.dart';
 import 'core/theme.dart';
+import 'core/widgets/dismiss_keyboard.dart';
 import 'features/account/account_screen.dart';
 import 'features/account/privacy/privacy_gate.dart';
 import 'features/account/privacy/privacy_store.dart';
@@ -188,7 +189,7 @@ class _MambaAppState extends State<MambaApp> {
               notifier: _notifier,
               ringer: _ringer,
               background: _background,
-              child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: PrivacyGate(child: child ?? const SizedBox.shrink()))),
+              child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: PrivacyGate(child: DismissKeyboard(child: child ?? const SizedBox.shrink())))),
             ),
             // Until the saved session is read, nothing of the app is shown (no flash of the home tab for a signed-out start).
             if (!_auth.ready) const Positioned.fill(child: ColoredBox(color: Colors.white, child: Center(child: CircularProgressIndicator()))),
