@@ -514,6 +514,15 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  /// The last thing in the chat is my own message the relay could not hand over because the friend is not online.
+  /// ("Đã kết nối" only says MY connection to the server is up; this says why the message did not go.)
+  bool get _peerOffline {
+    final list = _msgs;
+    if (list.isEmpty) return false;
+    final last = list.last;
+    return last.mine && last.status == MsgStatus.failed && last.reason == 'offline';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -531,7 +540,7 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_c.nameOf(_f), overflow: TextOverflow.ellipsis),
-              if (_f.isGroup) Text('${group?.members.length ?? _f.memberCount} thành viên', style: TextStyle(fontSize: 12, color: context.mutedColor)) else _ConnChip(state: _c.socket.state),
+              if (_f.isGroup) Text('${group?.members.length ?? _f.memberCount} thành viên', style: TextStyle(fontSize: 12, color: context.mutedColor)) else _ConnChip(state: _c.socket.state, peerOffline: _peerOffline),
             ]),
           ),
         ]),
@@ -786,15 +795,20 @@ class _ChatPageState extends State<ChatPage> {
 
 /// Đang kết nối / Đã kết nối / Mất kết nối.
 class _ConnChip extends StatelessWidget {
-  const _ConnChip({required this.state});
+  const _ConnChip({required this.state, this.peerOffline = false});
   final ConnState state;
+
+  /// Connected to the server, but the friend is not online: the last message could not be delivered.
+  final bool peerOffline;
   @override
   Widget build(BuildContext context) {
-    final (text, color) = switch (state) {
-      ConnState.connected => ('Đã kết nối', context.okColor),
-      ConnState.connecting => ('Đang kết nối', Brand.warning),
-      ConnState.disconnected => ('Mất kết nối', context.badColor),
-    };
+    final (text, color) = peerOffline && state == ConnState.connected
+        ? ('Bạn bè đang offline', Brand.warning)
+        : switch (state) {
+            ConnState.connected => ('Đã kết nối', context.okColor),
+            ConnState.connecting => ('Đang kết nối', Brand.warning),
+            ConnState.disconnected => ('Mất kết nối', context.badColor),
+          };
     return Semantics(
       label: 'Trạng thái kết nối: $text',
       child: Row(mainAxisSize: MainAxisSize.min, children: [
