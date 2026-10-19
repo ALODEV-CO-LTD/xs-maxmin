@@ -6,7 +6,7 @@
 // region drawing that day) or one station id ('mn-tphcm').
 import { api } from './api'
 
-// Plain module state (no framework): React reads it with useStations() (src/lib/useStations.ts), which re-renders when it loads.
+// Plain module state (no framework): React reads it with useStations() (src/lib/useStations.js), which re-renders when it loads.
 export const state = { regions: [], loaded: false }
 const listeners = new Set()
 export const subscribeStations = (fn) => (listeners.add(fn), () => listeners.delete(fn))
