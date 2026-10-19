@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import './Stats.css'
 import { useEffect, useMemo, useState } from 'react'
 import MaskedValue from '@/components/MaskedValue'
@@ -31,6 +32,7 @@ export default function AccountStats() {
   const [wrapRef, W] = useWidth<HTMLDivElement>(640, 240)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStill(!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
     let alive = true
     loadMoney({ api, cachedGet, loadAllEntries, loadStations, DEFAULT_RATES, moneyByDate })
@@ -125,7 +127,7 @@ export default function AccountStats() {
                 </g>
               ))}
               <line x1={PAD.l} x2={W - PAD.r} y1={plot.zeroY} y2={plot.zeroY} className="st-zero" />
-              {plot.bars.map((b, i) => (
+              {plot.bars.map((b: any, i: number) => (
                 <g key={b.key}>
                   <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={2} className={['st-bar', 'st-bar-' + barTone(metric, b.value), hover >= 0 && hover !== i ? 'st-dim' : '', still ? 'still' : ''].filter(Boolean).join(' ')} />
                   {plot.shown.has(i) && (
@@ -133,7 +135,7 @@ export default function AccountStats() {
                   )}
                 </g>
               ))}
-              {plot.bars.map((b, i) => (
+              {plot.bars.map((b: any, i: number) => (
                 <rect key={'h' + b.key} x={b.hx} y={PAD.t} width={b.hw} height={H - PAD.t - PAD.b} className="st-hit" onPointerEnter={() => setHover(i)} onPointerDown={() => setHover(i)} />
               ))}
             </svg>

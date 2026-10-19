@@ -1,5 +1,10 @@
-import ScreenStub from '@/components/ScreenStub'
+import { Suspense } from 'react'
+import AccountPage from '@/features/account/AccountPage'
 
 export default function Page() {
-  return <ScreenStub vue="AccountView.vue" />
+  return (
+    <Suspense fallback={null}>
+      <AccountPage />
+    </Suspense>
+  )
 }

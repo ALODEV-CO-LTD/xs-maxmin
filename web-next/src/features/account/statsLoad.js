@@ -7,7 +7,7 @@ export async function loadResult(api, cache, date, station) {
   try {
     const { result } = await api.get(`/lottery-results?date=${date}&station=${encodeURIComponent(station)}`)
     cache.set(`${date}|${station}`, result || null)
-  } catch (_) {
+  } catch {
     cache.set(`${date}|${station}`, null) // not known: counted as "chưa tính"
   }
 }

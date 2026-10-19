@@ -72,7 +72,7 @@ export default function StatsChart({ points, kind = 'bar', color = 'var(--primar
               ))}
             </>
           )}
-          {chartLabels(points, plotW).map((l) => (
+          {chartLabels(points, plotW).map((l: { i: number; text: string }) => (
             <text key={'x' + l.i} x={xAt(l.i)} y={H - 8} className="sch-tick" textAnchor="middle">{l.text}</text>
           ))}
           {points.map((d, i) => (
