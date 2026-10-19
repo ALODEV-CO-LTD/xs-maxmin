@@ -42,7 +42,7 @@ export default function ResultsScreen() {
           <h3>Kết quả xổ số {regionName}</h3>
           <div className="rs-date-nav">
             <AppButton variant="ghost" size="sm" aria-label="Ngày trước" title="Ngày trước" onClick={() => r.shift(-1)}>‹</AppButton>
-            <AppDatePicker value={r.date} onChange={(v) => v && r.setDate(v)} />
+            <AppDatePicker className="rs-date" value={r.date} onChange={(v) => v && r.setDate(v)} />
             <AppButton variant="ghost" size="sm" aria-label="Ngày sau" title="Ngày sau" onClick={() => r.shift(1)}>›</AppButton>
           </div>
         </div>
@@ -68,6 +68,7 @@ export default function ResultsScreen() {
           />
           <AppButton variant="secondary" block disabled={r.ocr.running} onClick={() => file.current?.click()}>
             {!r.ocr.running && <AppIcon name="camera" />}
+            {' '}
             {r.ocr.running ? `Đang đọc ảnh... ${r.ocr.progress}%` : 'Đọc kết quả từ ảnh'}
           </AppButton>
           <button

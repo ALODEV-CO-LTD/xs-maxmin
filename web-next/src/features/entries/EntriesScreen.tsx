@@ -153,9 +153,9 @@ export default function EntriesScreen() {
               <div className="en-empty">{emptyListText({ customerName: c.customerName, entries: c.entries, date: c.date })}</div>
             ) : (
               <div className="en-table-wrap">
-                <table className="table en-table">
+                <table className="table en-table stack-table">
                   <thead>
-                    <tr><th>Ngày</th><th>Hạng mục</th><th>Số</th><th>Điểm vào</th><th>Điểm ra</th><th>Ghi chú</th><th>Sửa</th><th>Xoá</th></tr>
+                    <tr><th className="en-col-date">Ngày</th><th className="en-col-type">Hạng mục</th><th className="en-col-val">Số</th><th className="en-col-pts">Điểm vào</th><th className="en-col-pts">Điểm ra</th><th className="en-col-note">Ghi chú</th><th className="en-col-btn">Sửa</th><th className="en-col-btn">Xoá</th></tr>
                   </thead>
                   <tbody>
                     {c.shown.map((e: any) => (
@@ -201,17 +201,17 @@ function EntryRow({ e, error, deleting, onEdit, onDelete }: any) {
   return (
     <>
       <tr>
-        <td>{viDate(e.entryDate)}{e.pending && <span className="chip en-pending">Chờ đồng bộ</span>}</td>
-        <td>
+        <td data-label="Ngày">{viDate(e.entryDate)}{e.pending && <span className="chip en-pending">Chờ đồng bộ</span>}</td>
+        <td data-label="Hạng mục">
           {betTypeLabel(e.betType || 'de')}
           {e.station && e.station !== 'mb' && <span className="chip en-station" title={stationLabel(e.station)}>{stationShort(e.station)}</span>}
         </td>
-        <td className="en-cell-num"><MaskedValue text={e.value} /></td>
-        <td className="en-cell-pts"><MaskedValue text={fmtPoints(e.score)} /></td>
-        <td className="en-cell-pts"><MaskedValue text={fmtPoints(e.result)} /></td>
-        <td className="en-cell-note"><MaskedValue text={e.note || '-'} /></td>
-        <td><AppButton variant="secondary" size="sm" onClick={onEdit}>Sửa</AppButton></td>
-        <td><AppButton variant="danger" size="sm" disabled={deleting} onClick={onDelete}>{deleting ? 'Đang xoá...' : 'Xoá'}</AppButton></td>
+        <td data-label="Số" className="en-cell-num"><MaskedValue text={e.value} /></td>
+        <td data-label="Điểm vào" className="en-cell-pts"><MaskedValue text={fmtPoints(e.score)} /></td>
+        <td data-label="Điểm ra" className="en-cell-pts"><MaskedValue text={fmtPoints(e.result)} /></td>
+        <td data-label="Ghi chú" className="en-cell-note"><MaskedValue text={e.note || '-'} /></td>
+        <td className="en-col-btn"><AppButton variant="secondary" size="sm" onClick={onEdit}>Sửa</AppButton></td>
+        <td className="en-col-btn"><AppButton variant="danger" size="sm" disabled={deleting} onClick={onDelete}>{deleting ? 'Đang xoá...' : 'Xoá'}</AppButton></td>
       </tr>
       {error && <tr className="en-row-error"><td colSpan={8}><div className="alert alert-error">{error}</div></td></tr>}
     </>
