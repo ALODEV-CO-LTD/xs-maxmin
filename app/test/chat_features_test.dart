@@ -12,6 +12,7 @@ import 'package:mamba_app/features/friends/chat_models.dart';
 import 'package:mamba_app/features/friends/chat_page.dart';
 import 'package:mamba_app/features/friends/chat_service.dart';
 import 'package:mamba_app/features/friends/chat_store.dart';
+import 'package:mamba_app/features/friends/e2ee_crypto.dart';
 import 'package:mamba_app/features/friends/friends_controller.dart';
 import 'package:mamba_app/features/friends/friends_screen.dart';
 import 'package:mamba_app/features/friends/messaging_host.dart';
@@ -22,6 +23,7 @@ class _Sock extends RealtimeSocket {
   _Sock() : super(tokenProvider: () => 't');
   final _in = StreamController<Map<String, dynamic>>.broadcast();
   final List<Map<String, dynamic>> sent = [];
+  void push(Map<String, dynamic> frame) => _in.add(frame);
   @override
   bool get ready => true;
   @override
@@ -121,11 +123,11 @@ void main() {
     setUp(() => SharedPreferences.setMockInitialValues({}));
     tearDown(() => hub.dispose());
 
-    Future<void> boot(WidgetTester t, List<ChatMessage> seed) async {
+    Future<void> boot(WidgetTester t, List<ChatMessage> seed, {List<Map<String, dynamic>>? friends, _Sock? sock}) async {
       final client = MockClient((req) async {
         final path = req.url.path;
         if (path.endsWith('/me/e2ee-key')) return _json({'publicKey': null});
-        if (path.endsWith('/me/friends')) return _json({'friends': [{'id': 'f1', 'name': 'Bình', 'username': 'binh', 'isAdmin': false}]});
+        if (path.endsWith('/me/friends')) return _json({'friends': friends ?? [{'id': 'f1', 'name': 'Bình', 'username': 'binh', 'isAdmin': false}]});
         if (path.endsWith('/me/customer-codes')) return _json({'codes': []});
         if (path.endsWith('/me/calls')) return _json({'calls': [], 'unseenMissed': {}});
         if (path.endsWith('/me/unread')) return _json({'support': 0});
@@ -136,7 +138,7 @@ void main() {
       for (final m in seed) {
         await store.putMessage(m);
       }
-      hub = FriendsController(api: ApiClient(AuthStore(), client: client), auth: AuthStore(), socket: _Sock())
+      hub = FriendsController(api: ApiClient(AuthStore(), client: client), auth: AuthStore(), socket: sock ?? _Sock())
         ..storeFactory = ((_) async => store)
         ..vault = MemoryKeyVault();
       await hub.start();
@@ -168,6 +170,45 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('📌 tin của tôi'), findsOneWidget);
       expect(await hub.chat!.pinsOf('f1'), ['b']);
+    });
+
+    testWidgets('Chuyển tiếp: chọn người nhận (không có Admin), gửi mã hoá đúng nội dung (bỏ dòng trích dẫn) và mở cuộc trò chuyện đó', (t) async {
+      final sock = _Sock();
+      final k1 = E2eeIdentity.generate().publicJwk, k2 = E2eeIdentity.generate().publicJwk;
+      await t.runAsync(() => boot(t, [msg('a', '↪ câu cũ\n12 x 5')], sock: sock, friends: [
+            {'id': 'f1', 'name': 'Bình', 'username': 'binh', 'isAdmin': false, 'publicKey': k1},
+            {'id': 'f2', 'name': 'Cường', 'username': 'cuong', 'isAdmin': false, 'publicKey': k2},
+            {'id': 'ad', 'name': 'Quản trị', 'username': 'admin', 'isAdmin': true},
+          ]));
+      await t.pumpWidget(host(ChatPage(controller: hub, friend: hub.friends.firstWhere((f) => f.id == 'f1'))));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+
+      await t.longPress(find.text('12 x 5'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Chuyển tiếp'));
+      await t.pumpAndSettle();
+      expect(find.text('Chuyển tiếp tới'), findsOneWidget);
+      expect(find.text('Cường'), findsOneWidget);
+      expect(find.text('Quản trị'), findsNothing);
+
+      await t.tap(find.text('Cường'));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await t.pumpAndSettle();
+
+      final frames = sock.sent.where((f) => f['type'] == 'e2ee-msg').toList();
+      expect(frames, isNotEmpty);
+      expect(frames.every((f) => f['to'] == 'f2'), isTrue);
+      final stored = await hub.chat!.messages('f2');
+      expect(stored, hasLength(1));
+      expect(stored.single.mine, isTrue);
+      expect(stored.single.text, '12 x 5'); // the quote line of a reply is not forwarded
+      expect(find.text('12 x 5'), findsOneWidget); // now showing the chat with Cường
+      expect(find.textContaining('Cường'), findsWidgets);
+      // the friend confirms: the pending "no answer" timer is gone
+      sock.push({'type': 'e2ee-ack', 'id': stored.single.id});
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await t.pump();
     });
 
     testWidgets('select mode: ticks, the button becomes "Nhập số (N)" and sends the picked text to Nhập số; only text messages can be picked', (t) async {
