@@ -54,7 +54,7 @@
 .is-open .app-select-chevron {
   transform: rotate(180deg);
 }
-.app-select-native {
+div.app-select > input.app-select-native {
   position: absolute;
   left: 0;
   bottom: 0;
