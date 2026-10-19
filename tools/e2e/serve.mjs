@@ -12,6 +12,8 @@ http.createServer((req, res) => {
     return req.pipe(p)
   }
   let file = path.join(dist, decodeURIComponent(req.url.split('?')[0]))
+  // Next.js static export writes /entries as entries.html (same rule as the nginx `try_files $uri $uri.html`)
+  if (!path.extname(file) && fs.existsSync(file + '.html')) file += '.html'
   if (!file.startsWith(dist) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(dist, 'index.html')
   res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' })
   fs.createReadStream(file).pipe(res)
