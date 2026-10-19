@@ -89,3 +89,10 @@ test('sửa: chỉ đổi số, điểm vào, ghi chú', () => {
     customerName: 'A', value: '12', entryDate: '2026-10-19', score: '3.5', betType: 'lo', note: 'x',
   })
 })
+
+test('bulkPatch: chỉ đổi ô đã điền (hạng mục / điểm vào), không có gì thì null', () => {
+  assert.deepEqual(L.bulkPatch('lo', ''), { type: 'lo' })
+  assert.deepEqual(L.bulkPatch('', ' 12 '), { score: '12' })
+  assert.deepEqual(L.bulkPatch('de', '5'), { type: 'de', score: '5' })
+  assert.equal(L.bulkPatch('', '  '), null)
+})

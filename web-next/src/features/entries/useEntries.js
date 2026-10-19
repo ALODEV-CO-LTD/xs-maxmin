@@ -131,6 +131,9 @@ export function useEntries() {
   const addRow = () => setRows((r) => [...r, blankRow(r[r.length - 1]?.type)])
   const removeRow = (uid) => setRows((r) => (r.length > 1 ? r.filter((x) => x.uid !== uid) : [blankRow(betTypes[0])]))
   const patchRow = (uid, patch) => setRows((r) => r.map((x) => (x.uid === uid ? { ...x, ...patch } : x)))
+  // bulk edit of the ticked rows (Vue: applyBulk / deleteSelectedRows)
+  const patchRows = (uids, patch) => setRows((r) => r.map((x) => (uids.includes(x.uid) ? { ...x, ...patch } : x)))
+  const removeRows = (uids) => setRows((r) => { const keep = r.filter((x) => !uids.includes(x.uid)); return keep.length ? keep : [blankRow(betTypes[0])] })
   const addRowsFromDrafts = (drafts) =>
     setRows((r) => mergeRows(r, drafts.map((d) => ({ uid: nextUid(), type: d.type, value: d.value, score: d.score }))))
 
@@ -258,7 +261,7 @@ export function useEntries() {
     user, entries, loading, loadError, fromCache, customers, accountRates, customerName, setCustomerName, station, setStation,
     rows, note, setNote, submitting, formError, notice, setNotice, addedMsg, date, betTypes, regionId, canAdd, shown, ofCustomer,
     savedTemplate, boxPrefill, takeBoxPrefill: () => { const t = boxPrefill; setBoxPrefill(null); return t },
-    addRow, removeRow, patchRow, addRowsFromDrafts, submit, saveDrafts, finishChatFlow, saveEdit, deleteEntry, deleteAll,
+    addRow, removeRow, patchRow, patchRows, removeRows, addRowsFromDrafts, submit, saveDrafts, finishChatFlow, saveEdit, deleteEntry, deleteAll,
     saveTemplate, deleteTemplate, reload: loadAll,
   }
 }

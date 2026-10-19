@@ -145,3 +145,11 @@ export function editChanges(entry, { value, score, note }) {
 export function editError({ value }) {
   return value.trim() ? '' : 'Vui lòng nhập số liệu'
 }
+
+/** Bulk edit of the ticked rows: only the filled fields (hạng mục / điểm vào) change. Returns null when nothing to apply. */
+export function bulkPatch(type, score) {
+  const patch = {}
+  if (type) patch.type = type
+  if (String(score ?? '').trim() !== '') patch.score = String(score).trim()
+  return Object.keys(patch).length ? patch : null
+}

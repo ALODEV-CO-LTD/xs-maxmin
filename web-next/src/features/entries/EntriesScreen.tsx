@@ -12,7 +12,7 @@ import { betTypeLabel } from '@/lib/betTypes'
 import { isRegionCode, regionOf, stationLabel, stationName, stationOptions } from '@/lib/lotteryStations'
 import { useEntries } from './useEntries'
 import QuickEntryBox from './QuickEntryBox'
-import { entryCount, emptyListText, fmtPoints, formatNumber, totalsOf, viDate } from './logic'
+import { bulkPatch, entryCount, emptyListText, fmtPoints, formatNumber, totalsOf, viDate } from './logic'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const stationShort = (code: string) => (isRegionCode(code) ? regionOf(code).name : stationName(code))
@@ -24,6 +24,9 @@ export default function EntriesScreen() {
   const [deletingAll, setDeletingAll] = useState(false)
   const [deleteAllError, setDeleteAllError] = useState('')
   const [editing, setEditing] = useState<any>(null)
+  const [selected, setSelected] = useState<number[]>([])
+  const [bulkType, setBulkType] = useState('')
+  const [bulkScore, setBulkScore] = useState('')
   const firstNumber = useRef<HTMLInputElement>(null)
   const totals = totalsOf(c.ofCustomer)
 
@@ -33,6 +36,18 @@ export default function EntriesScreen() {
   }, [c.customerName])
 
   const noPackage = c.user && c.user.package?.isActive === false
+
+  const pickedUids: number[] = selected.filter((u) => c.rows.some((r: any) => r.uid === u))
+  const allSelected = c.rows.length > 0 && pickedUids.length === c.rows.length
+  const someSelected = pickedUids.length > 0 && !allSelected
+  const bulk = bulkPatch(bulkType, bulkScore)
+  const canApplyBulk = pickedUids.length > 0 && bulk !== null
+  const applyBulk = () => {
+    if (!canApplyBulk || !bulk) return
+    c.patchRows(pickedUids, bulk)
+    setBulkType('')
+    setBulkScore('')
+  }
 
   return (
     <div className="page en-page">
@@ -101,16 +116,50 @@ export default function EntriesScreen() {
               <QuickEntryBox c={c} />
 
               <div className="en-rows">
-                <div className="en-head"><span>Hạng mục</span><span>Số</span><span>Điểm vào</span><span /></div>
+                <div className="en-head">
+                  <label className="en-check" title="Chọn tất cả">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = someSelected }}
+                      aria-label="Chọn tất cả các dòng"
+                      onChange={() => setSelected(allSelected ? [] : c.rows.map((r: any) => r.uid))}
+                    />
+                  </label>
+                  <span>Hạng mục</span><span>Số</span><span>Điểm vào</span><span />
+                </div>
+                {pickedUids.length > 0 && (
+                  <div className="en-bulk">
+                    <AppSelect className="en-bulk-type" value={bulkType} onChange={setBulkType} aria-label="Đổi hạng mục">
+                      <option value="" hidden>Đổi hạng mục</option>
+                      {c.betTypes.map((t: string) => <option key={t} value={t}>{betTypeLabel(t)}</option>)}
+                    </AppSelect>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className="en-input en-bulk-score"
+                      placeholder="Đổi điểm vào"
+                      aria-label="Đổi điểm vào"
+                      value={bulkScore}
+                      onChange={(e) => setBulkScore(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyBulk() } }}
+                    />
+                    <button type="button" className="btn btn-secondary btn-sm en-bulk-apply" disabled={!canApplyBulk} onClick={applyBulk}>Áp dụng</button>
+                    <button type="button" className="btn btn-danger btn-sm en-bulk-delete" onClick={() => { c.removeRows(pickedUids); setSelected([]) }}>Xoá</button>
+                  </div>
+                )}
                 <div className="en-row-list">
                   {c.rows.map((row: any, i: number) => (
-                    <div key={row.uid} className="en-row">
+                    <div key={row.uid} className={`en-row${pickedUids.includes(row.uid) ? ' is-selected' : ''}`}>
+                      <label className="en-check">
+                        <input type="checkbox" checked={pickedUids.includes(row.uid)} aria-label={`Chọn dòng ${i + 1}`} onChange={() => setSelected((s) => (s.includes(row.uid) ? s.filter((u) => u !== row.uid) : [...s, row.uid]))} />
+                      </label>
                       <AppSelect value={row.type} onChange={(v: string) => c.patchRow(row.uid, { type: v })} aria-label={`Hạng mục dòng ${i + 1}`}>
                         {(c.betTypes.includes(row.type) ? c.betTypes : [...c.betTypes, row.type]).map((t: string) => <option key={t} value={t}>{betTypeLabel(t)}</option>)}
                       </AppSelect>
                       <input ref={i === 0 ? firstNumber : undefined} type="text" className="en-input en-number" placeholder="Số, vd: 12" aria-label={`Số dòng ${i + 1}`} value={row.value} onChange={(e) => c.patchRow(row.uid, { value: e.target.value })} />
                       <input type="text" inputMode="decimal" className="en-input" placeholder="Điểm vào" aria-label={`Điểm vào dòng ${i + 1}`} value={row.score} onChange={(e) => c.patchRow(row.uid, { score: e.target.value })} />
-                      <button type="button" className="btn btn-ghost btn-sm en-remove" aria-label="Xoá dòng" disabled={c.rows.length === 1 && !row.value && !row.score} onClick={() => c.removeRow(row.uid)}>
+                      <button type="button" className="btn btn-ghost btn-sm en-remove" aria-label="Xoá dòng" disabled={c.rows.length === 1 && !row.value && !row.score} onClick={() => { c.removeRow(row.uid); setSelected((s) => s.filter((u) => u !== row.uid)) }}>
                         <AppIcon name="x" />
                       </button>
                     </div>
