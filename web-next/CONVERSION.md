@@ -13,13 +13,18 @@ Thư mục `frontend/` (Vue 3 + Vite) vẫn là bản đang chạy thật. `web-
 - `AuthGate`: chặn route như `router.beforeEach` (chưa đăng nhập → `/login?redirect=`, admin/khách tách khu vực, quyền admin).
 - Mỗi route có `page.tsx` đang là `ScreenStub`; chuyển màn nào thì thay stub bằng màn thật.
 
+## Đã xong (giai đoạn 2: store, thành phần dùng chung, khung app, đăng nhập)
+- Store (zustand, trong `src/lib`, giữ tên hàm của bản Vue): `maskStore`, `notifyStore` (getter là selector: `useNotifyStore(totalOf)`), `policyStore`, `privacyStore`, `session.js` (`teardownSession`), `theme.js`, `confirm.js`, `packageLabels.js` (+ `usePackageLabel`), `pasteImage.js` (`usePasteImage` hook), `offline.js` (`useSyncStore`/`syncState`), `useStations.js` (hook trên `lotteryStations`).
+- `src/lib/hooks.js` là chỗ cắm cho phần chưa chuyển (call store, e2ee/chat): `registerTeardown`, `hooks.inCall`, `hooks.markFriendRead`, `registerShellStart` (vd. `call.connect()`), `registerUserReady` (vd. `chat.init(user)`), `registerShellOverlay` (CallOverlay), và `navigate()` / `currentLocation()` thay router. Địa chỉ toast là chuỗi (`/friends?thread=<id>`, `/admin/messages?user=<id>`, `/feedback` = mở popover Phản hồi).
+- `src/components`: ModalDialog, ConfirmDialog, AppButton, AppSelect (onChange nhận giá trị, con là `<option>`), AppDatePicker, AppIcon, PasswordInput, MaskedValue, ThemeToggle, ActionBar, SyncStatus, AnnouncementBanner, ScreenWatermark, PrivacyGuard, PasswordPromptDialog, MessageToast, RecoveryCodeDisplay/Panel, AttachmentPreview, ChatAttachButtons, MessageAttachment, SupportChat, AuthLayout, AppShell. CSS của mỗi thành phần lấy nguyên từ file .vue (global, tên lớp có tiền tố nên không đụng nhau).
+- `Providers` bọc `<div id="app">` (PrivacyGuard làm `inert` phần này khi khoá), bật chặn chụp màn hình khi đăng nhập, gọi `teardownSession()` khi phiên kết thúc, và đặt `AppShell` quanh mọi route không công khai. Trang `/login`, `/register` là `LoginScreen`/`RegisterScreen`, logic thuần ở `lib/authFlow.js`. Sau đăng nhập `AuthGate` chuyển tới `?redirect=` (chỉ đường dẫn trong trang) hoặc trang chủ.
+- Test: `tests/stores.test.mjs`, `tests/auth.test.mjs` (không cần trình duyệt; `tests/stubs.mjs` giờ cho phép import không đuôi `.js`).
+
 ## Còn lại (bản đồ Vue → Next)
 | Vue | Việc |
 |---|---|
-| `stores/{mask,notify,policy,privacy,call}.js`, `e2ee/chat.js`, `session.js`, `offline.js`, `theme.js`, `confirm.js`, `packageLabels.js`, `pasteImage.js` | viết lại bằng zustand / hook (chứa `ref`/`reactive`/`computed` của Vue) |
-| `components/*.vue` (40 file) | chuyển sang `src/components/*.tsx`; `ModalDialog`, `AppButton`, `AppSelect`, `AppDatePicker`, `AppIcon` làm trước (mọi màn dùng) |
-| `views/LoginView`, `RegisterView`, `AuthLayout` | đăng nhập / đăng ký (2 lớp mật khẩu, khôi phục) |
-| `components/AppShell` + `App.vue` | khung (thanh trên, menu, popover Phản hồi, thông báo, cuộc gọi, khoá riêng tư) |
+| `stores/call.js`, `e2ee/chat.js` | viết lại bằng zustand rồi cắm vào `lib/hooks.js` (xem trên) |
+| `components/*.vue` còn lại (AccountStats, AddBetTypeDialog, AdminChatPane, AdminRecoveryRequests, AppVersionPanel, CallOverlay, ChatCalcDialog, ChatDecodeDialog, ChatRetentionPanel, DeleteDataDialog, DeletionSchedules, PrivacySettings, ScoringConfigEditor, ScoringSummary, StatsChart) | chuyển cùng màn dùng chúng |
 | `views/EntriesView` (3.1k dòng), `ResultsView` (1.8k), `ScoringView`, `CustomersView`, `FriendsView` (2k), `AccountView`, `ScoringSettings` | các màn khách |
 | `views/admin/*` (7 màn) | khu admin |
 
