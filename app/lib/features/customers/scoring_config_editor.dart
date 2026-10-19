@@ -281,7 +281,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
                       child: Text(tag, style: TextStyle(fontSize: 12, color: own ? scheme.primary : context.mutedColor)),
                     ),
                 ]),
-                if (!(_editing && r.editable && !r.off)) Text(r.symbolText, style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
+                if (!(_editing && r.editable && !r.off) && r.symbolText.isNotEmpty) Text(r.symbolText, style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
                 Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
                   Text('Lấy số: ${_m.srcCaption(r)}', key: ValueKey('src-$k'), style: TextStyle(color: context.mutedColor, fontSize: 11.5)),
                   if (_editing && !r.off)

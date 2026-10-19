@@ -46,8 +46,8 @@ class TableKind {
 
 const tableKinds = [
   TableKind('lo', 'lo', 'Bao lô 2 số', 'L, l, lo, lô, x, X', editable: true),
-  TableKind('lo3', 'lo', 'Bao lô 3 số', 'chọn ở ô Hạng mục khi nhập số'),
-  TableKind('lo4', 'lo', 'Bao lô 4 số', 'chọn ở ô Hạng mục khi nhập số'),
+  TableKind('lo3', 'lo', 'Bao lô 3 số', ''),
+  TableKind('lo4', 'lo', 'Bao lô 4 số', ''),
   TableKind('dau', 'de', 'Đầu', 'Đ, D, đ, dau, đầu', editable: true),
   TableKind('duoi', 'de', 'Đuôi', 'C, c, cuoi, cuối', editable: true),
   TableKind('cang3', 'de', '3 càng', '3 số + x / lo + điểm, vd 123x10'),
@@ -55,11 +55,11 @@ const tableKinds = [
   TableKind('xien2', 'xien', 'Xiên 2', 'vd 20.02x10, 20x02lo10'),
   TableKind('xien3', 'xien', 'Xiên 3', 'như xiên 2, 3 cặp số'),
   TableKind('xien4', 'xien', 'Xiên 4', 'như xiên 2, 4 cặp số'),
-  TableKind('truot4', 'truot', 'Trượt xiên 4', 'chọn ở ô Hạng mục, 4 cặp số'),
-  TableKind('truot8', 'truot', 'Trượt xiên 8', 'chọn ở ô Hạng mục, 8 cặp số'),
-  TableKind('truot10', 'truot', 'Trượt xiên 10', 'chọn ở ô Hạng mục, 10 cặp số'),
-  TableKind('tai_xiu', 'thantai', 'Tài / Xỉu', 'nhập "tai" hoặc "xiu" (chọn ở ô Hạng mục)'),
-  TableKind('chan_le', 'thantai', 'Chẵn / Lẻ', 'nhập "chan" hoặc "le" (chọn ở ô Hạng mục)'),
+  TableKind('truot4', 'truot', 'Trượt xiên 4', '4 cặp số'),
+  TableKind('truot8', 'truot', 'Trượt xiên 8', '8 cặp số'),
+  TableKind('truot10', 'truot', 'Trượt xiên 10', '10 cặp số'),
+  TableKind('tai_xiu', 'thantai', 'Tài / Xỉu', 'nhập "tai" hoặc "xiu"'),
+  TableKind('chan_le', 'thantai', 'Chẵn / Lẻ', 'nhập "chan" hoặc "le"'),
 ];
 final List<String> tableKindKeys = [for (final k in tableKinds) k.kind];
 bool isTableKind(Object? k) => k is String && tableKindKeys.contains(k);
