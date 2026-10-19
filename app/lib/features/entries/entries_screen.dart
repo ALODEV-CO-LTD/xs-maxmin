@@ -41,7 +41,6 @@ class _EntriesBody extends StatefulWidget {
 }
 
 class _EntriesBodyState extends State<_EntriesBody> {
-  final _search = TextEditingController();
   bool _selecting = false;
   final Set<String> _selected = {};
   String _copyMessage = '';
@@ -81,7 +80,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
   void dispose() {
     ChatPrefillHub.instance.removeListener(_takePrefill);
     _ctrl?.removeListener(_shareSelection);
-    _search.dispose();
     super.dispose();
   }
 
@@ -277,19 +275,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
     final f = c.filter;
     final types = c.betTypes;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      TextField(
-        controller: _search,
-        decoration: InputDecoration(
-          hintText: 'Tìm số, ghi chú, điểm',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: f.q.isEmpty ? null : IconButton(icon: const Icon(Icons.close), onPressed: () { _search.clear(); f.q = ''; c.touchFilter(); }),
-        ),
-        onChanged: (v) {
-          f.q = v;
-          c.touchFilter();
-        },
-      ),
-      const SizedBox(height: 6),
       Row(children: [
         Expanded(
           child: AppButton(label: c.listDate.isEmpty ? 'Mọi ngày' : viDate(c.listDate), variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(c)),
@@ -316,7 +301,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
           f.all = v;
           c.touchFilter();
         }),
-        if (f.active) AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, size: AppButtonSize.small, onPressed: () { _search.clear(); f.clear(); c.touchFilter(); }),
+        if (f.active) AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, size: AppButtonSize.small, onPressed: () { f.clear(); c.touchFilter(); }),
       ]),
     ]);
   }
