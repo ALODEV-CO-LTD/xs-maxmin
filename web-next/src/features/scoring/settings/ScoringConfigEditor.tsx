@@ -35,11 +35,8 @@ export default function ScoringConfigEditor({ scope = 'default', customer = null
   const isCustomer = scope === 'customer'
   const ctx = useMemo(() => ({ isCustomer, base: isCustomer ? accountRates : EMPTY, customerName: customer?.name ?? '' }), [isCustomer, accountRates, customer?.name])
   const ctxRef = useRef(ctx)
-  ctxRef.current = ctx
   const customerRef = useRef(customer)
-  customerRef.current = customer
 
-  const [region, setRegion] = useState('mb')
   const [st, setSt] = useState<St>(() => newState(ctx, {}, 'mb'))
   const [initial, setInitial] = useState('{}')
   // Values and ký hiệu are shown as text; only after "Sửa" can they be changed.
@@ -50,7 +47,13 @@ export default function ScoringConfigEditor({ scope = 'default', customer = null
   const [notice, setNotice] = useState('')
   const [addForm, setAddForm] = useState(emptyAddForm())
   const stRef = useRef(st)
-  stRef.current = st
+
+  // latest values for the async loaders (written after each render, before the effects below read them)
+  useEffect(() => {
+    ctxRef.current = ctx
+    customerRef.current = customer
+    stRef.current = st
+  })
 
   async function init() {
     const c = ctxRef.current
@@ -77,7 +80,7 @@ export default function ScoringConfigEditor({ scope = 'default', customer = null
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the settings on mount / when the customer changes
     void init()
-  }, [customer?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [customer?.id])
 
   // the account-wide map changed (customer scope: the fallback): rebuild the rows
   const firstRates = useRef(true)
@@ -89,7 +92,6 @@ export default function ScoringConfigEditor({ scope = 'default', customer = null
     // eslint-disable-next-line react-hooks/set-state-in-effect -- rows follow the fallback map
     if (!loading) setSt((s) => ({ ...s, rows: buildRows(ctx, s.work, s.region) }))
   }, [accountRates]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => setRegion(st.region), [st.region])
 
   const patchRow = (type: string, patch: Row) => setSt((s) => ({ ...s, rows: s.rows.map((r) => (r.type === type ? { ...r, ...patch } : r)) }))
   const groups = groupsOf(st.rows, editing)
@@ -171,7 +173,7 @@ export default function ScoringConfigEditor({ scope = 'default', customer = null
       <div className="sce-bar">
         <div className="sce-tabs" role="tablist" aria-label="Miền">
           {REGIONS.map((id) => (
-            <button key={id} type="button" role="tab" className={`sce-tab${region === id ? ' on' : ''}`} aria-selected={region === id} onClick={() => onSwitchRegion(id)}>
+            <button key={id} type="button" role="tab" className={`sce-tab${st.region === id ? ' on' : ''}`} aria-selected={st.region === id} onClick={() => onSwitchRegion(id)}>
               {REGION_NAMES[id as keyof typeof REGION_NAMES]}
               {regionHasOverride(ctx, st.work, id) && <span className="sce-dot" title="Có cấu hình riêng cho miền này" />}
             </button>

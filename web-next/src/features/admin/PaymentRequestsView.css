@@ -1,0 +1,161 @@
+
+.adm-pay .view-tabs {
+  margin-bottom: 16px;
+}
+
+.adm-pay .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.adm-pay .sum-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.adm-pay .sum-card {
+  padding: 14px 16px;
+}
+
+.adm-pay .sum-card.hot {
+  border-color: var(--primary);
+}
+
+.adm-pay .sum-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.adm-pay .sum-value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-pay .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.adm-pay .tab {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.adm-pay .tab:hover {
+  border-color: var(--primary);
+}
+
+.adm-pay .tab.active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.adm-pay .f-status {
+  flex: 0 0 170px;
+}
+
+.adm-pay .filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.adm-pay .f-input {
+  min-height: 42px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.adm-pay .f-q {
+  flex: 1 1 240px;
+}
+
+.adm-pay .f-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.adm-pay .ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.05em;
+}
+
+.adm-pay .reason {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.adm-pay .more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.adm-pay .r-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.adm-pay .r-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.adm-pay .r-chip {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.adm-pay .r-text {
+  width: 100%;
+  padding: 10px 12px;
+  resize: vertical;
+}
+

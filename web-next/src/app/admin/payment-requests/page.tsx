@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import PaymentRequestsView from '@/features/admin/PaymentRequestsView'
 
 export default function Page() {
-  return <ScreenStub vue="admin/PaymentRequestsView.vue" />
+  return <PaymentRequestsView />
 }
