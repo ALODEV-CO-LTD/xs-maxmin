@@ -31,8 +31,8 @@ if [[ $WANT == all || $WANT == app ]]; then
   run app-test app flutter test
 fi
 if [[ $WANT == all || $WANT == web ]]; then
-  run web-test frontend npm test
-  run web-build frontend npm run build
+  run web-test web-next npm test
+  run web-build web-next npm run build
 fi
 if [[ $WANT == all || $WANT == backend ]]; then
   run backend-test backend dart test

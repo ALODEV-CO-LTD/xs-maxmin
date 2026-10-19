@@ -1,5 +1,5 @@
 // Unit test of the E2EE primitives (run: node tools/e2e/e2ee.mjs). No server needed.
-import { decryptBytes, deriveSessionKey, encryptBytes, fingerprint, generateIdentity, newMessageId, packMessage, samePublicKey, unpackMessage } from '../../frontend/src/e2ee/crypto.js'
+import { decryptBytes, deriveSessionKey, encryptBytes, fingerprint, generateIdentity, newMessageId, packMessage, samePublicKey, unpackMessage } from '../../web-next/src/lib/e2ee/crypto.js'
 let pass = 0, fail = 0
 const ok = (c, n) => { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL ') + n) }
 

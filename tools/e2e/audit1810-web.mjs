@@ -1,5 +1,5 @@
 // Audit 18/10 - web checks (puppeteer-core). Needs: backend with XOSO_SEED_DEMO=1 XOSO_ADMIN_PASSWORD=Test-Admin-1,
-// frontend/dist served by serve.mjs. node audit1810-web.mjs <webPort> <backendPort> <sqlitePath> <puppeteerDir>
+// web-next/out served by serve.mjs. node audit1810-web.mjs <webPort> <backendPort> <sqlitePath> <puppeteerDir>
 import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
 const [webPort, bePort, dbPath, pupDir] = process.argv.slice(2)

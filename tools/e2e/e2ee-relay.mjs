@@ -1,6 +1,6 @@
 // End-to-end check of the encrypted relay against a running backend (default http://localhost:8080).
 // Needs two friends: node tools/e2e/e2ee-relay.mjs <userA> <passA> <secondA> <userB> <passB> <secondB>
-import { decryptBytes, deriveSessionKey, encryptBytes, generateIdentity, newMessageId, packMessage, unpackMessage } from '../../frontend/src/e2ee/crypto.js'
+import { decryptBytes, deriveSessionKey, encryptBytes, generateIdentity, newMessageId, packMessage, unpackMessage } from '../../web-next/src/lib/e2ee/crypto.js'
 const BASE = process.env.BASE || 'http://localhost:8080/api'
 const [uA, pA, sA, uB, pB, sB] = process.argv.slice(2)
 let pass = 0, fail = 0

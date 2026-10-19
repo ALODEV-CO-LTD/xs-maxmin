@@ -471,3 +471,13 @@ Trước đây Tổng quan cộng thẳng "điểm vào/ra" của mọi kiểu �
 ## Kiểm thử chat giữa hai thiết bị bằng mã thật (19/10/2026)
 
 `tools/test_chat_e2e.sh` (~1 phút): dựng một máy chủ THỬ cô lập (bản sao backend, DB mới, cổng 8597, không đụng dữ liệu thật), tạo hai tài khoản, kết bạn, rồi chạy `app/test_e2e/chat_two_devices_test.dart` với mã app thật: hai "thiết bị" (mỗi bên có kho khoá, kho tin nhắn và WebSocket riêng; Android và iOS dùng chung mã Dart nên không khác nhau về giao thức) gửi/nhận/xác nhận hai chiều, tin dài có dấu và emoji, bạn offline rồi "Gửi lại", và giới hạn "cùng một tài khoản trên hai máy" (máy thứ hai thay khoá, máy thứ nhất không đọc được tin mới).
+
+## Web chuyển từ Vue sang Next.js (19/10/2026)
+
+Web giờ là **Next.js 16** trong `web-next/` (App Router, React 19, TypeScript, xuất tĩnh ra `web-next/out`); thư mục Vue `frontend/` đã bỏ (xem lại bằng tag git `vue-frontend-final`). Backend Dart và app Flutter không đổi.
+- Chạy thử: `cd web-next && npm run dev` (chuyển `/api` sang `http://localhost:8080`, đổi bằng `API_PROXY`). Test: `npm test` (229 test, gồm toàn bộ logic thuần chép từ bản Vue). Build: `npm run build` (prebuild chép OCR vào `public/tesseract`, được git bỏ qua).
+- Kiểm thử trình duyệt: `tools/e2e/next-stack.sh start` (backend thử cô lập + web) rồi `tools/e2e/next-smoke.mjs` (mở từng route khách/admin, báo lỗi); `tools/e2e/qa-compare/` là bộ kịch bản đã dùng để so với bản Vue (cần dựng lại bản Vue từ tag nếu muốn chạy).
+- Địa chỉ có tham số thành truy vấn: `/friends?thread=<id>`, `/admin/messages?user=<id>`; nginx chuyển 302 cho đường dẫn cũ.
+- Deploy web: `deploy/deploy-web-next.sh` (gói `tar -czf web_dist.tar.gz -C web-next/out .` từ bản checkout sạch, đẩy vào `/root` của container 501). Script thay cả thư mục web, cập nhật nginx một lần (`try_files $uri $uri.html $uri/ /index.html`, `absolute_redirect off`, 302 đường dẫn cũ, cache dài cho `/_next/static/`), kiểm tra các route và tự quay lại nếu lỗi. `deploy/deploy-web.sh` (bản Vue) không dùng nữa.
+- Đã deploy lên https://xs.massagehomeriyadh.com ngày 19/10/2026; sao lưu để quay lại: `/opt/xs-maxmin/web.bak-20261019-113310` và `/root/xs-maxmin.conf.bak-20261019-113310` trong container 501.
+- CSP đang ở chế độ Report-Only; Next chèn script dòng (hydrate) nên nếu sau này bật CSP thật phải dùng nonce hoặc hash.
