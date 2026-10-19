@@ -1,5 +1,11 @@
-import ScreenStub from '@/components/ScreenStub'
+import { Suspense } from 'react'
+import CustomersScreen from '@/features/customers/CustomersScreen'
 
+// useSearchParams (?from=entries, ?config=default) needs a Suspense boundary in a static export.
 export default function Page() {
-  return <ScreenStub vue="CustomersView.vue" />
+  return (
+    <Suspense>
+      <CustomersScreen />
+    </Suspense>
+  )
 }
