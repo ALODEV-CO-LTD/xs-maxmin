@@ -1,5 +1,5 @@
-import ScreenStub from '@/components/ScreenStub'
+import StatsView from '@/features/admin/StatsView'
 
 export default function Page() {
-  return <ScreenStub vue="admin/StatsView.vue" />
+  return <StatsView />
 }

@@ -1,0 +1,79 @@
+
+.adm-chart .sc {
+  padding: 16px 16px 8px;
+  border-radius: 14px;
+}
+
+.adm-chart .sc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
+
+.adm-chart .sc-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.adm-chart .sc-total {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-chart .sw-bar {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.adm-chart .sw-line {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.adm-chart .sc-wrap {
+  position: relative;
+}
+
+.adm-chart svg {
+  display: block;
+  max-width: 100%;
+}
+
+.adm-chart .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.adm-chart .tick {
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-chart .tip {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--text-primary);
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+}
+
