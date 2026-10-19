@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
 import 'friends_controller.dart';
@@ -69,7 +71,12 @@ class _SheetState extends State<_Sheet> {
               trailing: _allowed == true
                   ? null
                   : AppButton(label: 'Bật', variant: AppButtonVariant.ghost, onPressed: () async {
-                        await c.requestNotificationPermission(force: true);
+                        final t0 = DateTime.now();
+                        final ok = await c.requestNotificationPermission(force: true);
+                        // iOS asks only once: when it answers "no" at once (no dialog was shown) the switch is in Cài đặt.
+                        if (!ok && Platform.isIOS && DateTime.now().difference(t0).inMilliseconds < 700) {
+                          await launchUrl(Uri.parse('app-settings:'));
+                        }
                         _refresh();
                       }),
             ),

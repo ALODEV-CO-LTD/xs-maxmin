@@ -173,19 +173,24 @@ const _callChannel = 'mamba_calls_incoming_v2';
 const _callChannelInApp = 'mamba_calls_incoming_inapp';
 const _missedChannel = 'mamba_calls_missed';
 
-/// flutter_local_notifications on Android.
+/// flutter_local_notifications on Android and iOS.
 class LocalNotifier implements AppNotifier {
   LocalNotifier([FlutterLocalNotificationsPlugin? plugin]) : _p = plugin ?? FlutterLocalNotificationsPlugin();
   final FlutterLocalNotificationsPlugin _p;
   bool _ready = false;
 
   AndroidFlutterLocalNotificationsPlugin? get _android => _p.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  IOSFlutterLocalNotificationsPlugin? get _ios => _p.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
 
   @override
   Future<void> init({required void Function(String? payload) onTap}) async {
     try {
       await _p.initialize(
-        settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        // iOS: nothing is asked at start-up; the permission dialog comes from the Bật button / the first visit to Bạn bè.
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
+        ),
         onDidReceiveNotificationResponse: (r) => onTap(r.payload),
       );
       final a = _android;
@@ -228,6 +233,8 @@ class LocalNotifier implements AppNotifier {
   @override
   Future<bool> requestPermission() async {
     try {
+      final ios = _ios;
+      if (ios != null) return await ios.requestPermissions(alert: true, badge: true, sound: true) ?? false;
       return await _android?.requestNotificationsPermission() ?? false;
     } catch (_) {
       return false;
@@ -237,6 +244,8 @@ class LocalNotifier implements AppNotifier {
   @override
   Future<bool> get allowed async {
     try {
+      final ios = _ios;
+      if (ios != null) return (await ios.checkPermissions())?.isEnabled ?? false;
       return await _android?.areNotificationsEnabled() ?? false;
     } catch (_) {
       return false;
@@ -293,7 +302,7 @@ class LocalNotifier implements AppNotifier {
   Future<void> show(NoticeContent content) async {
     if (!_ready) return;
     try {
-      await _p.show(id: content.id, title: content.title, body: content.body, notificationDetails: NotificationDetails(android: _details(content)), payload: content.payload);
+      await _p.show(id: content.id, title: content.title, body: content.body, notificationDetails: NotificationDetails(android: _details(content), iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true, presentBadge: false)), payload: content.payload);
     } catch (e) {
       debugPrint('notification failed: $e');
     }
