@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 // Nhập nhanh: ONE box for a pasted message or a picture of it (choose / drop / paste). A picture is read into the text
 // box on this device (tesseract.js), then both go through the same "Phân tích" preview. Nothing is saved until "Lưu".

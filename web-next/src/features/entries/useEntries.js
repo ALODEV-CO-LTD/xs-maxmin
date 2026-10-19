@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 // State + actions of the Nhập số screen (port of the script part of EntriesView.vue, new "points only" version).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
