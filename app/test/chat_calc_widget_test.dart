@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
+import 'package:mamba_app/core/format.dart';
 import 'package:mamba_app/core/auth_store.dart';
 import 'package:mamba_app/core/widgets/app_dropdown.dart';
 import 'package:mamba_app/core/lottery_stations.dart';
@@ -273,8 +274,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Lưu'));
       await tester.pumpAndSettle();
-      expect(saved, ['lo:20:10:2026-10-15:mn-dongnai', 'lo:30:5:2026-10-15:mn-dongnai']);
-      expect(went, [('An', '2026-10-15', 2)]);
+      final today = todayIso(); // the entry date is always the day of saving
+      expect(saved, ['lo:20:10:$today:mn-dongnai', 'lo:30:5:$today:mn-dongnai']);
+      expect(went, [('An', today, 2)]);
       expect(c.fromChat, isFalse); // chỉ chuyển một lần
       await tester.pumpWidget(const SizedBox());
       c.dispose();

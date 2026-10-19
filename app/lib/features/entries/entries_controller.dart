@@ -292,7 +292,6 @@ class EntriesController extends ChangeNotifier {
     if (_disposed) return;
     fromChat = true;
     if (p.customer.isNotEmpty) selectedName = p.customer;
-    if (p.date.isNotEmpty) entryDate = p.date;
     _forcedStation = p.station.isNotEmpty ? p.station : null;
     _applyDefaultStation();
     _boxPrefill = p.text;
@@ -396,7 +395,7 @@ class EntriesController extends ChangeNotifier {
   Map<String, dynamic> _payload(String type, String value, String score) => {
         'customerName': selectedName.trim(),
         'value': value.trim(),
-        'entryDate': entryDate,
+        'entryDate': todayIso(),
         'score': score.trim().isEmpty ? null : normalizeNumberText(score.trim()),
         'betType': type,
         'station': station,

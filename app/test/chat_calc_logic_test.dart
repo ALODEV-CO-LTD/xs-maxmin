@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
+import 'package:mamba_app/core/format.dart';
 import 'package:mamba_app/core/auth_store.dart';
 import 'package:mamba_app/features/calc/calc_screen.dart';
 import 'package:mamba_app/features/chat_calc/chat_decode_model.dart';
@@ -120,7 +121,7 @@ void main() {
     await init;
     await applying;
     expect(c.selectedName, 'An');
-    expect(c.entryDate, '2026-10-15');
+    expect(c.entryDate, todayIso()); // the entry date is always today; the chat's date is not used
     expect(c.station, 'mn-dongnai'); // không phải đài mặc định 'mt' của khách
     expect(c.fromChat, isTrue);
     expect(c.takeBoxPrefill(), '20lô10\n30lô5');

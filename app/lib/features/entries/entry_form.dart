@@ -34,13 +34,6 @@ class _EntryFormCardState extends State<EntryFormCard> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final cur = DateTime.tryParse(c.entryDate) ?? now;
-    final d = await showDatePicker(context: context, initialDate: cur, firstDate: DateTime(now.year - 5), lastDate: DateTime(now.year + 2));
-    if (d != null) c.setDate(isoOf(d));
-  }
-
   Future<void> _deleteAll() async {
     final list = c.customerEntries.where((e) => !e.pending).toList();
     if (list.isEmpty) return;
@@ -86,10 +79,8 @@ class _EntryFormCardState extends State<EntryFormCard> {
             const SizedBox(width: 8),
             Expanded(
               flex: 4,
-              child: InkWell(
-                onTap: _pickDate,
-                child: InputDecorator(decoration: const InputDecoration(labelText: 'Ngày', suffixIcon: Icon(Icons.event, size: 20)), child: Text(viDate(c.entryDate))),
-              ),
+              // Always the day the numbers are entered; it cannot be changed.
+              child: InputDecorator(decoration: const InputDecoration(labelText: 'Ngày'), child: Text(viDate(todayIso()))),
             ),
           ]),
           const SizedBox(height: 12),

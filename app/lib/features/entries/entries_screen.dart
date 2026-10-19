@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -20,7 +19,6 @@ import 'entry_model.dart';
 import '../calc/calc_sync.dart';
 import 'offline_store.dart';
 import '../../core/widgets/app_button.dart';
-import '../../core/widgets/app_dropdown.dart';
 
 /// Nhập số: pick a customer, add numbers (by hand, from a pasted message or from a photo), review the list.
 class EntriesScreen extends StatelessWidget {
@@ -43,10 +41,7 @@ class _EntriesBody extends StatefulWidget {
 class _EntriesBodyState extends State<_EntriesBody> {
   bool _selecting = false;
   final Set<String> _selected = {};
-  String _copyMessage = '';
   final Map<String, String> _rowErrors = {};
-  String _bulkError = '';
-  bool _bulkBusy = false;
 
   @override
   void initState() {
@@ -105,51 +100,11 @@ class _EntriesBodyState extends State<_EntriesBody> {
     });
   }
 
-  Future<void> _pickDate(EntriesController c) async {
-    final now = DateTime.now();
-    final cur = DateTime.tryParse(c.listDate) ?? now;
-    final d = await showDatePicker(context: context, initialDate: cur, firstDate: DateTime(now.year - 5), lastDate: DateTime(now.year + 2));
-    if (d != null) {
-      c.filter.date = isoOf(d);
-      c.filter.anyDate = false;
-      c.touchFilter();
-    }
-  }
-
-  Future<void> _copy(EntriesController c, List<Entry> shown) async {
-    if (shown.isEmpty) return;
-    try {
-      await Clipboard.setData(ClipboardData(text: entriesToText(shown, withCustomer: c.filter.all)));
-      setState(() => _copyMessage = 'Đã sao chép ${shown.length} số liệu');
-    } catch (_) {
-      setState(() => _copyMessage = 'Không sao chép được');
-    }
-  }
-
   Future<void> _delete(EntriesController c, Entry e, bool masked) async {
     final ok = await confirmDialog(context, title: 'Xoá số liệu', message: 'Xoá số liệu ${masked ? 'này' : '"${e.value}"'} (${e.customerName})? Không thể hoàn tác.', confirmText: 'Xoá', danger: true);
     if (!ok) return;
     final err = await c.deleteEntry(e);
     if (mounted) setState(() => _rowErrors[e.id] = err);
-  }
-
-  Future<void> _deleteSelected(EntriesController c) async {
-    final list = c.entries.where((e) => _selected.contains(e.id)).toList();
-    if (list.isEmpty) return;
-    final ok = await confirmDialog(context, title: 'Xoá số liệu đã chọn', message: 'Xoá ${list.length} số liệu đã chọn? Không thể hoàn tác.', confirmText: 'Xoá', danger: true);
-    if (!ok || !mounted) return;
-    setState(() {
-      _bulkBusy = true;
-      _bulkError = '';
-    });
-    final failed = await c.deleteMany(list);
-    if (!mounted) return;
-    setState(() {
-      _bulkBusy = false;
-      _selected.removeWhere((id) => !c.entries.any((e) => e.id == id));
-      if (failed > 0) _bulkError = '$failed số liệu không xoá được (đang chờ đồng bộ hoặc lỗi mạng), thử lại.';
-      if (_selected.isEmpty) _selecting = false;
-    });
   }
 
   @override
@@ -186,7 +141,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
             else if (shown.isEmpty)
               SliverPadding(
                 padding: const EdgeInsets.all(24),
-                sliver: SliverToBoxAdapter(child: Center(child: Text(c.followsForm && c.entries.any((e) => c.filter.all || e.customerName == c.selectedName) ? 'Chưa có số liệu ngày ${viDate(c.listDate)}${c.filter.all ? '' : ' (đài này)'}. Bấm biểu tượng ∞ để xem mọi ngày.' : c.filter.active ? 'Không có số liệu nào khớp bộ lọc.' : 'Khách hàng này chưa có số liệu nào.', style: TextStyle(color: context.mutedColor)))),
+                sliver: SliverToBoxAdapter(child: Center(child: Text(c.followsForm && c.entries.any((e) => c.filter.all || e.customerName == c.selectedName) ? 'Chưa có số liệu ngày ${viDate(c.listDate)}${c.filter.all ? '' : ' (đài này)'}.' : c.filter.active ? 'Không có số liệu nào khớp bộ lọc.' : 'Khách hàng này chưa có số liệu nào.', style: TextStyle(color: context.mutedColor)))),
               )
             else
               SliverPadding(
@@ -246,8 +201,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
       // list header
       Text('Danh sách số liệu${c.selectedName.isNotEmpty && !c.filter.all ? ': ${c.selectedName}' : ''}', style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 8),
-      _filterBar(context, c),
-      _copyBar(context, c, shown, masked),
       const SizedBox(height: 4),
     ]);
   }
@@ -269,75 +222,6 @@ class _EntriesBodyState extends State<_EntriesBody> {
     } on ApiError catch (e) {
       if (mounted) showSnack(context, e.message);
     }
-  }
-
-  Widget _filterBar(BuildContext context, EntriesController c) {
-    final f = c.filter;
-    final types = c.betTypes;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        Expanded(
-          child: AppButton(label: c.listDate.isEmpty ? 'Mọi ngày' : viDate(c.listDate), variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(c)),
-        ),
-        // Following the form: one tap to see every day; otherwise one tap to go back to the day being entered.
-        if (c.followsForm) IconButton(tooltip: 'Xem mọi ngày', icon: const Icon(Icons.all_inclusive, size: 18), onPressed: () { f.anyDate = true; f.date = ''; c.touchFilter(); })
-        else IconButton(tooltip: 'Theo ngày đang nhập', icon: const Icon(Icons.close, size: 18), onPressed: () { f.anyDate = false; f.date = ''; c.touchFilter(); }),
-        const SizedBox(width: 8),
-        Expanded(
-          child: AppDropdown<String>(
-            initialValue: f.type.isEmpty || !types.contains(f.type) ? '' : f.type,
-            isExpanded: true,
-            decoration: const InputDecoration(isDense: true),
-            items: [const DropdownMenuItem(value: '', child: Text('Mọi hạng mục')), for (final t in types) DropdownMenuItem(value: t, child: Text(betTypeLabel(t), overflow: TextOverflow.ellipsis))],
-            onChanged: (v) {
-              f.type = v ?? '';
-              c.touchFilter();
-            },
-          ),
-        ),
-      ]),
-      Row(children: [
-        _check('Tất cả khách hàng', f.all, (v) {
-          f.all = v;
-          c.touchFilter();
-        }),
-        if (f.active) AppButton(label: 'Xoá lọc', variant: AppButtonVariant.ghost, size: AppButtonSize.small, onPressed: () { f.clear(); c.touchFilter(); }),
-      ]),
-    ]);
-  }
-
-  /// A small checkbox with its label; two of them share one row.
-  Widget _check(String label, bool value, void Function(bool) onChanged) => Expanded(
-        child: InkWell(
-          onTap: () => onChanged(!value),
-          child: Row(children: [
-            Checkbox(value: value, visualDensity: VisualDensity.compact, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => onChanged(v ?? false)),
-            Flexible(child: Text(label, style: const TextStyle(fontSize: 13.5))),
-          ]),
-        ),
-      );
-
-  Widget _copyBar(BuildContext context, EntriesController c, List<Entry> shown, bool masked) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        AppButton(label: 'Sao chép ${masked ? '•••' : shown.length} số liệu', variant: AppButtonVariant.secondary, size: AppButtonSize.small, icon: Icons.copy, onPressed: shown.isEmpty || masked ? null : () => _copy(c, shown)),
-        AppButton(label: _selecting ? 'Thôi chọn' : 'Chọn để xoá', variant: AppButtonVariant.secondary, size: AppButtonSize.small, icon: _selecting ? Icons.close : Icons.checklist, onPressed: shown.isEmpty ? null : () => setState(() { _selecting = !_selecting; _selected.clear(); _bulkError = ''; })),
-      ]),
-      if (masked) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Đang ẩn số liệu: bấm Hiện số liệu để sao chép.', style: TextStyle(fontSize: 12.5, color: context.mutedColor))),
-      if (_copyMessage.isNotEmpty) Text(_copyMessage, style: const TextStyle(fontWeight: FontWeight.w700), semanticsLabel: _copyMessage),
-      if (_selecting)
-        Container(
-          margin: const EdgeInsets.only(top: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
-          child: Row(children: [
-            AppButton(label: 'Chọn tất cả', variant: AppButtonVariant.ghost, onPressed: () => setState(() { _selected..clear()..addAll(shown.map((e) => e.id)); })),
-            const Spacer(),
-            AppButton(label: 'Xoá ${_selected.length} dòng', variant: AppButtonVariant.danger, loading: _bulkBusy, onPressed: _selected.isEmpty || _bulkBusy ? null : () => _deleteSelected(c)),
-          ]),
-        ),
-      if (_bulkError.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: InfoBox(_bulkError)),
-    ]);
   }
 
   Widget _totalsCard(BuildContext context, EntriesController c, EntryTotals t) {
