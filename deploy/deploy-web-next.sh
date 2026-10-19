@@ -55,8 +55,12 @@ systemctl reload nginx || rollback
 
 # 3) checks through nginx (Host header of the site)
 H="Host: xs.massagehomeriyadh.com"
+sleep 2 # the graceful reload hands over to the new workers a moment after systemctl returns
 for path in /login /entries /scoring /account /admin/stats /friends; do
-  code=$(curl -s -o /dev/null -w "%{http_code}" -H "$H" http://127.0.0.1$path); echo "$path -> $code"
+  for try in 1 2 3 4 5; do
+    code=$(curl -s -o /dev/null -w "%{http_code}" -H "$H" http://127.0.0.1$path); [ "$code" = "200" ] && break; sleep 1
+  done
+  echo "$path -> $code"
   [ "$code" = "200" ] || rollback
 done
 curl -s -o /dev/null -w "/friends/abc -> %{http_code} %{redirect_url}\n" -H "$H" http://127.0.0.1/friends/abc
