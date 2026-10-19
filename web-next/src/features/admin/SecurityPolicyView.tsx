@@ -36,11 +36,11 @@ export default function SecurityPolicyView({ embedded = false }: { embedded?: bo
       .finally(() => setLoading(false))
   }, [])
 
-  const num = (k: NumKey, min: number, max: number, hint: string, label: string, extra = '') => (
+  const num = (k: NumKey, min: number, max: number, hint: string, label: string, extra = '', showDefault = true) => (
     <label>
       {label}
       <input value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value === '' ? '' : Number(e.target.value) })} type="number" min={min} max={max} />
-      <small>{hint} (mặc định {String(defaults[k])}){extra}</small>
+      <small>{hint}{showDefault ? ` (mặc định ${String(defaults[k])})` : ''}{extra}</small>
     </label>
   )
   const check = (k: BoolKey, text: string) => (
@@ -112,7 +112,7 @@ export default function SecurityPolicyView({ embedded = false }: { embedded?: bo
                 <h2>Phiên đăng nhập</h2>
                 <div className="grid">
                   {num('tokenDays', 1, 365, '1 đến 365', 'Thời hạn đăng nhập (ngày)', '. Chỉ áp dụng cho lần đăng nhập mới; phiên hiện có giữ hạn cũ.')}
-                  {num('autoLockMinutes', 0, 240, '0 là tắt', 'Tự khoá màn hình mặc định (phút)', '. Chỉ dùng cho người chưa tự chọn trong Tài khoản.')}
+                  {num('autoLockMinutes', 0, 240, '0 là tắt', 'Tự khoá màn hình mặc định (phút)', '. Chỉ dùng cho người chưa tự chọn trong Tài khoản.', false)}
                 </div>
               </section>
 
