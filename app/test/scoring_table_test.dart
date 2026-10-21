@@ -262,10 +262,10 @@ void main() {
       List pp(String k) => [r(k)['price'], r(k)['payout']];
       expect(pp('lo@mb'), [21600, 70000]);
       expect(pp('lo@mt'), [12600, 70000]);
-      expect(pp('lo3@mb'), [18400, 0]);
-      expect(pp('lo3@mn'), [11900, 0]);
-      expect(pp('lo4@mb'), [16000, 0]);
-      expect(pp('lo4@mn'), [11200, 0]);
+      expect(pp('lo3@mb'), [18400, 500000]); // payouts of lo3/lo4/xiên/trượt/tài-xỉu/chẵn-lẻ are DEMO placeholders
+      expect(pp('lo3@mn'), [11900, 500000]);
+      expect(pp('lo4@mb'), [16000, 5000000]);
+      expect(pp('lo4@mn'), [11200, 5000000]);
       expect(r('lo3@mn')['digits'], 3);
       expect(r('lo4@mn')['digits'], 4);
       expect(r('lo3@mn')['tiers'], hasLength(8));
@@ -275,9 +275,15 @@ void main() {
       expect(pp('duoi@mb'), [1000, 70000]);
       expect(pp('cang3@mn'), [12600, 500000]);
       expect(pp('cang4@mn'), [12600, 5000000]);
-      for (final k in ['xien2', 'xien3', 'xien4', 'truot4', 'truot8', 'truot10', 'tai_xiu', 'chan_le']) {
-        expect(pp('$k@mn'), [12600, 0], reason: k);
-        expect(pp('$k@mb'), [21600, 0], reason: k);
+      for (final k in ['xien2', 'xien3', 'xien4', 'truot4', 'truot8', 'truot10']) {
+        expect(r('$k@mn')['price'], 12600, reason: k);
+        expect(r('$k@mb')['price'], 21600, reason: k);
+        expect(r('$k@mn')['payout'], greaterThan(0), reason: k);
+        expect(r('$k@mb')['payout'], greaterThan(0), reason: k);
+      }
+      for (final k in ['tai_xiu', 'chan_le']) {
+        expect(pp('$k@mn'), [1000, 1900], reason: k);
+        expect(pp('$k@mb'), [1000, 1900], reason: k);
       }
       expect(r('truot8@mn')['tiers'], hasLength(8));
       expect(r('tai_xiu@mn')['tiers'], ['dacBiet']);

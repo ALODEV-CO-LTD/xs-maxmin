@@ -80,8 +80,8 @@ void main() {
     test('có kết quả', () {
       final r = _build(result: mn, rows: rows);
       expect(r.totals.stake, 255005);
-      expect(r.totals.won, 3500000);
-      expect(r.totals.profit, -3244995);
+      expect(r.totals.won, 4500000); // 3.500.000 + xiên 2 trúng 4 điểm × 250.000 (giá trúng tạm của demo)
+      expect(r.totals.profit, -4244995);
       expect(r.other.stakeMoney, 5);
       expect(r.other.kinds, ['de']);
       expect(reportText(r), '''BÁO CÁO KẾT QUẢ
@@ -99,13 +99,13 @@ Tổng số 3 càng: 2 điểm
 Trúng 0 điểm = 0đ (còn 2 điểm)
 Tổng số xiên 2: 8 điểm
 Đánh 8 điểm × 12.600 = 100.800đ
-Trúng 4 điểm = 0đ (còn 4 điểm)
+Trúng 4 điểm = 1.000.000đ (còn 4 điểm)
 Tổng số xiên 3: 0 điểm
 Kiểu đánh khác: đánh 5đ, trúng 0đ
 
 Tổng tiền khách đánh: 255.005đ
-Tổng tiền khách trúng: 3.500.000đ
-Tổng lợi nhuận: -3.244.995đ''');
+Tổng tiền khách trúng: 4.500.000đ
+Tổng lợi nhuận: -4.244.995đ''');
     });
 
     test('chưa có kết quả', () {

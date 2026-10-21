@@ -190,7 +190,7 @@ void main() {
       expect(m.dirty, isTrue);
       final map = m.resultMap();
       expect((map['xien2@mn'] as Map)['payout'], 1000000);
-      expect((map['xien2@mb'] as Map)['payout'], 0);
+      expect((map['xien2@mb'] as Map)['payout'], 430000); // the default of Bắc is untouched
       expect((map['xien2@mn'] as Map)['price'], 12600);
     });
 
@@ -425,6 +425,11 @@ void main() {
 
     test('xiên without a payout is flagged "chưa nhập"', () {
       final m = customerModel();
+      // the defaults all carry a (demo) payout, so nothing is flagged until a payout is emptied / zeroed
+      expect(m.notSet(row(m, 'xien2')), isFalse);
+      for (final k in ['xien2', 'lo3', 'tai_xiu']) {
+        row(m, k).payout = '0';
+      }
       expect(m.notSet(row(m, 'xien2')), isTrue);
       expect(m.notSet(row(m, 'lo')), isFalse);
       expect(m.notSet(row(m, 'lo3')), isTrue); // every standard row without a payout

@@ -152,7 +152,9 @@ final _keyPattern = RegExp(r'^[^@\s]+(@(mb|mt|mn))?$');
 
 /// Default "bảng cấu hình" of a new account: [price, payout] per kind and region. From the customer's doc
 /// (Nam/Trung bao lô 12.600 / 70.000, đầu và đuôi 1.000 / 70.000, 3 càng 12.600 / 500.000; Bắc bao lô 21.600).
-/// 4 càng and xiên are NOT given in the doc: 4 càng is a placeholder, xiên payout 0 = "chưa nhập" (the customer sets it).
+/// 4 càng, bao lô 3/4 số, xiên, trượt xiên, tài/xỉu and chẵn/lẻ are NOT given in the doc: their payouts are DEMO placeholders
+/// (xiên 2/3/4 ≈ 10/40/100 × the stake, trượt xiên ≈ the fair odds less the house edge, tài-xỉu / chẵn-lẻ 1.900 on 1.000);
+/// the customer sets the real ones. Keep in step with app/lib/core/scoring_config.dart and web-next/src/lib/scoringConfig.js.
 Map<String, dynamic> defaultTableRates() {
   const kinds = ['lo', 'lo3', 'lo4', 'dau', 'duoi', 'cang3', 'cang4', 'xien2', 'xien3', 'xien4', 'truot4', 'truot8', 'truot10', 'tai_xiu', 'chan_le'];
   final out = <String, dynamic>{};
@@ -160,8 +162,15 @@ Map<String, dynamic> defaultTableRates() {
     final mb = region == 'mb';
     final loPrice = mb ? 21600 : 12600;
     // Bao lô 3 / 4 số: the bao lô price scaled to the lô it covers (700đ a lô Nam/Trung, 800đ Bắc); a starting point only.
-    final price = <String, num>{'lo': loPrice, 'lo3': mb ? 18400 : 11900, 'lo4': mb ? 16000 : 11200, 'dau': 1000, 'duoi': 1000, 'cang3': 12600, 'cang4': 12600};
-    const payout = <String, num>{'lo': 70000, 'dau': 70000, 'duoi': 70000, 'cang3': 500000, 'cang4': 5000000};
+    final price = <String, num>{'lo': loPrice, 'lo3': mb ? 18400 : 11900, 'lo4': mb ? 16000 : 11200, 'dau': 1000, 'duoi': 1000, 'cang3': 12600, 'cang4': 12600, 'tai_xiu': 1000, 'chan_le': 1000};
+    final payout = <String, num>{
+      'lo': 70000, 'dau': 70000, 'duoi': 70000, 'cang3': 500000, 'cang4': 5000000,
+      // demo placeholders (see above)
+      'lo3': 500000, 'lo4': 5000000,
+      'xien2': mb ? 430000 : 250000, 'xien3': mb ? 2590000 : 1500000, 'xien4': mb ? 8640000 : 5000000,
+      'truot4': mb ? 225000 : 90000, 'truot8': mb ? 1350000 : 350000, 'truot10': mb ? 2800000 : 630000,
+      'tai_xiu': 1900, 'chan_le': 1900,
+    };
     for (final kind in kinds) {
       final tiers = ['lo', 'lo3', 'lo4'].contains(kind) || kind.startsWith('xien') || kind.startsWith('truot')
           ? List<String>.from(validTiers)

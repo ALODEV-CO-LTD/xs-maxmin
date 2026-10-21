@@ -26,9 +26,12 @@ test('khi đang sửa mọi nhóm đều hiện (kể cả nhóm trống "Kiểu
   assert.ok(M.groupsOf(st.rows, true).some((g) => g.id === 'other'))
 })
 test('giá trúng 0 (chưa nhập) bị đánh dấu đỏ, kiểu tự đặt thì không', () => {
-  const st = stateOf(def, DEFAULT_RATES)
+  // the defaults all carry a (demo) payout, so nothing is flagged until a payout is zeroed
+  assert.deepEqual(stateOf(def, DEFAULT_RATES).rows.filter((r) => M.notSet(r)).map((r) => r.type), [])
+  const zeroed = { ...DEFAULT_RATES, 'xien2@mb': { ...DEFAULT_RATES['xien2@mb'], payout: 0 }, 'xien2@mt': { ...DEFAULT_RATES['xien2@mt'], payout: 0 }, 'xien2@mn': { ...DEFAULT_RATES['xien2@mn'], payout: 0 } }
+  const st = stateOf(def, zeroed)
   const zero = st.rows.filter((r) => M.notSet(r)).map((r) => r.type)
-  assert.ok(zero.length > 0 && zero.every((t) => !(Number(DEFAULT_RATES[`${t}@mb`].payout) > 0)))
+  assert.ok(zero.length > 0 && zero.every((t) => !(Number(zeroed[`${t}@mb`].payout) > 0)))
   assert.equal(M.notSet({ ...rowOf(st, 'lo'), extra: true, payout: '0' }), false)
 })
 test('đổi giá một miền chỉ ghi khoá của miền đó; sửa lại bằng giá gốc thì bỏ khoá riêng', () => {
