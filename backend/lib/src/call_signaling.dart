@@ -66,8 +66,15 @@ class CallSignalingRegistry {
   // exactly those sockets (the handshake is the only time the token is checked otherwise).
   final Map<WebSocketChannel, String?> _sessionOf = {};
 
-  void register(String userId, WebSocketChannel channel, {String? sessionId}) {
+  // The E2EE device each connection belongs to (the app opens the socket with `?device=<id>`); null for older app versions.
+  final Map<WebSocketChannel, String?> _deviceOf = {};
+
+  /// The device id [channel] was opened with, or null.
+  String? deviceOf(WebSocketChannel channel) => _deviceOf[channel];
+
+  void register(String userId, WebSocketChannel channel, {String? sessionId, String? deviceId}) {
     _sessionOf[channel] = sessionId;
+    _deviceOf[channel] = deviceId;
     _sockets[userId] = channel;
     final list = _all.putIfAbsent(userId, () => []);
     if (!list.contains(channel)) list.add(channel);
@@ -78,6 +85,7 @@ class CallSignalingRegistry {
   /// already replaced it for the same user.
   void unregister(String userId, WebSocketChannel channel) {
     _sessionOf.remove(channel);
+    _deviceOf.remove(channel);
     if (_sockets[userId] == channel) {
       _sockets.remove(userId);
       // The newest connection is gone: fall back to the most recent one still open (if any), so calls keep working.
@@ -158,6 +166,27 @@ class CallSignalingRegistry {
     if (channel == null) return false;
     channel.sink.add(jsonEncode(message));
     return true;
+  }
+
+  /// Sends a JSON message to the open connections of [userId] that belong to [deviceId] (a device may have several, e.g. after a
+  /// reconnect). `legacy` is the device of older app versions, which open the socket without a device id. Returns true if at
+  /// least one accepted it.
+  bool sendToDevice(String userId, String deviceId, Map<String, dynamic> message) {
+    final list = _all[userId];
+    if (list == null || list.isEmpty) return false;
+    final data = jsonEncode(message);
+    var any = false;
+    for (final channel in List.of(list)) {
+      final d = _deviceOf[channel];
+      if (deviceId == 'legacy' ? d != null : d != deviceId) continue;
+      try {
+        channel.sink.add(data);
+        any = true;
+      } catch (_) {
+        unregister(userId, channel);
+      }
+    }
+    return any;
   }
 
   /// Sends a JSON message to EVERY open connection of [userId]. Returns true if at least one accepted it. A connection

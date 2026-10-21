@@ -5,6 +5,7 @@ import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/customer_codes.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/e2ee_devices.dart';
 import 'package:server/src/friend_requests.dart';
 import 'package:server/src/rate_gate.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -78,6 +79,8 @@ Response _list(RequestContext context, String userId) {
             'username': r['username'],
             'isAdmin': r['role'] == 'admin',
             'publicKey': _key(r['e2ee_public_key']),
+            // one key per device of the friend: the sender encrypts to each of them
+            'devices': friendDevices(db, r['id'] as String),
           },
       ],
     },

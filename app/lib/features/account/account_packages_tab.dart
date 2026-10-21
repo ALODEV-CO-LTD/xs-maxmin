@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
 import '../../core/format.dart';
+import '../../core/package_events.dart';
 import '../../core/theme.dart';
 import 'account_controller.dart';
 import 'account_widgets.dart';
@@ -13,7 +17,9 @@ String formatVnd(num n) => '${formatNumber(n)}đ';
 
 String paymentStatusLabel(String s) => const {'pending': 'Đang chờ duyệt', 'approved': 'Đã duyệt', 'rejected': 'Bị từ chối', 'cancelled': 'Đã huỷ'}[s] ?? s;
 
-/// VietQR image URL built exactly like PackagesView.vue; null while there is no pending request or no bank configured.
+/// VietQR image URL (amount, content and account name are in the link, so the banking app fills them in when it scans the code).
+/// It must be `api.vietqr.io`: `img.vietqr.io` now answers a `.png` request with an SVG, which Image.network cannot draw.
+/// Null while there is no pending request or no bank configured.
 String? vietQrUrl({required Map<String, dynamic>? bank, required Map<String, dynamic>? pending, required String username}) {
   final bin = bank?['bankBin'], acct = bank?['bankAccountNumber'];
   if (bank == null || pending == null || bin is! String || bin.isEmpty || acct is! String || acct.isEmpty) return null;
@@ -23,7 +29,7 @@ String? vietQrUrl({required Map<String, dynamic>? bank, required Map<String, dyn
     'addInfo': ref is String && ref.isNotEmpty ? ref : '$username ${pending['packageType']}'.trim(),
     'accountName': (bank['bankAccountHolder'] as String?) ?? '',
   };
-  return Uri.parse('https://img.vietqr.io/image/$bin-$acct-compact2.png').replace(queryParameters: params).toString();
+  return Uri.parse('https://api.vietqr.io/image/$bin-$acct-compact2.png').replace(queryParameters: params).toString();
 }
 
 /// Gói & Thanh toán: current package, catalog (purchase -> pending payment request), bank info + VietQR, history, cancel.
@@ -45,10 +51,25 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
   String? _purchasing;
   bool _cancelling = false;
 
+  Timer? _poll;
+
   @override
   void initState() {
     super.initState();
     _loadAll();
+    // Admin decided a request: read the package and the requests again (the live event from the server).
+    PackageEvents.instance.addListener(_loadAll);
+    // While a request waits for Admin, look again every 30 s: the live event is lost when the connection is down.
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && _pending != null && !_loading) _loadAll();
+    });
+  }
+
+  @override
+  void dispose() {
+    PackageEvents.instance.removeListener(_loadAll);
+    _poll?.cancel();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> _list(Object? v) => [for (final x in (v as List? ?? const [])) (x as Map).cast<String, dynamic>()];
@@ -88,6 +109,16 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
     return type;
   }
 
+  /// "XS" + 6 characters, like the server's own references (no 0/O/1/I). It is made here so the QR can carry it BEFORE any request
+  /// exists; the server keeps it when the request is sent.
+  static String newReference([Random? random]) {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final r = random ?? Random.secure();
+    return 'XS${List.generate(6, (_) => alphabet[r.nextInt(alphabet.length)]).join()}';
+  }
+
+  /// "Gia hạn" / "Đăng ký": the transfer QR comes first. Nothing reaches Admin until "Đã chuyển khoản" is pressed there; "Huỷ"
+  /// (or closing the sheet) leaves no request behind.
   Future<void> _purchase(Map<String, dynamic> plan) async {
     final api = context.read<ApiClient>();
     setState(() {
@@ -95,17 +126,108 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
       _success = null;
     });
     if (_pending != null) return;
-    if (!await confirmDialog(context, title: 'Đăng ký gói', message: 'Xác nhận đăng ký gói "${plan['label']}" (${formatVnd(plan['priceVnd'] as num)})? Bạn sẽ cần chuyển khoản và chờ admin duyệt.', confirmText: 'Đăng ký')) return;
+    final draft = <String, dynamic>{'packageType': plan['type'], 'amount': plan['priceVnd'], 'referenceCode': newReference()};
+    final transferred = await _showTransferSheet(draft, confirm: true);
+    if (transferred != true || !mounted) return;
     setState(() => _purchasing = plan['type'] as String?);
     try {
-      await api.post('/me/packages/purchase', {'packageType': plan['type']});
-      _success = 'Đã tạo yêu cầu. Vui lòng chuyển khoản theo thông tin bên dưới và chờ admin xác nhận.';
+      final res = await api.post('/me/packages/purchase', {'packageType': plan['type'], 'referenceCode': draft['referenceCode']});
+      final ref = res is Map ? res['referenceCode'] : null;
+      _success = ref is String && ref != draft['referenceCode']
+          ? 'Đã gửi yêu cầu cho admin. Lưu ý: nội dung chuyển khoản của yêu cầu này là $ref (khác mã trên QR vừa rồi), admin sẽ đối chiếu theo số tiền.'
+          : 'Đã gửi yêu cầu cho admin. Admin sẽ xác nhận khi nhận được tiền và bạn sẽ nhận được thông báo.';
       await _loadAll();
     } catch (e) {
-      if (mounted) setState(() => _error = e is ApiError ? e.message : 'Không tạo được yêu cầu mua gói');
+      if (mounted) setState(() => _error = e is ApiError ? e.message : 'Không gửi được yêu cầu mua gói');
     } finally {
       if (mounted) setState(() => _purchasing = null);
     }
+  }
+
+  /// The plan the customer has now (renewing it is "Gia hạn", any other one is "Đăng ký").
+  bool _isCurrent(Map<String, dynamic> plan) {
+    final t = widget.ctl.me?.packageType;
+    return t != null && t.isNotEmpty && t == plan['type'];
+  }
+
+  /// Bank, account, holder, amount, content and the VietQR (amount and content are filled in when it is scanned).
+  List<Widget> _transferRows(Map<String, dynamic>? pending, String? qr) {
+    final bank = _bank;
+    if (bank?['bankName'] == null) return [Text('Admin chưa cài thông tin tài khoản nhận tiền nên chưa có số tài khoản và mã QR. Hãy liên hệ Admin để được hướng dẫn chuyển khoản.', style: TextStyle(color: context.mutedColor))];
+    return [
+      InfoRow('Ngân hàng', value: '${bank!['bankName']}'),
+      InfoRow('Số tài khoản', child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Flexible(child: SelectableText('${bank['bankAccountNumber']}', style: const TextStyle(fontWeight: FontWeight.w600))),
+        IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${bank['bankAccountNumber']}')),
+      ])),
+      InfoRow('Chủ tài khoản', value: '${bank['bankAccountHolder'] ?? '-'}'),
+      if (pending != null) ...[
+        InfoRow('Số tiền', child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(formatVnd(pending['amount'] as num), style: const TextStyle(fontWeight: FontWeight.w600)),
+          IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${pending['amount']}', done: 'Đã sao chép số tiền')),
+        ])),
+        InfoRow('Nội dung', child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(child: SelectableText('${pending['referenceCode']}', style: const TextStyle(fontWeight: FontWeight.w600))),
+          IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản')),
+        ])),
+      ],
+      if (qr != null) ...[
+        const SizedBox(height: 12),
+        Center(
+          child: Container(
+            width: 232,
+            height: 232,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            child: Image.network(
+              qr,
+              fit: BoxFit.contain,
+              semanticLabel: 'Mã QR chuyển khoản',
+              loadingBuilder: (c, child, p) => p == null ? child : const Center(child: CircularProgressIndicator()),
+              errorBuilder: (c, e, s) => const Center(child: Text('Không tải được mã QR', style: TextStyle(color: Colors.black54), textAlign: TextAlign.center)),
+            ),
+          ),
+        ),
+        Padding(padding: const EdgeInsets.only(top: 8), child: Text('Quét mã bằng app ngân hàng: số tiền và nội dung chuyển khoản được điền sẵn.', textAlign: TextAlign.center, style: TextStyle(color: context.mutedColor, fontSize: 13))),
+      ],
+    ];
+  }
+
+  /// The transfer details of [pending] in a sheet. With [confirm] (right after "Gia hạn" / "Đăng ký", before any request exists) it
+  /// ends with "Huỷ" and "Đã chuyển khoản" and returns true only for the latter; otherwise it is just a view of a waiting request.
+  Future<bool?> _showTransferSheet(Map<String, dynamic> pending, {bool confirm = false}) {
+    final qr = vietQrUrl(bank: _bank, pending: pending, username: widget.ctl.me?.username ?? '');
+    final hasBank = _bank?['bankName'] != null;
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Chuyển khoản để kích hoạt gói', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            confirm
+                ? 'Gói "${_planLabel('${pending['packageType']}')}" · ${formatVnd(pending['amount'] as num)}. Chuyển khoản theo thông tin dưới đây, rồi bấm "Đã chuyển khoản" để gửi yêu cầu cho admin.'
+                : 'Gói "${_planLabel('${pending['packageType']}')}" · ${formatVnd(pending['amount'] as num)}. Sau khi chuyển khoản, admin sẽ xác nhận và bạn nhận được thông báo.',
+            style: TextStyle(color: context.mutedColor, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          ..._transferRows(pending, qr),
+          const SizedBox(height: 16),
+          if (confirm)
+            Row(children: [
+              Expanded(child: AppButton(label: 'Huỷ', variant: AppButtonVariant.secondary, onPressed: () => Navigator.pop(ctx, false))),
+              const SizedBox(width: 10),
+              Expanded(flex: 2, child: AppButton(label: 'Đã chuyển khoản', variant: AppButtonVariant.primary, onPressed: hasBank ? () => Navigator.pop(ctx, true) : null)),
+            ])
+          else
+            AppButton(label: 'Đóng', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(ctx)),
+        ]),
+      ),
+    );
   }
 
   Future<void> _cancel(Map<String, dynamic> r) async {
@@ -137,7 +259,6 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
     if (_loadError != null && _plans.isEmpty) return Column(children: [NoticeBox(_loadError!), AppButton(label: 'Thử lại', variant: AppButtonVariant.secondary, onPressed: _loadAll)]);
     final me = widget.ctl.me;
     final pending = _pending;
-    final qr = vietQrUrl(bank: _bank, pending: pending, username: me?.username ?? '');
     final ok = context.okColor, bad = context.badColor;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Align(alignment: Alignment.centerRight, child: AppButton(label: 'Làm mới', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: _loading ? null : _loadAll)),
@@ -154,10 +275,14 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
       if (pending != null)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: Row(children: [
-            Expanded(child: AppButton(label: 'Sao chép nội dung', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'))),
-            const SizedBox(width: 10),
-            Expanded(child: AppButton(label: 'Huỷ yêu cầu', variant: AppButtonVariant.secondary, onPressed: _cancelling ? null : () => _cancel(pending))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            AppButton(label: 'Xem thông tin chuyển khoản và mã QR', variant: AppButtonVariant.primary, icon: Icons.qr_code_2, onPressed: () => _showTransferSheet(pending)),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: AppButton(label: 'Sao chép nội dung', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'))),
+              const SizedBox(width: 10),
+              Expanded(child: AppButton(label: 'Huỷ yêu cầu', variant: AppButtonVariant.secondary, onPressed: _cancelling ? null : () => _cancel(pending))),
+            ]),
           ]),
         ),
       if (_error != null) NoticeBox(_error!),
@@ -173,51 +298,21 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${plan['label']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Row(children: [
+                      Flexible(child: Text('${plan['label']}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                      if (_isCurrent(plan)) Padding(padding: const EdgeInsets.only(left: 8), child: StatusChip('Đang dùng', color: ok, small: true)),
+                    ]),
                     Text(formatVnd(plan['priceVnd'] as num), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                     Text('${plan['durationDays']} ngày', style: TextStyle(color: context.mutedColor, fontSize: 13)),
                   ]),
                 ),
-                AppButton(label: _purchasing == plan['type'] ? 'Đang xử lý...' : 'Đăng ký', variant: AppButtonVariant.primary, onPressed: pending != null || _purchasing != null ? null : () => _purchase(plan)),
+                AppButton(label: _purchasing == plan['type'] ? 'Đang xử lý...' : (_isCurrent(plan) ? 'Gia hạn' : 'Đăng ký'), variant: AppButtonVariant.primary, onPressed: pending != null || _purchasing != null ? null : () => _purchase(plan)),
               ]),
             ),
           ),
         ),
-      const SizedBox(height: 4),
-      SectionCard(title: 'Thông tin chuyển khoản', children: [
-        if (_bank?['bankName'] != null) ...[
-          InfoRow('Ngân hàng', value: '${_bank!['bankName']}'),
-          InfoRow('Số tài khoản', child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Flexible(child: SelectableText('${_bank!['bankAccountNumber']}', style: const TextStyle(fontWeight: FontWeight.w600))),
-            IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${_bank!['bankAccountNumber']}')),
-          ])),
-          InfoRow('Chủ tài khoản', value: '${_bank!['bankAccountHolder'] ?? '-'}'),
-          if (pending != null) ...[
-            InfoRow('Số tiền', value: formatVnd(pending['amount'] as num)),
-            InfoRow('Nội dung', value: '${pending['referenceCode']}'),
-          ],
-          if (qr != null) ...[
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 232,
-                height: 232,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                child: Image.network(
-                  qr,
-                  fit: BoxFit.contain,
-                  semanticLabel: 'Mã QR chuyển khoản',
-                  loadingBuilder: (c, child, p) => p == null ? child : const Center(child: CircularProgressIndicator()),
-                  errorBuilder: (c, e, s) => const Center(child: Text('Không tải được mã QR', style: TextStyle(color: Colors.black54), textAlign: TextAlign.center)),
-                ),
-              ),
-            ),
-            Padding(padding: const EdgeInsets.only(top: 8), child: Text('Quét mã bằng app ngân hàng để tự động điền số tiền và nội dung chuyển khoản.', textAlign: TextAlign.center, style: TextStyle(color: context.mutedColor, fontSize: 13))),
-          ],
-        ] else
-          Text('Chưa cấu hình thông tin thanh toán.', style: TextStyle(color: context.mutedColor)),
-      ]),
+      // (no standing "Thông tin chuyển khoản" card: the transfer details open in the sheet - after Đăng ký / Gia hạn, or with
+      // "Xem thông tin chuyển khoản và mã QR" while a request waits)
       const Padding(padding: EdgeInsets.fromLTRB(0, 16, 0, 6), child: Text('Lịch sử thanh toán', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
       if (_requests.isEmpty) Card(child: Padding(padding: const EdgeInsets.all(14), child: Text('Chưa có yêu cầu nào.', style: TextStyle(color: context.mutedColor)))),
       for (final r in _requests)

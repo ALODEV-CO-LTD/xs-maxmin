@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -43,15 +44,7 @@ class OutgoingImage {
 /// the signalling WebSocket to a friend who is ONLINE (the server stores nothing; an offline friend means "not
 /// sent") and kept only in the local store.
 class ChatService extends ChangeNotifier {
-  ChatService({
-    required this.api,
-    required this.userId,
-    required this.store,
-    required this.vault,
-    required this.socket,
-    this.ackWait = const Duration(seconds: 15),
-    this.onIncoming,
-  });
+  ChatService({required this.api, required this.userId, required this.store, required this.vault, required this.socket, this.ackWait = const Duration(seconds: 15), this.onIncoming});
 
   final ApiClient api;
   final String userId;
@@ -68,7 +61,15 @@ class ChatService extends ChangeNotifier {
   String myFingerprint = '';
   int tick = 0; // bumps whenever stored messages / statuses change
   final Map<String, PeerInfo> peerInfo = {};
+
+  /// The newest key of each friend (is there a key at all? and what the older single-key code reads).
   final Map<String, Map<String, dynamic>> friendKeys = {};
+
+  /// Every device of each friend that can read our messages: a message is encrypted once for each of them.
+  final Map<String, List<DeviceKey>> friendDevices = {};
+
+  /// This install's device id (random, kept in the secure vault next to the private key); null until [prepareDevice] ran.
+  String? myDeviceId;
   final Map<String, int> unread = {};
 
   /// Group chats this device knows (the server stores none): group id -> group.
@@ -85,13 +86,30 @@ class ChatService extends ChangeNotifier {
 
   E2eeIdentity? _identity;
   bool _disposed = false;
-  final Map<String, ({Map<String, dynamic> jwk, Uint8List key})> _sessions = {};
+  final Map<String, ({Map<String, dynamic> jwk, Uint8List key})> _sessions = {}; // 'friend|device' -> session key
   final Map<String, Timer> _ackTimers = {};
   final PartAssembler _assembler = PartAssembler();
   final Map<String, DateTime> _lastShot = {};
   Future<void> _inbox = Future.value(); // incoming frames are handled one at a time, in order
 
   String get _vaultKey => 'mamba_e2ee_identity_$userId';
+  String get _deviceVaultKey => 'mamba_e2ee_device_$userId';
+
+  /// Reads (or creates) this install's device id. The socket needs it BEFORE it connects, so the relay knows which device a
+  /// connection is; `init` calls it too. When the vault cannot be read (phone locked) the id stays null and `init` reports it.
+  Future<void> prepareDevice() async {
+    if (myDeviceId != null) return;
+    try {
+      var d = await vault.read(_deviceVaultKey);
+      if (d == null || !RegExp(r'^[A-Za-z0-9_-]{8,64}$').hasMatch(d)) {
+        d = newMessageId();
+        await vault.write(_deviceVaultKey, d);
+      }
+      myDeviceId = d;
+    } catch (_) {
+      /* try again in init */
+    }
+  }
 
   void _bump() {
     tick++;
@@ -120,9 +138,23 @@ class ChatService extends ChangeNotifier {
       }
       _identity = id;
       myFingerprint = await fingerprint(id.publicJwk);
-      final remote = (await api.get('/me/e2ee-key') as Map)['publicKey'];
-      if (!samePublicKey(id.publicJwk, remote is Map<String, dynamic> ? remote : null)) {
-        await api.put('/me/e2ee-key', {'publicKey': id.publicJwk});
+      // One key per DEVICE: this install registers its own, so another device of the same account never replaces it.
+      await prepareDevice();
+      var registered = false;
+      final dev = myDeviceId;
+      if (dev != null) {
+        try {
+          await api.put('/me/e2ee-devices/$dev', {'publicKey': id.publicJwk});
+          registered = true;
+        } on ApiError catch (e) {
+          if (e.status != 404 && e.status != 405) rethrow; // an older server only knows one key per account
+        }
+      }
+      if (!registered) {
+        final remote = (await api.get('/me/e2ee-key') as Map)['publicKey'];
+        if (!samePublicKey(id.publicJwk, remote is Map<String, dynamic> ? remote : null)) {
+          await api.put('/me/e2ee-key', {'publicKey': id.publicJwk});
+        }
       }
       await _restoreUnread();
       await restorePrefs();
@@ -146,60 +178,143 @@ class ChatService extends ChangeNotifier {
   }
 
   /// Remembers each friend's public key and flags one that changed since we last saw it.
-  Future<void> rememberFriends(List<Map<String, dynamic>> friends) async {
+  Future<void> rememberFriends(List<Map<String, dynamic>> friends) => _keyStep(() => _rememberFriends(friends));
+
+  // Remembering keys and accepting a changed key run one at a time: a refresh of the friend list that started before "Đã hiểu"
+  // must not finish after it and flag the key again from what it read earlier.
+  Future<void> _keyLock = Future.value();
+  Future<void> _keyStep(Future<void> Function() fn) {
+    final next = _keyLock.then((_) => fn());
+    _keyLock = next.catchError((_) {});
+    return next;
+  }
+
+  /// The devices a friend row lists; an older server (or one without devices yet) only has the single `publicKey`.
+  List<DeviceKey> _devicesOfRow(Map<String, dynamic> f) {
+    final out = <DeviceKey>[];
+    final list = f['devices'];
+    if (list is List) {
+      for (final d in list) {
+        if (d is! Map) continue;
+        final id = d['id'];
+        final raw = d['publicKey'];
+        if (id is! String || raw is! Map || !isValidPublicJwk(raw)) continue;
+        out.add(DeviceKey(id, pickPublic(Map<String, dynamic>.from(raw))));
+      }
+    }
+    if (out.isEmpty) {
+      final raw = f['publicKey'];
+      if (raw is Map && isValidPublicJwk(raw)) out.add(DeviceKey(legacyDeviceId, pickPublic(Map<String, dynamic>.from(raw))));
+    }
+    return out;
+  }
+
+  Future<void> _rememberFriends(List<Map<String, dynamic>> friends) async {
     for (final f in friends) {
       final id = f['id'] as String;
-      final raw = f['publicKey'];
-      if (raw is! Map || !isValidPublicJwk(raw)) {
+      final devices = _devicesOfRow(f);
+      if (devices.isEmpty) {
         friendKeys.remove(id);
+        friendDevices.remove(id);
         continue;
       }
-      final jwk = pickPublic(Map<String, dynamic>.from(raw));
-      friendKeys[id] = jwk;
-      final known = await store.peer(id);
-      final fp = await fingerprint(jwk);
-      if (known == null) {
-        await store.putPeer(PeerRecord(id: id, jwk: jwk, fingerprint: fp, changed: false));
-        peerInfo[id] = PeerInfo(fingerprint: fp, changed: false);
-      } else if (!samePublicKey(known.jwk, jwk)) {
-        await store.putPeer(PeerRecord(id: id, jwk: jwk, fingerprint: fp, changed: true));
-        _sessions.remove(id);
-        peerInfo[id] = PeerInfo(fingerprint: fp, changed: true);
-      } else {
-        peerInfo[id] = PeerInfo(fingerprint: fp, changed: known.changed);
+      friendDevices[id] = devices;
+      friendKeys[id] = devices.first.jwk;
+      // The warning is about a key that CHANGED for a device we already knew; a friend adding another device is not a change.
+      var changed = false;
+      var firstFp = '';
+      for (final (i, d) in devices.indexed) {
+        final fp = await fingerprint(d.jwk);
+        if (i == 0) firstFp = fp;
+        final pk = peerKeyOf(id, d.id);
+        final known = await store.peer(pk);
+        if (known == null) {
+          await store.putPeer(PeerRecord(id: pk, jwk: d.jwk, fingerprint: fp, changed: false));
+        } else if (!samePublicKey(known.jwk, d.jwk)) {
+          await store.putPeer(PeerRecord(id: pk, jwk: d.jwk, fingerprint: fp, changed: true));
+          _sessions.remove('$id|${d.id}');
+          changed = true;
+        } else if (known.changed) {
+          changed = true;
+        }
       }
+      peerInfo[id] = PeerInfo(fingerprint: firstFp, changed: changed, devices: devices.length);
     }
     if (!_disposed) notifyListeners();
   }
 
   /// The user saw the "key changed" warning for this friend: trust the key the server shows NOW. The stored key is replaced too,
   /// otherwise the next refresh of the friend list still sees "different from the stored one" and shows the warning again.
-  Future<void> acceptKeyChange(String friendId) async {
-    final current = friendKeys[friendId];
-    final known = await store.peer(friendId);
-    if (current != null) {
-      final fp = await fingerprint(current);
-      await store.putPeer(PeerRecord(id: friendId, jwk: current, fingerprint: fp, changed: false));
-      peerInfo[friendId] = PeerInfo(fingerprint: fp, changed: false);
-      _sessions.remove(friendId);
+  Future<void> acceptKeyChange(String friendId) => _keyStep(() => _acceptKeyChange(friendId));
+
+  Future<void> _acceptKeyChange(String friendId) async {
+    final devices = friendDevices[friendId];
+    if (devices != null && devices.isNotEmpty) {
+      for (final d in devices) {
+        await store.putPeer(PeerRecord(id: peerKeyOf(friendId, d.id), jwk: d.jwk, fingerprint: await fingerprint(d.jwk), changed: false));
+        _sessions.remove('$friendId|${d.id}');
+      }
+      peerInfo[friendId] = PeerInfo(fingerprint: await fingerprint(devices.first.jwk), changed: false, devices: devices.length);
     } else {
+      final known = await store.peer(friendId);
       if (known != null) await store.putPeer(PeerRecord(id: known.id, jwk: known.jwk, fingerprint: known.fingerprint, changed: false));
       final info = peerInfo[friendId];
-      if (info != null) peerInfo[friendId] = PeerInfo(fingerprint: info.fingerprint, changed: false);
+      if (info != null) peerInfo[friendId] = PeerInfo(fingerprint: info.fingerprint, changed: false, devices: info.devices);
     }
     if (!_disposed) notifyListeners();
   }
 
-  Future<Uint8List?> _session(String friendId) async {
-    final jwk = friendKeys[friendId];
+  Future<Uint8List?> _sessionFor(String friendId, DeviceKey device) async {
     final id = _identity;
-    if (jwk == null || id == null) return null;
-    final cached = _sessions[friendId];
-    if (cached != null && samePublicKey(cached.jwk, jwk)) return cached.key;
-    final key = await deriveSessionKey(id, jwk, userId, friendId);
-    _sessions[friendId] = (jwk: jwk, key: key);
+    if (id == null) return null;
+    final slot = '$friendId|${device.id}';
+    final cached = _sessions[slot];
+    if (cached != null && samePublicKey(cached.jwk, device.jwk)) return cached.key;
+    final key = await deriveSessionKey(id, device.jwk, userId, friendId);
+    _sessions[slot] = (jwk: device.jwk, key: key);
     return key;
   }
+
+  /// The session key with the friend's newest device (null = no key at all: not a friend, or no 2-end encryption yet).
+  Future<Uint8List?> _session(String friendId) async {
+    final d = friendDevices[friendId]?.firstOrNull;
+    return d == null ? null : _sessionFor(friendId, d);
+  }
+
+  /// Encrypts [plain] once for EVERY device of [to] and relays each copy to that device only. Returns for how many devices a copy
+  /// was handed to the socket. [strict]: a message too big for the relay throws instead of skipping that device.
+  Future<int> _relayTo(String to, String id, Uint8List plain, int ts, {bool strict = false}) async {
+    var n = 0;
+    for (final d in friendDevices[to] ?? const <DeviceKey>[]) {
+      final key = await _sessionFor(to, d);
+      if (key == null) continue;
+      final env = await encryptBytes(key, plain, from: userId, to: to, id: id);
+      final slices = splitCiphertext(env.ct);
+      if (slices.length > maxParts) {
+        if (strict) throw StateError('too big');
+        continue;
+      }
+      for (var i = 0; i < slices.length; i++) {
+        socket.send({'type': 'e2ee-msg', 'to': to, 'toDevice': d.id, 'id': id, 'iv': env.iv, 'ct': slices[i], 'part': i, 'parts': slices.length, 'ts': ts});
+      }
+      n++;
+    }
+    return n;
+  }
+
+  /// Devices that were counted for message [id] but never got a copy (no key, too big) will not answer: stop waiting for them.
+  void _settleFanOut(String id, int skipped) {
+    final left = _fanOut[id];
+    if (left == null || skipped <= 0) return;
+    if (left - skipped <= 0) {
+      _fanOut.remove(id);
+    } else {
+      _fanOut[id] = left - skipped;
+    }
+  }
+
+  /// Confirms receipt to the sender's device that sent [frame].
+  void _ack(E2eeFrame frame) => socket.send({'type': 'e2ee-ack', 'to': frame.from, 'toDevice': ?frame.fromDevice, 'id': frame.id});
 
   Future<List<ChatMessage>> messages(String friendId) async {
     await applyRetention(friendId); // messages that expired while the screen stayed open
@@ -251,22 +366,23 @@ class ChatService extends ChangeNotifier {
       var bytes = fileBytes;
       final a = att ?? msg.att;
       if (a != null && bytes == null && a.path != null) bytes = await store.readFile(a.path!);
-      final plain = packMessage(
-        text: msg.text,
-        ts: msg.createdAt,
-        att: a == null ? null : {'name': a.name, 'type': a.type, 'size': a.size},
-        kind: msg.sys == SysKind.screenshotSent ? 'screenshot' : null,
-        file: bytes,
-      );
-      final env = await encryptBytes(key, plain, from: userId, to: msg.peerId, id: msg.id);
-      final slices = splitCiphertext(env.ct);
-      if (slices.length > maxParts) return await fail('invalid');
-      for (var i = 0; i < slices.length; i++) {
-        socket.send({'type': 'e2ee-msg', 'to': msg.peerId, 'id': msg.id, 'iv': env.iv, 'ct': slices[i], 'part': i, 'parts': slices.length, 'ts': msg.createdAt});
+      final plain = packMessage(text: msg.text, ts: msg.createdAt, att: a == null ? null : {'name': a.name, 'type': a.type, 'size': a.size}, kind: msg.sys == SysKind.screenshotSent ? 'screenshot' : null, file: bytes);
+      // Several devices: it only failed when NONE of them can get it (see the `e2ee-undelivered` handling). The count is set BEFORE
+      // the frames go out, so an early answer is never taken for the last one.
+      final total = friendDevices[msg.peerId]?.length ?? 0;
+      if (total > 1) _fanOut[msg.id] = total;
+      final devices = await _relayTo(msg.peerId, msg.id, plain, msg.createdAt, strict: true);
+      if (devices == 0) {
+        _fanOut.remove(msg.id);
+        return await fail('no-key');
       }
+      if (total > 1) _settleFanOut(msg.id, total - devices);
       await _setStatus(msg.id, MsgStatus.sent);
       _ackTimers[msg.id]?.cancel();
-      _ackTimers[msg.id] = Timer(ackWait, () => _setStatus(msg.id, MsgStatus.failed, 'timeout'));
+      _ackTimers[msg.id] = Timer(ackWait, () {
+        _fanOut.remove(msg.id);
+        _setStatus(msg.id, MsgStatus.failed, 'timeout');
+      });
     } catch (_) {
       await fail('invalid');
     }
@@ -289,18 +405,7 @@ class ChatService extends ChangeNotifier {
     }
     // A late timeout must not overwrite a delivery that already happened.
     if (m.status == MsgStatus.delivered && status == MsgStatus.failed) return;
-    await store.putMessage(ChatMessage(
-      id: m.id,
-      peerId: m.peerId,
-      mine: m.mine,
-      text: m.text,
-      createdAt: m.createdAt,
-      status: status,
-      att: m.att,
-      sys: m.sys,
-      reason: status == MsgStatus.failed ? reason : null,
-      fromId: m.fromId,
-    ));
+    await store.putMessage(ChatMessage(id: m.id, peerId: m.peerId, mine: m.mine, text: m.text, createdAt: m.createdAt, status: status, att: m.att, sys: m.sys, reason: status == MsgStatus.failed ? reason : null, fromId: m.fromId));
     _bump();
   }
 
@@ -345,11 +450,24 @@ class ChatService extends ChangeNotifier {
       final seen = await store.message(frame.id);
       if (seen != null) {
         // duplicate: shown once, but the sender may have missed our ack (lost on the way), so confirm again
-        if (!seen.mine) socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+        if (!seen.mine) _ack(frame);
         return;
       }
-      if (!friendKeys.containsKey(frame.from)) await loadFriendKeys(); // new friend / new device
-      var key = await _session(frame.from);
+      if (!friendKeys.containsKey(frame.from)) await loadFriendKeys(); // new friend
+      // The key of the device that sent it (the relay names it); a sender on an older app has only the single `legacy` key.
+      Future<Uint8List?> keyOfSender() async {
+        final list = friendDevices[frame.from];
+        if (list == null || list.isEmpty) return null;
+        final want = frame.fromDevice ?? legacyDeviceId;
+        final d = list.where((x) => x.id == want).firstOrNull ?? (frame.fromDevice == null ? list.first : null);
+        return d == null ? null : _sessionFor(frame.from, d);
+      }
+
+      var key = await keyOfSender();
+      if (key == null && frame.fromDevice != null) {
+        await loadFriendKeys(); // a device that registered a moment ago
+        key = await keyOfSender();
+      }
       if (key == null) return;
       final env = Envelope(frame.iv, frame.ct);
       Uint8List plain;
@@ -357,7 +475,7 @@ class ChatService extends ChangeNotifier {
         plain = await decryptBytes(key, env, from: frame.from, to: userId, id: frame.id);
       } catch (_) {
         await loadFriendKeys(); // their key may have changed; retry once with a fresh one
-        key = await _session(frame.from);
+        key = await keyOfSender();
         if (key == null) return;
         plain = await decryptBytes(key, env, from: frame.from, to: userId, id: frame.id);
       }
@@ -371,7 +489,7 @@ class ChatService extends ChangeNotifier {
       }
       if (m.kind == 'screenshot') {
         await store.putMessage(ChatMessage(id: frame.id, peerId: frame.from, mine: false, text: '', createdAt: createdAt, status: MsgStatus.delivered, sys: SysKind.screenshot));
-        socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+        _ack(frame);
         _bump();
         await _bumpUnread(frame.from);
         onIncoming?.call(frame.from, frame.fromName, 'đã chụp màn hình cuộc trò chuyện với bạn');
@@ -379,7 +497,7 @@ class ChatService extends ChangeNotifier {
       }
       final att = await _incomingAttachment(m, frame.id);
       await store.putMessage(ChatMessage(id: frame.id, peerId: frame.from, mine: false, text: m.text, att: att, createdAt: createdAt, status: MsgStatus.delivered));
-      socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+      _ack(frame);
       _bump();
       await _bumpUnread(frame.from);
       onIncoming?.call(frame.from, frame.fromName, m.text.isNotEmpty ? m.text : 'Đã gửi một tệp đính kèm');
@@ -394,12 +512,7 @@ class ChatService extends ChangeNotifier {
     final aType = a?['type'];
     if (a != null && m.file.isNotEmpty && aType is String && allowedImageTypes.contains(aType) && sniffImageType(m.file) != null) {
       final name = (a['name'] ?? 'tep-dinh-kem').toString();
-      return ChatAttachment(
-        name: name.length > 200 ? name.substring(0, 200) : name,
-        type: aType,
-        size: m.file.length,
-        path: await store.writeFile(messageId, Uint8List.fromList(m.file), imageExt(aType)),
-      );
+      return ChatAttachment(name: name.length > 200 ? name.substring(0, 200) : name, type: aType, size: m.file.length, path: await store.writeFile(messageId, Uint8List.fromList(m.file), imageExt(aType)));
     }
     return null;
   }
@@ -428,7 +541,11 @@ class ChatService extends ChangeNotifier {
     final ids = {for (final o in others) o.id}..remove(userId);
     if (ids.length < 2) throw Exception('Chọn ít nhất 2 bạn bè để tạo nhóm.');
     if (ids.length > 49) throw Exception('Nhóm tối đa 50 người.');
-    final members = [GroupMember(userId, myName.isEmpty ? 'Thành viên' : myName), for (final o in others) if (ids.remove(o.id)) o];
+    final members = [
+      GroupMember(userId, myName.isEmpty ? 'Thành viên' : myName),
+      for (final o in others)
+        if (ids.remove(o.id)) o,
+    ];
     final g = ChatGroup(id: '$groupIdPrefix${newMessageId()}', name: n.length > 60 ? n.substring(0, 60) : n, members: members, creatorId: userId, updatedAt: DateTime.now().millisecondsSinceEpoch);
     await _saveGroup(g);
     _bump();
@@ -453,7 +570,10 @@ class ChatService extends ChangeNotifier {
     final g = groups[groupId];
     if (g == null || g.creatorId != userId) return;
     final have = {for (final m in g.members) m.id};
-    final fresh = [for (final a in added) if (have.add(a.id)) a];
+    final fresh = [
+      for (final a in added)
+        if (have.add(a.id)) a,
+    ];
     if (fresh.isEmpty) return;
     if (g.members.length + fresh.length > 50) throw Exception('Nhóm tối đa 50 người.');
     final next = g.copyWith(members: [...g.members, ...fresh], updatedAt: DateTime.now().millisecondsSinceEpoch);
@@ -468,18 +588,20 @@ class ChatService extends ChangeNotifier {
     if (g == null || g.creatorId != userId || memberId == userId) return;
     final gone = g.members.where((m) => m.id == memberId).firstOrNull;
     if (gone == null) return;
-    final next = g.copyWith(members: [for (final m in g.members) if (m.id != memberId) m], updatedAt: DateTime.now().millisecondsSinceEpoch);
+    final next = g.copyWith(
+      members: [
+        for (final m in g.members)
+          if (m.id != memberId) m,
+      ],
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
     if (next.members.length < 2) throw Exception('Nhóm cần ít nhất 2 người.');
     await _saveGroup(next);
     _bump();
     // the removed member is told with the group as it was (so it still lists them) and kind "group-removed"
     final id = newMessageId();
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final key = await _session(memberId);
-    if (key != null && socket.ready) {
-      final env = await encryptBytes(key, packMessage(text: '', ts: ts, kind: 'group-removed', group: next.toHeader()), from: userId, to: memberId, id: id);
-      socket.send({'type': 'e2ee-msg', 'to': memberId, 'id': id, 'iv': env.iv, 'ct': env.ct, 'part': 0, 'parts': 1, 'ts': ts});
-    }
+    if (socket.ready) await _relayTo(memberId, id, packMessage(text: '', ts: ts, kind: 'group-removed', group: next.toHeader()), ts);
     await _fanOutKind(next, 'group-new');
   }
 
@@ -487,7 +609,13 @@ class ChatService extends ChangeNotifier {
   Future<void> leaveGroup(String groupId, {bool notify = true}) async {
     final g = groups[groupId];
     if (g != null && notify) {
-      final rest = g.copyWith(members: [for (final m in g.members) if (m.id != userId) m], updatedAt: DateTime.now().millisecondsSinceEpoch);
+      final rest = g.copyWith(
+        members: [
+          for (final m in g.members)
+            if (m.id != userId) m,
+        ],
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
       if (rest.members.length >= 2) await _fanOutKind(rest, 'group-left');
     }
     await deleteConversation(groupId);
@@ -507,23 +635,27 @@ class ChatService extends ChangeNotifier {
     return _fanOutFrames(g, id, packMessage(text: '', ts: ts, kind: kind, group: g.toHeader()), ts, ack: false);
   }
 
-  /// Encrypts [plain] for every member except me and relays it. Returns the number of members it was handed to the socket for.
+  /// Encrypts [plain] for every device of every member except me and relays it. Returns the number of devices it was handed to the socket for.
   Future<int> _fanOutFrames(ChatGroup g, String id, Uint8List plain, int ts, {bool ack = true}) async {
     if (!socket.ready) return 0;
     var sent = 0;
+    var total = 0;
+    for (final member in g.members) {
+      if (member.id != userId) total += friendDevices[member.id]?.length ?? 0;
+    }
+    if (ack && total > 0) _fanOut[id] = total; // set before anything is sent: an early answer is not the last one
     for (final member in g.members) {
       if (member.id == userId) continue;
-      final key = await _session(member.id);
-      if (key == null) continue; // not my friend (no key): the relay would refuse it anyway
-      final env = await encryptBytes(key, plain, from: userId, to: member.id, id: id);
-      final slices = splitCiphertext(env.ct);
-      if (slices.length > maxParts) continue;
-      for (var i = 0; i < slices.length; i++) {
-        socket.send({'type': 'e2ee-msg', 'to': member.id, 'id': id, 'iv': env.iv, 'ct': slices[i], 'part': i, 'parts': slices.length, 'ts': ts});
-      }
-      sent++;
+      // not my friend (no key): nothing is sent, the relay would refuse it anyway; else one copy per device of the member
+      sent += await _relayTo(member.id, id, plain, ts);
     }
-    if (ack && sent > 0) _fanOut[id] = sent;
+    if (ack) {
+      if (sent == 0) {
+        _fanOut.remove(id);
+      } else {
+        _settleFanOut(id, total - sent);
+      }
+    }
     return sent;
   }
 
@@ -564,7 +696,7 @@ class ChatService extends ChangeNotifier {
     if (m.kind == 'group-removed') {
       // The creator removed me: forget the group (its messages go with it).
       if (known == null || known.creatorId != frame.from || incoming.members.any((x) => x.id == userId)) return;
-      socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+      _ack(frame);
       final name = known.name;
       await leaveGroup(known.id, notify: false);
       onIncoming?.call(known.id, name, 'Bạn đã bị xoá khỏi nhóm');
@@ -584,13 +716,16 @@ class ChatService extends ChangeNotifier {
     if (known == null) {
       await _saveGroup(incoming);
     } else if (incoming.updatedAt > known.updatedAt) {
-      final expected = {for (final x in known.members) if (x.id != frame.from) x.id};
+      final expected = {
+        for (final x in known.members)
+          if (x.id != frame.from) x.id,
+      };
       final got = incoming.members.map((x) => x.id).toList();
       final leftOk = m.kind == 'group-left' && got.length == expected.length && got.toSet().length == got.length && got.toSet().containsAll(expected);
       if (fromCreator || leftOk) await _saveGroup(incoming);
     }
     final g = groups[incoming.id]!;
-    socket.send({'type': 'e2ee-ack', 'to': frame.from, 'id': frame.id});
+    _ack(frame);
     final who = _nameInGroup(g, frame.from, frame.fromName);
     if (m.kind == 'group-new' || m.kind == 'group-left') {
       _bump();
@@ -609,10 +744,7 @@ class ChatService extends ChangeNotifier {
   Future<void> debugSendGroupFrame(ChatGroup g, String to, String text, {String? kind, String? id, int? ts}) async {
     id ??= newMessageId();
     ts ??= DateTime.now().millisecondsSinceEpoch;
-    final key = await _session(to);
-    if (key == null) return;
-    final env = await encryptBytes(key, packMessage(text: text, ts: ts, kind: kind, group: g.toHeader()), from: userId, to: to, id: id);
-    socket.send({'type': 'e2ee-msg', 'to': to, 'id': id, 'iv': env.iv, 'ct': env.ct, 'part': 0, 'parts': 1, 'ts': ts});
+    await _relayTo(to, id, packMessage(text: text, ts: ts, kind: kind, group: g.toHeader()), ts);
   }
 
   String _nameInGroup(ChatGroup g, String id, [String? fallback]) {
@@ -688,7 +820,10 @@ class ChatService extends ChangeNotifier {
   Future<void> restorePrefs() async {
     aliases
       ..clear()
-      ..addEntries([for (final e in (await store.metaWithPrefix('alias:')).entries) if (e.value.isNotEmpty) MapEntry(e.key.substring(6), e.value)]);
+      ..addEntries([
+        for (final e in (await store.metaWithPrefix('alias:')).entries)
+          if (e.value.isNotEmpty) MapEntry(e.key.substring(6), e.value),
+      ]);
     archived
       ..clear()
       ..addAll(_decodeList(await store.meta('archive')));
@@ -697,7 +832,10 @@ class ChatService extends ChangeNotifier {
   static List<String> _decodeList(String? raw) {
     if (raw == null || raw.isEmpty) return const [];
     try {
-      return [for (final x in (jsonDecode(raw) as List)) if (x is String) x];
+      return [
+        for (final x in (jsonDecode(raw) as List))
+          if (x is String) x,
+      ];
     } catch (_) {
       return const [];
     }
@@ -770,6 +908,7 @@ class ChatService extends ChangeNotifier {
     _sessions.clear();
     _identity = null;
     friendKeys.clear();
+    friendDevices.clear();
     peerInfo.clear();
     unread.clear();
     ready = false;

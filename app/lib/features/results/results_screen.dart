@@ -77,6 +77,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       value: _c,
       child: RefreshIndicator(
         onRefresh: () async {
+          context.read<ApiClient>().retryNow();
           await Future.wait([_c.loadEntryData(), _c.loadDay()]);
         },
         child: ListView(
@@ -132,6 +133,28 @@ class _Msg extends StatelessWidget {
   }
 }
 
+/// Scrolls its child into view once it appears, so a notice below the fold is never missed.
+class _ScrollIntoView extends StatefulWidget {
+  const _ScrollIntoView({super.key, required this.child});
+  final Widget child;
+  @override
+  State<_ScrollIntoView> createState() => _ScrollIntoViewState();
+}
+
+class _ScrollIntoViewState extends State<_ScrollIntoView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 250), alignment: 0.5, curve: Curves.easeOut);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 
 class _ResultCard extends StatelessWidget {
@@ -167,10 +190,11 @@ class _ResultCard extends StatelessWidget {
           const _PhotoBox(),
           if (c.dayLoading) const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator())),
           if (!c.dayLoading) ...[
-            if (c.error != null) _Msg(c.error!, error: true),
-            if (c.saveMsg != null) _Msg(c.saveMsg!, error: false),
             const SizedBox(height: 12),
             const _ResultForm(),
+            // Under the form, next to "Lưu kết quả": above it the notice was off screen when the person pressed save.
+            if (c.error != null) _ScrollIntoView(key: ValueKey('err-${c.error}'), child: _Msg(c.error!, error: true)),
+            if (c.saveMsg != null) _ScrollIntoView(key: ValueKey('ok-${c.saveMsg}'), child: _Msg(c.saveMsg!, error: false)),
           ],
         ]),
       ),
@@ -473,7 +497,7 @@ class _SyncNotices extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (c.syncMsg != null) _Msg(c.syncMsg!, error: false, action: c.undoItems == null ? null : (c.undoing ? 'Đang hoàn tác...' : 'Hoàn tác'), onAction: c.undoing ? null : c.undoScores),
         if (c.syncError != null) _Msg(c.syncError!, error: true),
-        if (offline) const _Msg('Đang offline: lưu kết quả cần có mạng.', error: false),
+        if (offline) const _Msg('Đang offline: kết quả và điểm ra được lưu trên máy, tự gửi lên khi có mạng.', error: false),
       ]),
     );
   }

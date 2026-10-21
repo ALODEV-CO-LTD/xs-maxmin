@@ -46,6 +46,14 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   @override
+  void didUpdateWidget(AccountScreen old) {
+    super.didUpdateWidget(old);
+    // /account?tab=packages (the renew button of Tổng quan) while this tab already exists: switch to that pill.
+    final t = widget.initialTab;
+    if (t != null && t != old.initialTab && _tabs.contains(t)) _select(t);
+  }
+
+  @override
   void dispose() {
     _ctl.dispose();
     _scroll.dispose();

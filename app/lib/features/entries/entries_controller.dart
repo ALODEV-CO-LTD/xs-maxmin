@@ -135,6 +135,7 @@ class EntriesController extends ChangeNotifier {
   // ---- loading ----------------------------------------------------------------------------------------------------
 
   Future<void> reload() async {
+    api.retryNow();
     loading = entries.isEmpty;
     loadError = '';
     _notify();
@@ -150,6 +151,8 @@ class EntriesController extends ChangeNotifier {
       final list = results[0] as LoadedEntries;
       entries = list.entries;
       fromCache = list.fromCache;
+      // Back online: the "Đang offline ..." notice of the numbers typed offline no longer applies.
+      if (!fromCache && notice.startsWith('Đang offline')) notice = '';
       pending = await store.pendingCount();
       _applyDefaultStation();
     } on ApiError catch (e) {

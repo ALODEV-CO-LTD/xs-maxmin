@@ -342,6 +342,13 @@ class OfflineStore {
       return r is Map ? Map<String, dynamic>.from(r) : null;
     } catch (e) {
       if (isNetworkError(e) && mine != null) return Map<String, dynamic>.from(mine['json'] as Map);
+      if (isNetworkError(e)) {
+        // The day was opened in Nhập kết quả (cached as "all stations"), just not station by station.
+        final all = _kvGet('get:$userId:/lottery-results?date=$date&all=1');
+        for (final r in (all is Map ? all['results'] : null) as List? ?? const []) {
+          if (r is Map && r['station'] == station) return Map<String, dynamic>.from(r);
+        }
+      }
       rethrow;
     }
   }

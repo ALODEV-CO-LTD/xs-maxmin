@@ -1,6 +1,6 @@
 import 'dart:async';
 
-enum PushKind { message, call, friendRequest }
+enum PushKind { message, call, friendRequest, payment }
 
 class PushMessage {
   const PushMessage({required this.kind, required this.title, required this.body, required this.friendId});

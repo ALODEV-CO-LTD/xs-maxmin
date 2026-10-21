@@ -53,16 +53,19 @@ class InfoRow extends StatelessWidget {
 }
 
 class StatusChip extends StatelessWidget {
-  const StatusChip(this.text, {super.key, this.color});
+  const StatusChip(this.text, {super.key, this.color, this.small = false});
   final String text;
   final Color? color;
+
+  /// About half the size (a tag next to a title, e.g. "Đang dùng").
+  final bool small;
   @override
   Widget build(BuildContext context) {
     final c = color ?? context.mutedColor;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      padding: small ? const EdgeInsets.symmetric(horizontal: 6, vertical: 1) : const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(color: c.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: c.withValues(alpha: 0.5))),
-      child: Text(text, style: TextStyle(color: c, fontSize: 12.5, fontWeight: FontWeight.w600)),
+      child: Text(text, style: TextStyle(color: c, fontSize: small ? 10 : 12.5, fontWeight: FontWeight.w600, height: small ? 1.3 : null)),
     );
   }
 }

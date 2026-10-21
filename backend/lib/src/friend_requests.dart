@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/call_signaling.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/e2ee_devices.dart';
 import 'package:server/src/push_message.dart';
 import 'package:server/src/push_notify.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -45,6 +46,7 @@ Map<String, dynamic>? friendListRow(Database db, String friendId) {
     'username': r.first['username'],
     'isAdmin': r.first['role'] == 'admin',
     'publicKey': k is String ? jsonDecode(k) : null,
+    'devices': friendDevices(db, friendId),
   };
 }
 

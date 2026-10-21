@@ -27,7 +27,7 @@ class PushOpened {
 }
 
 /// The kind a push carries; anything unknown is a plain message (the oldest, safest behaviour).
-String pushKindOf(Object? raw) => raw == 'call' ? 'call' : (raw == 'friendRequest' ? 'friendRequest' : 'message');
+String pushKindOf(Object? raw) => raw == 'call' ? 'call' : (raw == 'friendRequest' ? 'friendRequest' : (raw == 'payment' ? 'payment' : 'message'));
 
 /// The native bridge, so the logic can be tested without a platform channel.
 abstract class PushPort {
@@ -274,7 +274,11 @@ class PushRegistrar {
     _pendingOpen = null;
     // Calls open the chat too: a call that rang while the app was closed is long over. A friend request opens the
     // friends screen, where the requests block is at the top.
-    final route = o.kind == 'friendRequest' ? '/friends' : '/friends/chat/${Uri.encodeComponent(o.friendId)}';
+    final route = switch (o.kind) {
+      'friendRequest' => '/friends',
+      'payment' => o.friendId == 'rejected' ? '/account?tab=packages' : '/overview', // friendId carries the decision
+      _ => '/friends/chat/${Uri.encodeComponent(o.friendId)}',
+    };
     Timer(openDelay, () => openRoute(route));
   }
 
@@ -282,7 +286,7 @@ class PushRegistrar {
   bool _present(PushOpened info) {
     final h = hub?.call();
     if (h == null) return true;
-    if (info.kind == 'friendRequest') return !(h.socket.ready); // the live event already shows an in-app banner
+    if (info.kind == 'friendRequest' || info.kind == 'payment') return !(h.socket.ready); // the live event already shows an in-app banner
     if (info.kind == 'call') return h.call == null || h.call!.status == CallStatus.idle;
     return h.chat?.openPeer != info.friendId;
   }

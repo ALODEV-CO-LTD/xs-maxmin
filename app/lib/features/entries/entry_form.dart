@@ -55,7 +55,6 @@ class _EntryFormCardState extends State<EntryFormCard> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Thêm số liệu mới', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
-          if (c.formError.isNotEmpty) InfoBox(c.formError),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               flex: 5,
@@ -84,6 +83,8 @@ class _EntryFormCardState extends State<EntryFormCard> {
           if (_deleteAllError.isNotEmpty) InfoBox(_deleteAllError),
           if (!c.canAdd) const InfoBox('Gói của bạn đã hết hạn. Vui lòng gia hạn để tiếp tục nhập số liệu.', kind: InfoKind.warning),
           if (c.addedMessage.isNotEmpty) InfoBox(c.addedMessage, kind: InfoKind.success),
+          // Next to the save button: above the rows the notice was off screen when the person pressed save.
+          if (c.formError.isNotEmpty) ScrollIntoView(key: ValueKey('form-err-${c.formError}'), child: InfoBox(c.formError)),
           // One row: add a line (+), save (Thêm số liệu), delete all.
           Row(children: [
             AppButton.icon(label: 'Thêm số', variant: AppButtonVariant.secondary, icon: Icons.add, onPressed: c.addRow),

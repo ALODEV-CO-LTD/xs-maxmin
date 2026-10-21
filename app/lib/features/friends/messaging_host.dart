@@ -122,9 +122,16 @@ class _MessagingHostState extends State<MessagingHost> with WidgetsBindingObserv
     hub.removeListener(_onHub);
     final p = widget.privacy;
     if (p != null) p.isBusy = null;
-    hub.dispose();
     _launchHandled = false;
-    if (mounted) setState(() {});
+    if (!mounted) {
+      hub.dispose();
+      return;
+    }
+    setState(() {});
+    // The screens that listen to the hub are rebuilt without it in the coming frame (the router also leaves them for the login
+    // screen). Disposing it right here, inside the sign-out notification, made a screen that was still on the page add a listener
+    // to a disposed hub - a framework error instead of the login screen when another device ended this session.
+    WidgetsBinding.instance.addPostFrameCallback((_) => hub.dispose());
   }
 
   Future<void> _handleLaunchNotice() async {

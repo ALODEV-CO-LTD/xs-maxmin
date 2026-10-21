@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-enum NoticeKind { message, incomingCall, missedCall, support, friendRequest, friendAccepted }
+enum NoticeKind { message, incomingCall, missedCall, support, friendRequest, friendAccepted, payment }
 
 /// One Android notification, described without any plugin types so it can be tested.
 ///
@@ -41,54 +41,26 @@ String _shortName(String name) {
   return n.length > 40 ? '${n.substring(0, 40)}…' : n;
 }
 
-NoticeContent messageNotice(String friendId, String friendName) => NoticeContent(
-      kind: NoticeKind.message,
-      id: noticeIdFor('msg:$friendId'),
+NoticeContent messageNotice(String friendId, String friendName) => NoticeContent(kind: NoticeKind.message, id: noticeIdFor('msg:$friendId'), title: 'MAMBA', body: 'Tin nhắn mới từ ${_shortName(friendName)}', payload: 'chat:$friendId');
+
+NoticeContent incomingCallNotice(String friendId, String friendName, {bool inApp = false}) => NoticeContent(kind: NoticeKind.incomingCall, id: incomingCallNoticeId, title: 'Cuộc gọi thoại đến', body: '${_shortName(friendName)} đang gọi cho bạn', payload: 'call:$friendId', inApp: inApp);
+
+NoticeContent missedCallNotice(String friendId, String friendName) => NoticeContent(kind: NoticeKind.missedCall, id: noticeIdFor('missed:$friendId'), title: 'Cuộc gọi nhỡ', body: 'Cuộc gọi nhỡ từ ${_shortName(friendName)}', payload: 'missed:$friendId');
+
+NoticeContent supportNotice() => const NoticeContent(kind: NoticeKind.support, id: supportNoticeId, title: 'MAMBA', body: 'Có phản hồi mới từ Admin', payload: 'support');
+
+NoticeContent friendRequestNotice(String fromId, String fromName) => NoticeContent(kind: NoticeKind.friendRequest, id: noticeIdFor('freq:$fromId'), title: 'Lời mời kết bạn', body: '${_shortName(fromName)} muốn kết bạn với bạn', payload: 'freq:$fromId');
+
+/// Admin decided the customer's payment request. The text never names the plan or the amount (it can be read on the lock screen).
+NoticeContent paymentNotice({required bool approved}) => NoticeContent(
+      kind: NoticeKind.payment,
+      id: noticeIdFor('payment'),
       title: 'MAMBA',
-      body: 'Tin nhắn mới từ ${_shortName(friendName)}',
-      payload: 'chat:$friendId',
+      body: approved ? 'Gói của bạn đã được gia hạn' : 'Yêu cầu gói của bạn chưa được duyệt',
+      payload: 'pay:${approved ? 'approved' : 'rejected'}',
     );
 
-NoticeContent incomingCallNotice(String friendId, String friendName, {bool inApp = false}) => NoticeContent(
-      kind: NoticeKind.incomingCall,
-      id: incomingCallNoticeId,
-      title: 'Cuộc gọi thoại đến',
-      body: '${_shortName(friendName)} đang gọi cho bạn',
-      payload: 'call:$friendId',
-      inApp: inApp,
-    );
-
-NoticeContent missedCallNotice(String friendId, String friendName) => NoticeContent(
-      kind: NoticeKind.missedCall,
-      id: noticeIdFor('missed:$friendId'),
-      title: 'Cuộc gọi nhỡ',
-      body: 'Cuộc gọi nhỡ từ ${_shortName(friendName)}',
-      payload: 'missed:$friendId',
-    );
-
-NoticeContent supportNotice() => const NoticeContent(
-      kind: NoticeKind.support,
-      id: supportNoticeId,
-      title: 'MAMBA',
-      body: 'Có phản hồi mới từ Admin',
-      payload: 'support',
-    );
-
-NoticeContent friendRequestNotice(String fromId, String fromName) => NoticeContent(
-      kind: NoticeKind.friendRequest,
-      id: noticeIdFor('freq:$fromId'),
-      title: 'Lời mời kết bạn',
-      body: '${_shortName(fromName)} muốn kết bạn với bạn',
-      payload: 'freq:$fromId',
-    );
-
-NoticeContent friendAcceptedNotice(String friendId, String friendName) => NoticeContent(
-      kind: NoticeKind.friendAccepted,
-      id: noticeIdFor('facc:$friendId'),
-      title: 'MAMBA',
-      body: '${_shortName(friendName)} đã chấp nhận lời mời',
-      payload: 'facc:$friendId',
-    );
+NoticeContent friendAcceptedNotice(String friendId, String friendName) => NoticeContent(kind: NoticeKind.friendAccepted, id: noticeIdFor('facc:$friendId'), title: 'MAMBA', body: '${_shortName(friendName)} đã chấp nhận lời mời', payload: 'facc:$friendId');
 
 /// What a tapped notification points at.
 class NoticeTarget {
@@ -110,6 +82,7 @@ NoticeTarget? parseNoticePayload(String? payload) {
     'call' => NoticeTarget(NoticeKind.incomingCall, id),
     'freq' => NoticeTarget(NoticeKind.friendRequest, id),
     'facc' => NoticeTarget(NoticeKind.friendAccepted, id),
+    'pay' => NoticeTarget(NoticeKind.payment, id),
     _ => null,
   };
 }
@@ -117,11 +90,12 @@ NoticeTarget? parseNoticePayload(String? payload) {
 /// Where a tap goes (go_router location), or null to just show the app (an incoming call is answered in the call
 /// overlay that sits above every screen).
 String? routeForTarget(NoticeTarget t) => switch (t.kind) {
-      NoticeKind.message || NoticeKind.missedCall => '/friends/chat/${Uri.encodeComponent(t.friendId ?? '')}',
-      NoticeKind.support => '/support',
-      NoticeKind.friendRequest || NoticeKind.friendAccepted => '/friends',
-      NoticeKind.incomingCall => null,
-    };
+  NoticeKind.message || NoticeKind.missedCall => '/friends/chat/${Uri.encodeComponent(t.friendId ?? '')}',
+  NoticeKind.support => '/support',
+  NoticeKind.friendRequest || NoticeKind.friendAccepted => '/friends',
+  NoticeKind.payment => t.friendId == 'rejected' ? '/account?tab=packages' : '/overview',
+  NoticeKind.incomingCall => null,
+};
 
 /// What the app does when a message arrives: nothing while that chat is open on screen; the in-app banner while the
 /// app is on screen showing something else; an OS notification when the app is in the background.
@@ -187,43 +161,16 @@ class LocalNotifier implements AppNotifier {
     try {
       await _p.initialize(
         // iOS: nothing is asked at start-up; the permission dialog comes from the Bật button / the first visit to Bạn bè.
-        settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-          iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
-        ),
+        settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'), iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false)),
         onDidReceiveNotificationResponse: (r) => onTap(r.payload),
       );
       final a = _android;
       await a?.createNotificationChannel(const AndroidNotificationChannel(_msgChannel, 'Tin nhắn mới', description: 'Báo có tin nhắn mới (không hiện nội dung tin nhắn)', importance: Importance.high));
       // FCM "incoming call" push (app closed): rings with the phone's ringtone.
-      await a?.createNotificationChannel(AndroidNotificationChannel(
-        _pushCallChannel,
-        'Cuộc gọi đến (khi đóng app)',
-        description: 'Báo có cuộc gọi đến khi MAMBA đang đóng',
-        importance: Importance.max,
-        sound: const UriAndroidNotificationSound('content://settings/system/ringtone'),
-        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-        vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800]),
-      ));
+      await a?.createNotificationChannel(AndroidNotificationChannel(_pushCallChannel, 'Cuộc gọi đến (khi đóng app)', description: 'Báo có cuộc gọi đến khi MAMBA đang đóng', importance: Importance.max, sound: const UriAndroidNotificationSound('content://settings/system/ringtone'), audioAttributesUsage: AudioAttributesUsage.notificationRingtone, vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800])));
       await a?.createNotificationChannel(const AndroidNotificationChannel(_missedChannel, 'Cuộc gọi nhỡ', description: 'Báo cuộc gọi nhỡ', importance: Importance.high));
-      await a?.createNotificationChannel(AndroidNotificationChannel(
-        _callChannelInApp,
-        'Cuộc gọi đến (khi đang mở app)',
-        description: 'Đổ chuông khi có cuộc gọi đến lúc bạn đang dùng MAMBA',
-        importance: Importance.defaultImportance,
-        sound: const UriAndroidNotificationSound('content://settings/system/ringtone'),
-        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-        vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800]),
-      ));
-      await a?.createNotificationChannel(AndroidNotificationChannel(
-        _callChannel,
-        'Cuộc gọi đến',
-        description: 'Đổ chuông khi có cuộc gọi thoại đến',
-        importance: Importance.max,
-        sound: const UriAndroidNotificationSound('content://settings/system/ringtone'),
-        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-        vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800]),
-      ));
+      await a?.createNotificationChannel(AndroidNotificationChannel(_callChannelInApp, 'Cuộc gọi đến (khi đang mở app)', description: 'Đổ chuông khi có cuộc gọi đến lúc bạn đang dùng MAMBA', importance: Importance.defaultImportance, sound: const UriAndroidNotificationSound('content://settings/system/ringtone'), audioAttributesUsage: AudioAttributesUsage.notificationRingtone, vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800])));
+      await a?.createNotificationChannel(AndroidNotificationChannel(_callChannel, 'Cuộc gọi đến', description: 'Đổ chuông khi có cuộc gọi thoại đến', importance: Importance.max, sound: const UriAndroidNotificationSound('content://settings/system/ringtone'), audioAttributesUsage: AudioAttributesUsage.notificationRingtone, vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800])));
       _ready = true;
     } catch (e) {
       debugPrint('notifications init failed: $e');
@@ -256,20 +203,7 @@ class LocalNotifier implements AppNotifier {
     switch (c.kind) {
       case NoticeKind.incomingCall:
         if (c.inApp) {
-          return AndroidNotificationDetails(
-            _callChannelInApp,
-            'Cuộc gọi đến (khi đang mở app)',
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            category: AndroidNotificationCategory.call,
-            ongoing: true,
-            autoCancel: false,
-            timeoutAfter: 35000,
-            visibility: NotificationVisibility.private,
-            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-            additionalFlags: Int32List.fromList([4]),
-            vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800]),
-          );
+          return AndroidNotificationDetails(_callChannelInApp, 'Cuộc gọi đến (khi đang mở app)', importance: Importance.defaultImportance, priority: Priority.defaultPriority, category: AndroidNotificationCategory.call, ongoing: true, autoCancel: false, timeoutAfter: 35000, visibility: NotificationVisibility.private, audioAttributesUsage: AudioAttributesUsage.notificationRingtone, additionalFlags: Int32List.fromList([4]), vibrationPattern: Int64List.fromList([0, 800, 700, 800, 700, 800]));
         }
         return AndroidNotificationDetails(
           _callChannel,
@@ -294,6 +228,7 @@ class LocalNotifier implements AppNotifier {
       case NoticeKind.support:
       case NoticeKind.friendRequest:
       case NoticeKind.friendAccepted:
+      case NoticeKind.payment:
         return const AndroidNotificationDetails(_msgChannel, 'Tin nhắn mới', importance: Importance.high, priority: Priority.high, category: AndroidNotificationCategory.message, visibility: NotificationVisibility.private);
     }
   }
@@ -302,7 +237,13 @@ class LocalNotifier implements AppNotifier {
   Future<void> show(NoticeContent content) async {
     if (!_ready) return;
     try {
-      await _p.show(id: content.id, title: content.title, body: content.body, notificationDetails: NotificationDetails(android: _details(content), iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true, presentBadge: false)), payload: content.payload);
+      await _p.show(
+        id: content.id,
+        title: content.title,
+        body: content.body,
+        notificationDetails: NotificationDetails(android: _details(content), iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true, presentBadge: false)),
+        payload: content.payload,
+      );
     } catch (e) {
       debugPrint('notification failed: $e');
     }
@@ -312,14 +253,18 @@ class LocalNotifier implements AppNotifier {
   Future<void> cancel(int id) async {
     try {
       await _p.cancel(id: id);
-    } catch (_) {/* nothing to cancel */}
+    } catch (_) {
+      /* nothing to cancel */
+    }
   }
 
   @override
   Future<void> cancelAll() async {
     try {
       await _p.cancelAll();
-    } catch (_) {/* nothing to cancel */}
+    } catch (_) {
+      /* nothing to cancel */
+    }
   }
 
   @override

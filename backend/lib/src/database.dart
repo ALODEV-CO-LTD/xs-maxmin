@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import 'package_plans.dart';
 import 'customer_codes.dart';
 import 'friend_requests.dart';
+import 'e2ee_devices.dart';
 import 'deletion_scheduler.dart';
 
 const _uuid = Uuid();
@@ -109,6 +110,8 @@ void _migrateSchema(Database db) {
   // End-to-end encryption (docs/MA_HOA_2_DAU.md): the client's PUBLIC key (JWK
   // JSON). The private key never leaves the device.
   _ensureColumn(db, 'users', 'e2ee_public_key', 'TEXT');
+  // One key per DEVICE (lib/src/e2ee_devices.dart); an account's single older key becomes its `legacy` device.
+  ensureE2eeDevicesTable(db);
   // Multi-level Admin (lib/src/permissions.dart): NULL = root Admin, else a JSON list
   // of permission keys for a staff account.
   _ensureColumn(db, 'users', 'staff_permissions', 'TEXT');
@@ -674,6 +677,18 @@ void _migrateLotteryResultsPerUser(Database db) {
 String newId() => _uuid.v4();
 
 const _refAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I: easy to read out and type
+
+/// What a payment reference looks like. The app makes one BEFORE the request exists (it is printed in the transfer QR), so the
+/// customer can look at the QR first and only send the request after transferring.
+final paymentReferencePattern = RegExp('^XS[$_refAlphabet]{6}\$');
+
+/// The reference the client asked for when it is well formed and not used yet, else a fresh one.
+String paymentReferenceFor(Database db, Object? wanted) {
+  if (wanted is String && paymentReferencePattern.hasMatch(wanted) && db.select('SELECT 1 FROM payment_requests WHERE reference_code = ?', [wanted]).isEmpty) {
+    return wanted;
+  }
+  return newPaymentReference(db);
+}
 
 /// A fresh, unique "XS" + 6 character reference for a payment request.
 String newPaymentReference(Database db) {

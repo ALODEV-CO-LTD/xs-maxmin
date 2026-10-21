@@ -48,16 +48,30 @@ class ApiClient {
         if (auth.token != null) 'authorization': 'Bearer ${auth.token}',
       };
 
+  /// When the last request failed for lack of network. Reads (GET) fail at once for a few seconds after that instead of each
+  /// waiting for the timeout, so screens that fall back to the copy saved on the phone (Tính điểm, Nhập kết quả) stay fast
+  /// offline. Writes always try the network (they are queued by the offline store when it fails).
+  DateTime? _offlineAt;
+  static const _offlineFailFast = Duration(seconds: 6);
+
+  /// A person asked to refresh: forget the recent network failure so the next reads really try the network.
+  void retryNow() => _offlineAt = null;
+
   Future<dynamic> _send(String method, String path, {Object? body}) async {
+    final isRead = method == 'GET';
+    final at = _offlineAt;
+    if (isRead && at != null && DateTime.now().difference(at) < _offlineFailFast) throw ApiError(0, 'Không thể kết nối tới máy chủ');
     final uri = Uri.parse('${AppConfig.api}$path');
     final req = http.Request(method, uri)..headers.addAll(_headers(json: body != null));
     if (body != null) req.body = body is String ? body : jsonEncode(body);
     http.Response res;
     try {
-      res = await http.Response.fromStream(await _http.send(req).timeout(const Duration(seconds: 30)));
+      res = await http.Response.fromStream(await _http.send(req).timeout(Duration(seconds: isRead ? 12 : 30)));
     } on Object {
+      _offlineAt = DateTime.now();
       throw ApiError(0, 'Không thể kết nối tới máy chủ');
     }
+    _offlineAt = null;
     dynamic data;
     final text = utf8.decode(res.bodyBytes);
     if (text.isNotEmpty) {

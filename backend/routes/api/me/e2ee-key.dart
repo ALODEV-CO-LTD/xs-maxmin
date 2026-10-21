@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/request_body.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/e2ee_devices.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// End-to-end encryption identity (docs/MA_HOA_2_DAU.md). The browser/app makes
@@ -33,7 +34,8 @@ Future<Response> onRequest(RequestContext context) async {
   if (key == null) {
     return Response.json(statusCode: 400, body: {'error': 'Khoá công khai không hợp lệ'});
   }
-  db.execute('UPDATE users SET e2ee_public_key = ? WHERE id = ?', [jsonEncode(key), auth.userId]);
+  // Older app versions have one key per account: it is the `legacy` device (newer apps register their own devices).
+  upsertDevice(db, auth.userId, legacyDeviceId, key);
   return Response.json(body: {'publicKey': key});
 }
 

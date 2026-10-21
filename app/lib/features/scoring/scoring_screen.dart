@@ -96,6 +96,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
         onPointerDown: (_) => context.read<MaskStore>().touch(),
         child: RefreshIndicator(
           onRefresh: () async {
+            _c.api.retryNow();
             _c.lotteryCache.clear();
             await _c.load();
           },

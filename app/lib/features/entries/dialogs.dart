@@ -60,3 +60,25 @@ class InfoBox extends StatelessWidget {
 }
 
 enum InfoKind { error, success, warning }
+
+/// Scrolls its child into view once it appears, so a notice next to the save button is never left off screen.
+class ScrollIntoView extends StatefulWidget {
+  const ScrollIntoView({super.key, required this.child});
+  final Widget child;
+  @override
+  State<ScrollIntoView> createState() => _ScrollIntoViewState();
+}
+
+class _ScrollIntoViewState extends State<ScrollIntoView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 250), alignment: 0.5, curve: Curves.easeOut);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}

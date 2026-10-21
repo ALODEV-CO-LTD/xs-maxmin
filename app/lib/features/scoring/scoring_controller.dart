@@ -6,6 +6,8 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/lottery_stations.dart';
 import '../../core/scoring_config.dart';
+import '../entries/entry_model.dart' as stored;
+import '../entries/offline_store.dart';
 import 'entry_model.dart';
 import 'scoring_data.dart';
 import 'scoring_days.dart';
@@ -113,6 +115,29 @@ class ScoringController extends ChangeNotifier {
     loading = false;
     _touch();
     _refreshDerived();
+    if (loadError == null && !DataSource.fromCache) unawaited(_warmOfflineCache());
+  }
+
+  /// Online: keeps the lottery results of every day that has numbers on the phone (one request per day), so the score of
+  /// those days can still be calculated later with no network. Newest days first, at most [_warmDays] of them.
+  static const _warmDays = 45;
+  bool _warming = false;
+  Future<void> _warmOfflineCache() async {
+    if (_warming) return;
+    _warming = true;
+    try {
+      final days = (entries.map((e) => e.entryDate).toSet().toList()..sort()).reversed.take(_warmDays).toList();
+      final store = await OfflineStore.open(api, api.auth);
+      for (final d in days) {
+        try {
+          await store.dayResults(d);
+        } catch (_) {
+          return; // offline again: stop, what was kept is enough
+        }
+      }
+    } finally {
+      _warming = false;
+    }
   }
 
   // ---- filters ----------------------------------------------------------------------------------------------
@@ -182,6 +207,7 @@ class ScoringController extends ChangeNotifier {
   /// have been saved in Kết quả, numbers added or changed in Nhập số), read everything again and open the customer and day chosen in
   /// Nhập số. Without this the screen kept showing "no result" for a day whose result was saved afterwards.
   Future<void> syncFrom({String customer = '', String date = ''}) async {
+    api.retryNow();
     lotteryCache.clear();
     _calculated.clear();
     status.clear();
@@ -349,13 +375,17 @@ class ScoringController extends ChangeNotifier {
     var value = 0.0;
     results.forEach((st, lr) => value += entryDetail(entry, lr, configFor(entry.betType, st), ScoreCtx(region: stations.regionOf(st).id, customerRegion: customerRegion)).out);
     // Already saved with the same figure -> nothing to write.
-    final stored = entry.result;
-    if (stored != null && stored.isNotEmpty && toNumber(stored) == value) {
+    final prevResult = entry.result;
+    if (prevResult != null && prevResult.isNotEmpty && toNumber(prevResult) == value) {
       status[entry.id] = EntryStatus(CalcState.saved, value: value);
       return;
     }
     try {
-      await api.patch('/me/entries/${entry.id}', {'result': numToString(value)});
+      // Offline too: the figure is kept on the phone and sent with the other waiting changes.
+      await (await OfflineStore.open(api, api.auth)).updateEntry(
+        stored.Entry.fromJson({'id': entry.id, 'customerName': entry.customerName, 'entryDate': entry.entryDate, 'value': entry.value, 'updatedAt': entry.updatedAt}),
+        {'result': numToString(value)},
+      );
       final i = entries.indexWhere((x) => x.id == entry.id);
       if (i != -1) entries[i] = entry.withResult(numToString(value));
       status[entry.id] = EntryStatus(CalcState.saved, value: value);
@@ -368,6 +398,7 @@ class ScoringController extends ChangeNotifier {
 
   /// "Tính lại": forgets every cached result and calculation.
   void recalc() {
+    api.retryNow();
     _calculated.clear();
     lotteryCache.clear();
     status.clear();

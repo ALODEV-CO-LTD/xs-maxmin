@@ -5,6 +5,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/apns.dart';
 import 'package:server/src/call_signaling.dart';
 import 'package:server/src/data_wipe.dart';
+import 'package:server/src/e2ee_devices.dart';
 import 'package:server/src/friend_requests.dart';
 import 'package:server/src/push_message.dart';
 import 'package:server/src/push_notify.dart';
@@ -64,6 +65,7 @@ void main() {
   setUp(() {
     db = testDb();
     db.execute('ALTER TABLE users ADD COLUMN e2ee_public_key TEXT'); // added by a migration in prod
+    ensureE2eeDevicesTable(db); // likewise
     db.execute(
       "INSERT INTO users (id, username, name, password_hash, role, data_used, created_at) VALUES ('u3','nameu3','U u3','x','user',0,'2026-01-01')",
     );
@@ -110,7 +112,7 @@ void main() {
       expect(r.statusCode, 200);
       final b = await jsonBody(r);
       expect(b['status'], 'friends');
-      expect((b['friend'] as Map).keys.toSet(), {'id', 'name', 'username', 'isAdmin', 'publicKey'});
+      expect((b['friend'] as Map).keys.toSet(), {'id', 'name', 'username', 'isAdmin', 'publicKey', 'devices'});
       expect(reqRows(), 0);
     });
 

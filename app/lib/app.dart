@@ -88,7 +88,7 @@ GoRouter buildRouter(AuthStore auth) => GoRouter(
             StatefulShellBranch(routes: [GoRoute(path: '/calc', builder: (_, _) => const CalcScreen())]),
             StatefulShellBranch(routes: [GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen())]),
             StatefulShellBranch(routes: [GoRoute(path: '/config', builder: (_, _) => const DefaultConfigScreen())]),
-            StatefulShellBranch(routes: [GoRoute(path: '/account', builder: (_, _) => const AccountScreen(embedded: true))]),
+            StatefulShellBranch(routes: [GoRoute(path: '/account', builder: (_, state) => AccountScreen(embedded: true, initialTab: state.uri.queryParameters['tab'] == 'packages' ? AccountTab.packages : null))]),
           ],
         ),
       ],

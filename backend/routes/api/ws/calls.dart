@@ -7,6 +7,7 @@ import 'package:server/src/call_log.dart';
 import 'package:server/src/apns.dart';
 import 'package:server/src/call_signaling.dart';
 import 'package:server/src/database.dart';
+import 'package:server/src/e2ee_devices.dart';
 import 'package:server/src/push_notify.dart';
 import 'package:server/src/security.dart';
 import 'package:server/src/sessions.dart';
@@ -67,7 +68,9 @@ Future<Response> onRequest(RequestContext context) async {
 
   final handler = webSocketHandler(
     (channel, protocol) {
-      registry.register(userId, channel, sessionId: auth!.sessionId);
+      // `?device=<id>`: the E2EE device of this connection (see lib/src/e2ee_devices.dart); older app versions send none.
+      final dev = context.request.uri.queryParameters['device'];
+      registry.register(userId, channel, sessionId: auth!.sessionId, deviceId: dev != null && deviceIdPattern.hasMatch(dev) ? dev : null);
 
       // The session is checked by the handshake; also re-check it now and then so a revoked or locked account whose
       // socket was somehow not closed right away still loses it within half a minute.
@@ -277,8 +280,16 @@ void _relayE2ee(
     return;
   }
 
+  // Several devices: the sender names the device a frame is for (`toDevice`, encrypted with THAT device's key). Without it the
+  // frame goes to every connection of the friend, as older app versions expect. `fromDevice` is the sender's own device, set
+  // here from the connection so it cannot be spoofed; an older connection has none.
+  final toDevice = msg['toDevice'];
+  final target = toDevice is String && (toDevice == legacyDeviceId || deviceIdPattern.hasMatch(toDevice)) ? toDevice : null;
+  final fromDevice = registry.deviceOf(channel as WebSocketChannel);
+  bool deliver(Map<String, dynamic> m) => target == null ? registry.sendToAll(to, m) : registry.sendToDevice(to, target, m);
+
   if (type == 'e2ee-ack') {
-    registry.sendToAll(to, {'type': 'e2ee-ack', 'id': id, 'from': userId});
+    deliver({'type': 'e2ee-ack', 'id': id, 'from': userId, 'fromDevice': ?fromDevice});
     return;
   }
 
@@ -297,10 +308,11 @@ void _relayE2ee(
   // `ts` is the sender's clock, shown by the receiver; `fromName` comes from the
   // account, never from the client.
   final nameRow = db.select('SELECT name FROM users WHERE id = ?', [userId]);
-  final delivered = registry.sendToAll(to, {
+  final delivered = deliver({
     'type': 'e2ee-msg',
     'id': id,
     'from': userId,
+    'fromDevice': ?fromDevice,
     'fromName': nameRow.isEmpty ? 'Người dùng' : nameRow.first['name'],
     'iv': iv,
     'ct': ct,
@@ -319,6 +331,6 @@ void _relayE2ee(
         toUserId: to,
       );
     }
-    channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'reason': 'offline'}));
+    channel.sink.add(jsonEncode({'type': 'e2ee-undelivered', 'id': id, 'to': to, 'toDevice': ?target, 'reason': 'offline'}));
   }
 }

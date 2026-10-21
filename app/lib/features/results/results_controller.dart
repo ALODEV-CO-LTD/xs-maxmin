@@ -213,7 +213,7 @@ class ResultsController extends ChangeNotifier {
       _rebuildForms();
     } on ApiError catch (e) {
       if (token != _dayToken) return;
-      error = e.message;
+      error = e.status == 0 ? 'Đang offline và chưa có kết quả đã lưu của ngày này. Bạn vẫn nhập và lưu được, kết quả sẽ tự gửi lên khi có mạng.' : e.message;
       dayResults = {};
       _rebuildForms();
     } catch (_) {
@@ -552,7 +552,7 @@ class ResultsController extends ChangeNotifier {
 
   Future<void> _writeResult(Entry e, String value) async {
     await (await _store()).updateEntry(
-      stored.Entry.fromJson({'id': e.id, 'customerName': e.customerName, 'entryDate': e.entryDate, 'value': e.value}),
+      stored.Entry.fromJson({'id': e.id, 'customerName': e.customerName, 'entryDate': e.entryDate, 'value': e.value, 'updatedAt': e.updatedAt}),
       {'result': value},
     );
     final i = entries.indexWhere((x) => x.id == e.id);
@@ -665,7 +665,7 @@ class ResultsController extends ChangeNotifier {
   void _applyNorth(OcrResult res) {
     final before = filledCount(mbForm);
     // Rows from the word positions (the plain text order of the reader can run down the columns).
-    final ordered = orderedDigitText(uprightWords(res.words, lengthsDecreaseDownward: true));
+    final ordered = orderedDigitText(uprightWords(repairDigitWords(res.words), lengthsDecreaseDownward: true));
     guessNorthForm(ordered.isEmpty ? res.text : ordered, mbForm);
     mbLocked = true;
     if (filledCount(mbForm) == before) {
@@ -684,10 +684,19 @@ class ResultsController extends ChangeNotifier {
       return;
     }
     // Which region and day the photo is of: from its title ("XSMT ... 09/10/2026"), else what is selected now.
+    // The region: the title ("XSMN", "Miền Nam"), else the one the station names in the headers belong to, else the selected one.
     final titleRegion = regionFromTitle(res.words);
-    final seenRegion = titleRegion == 'mt' || titleRegion == 'mn' ? titleRegion! : region;
-    final seenDate = parsed.date ?? date;
-    assignStations(parsed.columns, stations.stationsOn(seenRegion, seenDate), stations);
+    final headerRegion = regionFromColumns(parsed.columns, stations);
+    final seenRegion = titleRegion == 'mt' || titleRegion == 'mn' ? titleRegion! : (headerRegion ?? (region == 'mb' ? 'mn' : region));
+    // The day: the date printed in the photo; when it cannot be read, the recent day on which the stations named in the
+    // headers all draw; else the selected day.
+    var seenDate = parsed.date ?? date;
+    if (parsed.date == null) {
+      final named = [for (final c in parsed.columns) if (c.station != null) c.station!];
+      seenDate = inferDateFromStations(seenRegion, named, date, stations) ?? date;
+    }
+    final regionStations = stations.regionOf(seenRegion).stations.keys.where((id) => id != 'mb').toList();
+    assignStations(parsed.columns, stations.stationsOn(seenRegion, seenDate), stations, others: regionStations);
     if (seenRegion != region || seenDate != date) {
       region = seenRegion;
       date = seenDate;
@@ -698,6 +707,11 @@ class ResultsController extends ChangeNotifier {
     var firstSet = false;
     for (final c in parsed.columns) {
       final st = c.station;
+      if (st != null && !board.containsKey(st)) {
+        // named in the photo but not on this day's schedule: it becomes one more choice, like "+ Đài khác"
+        extraStations = [...extraStations, st];
+        board[st] = blankForm(structure);
+      }
       if (st == null || !board.containsKey(st)) {
         ocrWarnings.add('Có một cột chưa xác định được đài, nên chưa điền vào bảng.');
         continue;

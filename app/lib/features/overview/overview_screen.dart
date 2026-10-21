@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../account/account_stats_tab.dart';
 import '../friends/messaging_host.dart';
+import 'package_card.dart';
 
 /// Tổng quan: the home tab. The statistics (customers, plays, points in/out, profit, chart by day/month/year).
 class OverviewScreen extends StatelessWidget {
@@ -15,7 +16,12 @@ class OverviewScreen extends StatelessWidget {
       body: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 32),
-        child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: const AccountStatsTab())),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [PackageCard(), AccountStatsTab()]),
+          ),
+        ),
       ),
     );
   }

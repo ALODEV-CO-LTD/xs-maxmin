@@ -240,7 +240,7 @@ void main() {
     final bank = {'bankBin': '970436', 'bankAccountNumber': '0123456789', 'bankAccountHolder': 'NGUYEN VAN A'};
     test('built like the web app', () {
       final url = vietQrUrl(bank: bank, pending: {'amount': 199000, 'referenceCode': 'MB123', 'packageType': '1m'}, username: 'an')!;
-      expect(url, startsWith('https://img.vietqr.io/image/970436-0123456789-compact2.png?'));
+      expect(url, startsWith('https://api.vietqr.io/image/970436-0123456789-compact2.png?'));
       final q = Uri.parse(url).queryParameters;
       expect(q, {'amount': '199000', 'addInfo': 'MB123', 'accountName': 'NGUYEN VAN A'});
       expect(url, contains('accountName=NGUYEN+VAN+A'));

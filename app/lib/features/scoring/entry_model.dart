@@ -10,6 +10,7 @@ class Entry {
     this.betType,
     this.station,
     this.note,
+    this.updatedAt,
   });
 
   final String id;
@@ -21,6 +22,7 @@ class Entry {
   final String? betType;
   final String? station;
   final String? note;
+  final String? updatedAt; // server stamp of the last change (lets the offline queue spot a conflict)
 
   factory Entry.fromJson(Map<String, dynamic> j) => Entry(
         id: '${j['id']}',
@@ -32,6 +34,7 @@ class Entry {
         betType: j['betType'] as String?,
         station: j['station'] as String?,
         note: j['note'] as String?,
+        updatedAt: j['updatedAt'] as String?,
       );
 
   Entry withResult(String? r) => Entry(
@@ -44,6 +47,7 @@ class Entry {
         betType: betType,
         station: station,
         note: note,
+        updatedAt: updatedAt,
       );
 }
 

@@ -116,6 +116,25 @@ int _levenshtein(String a, String b) {
 
 double _similarity(String a, String b) => a.isNotEmpty && b.isNotEmpty ? 1 - _levenshtein(a, b) / math.max(a.length, b.length) : 0;
 
+/// The digits of one OCR word, or null when it is not a number. The reader often takes a digit of a bold printed number for a
+/// letter of similar shape (0 -> O, 1 -> I / l, 5 -> S, 8 -> B, 2 -> Z): such a word is accepted when most of it is real digits.
+String? _digitsOf(String raw) {
+  final t = raw.trim();
+  if (t.isEmpty) return null;
+  if (RegExp(r'^\d+$').hasMatch(t)) return t;
+  if (!RegExp(r'^[0-9OoDQIl|SsBZz]+$').hasMatch(t)) return null;
+  final real = RegExp(r'\d').allMatches(t).length;
+  if (real * 2 < t.length) return null;
+  const map = {'O': '0', 'o': '0', 'D': '0', 'Q': '0', 'I': '1', 'l': '1', '|': '1', 'S': '5', 's': '5', 'B': '8', 'Z': '2', 'z': '2'};
+  return [for (final ch in t.split('')) map[ch] ?? ch].join();
+}
+
+/// The words with look-alike letters inside numbers repaired (see [_digitsOf]); other words are kept as they are.
+List<OcrWord> repairDigitWords(List<OcrWord> words) => [
+      for (final w in words)
+        if (_digitsOf(w.text) case final d? when d != w.text.trim()) OcrWord(d, w.x0, w.y0, w.x1, w.y1) else w,
+    ];
+
 const _noise = {'giai', 'xsmn', 'xsmt', 'xsmb', 'thu', 'thir', 'thur', 'kqxs', 'truc', 'tiep', 'ngay', 'mien', 'nam', 'trung', 'bac'};
 
 /// How well the header text of a column fits a station name (0..1): the best match over windows of 1-3 header words.
@@ -137,12 +156,18 @@ double headerScore(String headerText, String id, LotteryStations stations) {
 
 /// Gives every column a station among [candidates] (the stations drawing that day): the best header matches first, then
 /// the remaining columns take the remaining stations in page order. `source` tells the user how sure it is.
-List<OcrColumn> assignStations(List<OcrColumn> columns, List<String> candidates, LotteryStations stations) {
-  final pool = [...candidates];
+///
+/// [others] = the rest of the region's stations (not drawing that day): a column whose header clearly names one of them
+/// (a photo of another day, or a day the schedule has wrong) takes it too, but needs a stronger match than a scheduled one.
+List<OcrColumn> assignStations(List<OcrColumn> columns, List<String> candidates, LotteryStations stations, {List<String> others = const []}) {
+  final pool = [...candidates, ...others.where((id) => !candidates.contains(id))];
   final pairs = <({int ci, String id, double score})>[];
   for (var ci = 0; ci < columns.length; ci++) {
     for (final id in pool) {
-      pairs.add((ci: ci, id: id, score: columns[ci].station == id ? 1.0 : headerScore(columns[ci].headerText, id, stations)));
+      final s = columns[ci].station == id ? 1.0 : headerScore(columns[ci].headerText, id, stations);
+      // off-schedule stations only count on a clear match, and lose a tie against a scheduled one
+      final onSchedule = candidates.contains(id);
+      pairs.add((ci: ci, id: id, score: onSchedule ? s : (s >= 0.8 ? s - 0.01 : 0.0)));
     }
   }
   // stable sort by score, best first
@@ -162,7 +187,7 @@ List<OcrColumn> assignStations(List<OcrColumn> columns, List<String> candidates,
     usedCol.add(p.ci);
     usedSt.add(p.id);
   }
-  final left = pool.where((id) => !usedSt.contains(id)).toList();
+  final left = candidates.where((id) => !usedSt.contains(id)).toList();
   for (var ci = 0; ci < columns.length; ci++) {
     if (usedCol.contains(ci)) continue;
     columns[ci].station = left.isEmpty ? null : left.removeAt(0);
@@ -198,12 +223,23 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
     if ((dateRe.hasMatch(t) || RegExp(r'^20\d\d$').hasMatch(t)) && w.cy <= top + span * 0.35 && (dateTop == null || w.cy < dateTop.cy)) dateTop = w;
   }
   final cut = dateTop == null ? double.negativeInfinity : dateTop.cy + (dateTop.y1 - dateTop.y0) * 0.9;
-  final nums = <OcrWord>[
+  var nums = <OcrWord>[
     for (final w in words)
-      if (RegExp(r'^\d+$').hasMatch(w.text.trim()) && w.text.trim().length >= 2 && w.text.trim().length <= 6 && w.cy > cut) OcrWord(w.text.trim(), w.x0, w.y0, w.x1, w.y1),
+      if (w.cy > cut)
+        if (_digitsOf(w.text) case final d? when d.length >= 2 && d.length <= 6) OcrWord(d, w.x0, w.y0, w.x1, w.y1),
   ];
   final specials = nums.where((w) => w.text.length == 6).toList()..sort((a, b) => a.cx.compareTo(b.cx));
   if (specials.isEmpty) return const ParsedColumns([], null);
+
+  // Only numbers inside the band of the station columns are prizes. The printed table also has a label column on its left
+  // ("100N", "3TR", "2Tỷ" - read as "100", "3"...) and a header cell with the date ("19/10" "2026"): read as 3 and 4 digit
+  // numbers they used to land in the first column and push its real prizes one place down.
+  final cxs = [for (final w in specials) w.cx];
+  final gap = cxs.length > 1
+      ? (cxs.last - cxs.first) / (cxs.length - 1)
+      : (specials.first.x1 - specials.first.x0) * 2.2;
+  final bandL = cxs.first - gap * 0.5, bandR = cxs.last + gap * 0.5;
+  nums = [for (final w in nums) if (w.cx >= bandL && w.cx <= bandR) w];
 
   // One 6-digit special prize per station: they fix the column centres.
   final centres = [for (final w in specials) w.cx];
@@ -217,6 +253,8 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
 
   final twoDigitYs = [for (final w in nums) if (w.text.length == 2) w.cy];
   final firstRowY = twoDigitYs.isEmpty ? double.infinity : twoDigitYs.reduce(math.min);
+  // a longer number ABOVE the first prize row is part of the header (a date, a draw code), never a prize
+  if (firstRowY.isFinite) nums = [for (final w in nums) if (w.text.length == 2 || w.cy >= firstRowY - 6) w];
   final columns = [for (final x in centres) OcrColumn(x)];
   final tokens = List.generate(columns.length, (_) => <OcrWord>[]);
   final headers = List.generate(columns.length, (_) => <({String text, double cx})>[]);
@@ -280,6 +318,57 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
 /// 'mt' / 'mn' / 'mb' when the TITLE area (top quarter of the picture) holds that region's word as a whole token
 /// ("XSMT", "XSMN", "XSMB"); null otherwise. A word elsewhere in the picture (a station name, a footer) does not count.
 String? regionFromTitle(List<OcrWord> words) {
+  final r = _regionFromTitleWords(words);
+  if (r != null) return r;
+  if (words.isEmpty) return null;
+  // "KQXS Miền Nam" / "Xổ số miền Trung": the two words in a row, in the top quarter
+  final top = words.map((w) => w.y0).reduce(math.min), bottom = words.map((w) => w.y1).reduce(math.max);
+  final limit = top + (bottom - top) * 0.25;
+  final head = [for (final w in words) if (w.cy <= limit) w]..sort((a, b) => (a.cy - b.cy).abs() > (a.y1 - a.y0) / 2 ? a.cy.compareTo(b.cy) : a.cx.compareTo(b.cx));
+  for (var i = 0; i + 1 < head.length; i++) {
+    if (foldText(head[i].text) != 'mien') continue;
+    switch (foldText(head[i + 1].text)) {
+      case 'nam':
+        return 'mn';
+      case 'trung':
+        return 'mt';
+      case 'bac':
+        return 'mb';
+    }
+  }
+  return null;
+}
+
+/// The region the recognised headers belong to: the one most columns name a station of (null when none does).
+String? regionFromColumns(List<OcrColumn> columns, LotteryStations stations) {
+  final votes = <String, int>{};
+  for (final c in columns) {
+    final st = c.station;
+    if (st == null) continue;
+    final r = stations.regionOf(st).id;
+    if (r != 'mb') votes[r] = (votes[r] ?? 0) + 1;
+  }
+  if (votes.isEmpty) return null;
+  return (votes.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
+}
+
+/// The photo has no readable date: the latest day, today or up to 6 days before [fromIso], on which every station in [ids]
+/// draws (so the right stations come up for the table). Null when there is none or fewer than 2 stations are known.
+String? inferDateFromStations(String regionId, Iterable<String> ids, String fromIso, LotteryStations stations) {
+  final want = ids.toSet();
+  if (want.length < 2) return null;
+  final base = DateTime.tryParse(fromIso);
+  if (base == null) return null;
+  final start = DateTime.utc(base.year, base.month, base.day);
+  for (var back = 0; back <= 6; back++) {
+    final d = start.subtract(Duration(days: back));
+    final iso = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    if (stations.stationsOn(regionId, iso).toSet().containsAll(want)) return iso;
+  }
+  return null;
+}
+
+String? _regionFromTitleWords(List<OcrWord> words) {
   if (words.isEmpty) return null;
   final top = words.map((w) => w.y0).reduce(math.min), bottom = words.map((w) => w.y1).reduce(math.max);
   final limit = top + (bottom - top) * 0.25;

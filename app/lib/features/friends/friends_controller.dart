@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api_client.dart';
+import '../../core/package_events.dart';
 import '../../core/auth_store.dart';
 import 'call_ringer.dart';
 import 'call_service.dart';
@@ -96,19 +97,11 @@ class AppBanner {
 /// customer is signed in (see MessagingHost) and disposed on logout, so messages and calls are received on every
 /// screen, not only on Bạn bè. The screens consume it; none opens a second socket.
 class FriendsController extends ChangeNotifier {
-  FriendsController({required this.api, required this.auth, AppNotifier? notifier, CallRinger? ringer, BackgroundService? background, RealtimeSocket? socket})
-      : notifier = notifier ?? const NoopNotifier(),
-        ringer = ringer ?? SilentRinger(),
-        background = background ?? const NoopBackgroundService(),
-        socket = socket ?? RealtimeSocket(tokenProvider: () => auth.token) {
+  FriendsController({required this.api, required this.auth, AppNotifier? notifier, CallRinger? ringer, BackgroundService? background, RealtimeSocket? socket}) : notifier = notifier ?? const NoopNotifier(), ringer = ringer ?? SilentRinger(), background = background ?? const NoopBackgroundService(), socket = socket ?? RealtimeSocket(tokenProvider: () => auth.token) {
+    this.socket.deviceIdProvider ??= () => chat?.myDeviceId;
     // Server closed the socket with 4401 (session revoked): sign out, do not reconnect in a loop.
     this.socket.onSessionRevoked ??= auth.clear;
-    screenshots = ScreenshotBridge(
-      openPeer: () => chat?.openPeer,
-      isForeground: () => foreground,
-      canNotify: (id) => !(friends.where((f) => f.id == id).firstOrNull?.isAdmin ?? false),
-      notify: (id) async => chat?.notifyScreenshot(id),
-    );
+    screenshots = ScreenshotBridge(openPeer: () => chat?.openPeer, isForeground: () => foreground, canNotify: (id) => !(friends.where((f) => f.id == id).firstOrNull?.isAdmin ?? false), notify: (id) async => chat?.notifyScreenshot(id));
   }
   final ApiClient api;
   final AuthStore auth;
@@ -212,10 +205,15 @@ class FriendsController extends ChangeNotifier {
           _onFriendAccepted(m);
           return;
         }
+        if (m['type'] == 'payment-decided') {
+          _onPaymentDecided(m);
+          return;
+        }
         chat!.onFrame(m);
       });
       screenshots.attach();
       await _loadSettings();
+      await chat!.prepareDevice(); // the socket must open with this install's device id
       socket.start();
       await Future.wait([chat!.init(), _loadFriends(), if (!isAdmin) _loadMyCode(), if (!isAdmin) loadUnseenMissed(), loadRequests()]);
       await refreshFriendList(quiet: true);
@@ -235,7 +233,9 @@ class FriendsController extends ChangeNotifier {
     keepAlive = await KeepAliveSettings.load();
     try {
       _notifAsked = (await SharedPreferences.getInstance()).getBool('mamba_notif_asked') ?? false;
-    } catch (_) {/* ask again */}
+    } catch (_) {
+      /* ask again */
+    }
     _syncService();
   }
 
@@ -285,6 +285,24 @@ class FriendsController extends ChangeNotifier {
     unawaited(loadRequests());
   }
 
+  /// `payment-decided` event: Admin approved or rejected the package payment. Tell the customer and make the screens that show the
+  /// package read it again (the card on Tổng quan, Gói & Thanh toán).
+  void _onPaymentDecided(Map<String, dynamic> m) {
+    final approved = m['status'] == 'approved';
+    final reason = (m['reason'] as String?)?.trim() ?? '';
+    PackageEvents.instance.bump();
+    if (foreground) {
+      _banner(AppBanner(
+        title: 'Gói dịch vụ',
+        body: approved ? 'Gói của bạn đã được gia hạn' : 'Yêu cầu gói chưa được duyệt${reason.isEmpty ? '' : ': $reason'}',
+        route: approved ? '/overview' : '/account?tab=packages',
+      ));
+    } else {
+      unawaited(notifier.show(paymentNotice(approved: approved)));
+    }
+    _changed();
+  }
+
   /// `friend-accepted` event: they accepted my request. Reload the list (and the keys) so the chat works.
   void _onFriendAccepted(Map<String, dynamic> m) {
     final id = (m['friendId'] ?? '') as String;
@@ -305,7 +323,9 @@ class FriendsController extends ChangeNotifier {
     if (chat == null) return;
     try {
       await _loadFriends();
-    } catch (_) {/* the next refresh retries */}
+    } catch (_) {
+      /* the next refresh retries */
+    }
     await refreshFriendList(quiet: true);
   }
 
@@ -403,7 +423,9 @@ class FriendsController extends ChangeNotifier {
     _notifAsked = true;
     try {
       await (await SharedPreferences.getInstance()).setBool('mamba_notif_asked', true);
-    } catch (_) {/* fine */}
+    } catch (_) {
+      /* fine */
+    }
     _changed();
   }
 
@@ -414,7 +436,9 @@ class FriendsController extends ChangeNotifier {
     _notifAsked = true;
     try {
       await (await SharedPreferences.getInstance()).setBool('mamba_notif_asked', true);
-    } catch (_) {/* fine */}
+    } catch (_) {
+      /* fine */
+    }
     if (await notifier.allowed) return true;
     return notifier.requestPermission();
   }
@@ -486,18 +510,7 @@ class FriendsController extends ChangeNotifier {
         f.lastMessageAt = prev[f.id]?.createdAt ?? 0;
       }
       friends.sort((a, b) => b.lastMessageAt != a.lastMessageAt ? b.lastMessageAt.compareTo(a.lastMessageAt) : foldVi(a.name).compareTo(foldVi(b.name)));
-      groups = [
-        for (final g in c.groups.values)
-          Friend(
-            id: g.id,
-            name: g.name,
-            username: '',
-            isGroup: true,
-            memberCount: g.members.length,
-            lastMessage: prev[g.id] == null ? null : '${prev[g.id]!.mine ? 'Bạn' : c.memberName(g, prev[g.id]!.fromId ?? '')}: ${prev[g.id]!.preview}',
-            lastMessageAt: prev[g.id]?.createdAt ?? g.updatedAt,
-          ),
-      ]..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
+      groups = [for (final g in c.groups.values) Friend(id: g.id, name: g.name, username: '', isGroup: true, memberCount: g.members.length, lastMessage: prev[g.id] == null ? null : '${prev[g.id]!.mine ? 'Bạn' : c.memberName(g, prev[g.id]!.fromId ?? '')}: ${prev[g.id]!.preview}', lastMessageAt: prev[g.id]?.createdAt ?? g.updatedAt)]..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
       loadError = '';
     } catch (e) {
       if (!quiet) loadError = e is ApiError ? e.message : 'Không tải được danh sách bạn bè';
@@ -512,7 +525,9 @@ class FriendsController extends ChangeNotifier {
       final codes = res['codes'] as List?;
       myCode = codes != null && codes.isNotEmpty ? (codes.first as Map)['code'] as String : '';
       noMyCode = myCode.isEmpty;
-    } catch (_) {/* the card simply stays hidden */}
+    } catch (_) {
+      /* the card simply stays hidden */
+    }
   }
 
   Future<void> loadUnseenMissed() async {
@@ -528,7 +543,9 @@ class FriendsController extends ChangeNotifier {
       _missedLoaded = true;
       unseenMissed = next;
       _changed();
-    } catch (_) {/* nicety */}
+    } catch (_) {
+      /* nicety */
+    }
   }
 
   /// Fallback poll of the server's counters (web: notify.refresh): support replies from Admin.
@@ -544,7 +561,9 @@ class FriendsController extends ChangeNotifier {
       }
       if (supportVisible && ((res['support'] as num?)?.toInt() ?? 0) > 0) unawaited(markSupportRead());
       _changed();
-    } catch (_) {/* badges are a nicety */}
+    } catch (_) {
+      /* badges are a nicety */
+    }
   }
 
   /// The Admin thread is being read: drop its badge and tell the server so it stays read (web: notify.clear('support')).
@@ -555,7 +574,9 @@ class FriendsController extends ChangeNotifier {
     }
     try {
       await api.post('/me/unread/read', {'peerId': 'support'});
-    } catch (_) {/* a nicety: the next poll corrects it */}
+    } catch (_) {
+      /* a nicety: the next poll corrects it */
+    }
   }
 
   // ---- friend requests --------------------------------------------------------------------------------------------------
@@ -567,7 +588,9 @@ class FriendsController extends ChangeNotifier {
       outgoingRequests = [for (final r in ((res['outgoing'] as List?) ?? const []).cast<Map>()) FriendRequest.outgoingTo(r)];
       pendingIncoming = incomingRequests.length;
       _changed();
-    } catch (_) {/* the block stays as it was */}
+    } catch (_) {
+      /* the block stays as it was */
+    }
   }
 
   /// Adds [f] (from the answer of accept / add) to the list and remembers its key. The E2EE key comes with the row.
@@ -685,10 +708,7 @@ class FriendsController extends ChangeNotifier {
       try {
         final res = await api.get('/me/friends/search?q=${Uri.encodeQueryComponent(query)}') as Map;
         if (searchQuery.trim() != query) return;
-        results = [
-          for (final r in (res['results'] as List).cast<Map>())
-            SearchResult(id: r['id'] as String, name: (r['name'] ?? '') as String, username: (r['username'] ?? '') as String, isFriend: r['isFriend'] == true, isAdmin: r['isAdmin'] == true, requestState: _requestState(r['requestState'])),
-        ];
+        results = [for (final r in (res['results'] as List).cast<Map>()) SearchResult(id: r['id'] as String, name: (r['name'] ?? '') as String, username: (r['username'] ?? '') as String, isFriend: r['isFriend'] == true, isAdmin: r['isAdmin'] == true, requestState: _requestState(r['requestState']))];
       } catch (e) {
         searchError = e is ApiError ? e.message : 'Không tìm kiếm được';
       }

@@ -1,4 +1,5 @@
 import 'package:server/src/call_signaling.dart';
+import 'package:server/src/push_notify.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// Status as the API reports it: a withdrawn request is 'cancelled' (stored as
@@ -27,10 +28,12 @@ Map<String, Object?> paymentJson(Row r, {bool withUser = false}) => {
 /// (best effort - an offline user sees the new status next time they open
 /// "Gói dịch vụ & Thanh toán").
 void pushPaymentDecision(String userId, {required String status, String? reason, required String reference}) {
-  CallSignalingRegistry.instance.sendTo(userId, {
+  // every open connection (a phone and a tablet), not only the newest; nobody connected -> a push wakes the phone
+  final delivered = CallSignalingRegistry.instance.sendToAll(userId, {
     'type': 'payment-decided',
     'status': status,
     'referenceCode': reference,
     'reason': reason,
   });
+  if (!delivered) notifyPaymentDecision(userId, approved: status == 'approved');
 }

@@ -22,6 +22,20 @@ class PushThrottle {
 
 PushThrottle pushThrottle = PushThrottle();
 
+/// Tells an OFFLINE customer that Admin decided their payment request (the app opens Tổng quan / Gói & Thanh toán on tap).
+/// Only the decision is named, nothing else about the payment.
+void notifyPaymentDecision(String toUserId, {required bool approved}) {
+  final message = PushMessage(
+    kind: PushKind.payment,
+    title: 'MAMBA',
+    body: approved ? 'Gói của bạn đã được gia hạn.' : 'Yêu cầu gói của bạn chưa được duyệt. Mở MAMBA để xem lý do.',
+    friendId: approved ? 'approved' : 'rejected',
+  );
+  try {
+    unawaited(pushSender.send(toUserId, message).catchError((Object _) {}));
+  } catch (_) {}
+}
+
 /// Wakes an OFFLINE recipient. Fire-and-forget: never throws, never delays or
 /// changes the reply the sender gets. Only the sender's display name and the
 /// kind are used - never any message content.
@@ -38,6 +52,7 @@ void notifyOfflineRecipient({
       PushMessage(kind: kind, title: 'Lời mời kết bạn', body: '$fromName muốn kết bạn với bạn', friendId: fromUserId),
     PushKind.message =>
       PushMessage(kind: kind, title: fromName, body: 'Đang nhắn tin cho bạn. Mở MAMBA để nhận.', friendId: fromUserId),
+    PushKind.payment => PushMessage(kind: kind, title: 'MAMBA', body: 'Yêu cầu gói của bạn đã được xử lý.', friendId: fromUserId),
   };
   try {
     unawaited(pushSender.send(toUserId, message).catchError((Object _) {}));

@@ -31,11 +31,12 @@ Duration reconnectDelay(int attempt, [Random? rnd]) {
 /// reconnection and backoff. The app opens it once for the signed-in customer and keeps it (with backoff) while the
 /// process is alive; [stop] closes it for good.
 class RealtimeSocket extends ChangeNotifier implements FrameSink {
-  RealtimeSocket({required this.tokenProvider, ChannelFactory? factory, Duration Function(int)? delay})
-      : _factory = factory ?? _defaultFactory,
-        _delay = delay ?? reconnectDelay;
+  RealtimeSocket({required this.tokenProvider, this.deviceIdProvider, ChannelFactory? factory, Duration Function(int)? delay}) : _factory = factory ?? _defaultFactory, _delay = delay ?? reconnectDelay;
 
   final String? Function() tokenProvider;
+
+  /// The E2EE device id of this install (see ChatService.myDeviceId): the relay delivers a message to the device it was encrypted for.
+  String? Function()? deviceIdProvider;
 
   /// Called (once, without reconnecting) when the server closes the socket with [sessionRevokedCloseCode]: the session
   /// was revoked, so the owner must sign out instead of retrying with a dead token.
@@ -95,7 +96,9 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
     if (c != null) {
       try {
         c.sink.close();
-      } catch (_) {/* closing */}
+      } catch (_) {
+        /* closing */
+      }
     }
     if (_ready) {
       _ready = false;
@@ -111,7 +114,7 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
     _dialing = true;
     notifyListeners();
     try {
-      final uri = Uri.parse(AppConfig.wsCalls).replace(queryParameters: {'token': token});
+      final uri = Uri.parse(AppConfig.wsCalls).replace(queryParameters: {'token': token, if (deviceIdProvider?.call() case final d? when d.isNotEmpty) 'device': d});
       final ch = _factory(uri);
       _channel = ch;
       await ch.ready;
@@ -126,7 +129,9 @@ class RealtimeSocket extends ChangeNotifier implements FrameSink {
           try {
             final m = jsonDecode(raw);
             if (m is Map<String, dynamic>) _frames.add(m);
-          } catch (_) {/* not JSON */}
+          } catch (_) {
+            /* not JSON */
+          }
         },
         onDone: () => _lost(gen, closeCode: ch.closeCode),
         onError: (_) => _lost(gen),

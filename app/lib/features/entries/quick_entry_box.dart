@@ -303,7 +303,7 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
         ]),
         if (_reading) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
         if (_templateOpen) _templateBox(types),
-        if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(_error)),
+        if (_error.isNotEmpty && _drafts.isEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(_error)),
         if (_drafts.isNotEmpty) ..._previewSection(types),
       ]),
     );
@@ -385,6 +385,8 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
       for (final d in _drafts) _previewRow(d, types),
       if (_ignored.isNotEmpty) Text('Bỏ qua ${_ignored.length} dòng không có số: ${_ignored.join(' / ')}', style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
       const SizedBox(height: 10),
+      // Next to the save button: above the preview list the notice was off screen when the person pressed save.
+      if (_error.isNotEmpty) ScrollIntoView(key: ValueKey('quick-err-$_error'), child: InfoBox(_error)),
       Wrap(spacing: 8, runSpacing: 8, children: [
         AppButton(label: 'Xác nhận và lưu ${_picked.length} dòng', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !c.canAdd || _picked.isEmpty ? null : _save),
         AppButton(label: 'Đưa vào bảng nhập để sửa', variant: AppButtonVariant.secondary, onPressed: _picked.isEmpty ? null : _toForm),

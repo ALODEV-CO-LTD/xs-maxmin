@@ -21,14 +21,7 @@ const imageOnlyMessage = 'Chỉ gửi được ảnh JPG, PNG hoặc WebP (khôn
 const maxAttachmentBytes = 5 * 1024 * 1024;
 
 /// Human text for the failure reasons the relay / client can report (e2ee/chat.js REASONS).
-const failReasons = {
-  'offline': 'Bạn bè đang offline, tin nhắn chưa được gửi. Hãy gửi lại khi họ trực tuyến.',
-  'not-friend': 'Không còn là bạn bè nên không gửi được.',
-  'invalid': 'Tin nhắn không hợp lệ.',
-  'no-key': 'Bạn bè chưa bật mã hoá 2 đầu (chưa mở phiên bản mới), chưa gửi được.',
-  'no-socket': 'Mất kết nối tới máy chủ, thử lại sau.',
-  'timeout': 'Không nhận được xác nhận, tin nhắn có thể chưa tới.',
-};
+const failReasons = {'offline': 'Bạn bè đang offline, tin nhắn chưa được gửi. Hãy gửi lại khi họ trực tuyến.', 'not-friend': 'Không còn là bạn bè nên không gửi được.', 'invalid': 'Tin nhắn không hợp lệ.', 'no-key': 'Bạn bè chưa bật mã hoá 2 đầu (chưa mở phiên bản mới), chưa gửi được.', 'no-socket': 'Mất kết nối tới máy chủ, thử lại sau.', 'timeout': 'Không nhận được xác nhận, tin nhắn có thể chưa tới.'};
 String reasonText(String? reason) => failReasons[reason] ?? 'Chưa gửi được.';
 
 class ChatAttachment {
@@ -66,12 +59,14 @@ class ChatGroup {
   String get convId => id;
 
   Map<String, dynamic> toHeader() => {
-        'i': id,
-        'n': name,
-        'c': creatorId,
-        'u': updatedAt,
-        'm': [for (final m in members) [m.id, m.name]],
-      };
+    'i': id,
+    'n': name,
+    'c': creatorId,
+    'u': updatedAt,
+    'm': [
+      for (final m in members) [m.id, m.name],
+    ],
+  };
 
   String toJson() => jsonEncode(toHeader());
 
@@ -104,18 +99,7 @@ class ChatGroup {
 }
 
 class ChatMessage {
-  const ChatMessage({
-    required this.id,
-    required this.peerId,
-    required this.mine,
-    required this.text,
-    required this.createdAt,
-    required this.status,
-    this.att,
-    this.sys,
-    this.reason,
-    this.fromId,
-  });
+  const ChatMessage({required this.id, required this.peerId, required this.mine, required this.text, required this.createdAt, required this.status, this.att, this.sys, this.reason, this.fromId});
   final String id;
   final String peerId;
   final bool mine;
@@ -129,18 +113,7 @@ class ChatMessage {
   /// Who wrote it (account id); set on group messages, where [mine] alone does not say who spoke.
   final String? fromId;
 
-  ChatMessage copyWith({String? status, String? reason, bool clearReason = false}) => ChatMessage(
-        id: id,
-        peerId: peerId,
-        mine: mine,
-        text: text,
-        createdAt: createdAt,
-        status: status ?? this.status,
-        att: att,
-        sys: sys,
-        reason: clearReason ? null : (reason ?? this.reason),
-        fromId: fromId,
-      );
+  ChatMessage copyWith({String? status, String? reason, bool clearReason = false}) => ChatMessage(id: id, peerId: peerId, mine: mine, text: text, createdAt: createdAt, status: status ?? this.status, att: att, sys: sys, reason: clearReason ? null : (reason ?? this.reason), fromId: fromId);
 
   /// Text for the friend-list preview (chat.js `previews`).
   String get preview => sys != null ? '📷 Chụp màn hình cuộc trò chuyện' : (text.isNotEmpty ? text : (att != null ? '[Đính kèm] ${att!.name}' : ''));
@@ -186,10 +159,29 @@ class PeerRecord {
 }
 
 class PeerInfo {
-  const PeerInfo({required this.fingerprint, required this.changed});
+  const PeerInfo({required this.fingerprint, required this.changed, this.devices = 1});
   final String fingerprint;
+
+  /// True when the key of a device we already knew changed (not when a friend merely added another device).
   final bool changed;
+
+  /// How many devices of the friend can read our messages.
+  final int devices;
 }
+
+/// One device of a friend (or of mine): the id the server knows it by and its public key. `legacy` is the single key of an older
+/// app version.
+class DeviceKey {
+  const DeviceKey(this.id, this.jwk);
+  final String id;
+  final Map<String, dynamic> jwk;
+}
+
+const legacyDeviceId = 'legacy';
+
+/// Key of a device in the local `peers` table: the friend id alone for the older single key (rows written before devices existed),
+/// `friend|device` for the others.
+String peerKeyOf(String friendId, String deviceId) => deviceId == legacyDeviceId ? friendId : '$friendId|$deviceId';
 
 // ---- auto-delete (ChatRetentionPanel.vue) ------------------------------------------------------------------------
 
@@ -235,7 +227,7 @@ const partChars = 1000000;
 const maxParts = 8;
 
 class E2eeFrame {
-  E2eeFrame({required this.id, required this.from, required this.fromName, required this.iv, required this.ct, required this.part, required this.parts, this.ts});
+  E2eeFrame({required this.id, required this.from, required this.fromName, required this.iv, required this.ct, required this.part, required this.parts, this.ts, this.fromDevice});
   final String id;
   final String from;
   final String? fromName;
@@ -244,6 +236,9 @@ class E2eeFrame {
   final int part;
   final int parts;
   final int? ts;
+
+  /// The sender's device (set by the relay); null for a sender on an older app version.
+  final String? fromDevice;
 
   static E2eeFrame? tryParse(Map<String, dynamic> m) {
     final id = m['id'];
@@ -254,10 +249,10 @@ class E2eeFrame {
     final parts = m['parts'] ?? 1;
     if (id is! String || from is! String || iv is! String || ct is! String || part is! int || parts is! int) return null;
     if (parts < 1 || parts > maxParts || part < 0 || part >= parts) return null;
-    return E2eeFrame(id: id, from: from, fromName: m['fromName'] as String?, iv: iv, ct: ct, part: part, parts: parts, ts: m['ts'] is int ? m['ts'] as int : null);
+    return E2eeFrame(id: id, from: from, fromName: m['fromName'] as String?, iv: iv, ct: ct, part: part, parts: parts, ts: m['ts'] is int ? m['ts'] as int : null, fromDevice: m['fromDevice'] is String ? m['fromDevice'] as String : null);
   }
 
-  E2eeFrame withCt(String joined) => E2eeFrame(id: id, from: from, fromName: fromName, iv: iv, ct: joined, part: 0, parts: 1, ts: ts);
+  E2eeFrame withCt(String joined) => E2eeFrame(id: id, from: from, fromName: fromName, iv: iv, ct: joined, part: 0, parts: 1, ts: ts, fromDevice: fromDevice);
 }
 
 /// Splits ciphertext into relay frames' `ct` slices.
@@ -302,7 +297,11 @@ String? sniffImageType(Uint8List b) {
   return null;
 }
 
-String imageExt(String type) => switch (type) { 'image/png' => 'png', 'image/webp' => 'webp', _ => 'jpg' };
+String imageExt(String type) => switch (type) {
+  'image/png' => 'png',
+  'image/webp' => 'webp',
+  _ => 'jpg',
+};
 
 /// `anh-<10 hex>.<ext>`: attachments are always renamed (the original name can hold a date or device).
 String anonymousName(String type, [int Function()? byte]) {
