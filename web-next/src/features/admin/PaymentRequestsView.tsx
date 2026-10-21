@@ -44,7 +44,7 @@ export default function PaymentRequestsView() {
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [summary, setSummary] = useState<Summary | null>(null)
-  const [status, setStatus] = useState('pending')
+  const [status, setStatus] = useState('all') // the list opens on Tất cả, not on Chờ duyệt
   const [q, setQ] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')

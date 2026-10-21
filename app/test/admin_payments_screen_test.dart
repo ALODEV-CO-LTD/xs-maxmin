@@ -58,7 +58,7 @@ void main() {
         }
         if (req.url.path.endsWith('/admin/payment-requests')) {
           final status = req.url.queryParameters['status'];
-          final pending = status == 'pending' && !decided;
+          final pending = (status == 'pending' || status == 'all') && !decided; // the list opens on Tất cả
           return _json({
             'requests': pending
                 ? [
@@ -97,7 +97,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(calls.any((c) => c.startsWith('POST /api/admin/payment-requests/r1/approve')), isTrue);
     expect(find.text('Không có yêu cầu nào'), findsOneWidget);
-    expect(calls.where((c) => c.contains('status=pending')).length, greaterThanOrEqualTo(2));
+    expect(calls.where((c) => c.contains('status=all')).length, greaterThanOrEqualTo(2)); // opens on Tất cả and reloads after approving
+    expect(calls.any((c) => c.contains('status=pending')), isFalse);
   });
 
   testWidgets('settings: only the pills the rights allow; policy stays read-only until Sửa', (tester) async {

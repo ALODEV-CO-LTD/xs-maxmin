@@ -2,12 +2,13 @@
 
 export const PAGE = 30
 export const statusLabels = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Đã từ chối', cancelled: 'Người dùng huỷ' }
+// Same order as the app (paymentStatusFilters): Tất cả first, it is also the default.
 export const STATUS_TABS = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'cancelled', label: 'Đã huỷ' },
-  { key: 'rejected', label: 'Đã từ chối' },
-  { key: 'approved', label: 'Đã duyệt' },
   { key: 'pending', label: 'Chờ duyệt' },
+  { key: 'approved', label: 'Đã duyệt' },
+  { key: 'rejected', label: 'Đã từ chối' },
+  { key: 'cancelled', label: 'Đã huỷ' },
 ]
 export const REASONS = ['Chưa nhận được tiền', 'Số tiền không khớp', 'Sai nội dung chuyển khoản', 'Yêu cầu trùng']
 export const renewalTypeLabels = { purchase: 'Mua mới', renew: 'Gia hạn' }

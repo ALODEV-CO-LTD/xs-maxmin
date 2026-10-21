@@ -5,7 +5,8 @@ import '../../../core/format.dart';
 const kPaymentPageSize = 30;
 
 /// Status filter, in the order of the web dropdown: key -> label.
-const paymentStatusFilters = <(String, String)>[('pending', 'Chờ duyệt'), ('approved', 'Đã duyệt'), ('rejected', 'Đã từ chối'), ('cancelled', 'Đã huỷ'), ('all', 'Tất cả')];
+/// "Tất cả" first: it is also the default of the list.
+const paymentStatusFilters = <(String, String)>[('all', 'Tất cả'), ('pending', 'Chờ duyệt'), ('approved', 'Đã duyệt'), ('rejected', 'Đã từ chối'), ('cancelled', 'Đã huỷ')];
 
 const paymentStatusLabels = {'pending': 'Chờ duyệt', 'approved': 'Đã duyệt', 'rejected': 'Đã từ chối', 'cancelled': 'Người dùng huỷ'};
 
@@ -103,7 +104,8 @@ class PaymentPage {
 
 /// Filters of the list; also the query of the CSV export.
 class PaymentFilter {
-  const PaymentFilter({this.status = 'pending', this.q = '', this.from = '', this.to = ''});
+  /// The list opens on "Tất cả" (not on "Chờ duyệt").
+  const PaymentFilter({this.status = 'all', this.q = '', this.from = '', this.to = ''});
   final String status;
   final String q;
   final String from;
