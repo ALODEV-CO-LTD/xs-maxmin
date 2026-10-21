@@ -70,17 +70,14 @@ String foldVi(String s) {
   return b.toString();
 }
 
-/// Total shown on the "Thêm" tab and the Bạn bè entry: unread chat messages + unseen missed calls + unread replies
-/// from Admin + pending incoming friend requests.
+/// Red number on the Bạn bè entry: how many CONVERSATIONS need a look (a chat with unread messages or an unseen missed
+/// call counts once, however many messages it holds), plus 1 when Admin has replied and one per pending friend request.
 int unreadBadgeCount({Map<String, int> chat = const {}, Map<String, int> missed = const {}, int support = 0, int friendRequests = 0}) {
-  var n = (support < 0 ? 0 : support) + (friendRequests < 0 ? 0 : friendRequests);
-  for (final v in chat.values) {
-    if (v > 0) n += v;
-  }
-  for (final v in missed.values) {
-    if (v > 0) n += v;
-  }
-  return n;
+  final ids = <String>{
+    for (final e in chat.entries) if (e.value > 0) e.key,
+    for (final e in missed.entries) if (e.value > 0) e.key,
+  };
+  return ids.length + (support > 0 ? 1 : 0) + (friendRequests < 0 ? 0 : friendRequests);
 }
 
 /// A short in-app message shown over any screen (new message while you are not in that chat, call problems, ...).

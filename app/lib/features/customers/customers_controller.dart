@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/lottery_stations.dart';
 import '../../core/scoring_config.dart';
+import '../account/stats_money.dart';
 import '../entries/entry_model.dart';
 import '../entries/message_parser.dart' show foldText;
 import '../entries/offline_store.dart';
@@ -21,6 +23,12 @@ class CustomerSummary {
   String? lastDate;
 
   double get chenhLech => vao - ra;
+
+  /// Tiền (đồng), tính như Tính điểm: tiền khách gửi, tiền trúng, lợi nhuận trên các ngày đã có kết quả xổ số.
+  double sent = 0;
+  double won = 0;
+  double settled = 0;
+  double get profit => settled - won;
   String get phone => customer?.phone ?? '';
 }
 
@@ -51,11 +59,73 @@ List<CustomerSummary> searchCustomers(List<CustomerSummary> list, String query) 
   return q.isEmpty ? list : [for (final c in list) if (foldText(c.name).contains(q)) c];
 }
 
+/// Bộ lọc kết quả của khách (lãi / lỗ / chưa có số liệu) và miền của khách (Bắc / Nam-Trung); null = không lọc.
+enum CustomerResultFilter { profit, loss, noData }
+
+List<CustomerSummary> filterCustomers(List<CustomerSummary> list, {CustomerResultFilter? result, String? region}) {
+  bool keep(CustomerSummary c) {
+    switch (result) {
+      case CustomerResultFilter.profit:
+        if (!(c.count > 0 && c.profit > 0)) return false;
+      case CustomerResultFilter.loss:
+        if (!(c.count > 0 && c.profit < 0)) return false;
+      case CustomerResultFilter.noData:
+        if (c.count > 0) return false;
+      case null:
+        break;
+    }
+    return region == null || c.customer?.homeRegion == region;
+  }
+
+  return [for (final c in list) if (keep(c)) c];
+}
+
+/// Thứ tự danh sách khách. `recent` = mặc định (ngày nhập gần nhất trước).
+enum CustomerSort {
+  recent('Gần đây nhất'),
+  sentDesc('Tiền vào nhiều nhất'),
+  sentAsc('Tiền vào ít nhất'),
+  wonDesc('Tiền ra nhiều nhất'),
+  wonAsc('Tiền ra ít nhất'),
+  profitDesc('Lợi nhuận nhiều nhất'),
+  profitAsc('Lợi nhuận ít nhất'),
+  nameAsc('Tên A → Z');
+
+  const CustomerSort(this.label);
+  final String label;
+}
+
+List<CustomerSummary> sortCustomers(List<CustomerSummary> list, CustomerSort sort) {
+  if (sort == CustomerSort.recent) return list;
+  int byName(CustomerSummary a, CustomerSummary b) => a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  final out = [...list];
+  num key(CustomerSummary c) => switch (sort) {
+        CustomerSort.sentDesc || CustomerSort.sentAsc => c.sent,
+        CustomerSort.wonDesc || CustomerSort.wonAsc => c.won,
+        CustomerSort.profitDesc || CustomerSort.profitAsc => c.profit,
+        _ => 0,
+      };
+  final desc = sort == CustomerSort.sentDesc || sort == CustomerSort.wonDesc || sort == CustomerSort.profitDesc;
+  if (sort == CustomerSort.nameAsc) {
+    out.sort(byName);
+  } else {
+    out.sort((a, b) {
+      final c = desc ? key(b).compareTo(key(a)) : key(a).compareTo(key(b));
+      return c != 0 ? c : byName(a, b);
+    });
+  }
+  return out;
+}
+
 class CustomersController extends ChangeNotifier {
-  CustomersController({required this.api, required this.auth, this.store});
+  CustomersController({required this.api, required this.auth, this.store, this.stations});
   final ApiClient api;
   final AuthStore auth;
   OfflineStore? store;
+  final LotteryStations? stations;
+
+  /// Money per customer name, worked out in the background after the list shows; null until it is ready.
+  Map<String, CustomerMoney>? money;
 
   List<Customer> roster = [];
   List<Entry> entries = [];
@@ -67,8 +137,54 @@ class CustomersController extends ChangeNotifier {
   bool _disposed = false;
 
   List<CustomerSummary>? _summaries;
-  List<CustomerSummary> get summaries => _summaries ??= summarizeCustomers(roster, entries);
-  List<CustomerSummary> get shown => searchCustomers(summaries, query);
+  List<CustomerSummary> get summaries {
+    final cached = _summaries;
+    if (cached != null) return cached;
+    final list = summarizeCustomers(roster, entries);
+    final m = money;
+    if (m != null) {
+      for (final s in list) {
+        final x = m[s.name];
+        if (x == null) continue;
+        s.sent = x.sent;
+        s.won = x.won;
+        s.settled = x.settled;
+      }
+    }
+    return _summaries = list;
+  }
+
+  bool get moneyReady => money != null;
+  CustomerResultFilter? resultFilter;
+  String? regionFilter; // 'mb' | 'mn'
+  CustomerSort sort = CustomerSort.recent;
+  bool get hasFilter => resultFilter != null || regionFilter != null;
+
+  /// Số mục đang áp dụng trong bộ lọc (kết quả, miền, thứ tự khác mặc định), hiện trên nút Bộ lọc.
+  int get activeCount => (resultFilter != null ? 1 : 0) + (regionFilter != null ? 1 : 0) + (sort != CustomerSort.recent ? 1 : 0);
+  List<CustomerSummary> get shown => sortCustomers(filterCustomers(searchCustomers(summaries, query), result: resultFilter, region: regionFilter), sort);
+
+  void setSort(CustomerSort s) {
+    sort = s;
+    _notify();
+  }
+
+  void setResultFilter(CustomerResultFilter? f) {
+    resultFilter = f;
+    _notify();
+  }
+
+  void setRegionFilter(String? r) {
+    regionFilter = r;
+    _notify();
+  }
+
+  void clearFilters() {
+    resultFilter = null;
+    regionFilter = null;
+    sort = CustomerSort.recent;
+    _notify();
+  }
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -113,6 +229,19 @@ class CustomersController extends ChangeNotifier {
       if (rates is Map && rates.isNotEmpty) accountRates = Map<String, dynamic>.from(rates);
     } catch (_) {/* keep the built-in fallback */}
     loading = false;
+    _summaries = null;
+    _notify();
+    _loadMoney();
+  }
+
+  Future<void> _loadMoney() async {
+    final st = stations;
+    if (st == null) return;
+    try {
+      money = await loadCustomerMoney(api, st);
+    } catch (_) {
+      return; // the cards keep showing "..." instead of wrong numbers
+    }
     _summaries = null;
     _notify();
   }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/format.dart';
+import '../../core/lottery_stations.dart';
 import '../../core/mask_store.dart';
 import '../../core/scoring_config_bus.dart';
 import '../../core/theme.dart';
@@ -22,7 +23,7 @@ class CustomersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<CustomersController>(
-      create: (c) => CustomersController(api: c.read<ApiClient>(), auth: c.read<AuthStore>())..load(),
+      create: (c) => CustomersController(api: c.read<ApiClient>(), auth: c.read<AuthStore>(), stations: c.read<LotteryStations>())..load(),
       child: const _CustomersBody(),
     );
   }
@@ -94,7 +95,7 @@ class _CustomersBodyState extends State<_CustomersBody> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            Text('Số liệu vào/ra được tổng hợp từ các lượt nhập.', style: TextStyle(fontSize: 13, color: context.mutedColor)),
+            Text('Tiền vào/ra tính theo bảng giá của từng khách; lợi nhuận chỉ tính các ngày đã có kết quả xổ số.', style: TextStyle(fontSize: 13, color: context.mutedColor)),
             const SizedBox(height: 10),
             if (c.fromCache) const InfoBox('Đang offline: hiển thị số liệu đã lưu trên máy. Thêm/xoá khách hàng cần có mạng.', kind: InfoKind.warning),
             if (c.loading)
@@ -108,6 +109,8 @@ class _CustomersBodyState extends State<_CustomersBody> {
               ]),
               const SizedBox(height: 10),
               TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: Icon(Icons.search)), onChanged: c.setQuery),
+              const SizedBox(height: 8),
+              _filters(c),
               const SizedBox(height: 10),
               if (_message.isNotEmpty) InfoBox(_message, onClose: () => setState(() => _message = '')),
               if (c.summaries.isEmpty)
@@ -115,9 +118,28 @@ class _CustomersBodyState extends State<_CustomersBody> {
               else if (list.isEmpty)
                 const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Không tìm thấy khách hàng phù hợp.')))
               else
-                for (var i = 0; i < list.length; i++) _tile(context, c, list[i], i + 1),
+                for (final s in list) _tile(context, c, s),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Một nút "Bộ lọc" (kèm số mục đang áp dụng); bấm thì mở bảng chọn lọc và sắp xếp.
+  Widget _filters(CustomersController c) {
+    final n = c.activeCount;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.tune, size: 18),
+        label: Text(n == 0 ? 'Bộ lọc' : 'Bộ lọc ($n)'),
+        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+        onPressed: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => ChangeNotifierProvider<CustomersController>.value(value: c, child: const _FilterSheet()),
         ),
       ),
     );
@@ -131,7 +153,7 @@ class _CustomersBodyState extends State<_CustomersBody> {
         onPressed: onPressed,
       );
 
-  Widget _tile(BuildContext context, CustomersController c, CustomerSummary s, int stt) {
+  Widget _tile(BuildContext context, CustomersController c, CustomerSummary s) {
     final cu = s.customer;
     Widget stat(String label, String value, Color? color) => Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -145,12 +167,6 @@ class _CustomersBodyState extends State<_CustomersBody> {
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Container(
-              width: 28,
-              alignment: Alignment.center,
-              child: Text('$stt', style: TextStyle(color: context.mutedColor, fontWeight: FontWeight.w600)),
-            ),
-            const SizedBox(width: 6),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(s.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
@@ -175,9 +191,9 @@ class _CustomersBodyState extends State<_CustomersBody> {
           ]),
           const SizedBox(height: 10),
           Row(children: [
-            stat('Điểm vào', formatNumber(s.vao), context.okColor),
-            stat('Điểm ra', formatNumber(s.ra), context.badColor),
-            stat('Lợi nhuận', formatNumber(s.chenhLech), s.chenhLech >= 0 ? context.okColor : context.badColor),
+            stat('Tiền vào', c.moneyReady ? formatNumber(s.sent) : '...', context.okColor),
+            stat('Tiền ra', c.moneyReady ? formatNumber(s.won) : '...', context.badColor),
+            stat('Lợi nhuận', c.moneyReady ? formatNumber(s.profit) : '...', s.profit >= 0 ? context.okColor : context.badColor),
           ]),
         ]),
       ),
@@ -236,6 +252,50 @@ class _EditPhoneDialogState extends State<_EditPhoneDialog> {
         AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => Navigator.pop(context)),
         AppButton(label: 'Lưu', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _save),
       ],
+    );
+  }
+}
+
+/// Bảng "Bộ lọc": lọc theo kết quả và miền, sắp xếp theo tiền vào / tiền ra / lợi nhuận / tên. Áp dụng ngay khi chọn.
+class _FilterSheet extends StatelessWidget {
+  const _FilterSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.watch<CustomersController>();
+    Widget group(String title, List<Widget> chips) => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 6, children: chips),
+          ]),
+        );
+    Widget chip(String label, bool on, VoidCallback onTap) => ChoiceChip(label: Text(label), selected: on, showCheckmark: false, onSelected: (_) => onTap());
+    const results = {
+      CustomerResultFilter.profit: 'Lãi',
+      CustomerResultFilter.loss: 'Lỗ',
+      CustomerResultFilter.noData: 'Chưa có số liệu',
+    };
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          group('Sắp xếp', [for (final s in CustomerSort.values) chip(s.label, c.sort == s, () => c.setSort(s))]),
+          group('Kết quả', [
+            for (final e in results.entries) chip(e.value, c.resultFilter == e.key, () => c.setResultFilter(c.resultFilter == e.key ? null : e.key)),
+          ]),
+          group('Miền của khách', [
+            chip('Miền Bắc', c.regionFilter == 'mb', () => c.setRegionFilter(c.regionFilter == 'mb' ? null : 'mb')),
+            chip('Nam/Trung', c.regionFilter == 'mn', () => c.setRegionFilter(c.regionFilter == 'mn' ? null : 'mn')),
+          ]),
+          Row(children: [
+            AppButton(label: 'Đặt lại', variant: AppButtonVariant.ghost, onPressed: c.activeCount == 0 ? null : c.clearFilters),
+            const Spacer(),
+            AppButton(label: 'Xong', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(context)),
+          ]),
+        ]),
+      ),
     );
   }
 }

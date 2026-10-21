@@ -91,8 +91,10 @@ List<StatPoint> buildMoneySeries(Map<String, DayMoney> byDate, StatUnit unit, St
   ];
 }
 
-/// Loads everything the same way Tính điểm does (saved copy when offline) and works the money out.
-Future<MoneyStats> loadMoneyStats(ApiClient api, LotteryStations stations) async {
+/// What both loaders need, fetched the same way Tính điểm does (saved copy when offline).
+typedef _MoneyInputs = ({List<Entry> entries, List<CustomerRec> customers, RatesMap rates, LotteryResult? Function(String, String) getResult});
+
+Future<_MoneyInputs> _loadMoneyInputs(ApiClient api, LotteryStations stations) async {
   final r = await Future.wait([
     fetchAllEntries(api, overlay: true),
     fetchCustomers(api).catchError((_) => <CustomerRec>[]),
@@ -126,5 +128,53 @@ Future<MoneyStats> loadMoneyStats(ApiClient api, LotteryStations stations) async
   }
 
   await Future.wait([worker(), worker(), worker(), worker()]);
-  return computeMoneyStats(entries: entries, customers: customers, accountRates: rates, stations: stations, getResult: (d, s) => cache[lotteryKey(d, s)]);
+  return (entries: entries, customers: customers, rates: rates, getResult: (String d, String s) => cache[lotteryKey(d, s)]);
+}
+
+Future<MoneyStats> loadMoneyStats(ApiClient api, LotteryStations stations) async {
+  final i = await _loadMoneyInputs(api, stations);
+  return computeMoneyStats(entries: i.entries, customers: i.customers, accountRates: i.rates, stations: stations, getResult: i.getResult);
+}
+
+/// One customer's money over all their days (đồng): sent, won, and the profit on the days that already have a result.
+class CustomerMoney {
+  double sent = 0;
+  double settled = 0;
+  double won = 0;
+  double pending = 0;
+  double get profit => settled - won;
+}
+
+/// Pure: money per customer name, each scored with their own rates / region (same `summarize` as Tính điểm).
+Map<String, CustomerMoney> computeMoneyByCustomer({
+  required List<Entry> entries,
+  required Iterable<CustomerRec> customers,
+  required RatesMap accountRates,
+  required LotteryStations stations,
+  required LotteryResult? Function(String date, String station) getResult,
+}) {
+  final byName = {for (final c in customers) c.name: c};
+  final groups = <String, Map<String, List<Entry>>>{};
+  for (final e in entries) {
+    final name = e.customerName.isEmpty ? noCustomerName : e.customerName;
+    groups.putIfAbsent(name, () => {}).putIfAbsent(e.entryDate, () => []).add(e);
+  }
+  final out = <String, CustomerMoney>{};
+  groups.forEach((name, days) {
+    final c = byName[name];
+    final m = out.putIfAbsent(name, CustomerMoney.new);
+    days.forEach((date, list) {
+      final s = summarize([DayEntries(date, list)], accountRates, c?.scoringRates, getResult, stations, customerRegion: c?.homeRegion);
+      m.sent += s.sentMoney;
+      m.settled += s.settledMoney;
+      m.won += s.wonMoney;
+      m.pending += s.pendingMoney;
+    });
+  });
+  return out;
+}
+
+Future<Map<String, CustomerMoney>> loadCustomerMoney(ApiClient api, LotteryStations stations) async {
+  final i = await _loadMoneyInputs(api, stations);
+  return computeMoneyByCustomer(entries: i.entries, customers: i.customers, accountRates: i.rates, stations: stations, getResult: i.getResult);
 }

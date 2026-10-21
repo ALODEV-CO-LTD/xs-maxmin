@@ -49,6 +49,18 @@ void main() {
     expect(m.customerNames, {'Anh Dũng'});
   });
 
+  test('tiền theo từng khách khớp với tổng của Tổng quan', () {
+    final other = Entry(id: '9', customerName: 'Chị Lan', entryDate: '2026-10-11', value: '12', score: '10', result: '0', betType: 'lo', station: 'mb');
+    final list = [...entries, other];
+    final total = stats(onlyThese, list);
+    final by = computeMoneyByCustomer(entries: list, customers: customers, accountRates: defaultRates, stations: testStations(), getResult: onlyThese);
+    expect(by.keys.toSet(), {'Anh Dũng', 'Chị Lan'});
+    expect(by['Anh Dũng']!.sent + by['Chị Lan']!.sent, total.sent);
+    expect(by['Anh Dũng']!.won + by['Chị Lan']!.won, total.won);
+    expect(by['Anh Dũng']!.profit + by['Chị Lan']!.profit, total.profit);
+    expect(by['Chị Lan']!.sent, 216000); // 10 điểm lô x giá mặc định 21.600 đ/điểm
+  });
+
   test('a day with no result yet is "chưa tính": never counted as profit', () {
     final m = stats((d, s) => d == '2026-10-11' && s == 'mb' ? draw11 : null);
     expect(m.byDate['2026-10-18']!.pending, m.byDate['2026-10-18']!.sent);

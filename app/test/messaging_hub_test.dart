@@ -232,9 +232,10 @@ void main() {
   });
 
   group('unread badge', () {
-    test('unreadBadgeCount sums chat + missed calls + admin replies and ignores junk', () {
+    test('unreadBadgeCount counts conversations (chat or missed call once each) + admin replies and ignores junk', () {
       expect(unreadBadgeCount(), 0);
-      expect(unreadBadgeCount(chat: {'a': 2, 'b': 3}, missed: {'a': 1}, support: 4), 10);
+      expect(unreadBadgeCount(chat: {'a': 2, 'b': 3}, missed: {'a': 1}, support: 4), 3); // chats a and b (a's missed call is the same chat) + the Admin reply
+      expect(unreadBadgeCount(chat: {'a': 9}, missed: {'c': 1}), 2);
       expect(unreadBadgeCount(chat: {'a': -5, 'b': 0}, support: -1), 0);
     });
 
@@ -245,14 +246,14 @@ void main() {
       await settle();
       expect(rig.hub.supportUnread, 2);
       expect(rig.hub.unseenMissed, {peerId: 1});
-      expect(rig.hub.unreadTotal, 3);
+      expect(rig.hub.unreadTotal, 2); // the chat with a missed call (1) + the Admin reply (1)
       await rig.peer.send(hubId, 'a');
       await rig.peer.send(hubId, 'b');
       await settle();
-      expect(rig.hub.unreadTotal, 5);
+      expect(rig.hub.unreadTotal, 2); // same chat: two more messages are still one chat
       rig.hub.markChatSeen(peerId);
       await settle();
-      expect(rig.hub.unreadTotal, 3);
+      expect(rig.hub.unreadTotal, 2); // the missed call is still unseen
       expect(rig.notifier.cancelled, contains(noticeIdFor('msg:$peerId')));
     });
 

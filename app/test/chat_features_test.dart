@@ -126,6 +126,10 @@ void main() {
     Future<void> boot(WidgetTester t, List<ChatMessage> seed, {List<Map<String, dynamic>>? friends, _Sock? sock}) async {
       final client = MockClient((req) async {
         final path = req.url.path;
+        if (path.endsWith('/me/verify-password')) {
+          final ok = (jsonDecode(req.body) as Map)['password'] == '1234';
+          return ok ? _json({'ok': true}) : http.Response.bytes(utf8.encode(jsonEncode({'error': 'Mật khẩu không đúng'})), 403, headers: {'content-type': 'application/json; charset=utf-8'});
+        }
         if (path.endsWith('/me/e2ee-key')) return _json({'publicKey': null});
         if (path.endsWith('/me/friends')) return _json({'friends': friends ?? [{'id': 'f1', 'name': 'Bình', 'username': 'binh', 'isAdmin': false}]});
         if (path.endsWith('/me/customer-codes')) return _json({'codes': []});
@@ -284,8 +288,71 @@ void main() {
       expect(find.text('Đã lưu trữ (1)'), findsNothing); // still in edit mode, bar shown instead
       await t.tap(find.text('Xong'));
       await t.pumpAndSettle();
-      expect(find.text('Đã lưu trữ (1)'), findsOneWidget);
+      expect(find.textContaining('Đã lưu trữ'), findsNothing); // archived chats leave no trace on the list
       expect(find.text('Bình'), findsNothing);
+
+      // Cài đặt tin nhắn > Tin nhắn lưu trữ: needs the password, then lists the archived chat with "Bỏ lưu trữ".
+      await t.tap(find.byTooltip('Cài đặt tin nhắn'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Tin nhắn lưu trữ'));
+      await t.pumpAndSettle();
+      expect(find.text('Xem tin nhắn lưu trữ'), findsOneWidget);
+      await t.enterText(find.byType(TextField).last, 'sai');
+      await t.tap(find.widgetWithText(FilledButton, 'Xem'));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pumpAndSettle();
+      expect(find.text('Mật khẩu không đúng'), findsOneWidget);
+      expect(find.text('Bình'), findsNothing);
+      await t.enterText(find.byType(TextField).last, '1234');
+      await t.tap(find.widgetWithText(FilledButton, 'Xem'));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pumpAndSettle();
+      expect(find.text('Bình'), findsOneWidget);
+      await t.tap(find.text('Bỏ lưu trữ'));
+      await t.pumpAndSettle();
+      expect(find.text('Chưa lưu trữ cuộc trò chuyện nào.'), findsOneWidget);
+    });
+
+    testWidgets('nhấn giữ một cuộc trò chuyện: Lưu trữ ẩn khỏi danh sách, Xoá hỏi trước khi xoá', (t) async {
+      await t.runAsync(() => boot(t, [msg('a', 'chào')]));
+      await t.pumpWidget(host(const FriendsScreen()));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Để sau'));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pumpAndSettle();
+      await t.longPress(find.text('Bình'));
+      await t.pumpAndSettle();
+      expect(find.text('Lưu trữ'), findsOneWidget);
+      expect(find.text('Xoá cuộc trò chuyện'), findsOneWidget);
+      await t.tap(find.text('Xoá cuộc trò chuyện'));
+      await t.pumpAndSettle();
+      expect(find.text('Xoá cuộc trò chuyện'), findsWidgets); // the confirm dialog
+      await t.tap(find.text('Huỷ'));
+      await t.pumpAndSettle();
+      expect(find.text('Bình'), findsOneWidget); // cancelled: still there
+      await t.longPress(find.text('Bình'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Lưu trữ'));
+      await t.pumpAndSettle();
+      expect(find.text('Bình'), findsNothing);
+    });
+
+    testWidgets('lướt xuống hiện nút mũi tên về đầu danh sách; số đỏ là số đoạn chat chưa đọc', (t) async {
+      final many = [for (var i = 0; i < 40; i++) {'id': 'f$i', 'name': 'Bạn ${i.toString().padLeft(2, '0')}', 'username': 'u$i', 'isAdmin': false}];
+      await t.runAsync(() => boot(t, [], friends: many));
+      await t.pumpWidget(host(const FriendsScreen()));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Để sau'));
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pumpAndSettle();
+      expect(find.byTooltip('Lên đầu danh sách'), findsNothing);
+      await t.drag(find.byType(Scrollable).first, const Offset(0, -2500));
+      await t.pumpAndSettle();
+      expect(find.byTooltip('Lên đầu danh sách'), findsOneWidget);
+      await t.tap(find.byTooltip('Lên đầu danh sách'));
+      await t.pumpAndSettle();
+      expect(find.byTooltip('Lên đầu danh sách'), findsNothing);
+      expect(find.text('Bạn 00'), findsOneWidget);
     });
   });
 }

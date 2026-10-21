@@ -1,8 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
+import 'archived_chats.dart';
 import 'friends_controller.dart';
 import '../../core/widgets/app_button.dart';
 
@@ -49,38 +51,59 @@ class _SheetState extends State<_Sheet> {
         padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
         child: ListenableBuilder(
           listenable: c,
-          builder: (context, _) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Cài đặt tin nhắn & cuộc gọi', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text(keepAliveTitle),
-              subtitle: const Padding(padding: EdgeInsets.only(top: 4), child: Text(keepAliveExplain)),
-              value: c.keepAlive,
-              onChanged: (v) async {
-                await c.setKeepAlive(v);
-                _refresh();
-              },
-            ),
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(_allowed == true ? Icons.notifications_active_outlined : Icons.notifications_off_outlined, color: _allowed == true ? context.okColor : Brand.warning),
-              title: Text(_allowed == true ? 'Thông báo đang bật' : 'Thông báo đang tắt'),
-              subtitle: const Text('Thông báo tin nhắn chỉ ghi "Tin nhắn mới từ <tên>", không bao giờ hiện nội dung.'),
-              trailing: _allowed == true
-                  ? null
-                  : AppButton(label: 'Bật', variant: AppButtonVariant.ghost, onPressed: () async {
-                        final t0 = DateTime.now();
-                        final ok = await c.requestNotificationPermission(force: true);
-                        // iOS asks only once: when it answers "no" at once (no dialog was shown) the switch is in Cài đặt.
-                        if (!ok && Platform.isIOS && DateTime.now().difference(t0).inMilliseconds < 700) {
-                          await launchUrl(Uri.parse('app-settings:'));
-                        }
-                        _refresh();
-                      }),
-            ),
-          ]),
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Cài đặt tin nhắn & cuộc gọi', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(keepAliveTitle),
+                subtitle: const Padding(padding: EdgeInsets.only(top: 4), child: Text(keepAliveExplain)),
+                value: c.keepAlive,
+                onChanged: (v) async {
+                  await c.setKeepAlive(v);
+                  _refresh();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(_allowed == true ? Icons.notifications_active_outlined : Icons.notifications_off_outlined, color: _allowed == true ? context.okColor : Brand.warning),
+                title: Text(_allowed == true ? 'Thông báo đang bật' : 'Thông báo đang tắt'),
+                subtitle: const Text('Thông báo tin nhắn chỉ ghi "Tin nhắn mới từ <tên>", không bao giờ hiện nội dung.'),
+                trailing: _allowed == true
+                    ? null
+                    : AppButton(
+                        label: 'Bật',
+                        variant: AppButtonVariant.ghost,
+                        onPressed: () async {
+                          final t0 = DateTime.now();
+                          final ok = await c.requestNotificationPermission(force: true);
+                          // iOS asks only once: when it answers "no" at once (no dialog was shown) the switch is in Cài đặt.
+                          if (!ok && Platform.isIOS && DateTime.now().difference(t0).inMilliseconds < 700) {
+                            await launchUrl(Uri.parse('app-settings:'));
+                          }
+                          _refresh();
+                        },
+                      ),
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: const Text('Tin nhắn lưu trữ'),
+                subtitle: const Text('Các cuộc trò chuyện đã lưu trữ được ẩn khỏi danh sách. Nhập mật khẩu cấp 2 để xem.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop(); // close this sheet first, the lock prompt and the list open on the page underneath
+                  showArchivedChats(nav, c);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

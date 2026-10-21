@@ -25,14 +25,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
   final _searchFocus = FocusNode();
   bool _copied = false;
   bool _edit = false; // Sửa: pick conversations to archive / delete
-  bool _showArchived = false;
   final Set<String> _picked = {};
+  final _scroll = ScrollController();
+  bool _showTop = false; // the round arrow that jumps back to the first conversation
   FriendsController? _c;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final c = MessagingScope.maybeOf(context);
+    // Signed out (e.g. from another device): the hub is gone and disposed. Forget it, or this screen keeps listening to it.
+    if (c == null) _c = null;
     if (c != null && !identical(c, _c)) {
       _c = c;
       // Fresh data every time the screen opens; the services themselves are already running.
@@ -76,7 +79,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
+    _scroll.dispose();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -91,19 +101,29 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
   }
 
+  void _onScroll() {
+    final far = _scroll.hasClients && _scroll.offset > 600;
+    if (far != _showTop) setState(() => _showTop = far);
+  }
+
   void _toggleEdit() => setState(() {
     _edit = !_edit;
     _picked.clear();
   });
 
   Future<void> _archivePicked(FriendsController c) async {
-    await c.chat?.setArchived(_picked.toList(), !_showArchived);
+    await c.chat?.setArchived(_picked.toList(), true);
     if (mounted) _toggleEdit();
   }
 
   Future<void> _deletePicked(FriendsController c) async {
-    final ids = _picked.toList();
-    if (ids.isEmpty) return;
+    final done = await _deleteIds(c, _picked.toList());
+    if (done && mounted) _toggleEdit();
+  }
+
+  /// Asks, then clears the conversations on this device (a group is left). Returns whether it was done.
+  Future<bool> _deleteIds(FriendsController c, List<String> ids) async {
+    if (ids.isEmpty) return false;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -125,7 +145,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true) return false;
     for (final id in ids) {
       // A group is left (the members are told); a friend's conversation is only cleared on this device.
       if (isGroupId(id)) {
@@ -135,7 +155,32 @@ class _FriendsScreenState extends State<FriendsScreen> {
       }
     }
     await c.refreshFriendList(quiet: true);
-    if (mounted) _toggleEdit();
+    return true;
+  }
+
+  /// Nhấn giữ một cuộc trò chuyện: Lưu trữ hoặc Xoá (nhóm thì Rời nhóm).
+  Future<void> _rowMenu(FriendsController c, Friend f) async {
+    final pick = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: Align(alignment: Alignment.centerLeft, child: Text(c.nameOf(f), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)))),
+          ListTile(leading: const Icon(Icons.inventory_2_outlined), title: const Text('Lưu trữ'), onTap: () => Navigator.pop(ctx, 'archive')),
+          ListTile(
+            leading: Icon(Icons.delete_outline, color: ctx.badColor),
+            title: Text(f.isGroup ? 'Rời nhóm' : 'Xoá cuộc trò chuyện', style: TextStyle(color: ctx.badColor)),
+            onTap: () => Navigator.pop(ctx, 'delete'),
+          ),
+        ]),
+      ),
+    );
+    if (!mounted) return;
+    if (pick == 'archive') {
+      await c.chat?.setArchived([f.id], true);
+    } else if (pick == 'delete') {
+      await _deleteIds(c, [f.id]);
+    }
   }
 
   /// "Thêm": Tin nhắn mới / Nhóm mới / Danh bạ mới.
@@ -195,7 +240,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
           ),
         );
         if (f != null && mounted) {
-          setState(() => _showArchived = false);
           _openChat(f);
         }
       case 'group':
@@ -205,7 +249,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
         );
         if (gid != null && mounted) {
           await c.refreshFriendList(quiet: true);
-          setState(() => _showArchived = false);
           _openChat(c.groups.where((g) => g.id == gid).firstOrNull);
         }
       default:
@@ -367,12 +410,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final archived = c.chat?.archived ?? const <String>{};
     final friends = [
       for (final f in all)
-        if (archived.contains(f.id) == _showArchived) f,
+        if (!archived.contains(f.id)) f,
     ];
-    final archivedCount = c.conversations
-        .where((f) => archived.contains(f.id))
-        .length;
-    return RefreshIndicator(
+    final list = RefreshIndicator(
       onRefresh: () async {
         await c.chat?.loadFriendKeys();
         await c.refreshFriendList();
@@ -380,6 +420,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       },
       // The conversation rows run edge to edge (like a messenger list); everything else keeps the 16 dp side margin.
       child: ListView(
+        controller: _scroll,
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           if (c.supportUnread > 0)
@@ -394,7 +435,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 ),
               ),
             ),
-          if (q.isEmpty && !_showArchived && (c.incomingRequests.isNotEmpty || c.outgoingRequests.isNotEmpty)) _side(_RequestsBlock(controller: c, onMessage: _toast)),
+          if (q.isEmpty && (c.incomingRequests.isNotEmpty || c.outgoingRequests.isNotEmpty)) _side(_RequestsBlock(controller: c, onMessage: _toast)),
           if (c.searchError.isNotEmpty) _side(Text(c.searchError, style: TextStyle(color: context.badColor))),
           if (c.addNotice.isNotEmpty) _side(Text(c.addNotice, key: const Key('add-notice'), style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600))),
           if (q.isNotEmpty && (c.searching || c.newPeople.isNotEmpty)) ...[
@@ -443,7 +484,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     ? _side(Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Không tìm thấy ai khớp với "$q". Nếu là mã ID, hãy kiểm tra lại các chữ số.'))))
                     : const SizedBox.shrink()
               else
-                _side(Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(_showArchived ? 'Chưa lưu trữ cuộc trò chuyện nào.' : 'Chưa có cuộc trò chuyện nào. Bấm Thêm > Tin nhắn mới để bắt đầu.'))))
+                _side(Card(child: Padding(padding: const EdgeInsets.all(16), child: const Text('Chưa có cuộc trò chuyện nào. Bấm Thêm > Tin nhắn mới để bắt đầu.'))))
             else
               for (final f in friends) _friendTile(context, c, f),
             if (_edit)
@@ -452,7 +493,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     AppButton(
-                      label: '${_showArchived ? 'Bỏ lưu trữ' : 'Lưu trữ'}${_picked.isEmpty ? '' : ' (${_picked.length})'}',
+                      label: 'Lưu trữ${_picked.isEmpty ? '' : ' (${_picked.length})'}',
                       variant: AppButtonVariant.ghost,
                       onPressed: _picked.isEmpty ? null : () => _archivePicked(c),
                     ),
@@ -463,20 +504,24 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   ],
                 ),
               )
-            else if (archivedCount > 0 || _showArchived)
-              _side(
-                Center(
-                  child: AppButton(
-                    label: _showArchived ? '← Về tin nhắn' : 'Đã lưu trữ ($archivedCount)',
-                    variant: AppButtonVariant.ghost,
-                    onPressed: () => setState(() => _showArchived = !_showArchived),
-                  ),
-                ),
-              ),
           ],
         ],
       ),
     );
+    return Stack(children: [
+      Positioned.fill(child: list),
+      if (_showTop)
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton.small(
+            heroTag: 'friends-top',
+            tooltip: 'Lên đầu danh sách',
+            onPressed: () => _scroll.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut),
+            child: const Icon(Icons.keyboard_arrow_up),
+          ),
+        ),
+    ]);
   }
 
   void _toast(String m) {
@@ -498,6 +543,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       children: [
         InkWell(
           onTap: _edit ? toggle : () => _openChat(f),
+          onLongPress: _edit ? null : () => _rowMenu(c, f),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             child: Row(
@@ -530,7 +576,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   children: [
                     Text(time, style: TextStyle(fontSize: 13, color: unread > 0 ? theme.colorScheme.primary : context.mutedColor)),
                     if (unread > 0 || missed > 0) const SizedBox(height: 4),
-                    if (unread > 0) _Badge(text: unread > 99 ? '99+' : '$unread', color: theme.colorScheme.primary),
+                    if (unread > 0) _Badge(text: unread > 99 ? '99+' : '$unread', color: context.badColor),
                     if (missed > 0) _Badge(text: '☎ $missed', color: context.badColor),
                   ],
                 ),

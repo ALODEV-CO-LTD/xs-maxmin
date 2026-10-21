@@ -88,4 +88,56 @@ void main() {
       expect(entriesToText([list[1]]).split('\n').last, '2026-10-02\tLô\t45\t5\t\t');
     });
   });
+
+  test('filterCustomers: lãi / lỗ / chưa có số liệu và miền, kết hợp được với nhau', () {
+    final roster = [
+      Customer(id: '1', name: 'An', homeRegion: 'mb'),
+      Customer(id: '2', name: 'Bình', homeRegion: 'mn'),
+      Customer(id: '3', name: 'Chi', homeRegion: 'mn'),
+      Customer(id: '4', name: 'Dung'),
+    ];
+    final entries = [
+      e('a', 'An', '2026-10-01', score: '10', result: '4'), // vào 10, ra 4 => lãi
+      e('b', 'Bình', '2026-10-02', score: '5', result: '9'), // lỗ
+    ];
+    final all = summarizeCustomers(roster, entries);
+    // lãi / lỗ lấy theo tiền (đã tính ở controller), không theo điểm
+    for (final c in all) {
+      if (c.name == 'An') {
+        c.sent = 1000;
+        c.settled = 1000;
+        c.won = 400;
+      }
+      if (c.name == 'Bình') {
+        c.sent = 500;
+        c.settled = 500;
+        c.won = 900;
+      }
+    }
+    List<String> names(List<CustomerSummary> l) => [for (final c in l) c.name]..sort();
+    expect(names(filterCustomers(all)), ['An', 'Bình', 'Chi', 'Dung']);
+    expect(names(filterCustomers(all, result: CustomerResultFilter.profit)), ['An']);
+    expect(names(filterCustomers(all, result: CustomerResultFilter.loss)), ['Bình']);
+    expect(names(filterCustomers(all, result: CustomerResultFilter.noData)), ['Chi', 'Dung']);
+    expect(names(filterCustomers(all, region: 'mn')), ['Bình', 'Chi']);
+    expect(names(filterCustomers(all, result: CustomerResultFilter.noData, region: 'mn')), ['Chi']);
+  });
+
+  test('sortCustomers: tiền vào / tiền ra / lợi nhuận nhiều hoặc ít, tên A→Z, mặc định giữ nguyên', () {
+    CustomerSummary mk(String n, double sent, double won, double settled) =>
+        CustomerSummary(n, null)
+          ..sent = sent
+          ..won = won
+          ..settled = settled;
+    final list = [mk('Chi', 300, 50, 300), mk('An', 100, 400, 100), mk('Bình', 200, 0, 200)];
+    List<String> names(CustomerSort s) => [for (final c in sortCustomers(list, s)) c.name];
+    expect(names(CustomerSort.recent), ['Chi', 'An', 'Bình']); // giữ thứ tự đang có
+    expect(names(CustomerSort.sentDesc), ['Chi', 'Bình', 'An']);
+    expect(names(CustomerSort.sentAsc), ['An', 'Bình', 'Chi']);
+    expect(names(CustomerSort.wonDesc), ['An', 'Chi', 'Bình']);
+    expect(names(CustomerSort.wonAsc), ['Bình', 'Chi', 'An']);
+    expect(names(CustomerSort.profitDesc), ['Chi', 'Bình', 'An']); // Chi 250, Bình 200, An -300
+    expect(names(CustomerSort.profitAsc), ['An', 'Bình', 'Chi']);
+    expect(names(CustomerSort.nameAsc), ['An', 'Bình', 'Chi']);
+  });
 }

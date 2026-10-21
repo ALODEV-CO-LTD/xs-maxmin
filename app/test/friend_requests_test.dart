@@ -174,7 +174,7 @@ void main() {
     test('badge total counts pending incoming requests', () {
       expect(
         unreadBadgeCount(chat: {'a': 2}, support: 1, friendRequests: 3),
-        6,
+        5, // 1 chat + 1 Admin reply + 3 requests
       );
       expect(unreadBadgeCount(friendRequests: -2), 0);
     });

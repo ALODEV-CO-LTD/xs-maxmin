@@ -164,7 +164,7 @@ void main() {
     expect(find.text('riêng tư'), findsNothing); // nothing leaks over the lock screen
   });
 
-  testWidgets('the Bạn bè tab of the bottom bar shows the unread total', (tester) async {
+  testWidgets('the Bạn bè tab of the bottom bar shows the number of chats that need a look', (tester) async {
     final auth = _Auth();
     late SpyHub hub;
     final router = GoRouter(
@@ -190,7 +190,7 @@ void main() {
     hub.unseenMissed = {'u2': 1};
     hub.showBanner(const AppBanner(title: 'x', body: 'y')); // any notification of the hub rebuilds the listeners
     await tester.pump();
-    expect(find.widgetWithText(Badge, '3'), findsOneWidget);
+    expect(find.widgetWithText(Badge, '2'), findsOneWidget); // 1 chat with a missed call + the Admin reply
     await tester.pump(const Duration(seconds: 7));
   });
 }
