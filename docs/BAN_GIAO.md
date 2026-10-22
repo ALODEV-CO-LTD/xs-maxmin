@@ -593,3 +593,5 @@ Nguồn: thư mục `~/Downloads/icon svg/` (13 file, đều một màu). Đã c
 **Phát hành 22/10/2026 (đêm, commit `a0c44b0`):** web đã deploy (sao lưu `/opt/xs-maxmin/web.bak-20261022-050945`, `/root/xs-maxmin.conf.bak-20261022-050945`; chỉ web); iPhone 12 đã cài đè (`tools/install_ios.sh`). Chưa build APK, chưa push GitHub.
 
 **Màn cuộc gọi + đổi tên tab (22/10/2026 đêm):** tab "Bạn bè" đổi nhãn thành **"Nhắn tin"** (app `app_shell.dart`, web `navLinks.js`; tiêu đề màn hình vốn là "Tin nhắn", các câu "Bạn bè đang offline"… giữ nguyên). Màn cuộc gọi (app, `call_panel.dart`): nền cả màn xanh lá nhạt (màu chính 7% trên nền), icon trong nút tròn 68 giảm còn 20 cho thoáng viền, nút tắt mic / loa lúc chưa bật có nền xanh nhạt 16% + icon xanh đậm (trước đó nền gần trắng + icon trắng nên mất icon), lúc bật vẫn icon trắng trên nền vàng / xanh.
+
+**Phát hành 22/10/2026 (đêm, commit `82b29a8`):** web đã deploy (sao lưu `/opt/xs-maxmin/web.bak-20261022-052425`, `/root/xs-maxmin.conf.bak-20261022-052425`; chỉ web); iPhone 12 đã cài đè; APK `~/Desktop/MAMBA-1.0.0.apk` (bản release, CHƯA đăng lên máy chủ, chờ chủ dự án đồng ý).
