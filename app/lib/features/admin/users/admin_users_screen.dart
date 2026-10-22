@@ -137,7 +137,7 @@ class _UsersListBodyState extends State<UsersListBody> {
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Tìm theo tên...',
-              prefixIcon: const SvgIcon(AppSvg.search),
+              prefixIcon: const SvgIcon(AppSvg.search, size: 8),
               suffixIcon: _q.text.isEmpty ? null : IconButton(icon: const SvgIcon(AppSvg.closeCircle), onPressed: () { _q.clear(); _onSearch(''); setState(() {}); }),
             ),
           ),

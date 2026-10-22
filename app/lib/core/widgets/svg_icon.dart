@@ -133,6 +133,30 @@ enum AppSvg {
   String get asset => 'assets/icons/$name.svg';
 }
 
+/// Bộ icon có độ phủ khung khác nhau (có icon tràn sát mép, có icon chỉ chiếm nửa khung);
+/// hệ số này đưa nét vẽ thật về cùng ~86% khung để các icon trông đều nhau.
+const _glyphScale = <String, double>{
+  'add_user': 0.86,
+  'arrow_left': 1.25,
+  'back_circle': 0.86,
+  'change_password': 0.86,
+  'check': 1.13,
+  'close': 1.25,
+  'config': 1.13,
+  'copy': 1.25,
+  'device': 0.86,
+  'edit': 1.13,
+  'login_lock_refresh': 0.86,
+  'new_password': 0.86,
+  'plus': 1.25,
+  'refresh': 0.86,
+  'search': 1.08, 'badge': 1.1, 'clock': 0.88,
+  'support': 0.86,
+  'sync': 1.25,
+  'user_admin': 0.86,
+  'users_group': 0.88,
+};
+
 class SvgIcon extends StatelessWidget {
   const SvgIcon(this.icon, {super.key, this.size, this.color});
   final AppSvg icon;
@@ -143,7 +167,23 @@ class SvgIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = IconTheme.of(context);
     final s = size ?? theme.size ?? 24;
-    final c = (color ?? theme.color ?? Colors.black).withValues(alpha: theme.opacity ?? 1);
-    return SvgPicture.asset(icon.asset, width: s, height: s, colorFilter: ColorFilter.mode(c, BlendMode.srcIn), excludeFromSemantics: true);
+    final c = (color ?? theme.color ?? Colors.black).withValues(
+      alpha: theme.opacity ?? 1,
+    );
+    final pic = SvgPicture.asset(
+      icon.asset,
+      width: s,
+      height: s,
+      colorFilter: ColorFilter.mode(c, BlendMode.srcIn),
+      excludeFromSemantics: true,
+    );
+    final k = _glyphScale[icon.name];
+    return k == null
+        ? pic
+        : SizedBox(
+            width: s,
+            height: s,
+            child: Transform.scale(scale: k, child: pic),
+          );
   }
 }

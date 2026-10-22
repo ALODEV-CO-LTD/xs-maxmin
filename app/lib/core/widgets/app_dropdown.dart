@@ -101,7 +101,7 @@ class _AppDropdownState<T> extends State<AppDropdown<T>> {
                       child: shown?.child ?? widget.hint ?? const SizedBox.shrink(),
                     ),
                   ),
-                  SvgIcon(AppSvg.chevronDown, color: enabled ? Colors.black54 : Colors.black26),
+                  SvgIcon(AppSvg.chevronDown, size: 8, color: enabled ? Colors.black54 : Colors.black26),
                 ],
               ),
             ),

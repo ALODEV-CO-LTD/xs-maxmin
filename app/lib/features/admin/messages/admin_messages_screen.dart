@@ -126,7 +126,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> with WidgetsB
         child: TextField(
           onChanged: (v) => setState(() => _query = v),
           textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(hintText: 'Tìm tên hoặc tên đăng nhập', prefixIcon: SvgIcon(AppSvg.search), isDense: true),
+          decoration: const InputDecoration(hintText: 'Tìm tên hoặc tên đăng nhập', prefixIcon: SvgIcon(AppSvg.search, size: 8), isDense: true),
         ),
       ),
       Padding(

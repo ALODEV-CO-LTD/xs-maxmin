@@ -109,7 +109,7 @@ class _CustomersBodyState extends State<_CustomersBody> {
                 AppButton(label: 'Thêm khách hàng', variant: AppButtonVariant.primary, svg: AppSvg.plus, onPressed: () => _add(c)),
               ]),
               const SizedBox(height: 10),
-              TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: SvgIcon(AppSvg.search)), onChanged: c.setQuery),
+              TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: SvgIcon(AppSvg.search, size: 8)), onChanged: c.setQuery),
               const SizedBox(height: 8),
               _filters(c),
               const SizedBox(height: 10),
@@ -133,7 +133,7 @@ class _CustomersBodyState extends State<_CustomersBody> {
     return Align(
       alignment: Alignment.centerLeft,
       child: OutlinedButton.icon(
-        icon: const SvgIcon(AppSvg.config, size: 18),
+        icon: const SvgIcon(AppSvg.config, size: 7),
         label: Text(n == 0 ? 'Bộ lọc' : 'Bộ lọc ($n)'),
         style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
         onPressed: () => showModalBottomSheet<void>(
