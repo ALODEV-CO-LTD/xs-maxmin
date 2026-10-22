@@ -103,8 +103,8 @@ export default function CallOverlay() {
             <div className="call-name">{peer?.name}</div>
             <div className="call-sub">Cuộc gọi thoại đến...</div>
             <div className="call-actions">
-              <button className="btn btn-danger btn-round" onClick={() => call().rejectCall()}><AppIcon name="x" /> Từ chối</button>
-              <button className="btn btn-primary btn-round" onClick={() => call().acceptCall()}><AppIcon name="check" /> Nghe máy</button>
+              <button className="btn btn-danger btn-round" onClick={() => call().rejectCall()}><AppIcon name="phone-off" /> Từ chối</button>
+              <button className="btn btn-primary btn-round" onClick={() => call().acceptCall()}><AppIcon name="phone-incoming" /> Nghe máy</button>
             </div>
           </>
         )}
