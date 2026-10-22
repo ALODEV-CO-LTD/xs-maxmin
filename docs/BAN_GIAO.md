@@ -544,7 +544,7 @@ Viết lại từ mã nguồn và bộ test (không có thay đổi mã). Kiểm
 
 **Chưa kiểm tay lại trong lần soát này:** chạy app thật với hai thiết bị, push thật qua FCM/APNs, đăng xuất từ xa trên máy thật. Việc còn mở giữ như mục "Nhật ký 21/10/2026" (giá trúng thật do khách chốt, khoá ký phát hành, tính năng mới cho web, quyết định lưu trữ chỉ nhận mật khẩu cấp 2).
 
-## Web (`web-next/`): thêm các tính năng của app (22/10/2026, CHƯA commit, CHƯA deploy)
+## Web (`web-next/`): thêm các tính năng của app (22/10/2026, commit `fea0f9c`, ĐÃ deploy)
 
 Đưa sang web bốn tính năng đã có ở app (mục "Việc còn mở (3)" của nhật ký 21/10). Kiểm: `web-next` **235** test qua (thêm 5), `tsc --noEmit` sạch, `next build` qua; thử tay trên bản chạy local (tài khoản demo `2`).
 
@@ -553,3 +553,5 @@ Viết lại từ mã nguồn và bộ test (không có thay đổi mã). Kiểm
 - **Nút mũi tên lên đầu danh sách** (`.to-top`): hiện khi lướt xuống quá 400 px (bắt cuộn của trang hoặc của khung chứa danh sách), bấm thì cuộn về đầu rồi ẩn; không hiện khi đang mở một cuộc trò chuyện.
 - **Số đỏ ở mục Bạn bè** (`friendChatsOf` trong `lib/notifyStore.js`, dùng ở `AppShell.tsx`): đếm số ĐOẠN CHAT cần xem (một bạn gửi nhiều tin vẫn là 1) cộng một cho mỗi lời mời kết bạn đang chờ, giống `unreadBadgeCount` của app. Khác app: Phản hồi với Admin có nút riêng trên web nên **không** cộng vào số này, và cuộc gọi nhỡ chưa vào số (web không giữ bộ đếm nhỡ theo từng bạn). Số chưa đọc ở từng dòng vẫn màu đỏ như trước.
 - **Chưa làm / ghi nhớ:** web vẫn ẩn thanh Danh bạ | Cuộc gọi | Tin nhắn | Cài đặt (`SHOW_BOTTOM_NAV`), nên không có trang Cài đặt tin nhắn riêng. Tên mục trong bảng ở mục 2 của hộp mật khẩu còn ghi "Mật khẩu đăng nhập" dù cũng nhận mật khẩu cấp 2 (câu chữ của `PasswordPromptDialog`). Lỗi eslint có từ trước ở `ChatCalcDialog.tsx`, `ChatDecodeDialog.tsx`, `FriendsScreen.tsx` (3 lỗi hooks) không thuộc đợt này.
+
+**Deploy web 22/10/2026 (09:01 giờ máy chủ), chỉ web (backend không đụng):** bản checkout sạch của `fea0f9c`; trong thư mục tạm phải CHÉP `node_modules` thật (`cp -cR`, không dùng liên kết vì Turbopack từ chối) và build bằng `npm run build` (không dùng `npx next build`: bước `prebuild` mới chép mô hình OCR `tesseract/` vào `out/`, thiếu thì `deploy-web-next.sh` từ chối gói). Kiểm sau deploy (script): `/login`, `/entries`, `/scoring`, `/account`, `/admin/stats`, `/friends` đều 200, `/friends/abc` chuyển 302, API còn chạy; trang thật có chuỗi "Tin nhắn lưu trữ", "Bộ lọc khách hàng", "Lên đầu danh sách". Sao lưu để quay lại: `/opt/xs-maxmin/web.bak-20261022-020154`, `/root/xs-maxmin.conf.bak-20261022-020154`. Người dùng không bị đăng xuất.
