@@ -515,3 +515,31 @@ Nhánh `mask-short`. Các commit trong ngày: `70a489e` (Khách hàng + Bạn b�
 **Deploy 21/10/2026 (06:23 giờ máy chủ):** `deploy.sh` (backend, kèm sao chép web) rồi `deploy-web-next.sh` (thay cả thư mục web, nginx không đổi). Trước khi ghi đè đã so từng file `.dart` của backend trên máy chủ với bản sạch: chỉ khác `scoring_rates.dart` (giá trúng tạm), 125 file còn lại giống hệt (nghĩa là phần chat nhiều thiết bị, gói và thanh toán đã chạy trên máy chủ từ lần deploy 20/10). Sao lưu để quay lại: `/opt/xs-maxmin/backend.bak-20261021-062308`, `web.bak-20261021-062308`, DB `/root/xoso-live-20261021-062308.db`, `web.bak-20261021-062326`, `/root/xs-maxmin.conf.bak-20261021-062326`. Kiểm sau deploy: `/login`, `/entries`, `/scoring`, `/account`, `/admin/stats`, `/friends` đều 200, `/friends/<id>` chuyển 302, đăng nhập sai trả lỗi đúng, DB 11 người dùng, bundle web và backend có giá trúng mới.
 
 **Việc còn mở:** (1) khách chốt giá trúng thật cho bao lô 3/4 số, xiên, trượt xiên, tài/xỉu, chẵn/lẻ; (2) tạo khoá ký phát hành riêng; (3) làm các tính năng mới ở trên cho web nếu cần; (4) quyết định có ép lưu trữ chỉ nhận mật khẩu cấp 2 không.
+
+## Bổ sung 22/10/2026: mô tả các phần đã làm nhưng chưa có mô tả (commit `f053c30` và kết bạn)
+
+Viết lại từ mã nguồn và bộ test (không có thay đổi mã). Kiểm lại ngày 22/10 trên nhánh `mask-short` (HEAD `15a66a3`): backend **184** test, web **230** test, app **581** test đều qua. Chưa kiểm tay lại trên máy thật.
+
+**1. Kết bạn phải được chấp nhận (quyết định 18/10)** (`backend/lib/src/friend_requests.dart`, `routes/api/me/friend-requests/`, `routes/api/me/friends/`)
+- Bảng `friend_requests` (`pending` / `accepted` / `declined` / `cancelled`); mỗi cặp chỉ có một lời mời đang chờ.
+- `POST /me/friends` (theo `userId` hoặc theo mã ID) **chỉ tạo lời mời** (201, trạng thái chờ), chưa thành bạn. Gọi lại thì trả 200 với cùng lời mời. Đã là bạn thì trả 200 kèm dòng bạn. Nếu người kia đã mời mình trước thì **thành bạn ngay**, lời mời được chấp nhận và người mời được báo.
+- `GET /me/friend-requests` trả `{incoming, outgoing}` đang chờ (mới nhất trước, tối đa 100 mỗi loại). `POST /me/friend-requests/{id}/accept` (chỉ người nhận) tạo hai dòng bạn bè; `.../decline`; người mời huỷ qua `.../{id}` (huỷ). Admin không gửi hoặc nhận lời mời (403).
+- Giới hạn: tối đa **30** lời mời gửi đang chờ (quá thì 429); người nhận đã có **200** lời mời chờ thì lời mời mới trả thành công nhưng không tạo bản ghi; bị từ chối thì **24 giờ** sau mới mời lại được (trong 24 giờ trả 200 nhưng không tạo).
+- Thời gian thực: người nhận đang online nhận sự kiện WebSocket `friend-request` (không push); offline thì nhận **một** push có điều tiết chỉ chứa tên người mời; người mời nhận `friend-accepted`. App tính mỗi lời mời đến là +1 trên số của mục Bạn bè.
+
+**2. Chat nhiều thiết bị** (`backend/lib/src/e2ee_devices.dart`, `routes/api/me/e2ee-devices/`, app `chat_service.dart`)
+- Trước đây mỗi tài khoản có MỘT khoá; mở app trên máy thứ hai ghi đè khoá máy thứ nhất, bạn bè thấy "khoá đã đổi" liên tục. Nay mỗi THIẾT BỊ có khoá riêng trong bảng `e2ee_devices` (`user_id`, `device_id`, `public_key`, `last_seen`).
+- `PUT /me/e2ee-devices/<id>` đăng ký khoá của máy (id ngẫu nhiên do máy tạo, 8 đến 64 ký tự `A-Za-z0-9_-`; `legacy` bị cấm đặt); `GET /me/e2ee-devices` liệt kê; `DELETE /me/e2ee-devices/<id>` quên một máy. Tối đa **6** thiết bị mỗi tài khoản: quá thì bỏ máy lâu không dùng nhất (không bao giờ bỏ máy mới).
+- Bản cũ chỉ có một khoá được đưa vào làm thiết bị `legacy` khi nâng cấp; `PUT /me/e2ee-key` (cũ) vẫn chạy. `GET /me/friends` trả thêm `devices` của từng bạn và khoá đơn cũ cho app cũ.
+- Gửi tin: mã hoá **một lần cho từng thiết bị** của người nhận; WebSocket chuyển khung đúng tới thiết bị đó (`legacy` tới kết nối không khai báo device id). Một máy offline mà máy kia nhận được thì không báo thất bại; mọi máy offline mới báo "offline". Bạn thêm thiết bị mới không phải cảnh báo "khoá đổi"; chỉ khoá đổi của một máy đã biết mới cảnh báo (quyết định 18/10: chỉ cảnh báo, vẫn gửi được). Device id giữ nguyên giữa các lần mở app.
+
+**3. Thẻ trạng thái gói và thông báo thanh toán** (app `package_status.dart`, `package_card.dart`, `package_events.dart`, `account_packages_tab.dart`; backend `payments.dart`, `push_notify.dart`)
+- Trạng thái gói của khách: còn hạn, **sắp hết** (còn 7 ngày hoặc ít hơn), đã hết hạn, chưa có gói; thẻ ở Tổng quan và ở Tài khoản đọc "Còn 12 ngày", "Còn 5 giờ 20 phút", "Gói đã hết hạn", "Chưa có gói".
+- Luồng mua: gói đang dùng ghi **Gia hạn**, các gói khác ghi **Đăng ký**. "Đăng ký" mở tờ mã QR chuyển khoản trước và **chưa gửi gì cho Admin**; Huỷ hoặc đóng tờ (vuốt xuống, chạm ngoài) cũng không để lại yêu cầu. "Đã chuyển khoản" mới gửi yêu cầu kèm **mã tham chiếu** in trong QR; nếu máy chủ phải đổi sang mã khác (trùng) thì khách được báo. Tab Gói không hiện số tài khoản hay QR, chỉ tờ mới hiện.
+- Khi Admin duyệt hoặc từ chối: khách đang online (kể cả hai máy) nhận kết quả qua WebSocket và màn hình tự đọc lại gói (`PackageEvents.bump`), không push; khách offline nhận **một push** nói gói đã gia hạn hoặc chưa được duyệt, không kèm nội dung khác.
+
+**4. Đăng xuất từ xa** (test `app/test/remote_logout_test.dart`): khi phiên bị thu hồi từ thiết bị khác hoặc Admin, app ở bất kỳ màn hình nào quay về màn đăng nhập, **không hiện lỗi**.
+
+**5. Nhận diện đài từ ảnh kết quả** (app `lottery_columns.dart`, test `results_station_detect_test.dart`): đài của từng cột lấy từ **tiêu đề cột** ảnh (chịu được tên có mã đi kèm, sai dấu hoặc một chữ), không dựa vào lịch của ngày đang chọn; nếu ảnh không in ngày thì suy ra ngày từ các đài đọc được; miền lấy từ chữ "Miền Nam" ở tiêu đề hoặc từ tên đài; cột có tiêu đề không đọc được nhận đài còn thiếu trong ngày. Số đọc sai quen thuộc được sửa (`O→0`, `l→1`, `S→5`, `B→8`), chữ không phải số không bị đổi thành số, cột nhãn và ô ngày không bị nhận thành giải.
+
+**Chưa kiểm tay lại trong lần soát này:** chạy app thật với hai thiết bị, push thật qua FCM/APNs, đăng xuất từ xa trên máy thật. Việc còn mở giữ như mục "Nhật ký 21/10/2026" (giá trúng thật do khách chốt, khoá ký phát hành, tính năng mới cho web, quyết định lưu trữ chỉ nhận mật khẩu cấp 2).
