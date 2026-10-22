@@ -31,6 +31,9 @@ function keyOf(msg) {
 // ---- getters (use as selectors: useNotifyStore(totalOf)) ----
 export const totalOf = (s) => Object.values(s.unread).reduce((a, b) => a + b, 0) + s.friendRequests
 export const friendUnreadOf = (s) => Object.entries(s.unread).reduce((a, [k, v]) => a + (k.startsWith('friend:') ? v : 0), 0)
+// Số đỏ ở mục Bạn bè: số ĐOẠN CHAT cần xem (một bạn gửi nhiều tin vẫn tính 1) cộng một cho mỗi lời mời kết bạn đang chờ
+// (giống app: unreadBadgeCount). Phản hồi với Admin có nút riêng nên không cộng vào đây.
+export const friendChatsOf = (s) => Object.entries(s.unread).reduce((a, [k, v]) => a + (k.startsWith('friend:') && v > 0 ? 1 : 0), 0) + (s.friendRequests > 0 ? s.friendRequests : 0)
 export const supportUnreadOf = (s) => s.unread.support || 0
 export const adminSupportUnreadOf = (s) => Object.entries(s.unread).reduce((a, [k, v]) => a + (k.startsWith('support:') ? v : 0), 0)
 

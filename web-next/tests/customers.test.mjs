@@ -77,3 +77,45 @@ test('thông báo lỗi: server, offline, không rõ', () => {
   assert.equal(saveError(null, 'Không lưu được đài'), 'Không lưu được đài')
   assert.deepEqual(removeConfirm('An'), { title: 'Xoá khách hàng', message: 'Xoá "An" khỏi danh sách khách hàng? Số liệu đã nhập của khách này vẫn được giữ nguyên.', confirmText: 'Xoá', danger: true })
 })
+
+// ---- Tiền, bộ lọc, sắp xếp ----
+import { REGION_FILTERS, RESULT_FILTERS, SORTS, activeViewCount, attachMoney, filterByView, formatMoney, sortCustomers } from '../src/features/customers/customersLogic.js'
+
+const people = () => attachMoney(buildCustomers(roster, entries), {
+  'Anh Dũng': { sent: 1000000, won: 300000, settled: 1000000, pending: 0 },
+  'Khách lạ': { sent: 200000, won: 500000, settled: 200000, pending: 0 },
+})
+test('tiền: lợi nhuận = tiền các ngày đã có kết quả − tiền trúng; chưa tính xong thì money=false', () => {
+  const list = people()
+  const dung = list.find((c) => c.name === 'Anh Dũng')
+  assert.equal(dung.profit, 700000)
+  assert.equal(list.find((c) => c.name === 'Khách lạ').profit, -300000)
+  assert.equal(list.find((c) => c.name === 'Chị Mai').sent, 0)
+  assert.equal(attachMoney(buildCustomers(roster, entries), null)[0].money, false)
+})
+test('lọc: lãi / lỗ chỉ xét khách có số liệu, "chưa có số liệu" là khách chưa nhập gì, miền theo miền riêng', () => {
+  const list = people()
+  assert.deepEqual(filterByView(list, { result: 'profit' }).map((c) => c.name), ['Anh Dũng'])
+  assert.deepEqual(filterByView(list, { result: 'loss' }).map((c) => c.name), ['Khách lạ'])
+  assert.deepEqual(filterByView(list, { result: 'noData' }).map((c) => c.name).sort(), ['Chị Mai', 'Đỗ Ngọc Mai'])
+  const region = (c) => (c.name === 'Anh Dũng' ? 'mb' : null)
+  assert.deepEqual(filterByView(list, { region: 'mb' }, region).map((c) => c.name), ['Anh Dũng'])
+  assert.equal(filterByView(list, {}).length, list.length)
+})
+test('sắp xếp: theo tiền vào / ra / lợi nhuận, tên A→Z; bằng nhau thì theo tên; recent giữ nguyên', () => {
+  const list = people()
+  assert.equal(sortCustomers(list, 'recent'), list)
+  assert.equal(sortCustomers(list, 'sentDesc')[0].name, 'Anh Dũng')
+  assert.equal(sortCustomers(list, 'sentAsc').at(-1).name, 'Anh Dũng')
+  assert.equal(sortCustomers(list, 'wonDesc')[0].name, 'Khách lạ')
+  assert.equal(sortCustomers(list, 'profitAsc')[0].name, 'Khách lạ')
+  assert.equal(sortCustomers(list, 'profitDesc')[0].name, 'Anh Dũng')
+  assert.deepEqual(sortCustomers(list, 'nameAsc').map((c) => c.name).slice(0, 2), ['(Không tên)', 'Anh Dũng'])
+  assert.ok(SORTS.length === 8 && RESULT_FILTERS.length === 4 && REGION_FILTERS.length === 3)
+})
+test('nút Bộ lọc ghi số mục đang áp dụng; tiền đồng có dấu phân cách', () => {
+  assert.equal(activeViewCount({}), 0)
+  assert.equal(activeViewCount({ sort: 'nameAsc', result: 'loss', region: 'mb' }), 3)
+  assert.equal(formatMoney(1234567), '1.234.567đ')
+  assert.equal(formatMoney(-300000), '-300.000đ')
+})

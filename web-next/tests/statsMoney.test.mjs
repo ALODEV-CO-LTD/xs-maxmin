@@ -60,3 +60,15 @@ test('series per day go through the unit-tested statsSeries', () => {
   assert.equal(profit.find((p) => p.key === '2026-10-11').value, m.byDate['2026-10-11'].settled - m.byDate['2026-10-11'].won)
   assert.deepEqual(neededResults(entries).map((x) => x.join('|')).sort(), ['2026-10-11|mb', '2026-10-18|mb'])
 })
+
+import { moneyByCustomer } from '../src/lib/statsMoney.js'
+test('tiền của từng khách cộng lại bằng tiền theo ngày; khách chưa có kết quả thì tiền ở "pending"', () => {
+  const two = [...entries, { id: '9', customerName: 'Chị Lan', entryDate: '2026-10-20', value: '12', score: '100', result: '0', betType: 'lo', station: 'mb' }]
+  const per = moneyByCustomer(two, customers, DEFAULT_RATES, both)
+  const day = moneyByDate(two, customers, DEFAULT_RATES, both)
+  const sum = (k) => Object.values(per).reduce((a, m) => a + m[k], 0)
+  const dsum = (k) => Object.values(day.byDate).reduce((a, m) => a + m[k], 0)
+  for (const k of ['sent', 'settled', 'won', 'pending']) assert.equal(sum(k), dsum(k))
+  assert.equal(per['Chị Lan'].settled, 0)
+  assert.ok(per['Chị Lan'].pending > 0)
+})

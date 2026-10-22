@@ -19,6 +19,7 @@ import { useNotifyStore } from '@/lib/notifyStore'
 import { kindSymbolsFor, typesOf } from '@/lib/scoringConfig'
 import { onScreenshotAttempt } from '@/lib/screenshotGuard'
 import { useCallStore } from '@/features/calls/callStore'
+import PasswordPromptDialog from '@/components/PasswordPromptDialog'
 import ChatCalcDialog from './ChatCalcDialog'
 import ChatDecodeDialog from './ChatDecodeDialog'
 import ChatRetentionPanel, { type RetentionHandle, type RetentionRule } from './ChatRetentionPanel'
@@ -513,7 +514,25 @@ export default function FriendsScreen() {
     setPrefs(jsonKey(prefsKey) || {})
   }, [archiveKey, prefsKey])
   const displayName = (f: any) => (f ? prefs[f.id]?.alias || f.name : '')
-  const archivedCount = friends.filter((f) => archived.includes(f.id)).length
+  // Tin nhắn lưu trữ nằm sau mật khẩu (POST /me/verify-password: mật khẩu đăng nhập hoặc mật khẩu cấp 2) và không hiện số lượng;
+  // rời khỏi mục này là khoá lại, lần sau phải nhập lại.
+  const [archiveAsk, setArchiveAsk] = useState(false)
+  // Nút mũi tên lên đầu danh sách khi lướt xuống (cuộn trang hoặc cuộn khung chứa danh sách).
+  const listRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<Element | null>(null)
+  const [showTop, setShowTop] = useState(false)
+  useEffect(() => {
+    const onScroll = (e: Event) => {
+      const t = e.target as Node
+      const el = (t === document ? document.scrollingElement : t) as Element | null
+      if (!el || !listRef.current || !(el.contains(listRef.current) || el === document.scrollingElement)) return
+      scrollerRef.current = el
+      setShowTop(el.scrollTop > 400)
+    }
+    document.addEventListener('scroll', onScroll, true)
+    return () => document.removeEventListener('scroll', onScroll, true)
+  }, [])
+  const scrollToTop = () => scrollerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   const chatList = filteredFriends.filter(
     (f) => archived.includes(f.id) === showArchived && (!SHOW_BOTTOM_NAV || f.lastMessageAt || unread[`friend:${f.id}`] || f.id === selectedId || showArchived),
   )
@@ -777,7 +796,7 @@ export default function FriendsScreen() {
       </div>
 
       <div className={`split${selectedId ? ' show-thread' : ''}`}>
-        <div className="list-pane">
+        <div className="list-pane" ref={listRef}>
           {showSearchCard && (
             <div className="card search-form">
               {searchError && <div className="alert alert-error" style={{ margin: '8px 0 0' }}>{searchError}</div>}
@@ -886,8 +905,8 @@ export default function FriendsScreen() {
                       <button type="button" className="tb-link danger" disabled={!editPicked.length} onClick={deleteSelected}>Xoá{editPicked.length ? ` (${editPicked.length})` : ''}</button>
                     </div>
                   )}
-                  {tab === 'chats' && !editMode && (archivedCount > 0 || showArchived) && (
-                    <button type="button" className="tb-link archive-link" onClick={() => setShowArchived(!showArchived)}>{showArchived ? '← Về tin nhắn' : `Đã lưu trữ (${archivedCount})`}</button>
+                  {tab === 'chats' && !editMode && (
+                    <button type="button" className="tb-link archive-link" onClick={() => (showArchived ? setShowArchived(false) : setArchiveAsk(true))}>{showArchived ? '← Về tin nhắn' : 'Tin nhắn lưu trữ'}</button>
                   )}
                 </>
               )}
@@ -915,7 +934,7 @@ export default function FriendsScreen() {
                 <div className="card chat-settings">
                   <strong>Cài đặt tin nhắn</strong>
                   <p className="search-sub">Tin nhắn mã hoá hai đầu, chỉ lưu trên máy này. Tên hiển thị riêng, mã bảo mật và tự xoá chỉnh ở nút ⚙ trong từng cuộc trò chuyện.</p>
-                  <button type="button" className="tb-link" onClick={() => { setTab('chats'); setShowArchived(true) }}>Cuộc trò chuyện đã lưu trữ ({archivedCount})</button>
+                  <button type="button" className="tb-link" onClick={() => { setTab('chats'); setArchiveAsk(true) }}>Tin nhắn lưu trữ</button>
                   <Link className="tb-link" href="/account?tab=security">Bảo mật tài khoản</Link>
                   {myCode && <p className="search-sub">ID của bạn: <strong>{myCode}</strong></p>}
                 </div>
@@ -1190,6 +1209,17 @@ export default function FriendsScreen() {
 
       <ChatDecodeDialog open={decodeOpen} messages={decodeMessages} betTypes={decodeTypes} kindSymbols={decodeSymbols} onClose={() => setDecodeOpen(false)} onUse={useDecoded} onCalc={(text, date, customer) => { setCalcText(text); setCalcDate(date); setCalcCustomer(customer); setDecodeOpen(false); setCalcOpen(true) }} />
       <ChatCalcDialog open={calcOpen} text={calcText} date={calcDate} customerId={calcCustomer} friends={friends.filter((f) => !f.isAdmin)} onClose={() => setCalcOpen(false)} onBack={() => { setCalcOpen(false); setDecodeOpen(true) }} />
+
+      <PasswordPromptDialog
+        open={archiveAsk}
+        title="Tin nhắn lưu trữ"
+        description="Nhập mật khẩu để xem các cuộc trò chuyện đã lưu trữ."
+        onClose={() => setArchiveAsk(false)}
+        onVerified={() => { setArchiveAsk(false); setTab('chats'); setShowArchived(true) }}
+      />
+      {showTop && !selectedId && (
+        <button type="button" className="to-top" aria-label="Lên đầu danh sách" title="Lên đầu danh sách" onClick={scrollToTop}>↑</button>
+      )}
 
       {newOpen && (
         <div className="group-overlay" onClick={(e) => e.target === e.currentTarget && setNewOpen(false)}>

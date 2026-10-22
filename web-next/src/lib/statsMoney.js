@@ -77,3 +77,30 @@ export function moneyTotals(byDate) {
   }
   return { sent, won, profit: settled - won, pending, pendingLots }
 }
+
+// Tiền của TỪNG khách (Khách hàng): cùng cách tính như moneyByDate nhưng gộp theo tên khách thay vì theo ngày.
+// -> { [tên]: { sent, settled, won, pending } } (đồng); lợi nhuận = settled − won chỉ trên các ngày đã có kết quả xổ số.
+export function moneyByCustomer(entries, customers, accountRates, getResult) {
+  const byName = new Map((customers || []).map((c) => [c.name, c]))
+  const groups = new Map() // customer -> date -> entries
+  for (const e of entries) {
+    const name = e.customerName || NO_NAME
+    if (!groups.has(name)) groups.set(name, new Map())
+    const days = groups.get(name)
+    if (!days.has(e.entryDate)) days.set(e.entryDate, [])
+    days.get(e.entryDate).push(e)
+  }
+  const out = {}
+  for (const [name, days] of groups) {
+    const c = byName.get(name)
+    const m = (out[name] = { sent: 0, settled: 0, won: 0, pending: 0 })
+    for (const [date, list] of days) {
+      const s = summarize([{ date, entries: list }], accountRates, c?.scoringRates || null, getResult, { customerRegion: c?.homeRegion || null })
+      m.sent += s.sent.money
+      m.settled += s.settled.money
+      m.won += s.won.money
+      m.pending += s.pending.money
+    }
+  }
+  return out
+}

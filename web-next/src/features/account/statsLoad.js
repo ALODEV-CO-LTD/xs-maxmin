@@ -29,3 +29,17 @@ export async function loadMoney({ api, cachedGet, loadAllEntries, loadStations, 
   }))
   return moneyByDate(list.entries, customers, rates, (date, st) => cache.get(`${date}|${st}`) || null)
 }
+
+// Kết quả xổ số của mọi (ngày, đài) mà các lượt nhập cần (4 yêu cầu song song); trả hàm getResult(date, station) -> kết quả | null.
+// Dùng cho tiền của từng khách ở màn Khách hàng; một ngày không tải được thì coi như chưa có kết quả (chưa tính lợi nhuận).
+export async function loadResultsFor({ api, entries }) {
+  const cache = new Map()
+  const queue = neededResults(entries)
+  await Promise.all(Array.from({ length: 4 }, async () => {
+    while (queue.length) {
+      const [date, st] = queue.pop()
+      await loadResult(api, cache, date, st)
+    }
+  }))
+  return (date, st) => cache.get(`${date}|${st}`) || null
+}

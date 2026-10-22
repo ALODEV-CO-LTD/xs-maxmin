@@ -14,7 +14,7 @@ import ThemeToggle from './ThemeToggle'
 import { useAuthStore } from '@/lib/authStore'
 import { showConfirm } from '@/lib/confirm'
 import { shellRegistry } from '@/lib/hooks'
-import { adminSupportUnreadOf, friendUnreadOf, supportUnreadOf, totalOf, useNotifyStore } from '@/lib/notifyStore'
+import { adminSupportUnreadOf, friendChatsOf, supportUnreadOf, totalOf, useNotifyStore } from '@/lib/notifyStore'
 import { startSync } from '@/lib/offline'
 import { usePolicyStore } from '@/lib/policyStore'
 import { backTargetOf } from '@/lib/routes'
@@ -36,7 +36,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const can = useAuthStore((s) => s.can)
   const isAdmin = role === 'admin'
   const notifyTotal = useNotifyStore(totalOf)
-  const friendBadge = useNotifyStore((s) => friendUnreadOf(s) + s.friendRequests)
+  const friendBadge = useNotifyStore(friendChatsOf)
   const adminBadge = useNotifyStore(adminSupportUnreadOf)
   const supportBadge = useNotifyStore(supportUnreadOf)
   void supportBadge

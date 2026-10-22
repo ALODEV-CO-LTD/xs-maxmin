@@ -17,9 +17,11 @@ import { DEFAULT_RATES } from '@/lib/scoringConfig'
 import { useStations } from '@/lib/useStations'
 import ScoringConfigEditor from '@/features/scoring/settings/ScoringConfigEditor'
 import ScoringSettings from '@/features/scoring/settings/ScoringSettings'
+import { loadResultsFor } from '@/features/account/statsLoad'
+import { moneyByCustomer } from '@/lib/statsMoney'
 import {
-  REGION_OPTIONS, buildCustomers, createCustomer, entriesUrl, filterCustomers, formatNumber, removeConfirm,
-  saveError, sortRoster, writeError,
+  REGION_FILTERS, REGION_OPTIONS, RESULT_FILTERS, SORTS, activeViewCount, attachMoney, buildCustomers, createCustomer, entriesUrl,
+  filterByView, filterCustomers, formatMoney, removeConfirm, saveError, sortCustomers, sortRoster, writeError,
 } from './customersLogic'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -79,7 +81,39 @@ export default function CustomersScreen() {
   }
 
   const customers = useMemo(() => buildCustomers(roster, entries), [roster, entries])
-  const filteredCustomers = useMemo(() => filterCustomers(customers, search), [customers, search])
+
+  // Tiền vào / tiền ra / lợi nhuận bằng TIỀN, tính như Tính điểm (bảng giá và miền riêng của từng khách). Cần kết quả xổ số của các
+  // ngày đã nhập nên tính sau khi danh sách hiện; trong lúc đó các ô ghi "...". Lợi nhuận chỉ tính các ngày đã có kết quả.
+  const [money, setMoney] = useState<Record<string, any> | null>(null)
+  useEffect(() => {
+    if (loading) return
+    let alive = true
+    void (async () => {
+      try {
+        const getResult = await loadResultsFor({ api, entries })
+        if (alive) setMoney(moneyByCustomer(entries, roster, accountRates, getResult))
+      } catch {
+        /* các ô giữ "..." thay vì hiện số sai */
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [loading, entries, roster, accountRates])
+
+  // Bộ lọc và sắp xếp (một nút "Bộ lọc"), giống app.
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [sort, setSort] = useState('recent')
+  const [resultFilter, setResultFilter] = useState('')
+  const [regionFilter, setRegionFilter] = useState('')
+  const view = { sort, result: resultFilter, region: regionFilter }
+  const filterCount = activeViewCount(view)
+  const withMoney = useMemo(() => attachMoney(customers, money), [customers, money])
+  const filteredCustomers = useMemo(
+    () => sortCustomers(filterByView(filterCustomers(withMoney, search), view, (c: any) => roster.find((r) => r.id === c.rosterId)?.homeRegion || null), sort),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `view` is built from the three values listed
+    [withMoney, search, sort, resultFilter, regionFilter, roster],
+  )
   const detail = useMemo(() => customers.find((c) => c.name === expanded) || null, [customers, expanded])
   const rosterRow = useMemo(() => roster.find((r) => r.id === detail?.rosterId) || null, [roster, detail])
   const patchRoster = (id: string, patch: Partial<RosterRow>) => setRoster((list) => list.map((r) => (r.id === id ? { ...r, ...patch } : r)))
@@ -248,7 +282,7 @@ export default function CustomersScreen() {
   return (
     <div className="page customers-page">
       <h1 className="page-title">Khách hàng</h1>
-      <p className="page-subtitle">Danh sách khách hàng của bạn. Bấm &quot;Thêm khách hàng&quot; để thêm khách mới; số liệu vào/ra được tổng hợp từ các lượt nhập.</p>
+      <p className="page-subtitle">Danh sách khách hàng của bạn. Bấm &quot;Thêm khách hàng&quot; để thêm khách mới; tiền vào/ra tính theo bảng giá của từng khách; lợi nhuận chỉ tính các ngày đã có kết quả xổ số.</p>
 
       {fromCache && <div className="alert alert-warning">Đang offline: hiển thị số liệu đã lưu trên máy. Thêm/xoá khách hàng cần có mạng.</div>}
       {loading ? (
@@ -267,6 +301,11 @@ export default function CustomersScreen() {
               <input value={search} onChange={(e) => setSearch(e.target.value)} type="text" placeholder="Tìm theo tên khách hàng..." />
             </div>
           </div>
+          <div className="config-row">
+            <AppButton variant="secondary" size="sm" onClick={() => setFilterOpen(true)}>
+              Bộ lọc{filterCount ? ` (${filterCount})` : ''}
+            </AppButton>
+          </div>
 
           {customers.length === 0 ? (
             <div className="card">Chưa có khách hàng nào. Bấm &quot;Thêm khách hàng&quot; để bắt đầu.</div>
@@ -277,24 +316,22 @@ export default function CustomersScreen() {
               <table className="table stack-table">
                 <thead>
                   <tr>
-                    <th>STT</th>
                     <th>Tên</th>
                     <th>SĐT</th>
-                    <th>Điểm đầu vào</th>
-                    <th>Điểm đầu ra</th>
+                    <th>Tiền vào</th>
+                    <th>Tiền ra</th>
                     <th>Lợi nhuận</th>
                     <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCustomers.map((c: any, i: number) => (
+                  {filteredCustomers.map((c: any) => (
                     <tr key={c.name} className="row-clickable" onClick={() => setExpanded(c.name)}>
-                      <td data-label="STT">{i + 1}</td>
                       <td data-label="Tên">{c.name}</td>
                       <td data-label="SĐT">{c.phone || '-'}</td>
-                      <td data-label="Điểm đầu vào"><MaskedValue text={formatNumber(c.vao)} /></td>
-                      <td data-label="Điểm đầu ra"><MaskedValue text={formatNumber(c.ra)} /></td>
-                      <td data-label="Lợi nhuận" className={c.chenhLech >= 0 ? 'calc-in' : 'calc-out'}><MaskedValue text={formatNumber(c.chenhLech)} /></td>
+                      <td data-label="Tiền vào">{c.money ? <MaskedValue text={formatMoney(c.sent)} /> : '...'}</td>
+                      <td data-label="Tiền ra">{c.money ? <MaskedValue text={formatMoney(c.won)} /> : '...'}</td>
+                      <td data-label="Lợi nhuận" className={c.money ? (c.profit >= 0 ? 'calc-in' : 'calc-out') : ''}>{c.money ? <MaskedValue text={formatMoney(c.profit)} /> : '...'}</td>
                       <td className="actions-cell">
                         {c.rosterId && <AppButton variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c) }}>Sửa</AppButton>}
                         <button type="button" className="btn btn-secondary btn-sm btn-detail" onClick={(e) => { e.stopPropagation(); setExpanded(c.name) }}>
@@ -316,6 +353,31 @@ export default function CustomersScreen() {
           )}
         </>
       )}
+
+      <ModalDialog open={filterOpen} title="Bộ lọc khách hàng" onClose={() => setFilterOpen(false)}>
+        <div className="field">
+          <label>Sắp xếp</label>
+          <AppSelect value={sort} onChange={(v: string) => setSort(v)} aria-label="Sắp xếp">
+            {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </AppSelect>
+        </div>
+        <div className="field">
+          <label>Kết quả</label>
+          <AppSelect value={resultFilter} onChange={(v: string) => setResultFilter(v)} aria-label="Lọc theo kết quả">
+            {RESULT_FILTERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </AppSelect>
+        </div>
+        <div className="field">
+          <label>Miền của khách</label>
+          <AppSelect value={regionFilter} onChange={(v: string) => setRegionFilter(v)} aria-label="Lọc theo miền">
+            {REGION_FILTERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </AppSelect>
+        </div>
+        <ActionBar>
+          <AppButton variant="ghost" onClick={() => { setSort('recent'); setResultFilter(''); setRegionFilter('') }} disabled={!filterCount}>Xoá bộ lọc</AppButton>
+          <AppButton variant="primary" onClick={() => setFilterOpen(false)}>Xong</AppButton>
+        </ActionBar>
+      </ModalDialog>
 
       <ModalDialog open={defaultConfigOpen} title="Cấu hình tính điểm mặc định" xwide back onClose={closeDefaultConfig}>
         <ScoringSettings embedded onSaved={() => void loadAccountRates()} />

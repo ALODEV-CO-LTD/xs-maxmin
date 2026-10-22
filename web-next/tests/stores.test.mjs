@@ -23,7 +23,7 @@ globalThis.fetch = async (url, init = {}) => {
 }
 const reset = () => ((calls = []), (replies = {}), mem.clear())
 
-const { useNotifyStore, totalOf, friendUnreadOf, adminSupportUnreadOf, supportUnreadOf } = await import('../src/lib/notifyStore.js')
+const { useNotifyStore, totalOf, friendUnreadOf, friendChatsOf, adminSupportUnreadOf, supportUnreadOf } = await import('../src/lib/notifyStore.js')
 const { usePrivacyStore } = await import('../src/lib/privacyStore.js')
 const { usePolicyStore } = await import('../src/lib/policyStore.js')
 const { mask, REVEAL_CHOICES, useMaskStore } = await import('../src/lib/maskStore.js')
@@ -43,6 +43,11 @@ test('notify: bộ đếm theo khoá và getter tổng', () => {
   assert.equal(friendUnreadOf(n.getState()), 3)
   assert.equal(supportUnreadOf(n.getState()), 3)
   assert.equal(adminSupportUnreadOf(n.getState()), 4)
+  // số đỏ mục Bạn bè: số đoạn chat có tin chưa đọc (a, b = 2) + lời mời đang chờ (2); Phản hồi Admin không cộng vào
+  assert.equal(friendChatsOf(n.getState()), 4)
+  n.setState({ unread: { 'friend:a': 9, 'friend:b': 0, 'friend:c': 1 }, friendRequests: 0 })
+  assert.equal(friendChatsOf(n.getState()), 2) // nhiều tin của một bạn vẫn là 1; 0 tin không tính
+  n.setState({ unread: { 'friend:a': 2, 'friend:b': 1, support: 3, 'support:u1': 4 }, friendRequests: 2 })
   n.getState().setFriendRequests(-5)
   assert.equal(n.getState().friendRequests, 0)
 })
