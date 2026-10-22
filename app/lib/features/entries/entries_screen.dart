@@ -193,7 +193,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
         borderRadius: BorderRadius.circular(10),
         onTap: () => _pickCustomer(c),
         child: InputDecorator(
-          decoration: const InputDecoration(labelText: 'Khách hàng', suffixIcon: Icon(Icons.arrow_drop_down)),
+          decoration: const InputDecoration(labelText: 'Khách hàng', suffixIcon: SvgIcon(AppSvg.chevronDown)),
           child: Text(c.selectedName.isEmpty ? '-- Chọn khách hàng --' : c.selectedName, overflow: TextOverflow.ellipsis),
         ),
       ),
@@ -275,7 +275,7 @@ class _CustomerPickerState extends State<_CustomerPicker> {
         builder: (ctx, scroll) => Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: TextField(decoration: const InputDecoration(hintText: 'Tìm khách hàng...', prefixIcon: Icon(Icons.search)), onChanged: (v) => setState(() => _q = v)),
+            child: TextField(decoration: const InputDecoration(hintText: 'Tìm khách hàng...', prefixIcon: SvgIcon(AppSvg.search)), onChanged: (v) => setState(() => _q = v)),
           ),
           ListTile(
             leading: const SvgIcon(AppSvg.addUser),
@@ -349,7 +349,7 @@ class _EntryTile extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 4, 2, 4),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              if (selecting) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(selected ? Icons.check_box : Icons.check_box_outline_blank, color: selected ? Theme.of(context).colorScheme.primary : null)),
+              if (selecting) Padding(padding: const EdgeInsets.only(right: 8), child: SvgIcon(selected ? AppSvg.checkboxOn : AppSvg.checkboxOff, color: selected ? Theme.of(context).colorScheme.primary : null)),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (withCustomer) Text(e.customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -370,7 +370,7 @@ class _EntryTile extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text('Ra ', style: muted),
                           MaskedText(fmtPoints(e.result), style: num.copyWith(color: context.badColor)),
-                          if (e.pending) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.sync, size: 15, color: Brand.warning)),
+                          if (e.pending) Padding(padding: const EdgeInsets.only(left: 6), child: SvgIcon(AppSvg.sync, size: 15, color: Brand.warning)),
                         ]),
                       ),
                     ),

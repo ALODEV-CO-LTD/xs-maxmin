@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mamba_app/core/widgets/svg_icon.dart';
+
+import 'svg_finder.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
@@ -71,6 +74,6 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await _pump(tester, {'maintenance': {'enabled': false, 'message': ''}, 'announcements': []});
     expect(find.byType(Card), findsNothing);
-    expect(find.byIcon(Icons.campaign_outlined), findsNothing);
+    expect(bySvg(AppSvg.megaphone), findsNothing);
   });
 }

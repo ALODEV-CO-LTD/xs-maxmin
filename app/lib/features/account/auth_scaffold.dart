@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
@@ -18,7 +19,7 @@ class AuthScaffold extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const SvgIcon(AppSvg.arrowLeft),
           tooltip: 'Quay lại',
           onPressed: onBack ?? () => context.canPop() ? context.pop() : context.go('/login'),
         ),

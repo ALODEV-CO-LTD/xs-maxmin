@@ -105,7 +105,7 @@ class ThreadComposer extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Stack(children: [
                 Padding(padding: const EdgeInsets.all(6), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(pending!, height: 72, fit: BoxFit.cover))),
-                Positioned(right: 0, top: 0, child: InkWell(onTap: onRemovePending, child: CircleAvatar(radius: 11, backgroundColor: cs.error, child: const Icon(Icons.close, size: 14, color: Colors.white)))),
+                Positioned(right: 0, top: 0, child: InkWell(onTap: onRemovePending, child: CircleAvatar(radius: 11, backgroundColor: cs.error, child: const SvgIcon(AppSvg.close, size: 14, color: Colors.white)))),
               ]),
             ),
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -126,7 +126,7 @@ class ThreadComposer extends StatelessWidget {
             IconButton.filled(
               tooltip: 'Gửi',
               onPressed: sending || (draft.text.trim().isEmpty && pending == null) ? null : onSend,
-              icon: sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send),
+              icon: sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const SvgIcon(AppSvg.send),
             ),
           ]),
         ]),
@@ -177,18 +177,18 @@ class _AttachmentViewState extends State<AttachmentView> {
             backgroundColor: Colors.black,
             child: Stack(children: [
               Center(child: InteractiveViewer(child: Image.memory(_bytes!))),
-              SafeArea(child: IconButton(color: Colors.white, icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop())),
+              SafeArea(child: IconButton(color: Colors.white, icon: const SvgIcon(AppSvg.close), onPressed: () => Navigator.of(context).pop())),
             ]),
           ),
         ),
-        child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(_bytes!, width: 220, fit: BoxFit.cover, semanticLabel: a.name, errorBuilder: (_, _, _) => const Icon(Icons.broken_image))),
+        child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(_bytes!, width: 220, fit: BoxFit.cover, semanticLabel: a.name, errorBuilder: (_, _, _) => const SvgIcon(AppSvg.photoAdd))),
       );
     }
     if (a.isImage && !_failed) return const SizedBox(width: 220, height: 120, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
     return InkWell(
       onTap: a.isImage ? _fetch : null,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(_failed ? Icons.error_outline : Icons.attach_file, size: 18, color: _failed ? Brand.danger : widget.color),
+        SvgIcon(_failed ? AppSvg.alertCircle : AppSvg.attach, size: 18, color: _failed ? Brand.danger : widget.color),
         const SizedBox(width: 6),
         Flexible(child: Text(_failed ? 'Không tải được ảnh, chạm để thử lại' : '${a.name} (${formatSize(a.size)})', style: TextStyle(color: widget.color))),
       ]),

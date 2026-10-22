@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mamba_app/core/widgets/svg_icon.dart';
+
+import 'svg_finder.dart';
 import 'package:mamba_app/core/widgets/app_dialog.dart';
 
 Future<void> _open(WidgetTester tester, Widget Function(BuildContext) build, {Size size = const Size(360, 640)}) async {
@@ -17,8 +20,8 @@ void main() {
   testWidgets('title, X in the corner closes it, footer buttons stay', (tester) async {
     await _open(tester, (_) => const AppDialog(title: 'Thêm khách hàng', body: Text('thân'), actions: [Text('Lưu')]));
     expect(find.text('Thêm khách hàng'), findsOneWidget);
-    expect(find.byIcon(Icons.close), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(bySvg(AppSvg.close), findsOneWidget);
+    expect(bySvg(AppSvg.backCircle), findsNothing);
     expect(find.text('Lưu'), findsOneWidget);
     await tester.tap(find.byTooltip('Đóng'));
     await tester.pumpAndSettle();
@@ -27,8 +30,8 @@ void main() {
 
   testWidgets('back variant shows the arrow instead of the X', (tester) async {
     await _open(tester, (_) => const AppDialog(title: 'Cấu hình', back: true, body: Text('thân')));
-    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
-    expect(find.byIcon(Icons.close), findsNothing);
+    expect(bySvg(AppSvg.backCircle), findsOneWidget);
+    expect(bySvg(AppSvg.close), findsNothing);
     await tester.tap(find.byTooltip('Quay lại'));
     await tester.pumpAndSettle();
     expect(find.text('Cấu hình'), findsNothing);

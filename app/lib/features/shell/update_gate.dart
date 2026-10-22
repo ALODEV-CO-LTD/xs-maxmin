@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -137,14 +138,14 @@ class _RequiredScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.system_update, size: 56),
+                const SvgIcon(AppSvg.download, size: 56),
                 const SizedBox(height: 12),
                 const Text('Cần cập nhật ứng dụng', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Text('Bạn đang dùng phiên bản $current, đã quá cũ. Hãy cập nhật lên phiên bản ${info.latest.isEmpty ? info.min : info.latest} để tiếp tục.', textAlign: TextAlign.center),
                 if (info.notes.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(info.notes, textAlign: TextAlign.center)),
                 const SizedBox(height: 18),
-                if (info.downloadUrl.isNotEmpty) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, icon: Icons.download, onPressed: onUpdate) else const Text('Liên hệ quản trị viên để nhận bản mới.', textAlign: TextAlign.center),
+                if (info.downloadUrl.isNotEmpty) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, svg: AppSvg.download, onPressed: onUpdate) else const Text('Liên hệ quản trị viên để nhận bản mới.', textAlign: TextAlign.center),
                 AppButton(label: 'Kiểm tra lại', variant: AppButtonVariant.ghost, loading: busy, onPressed: busy ? null : onRetry),
               ]),
             ),

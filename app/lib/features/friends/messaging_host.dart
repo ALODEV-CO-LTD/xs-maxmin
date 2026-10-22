@@ -263,7 +263,7 @@ class BannerCard extends StatelessWidget {
                 Text(banner.body, maxLines: 2, overflow: TextOverflow.ellipsis),
               ]),
             ),
-            IconButton(icon: const Icon(Icons.close, size: 20), tooltip: 'Đóng', onPressed: onClose),
+            IconButton(icon: const SvgIcon(AppSvg.close, size: 20), tooltip: 'Đóng', onPressed: onClose),
           ]),
         ),
       ),

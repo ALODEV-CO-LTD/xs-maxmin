@@ -106,10 +106,10 @@ class _CustomersBodyState extends State<_CustomersBody> {
               AppButton(label: 'Thử lại', variant: AppButtonVariant.primary, onPressed: c.load),
             ] else ...[
               Wrap(spacing: 8, runSpacing: 8, children: [
-                AppButton(label: 'Thêm khách hàng', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: () => _add(c)),
+                AppButton(label: 'Thêm khách hàng', variant: AppButtonVariant.primary, svg: AppSvg.plus, onPressed: () => _add(c)),
               ]),
               const SizedBox(height: 10),
-              TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: Icon(Icons.search)), onChanged: c.setQuery),
+              TextField(decoration: const InputDecoration(hintText: 'Tìm theo tên khách hàng...', prefixIcon: SvgIcon(AppSvg.search)), onChanged: c.setQuery),
               const SizedBox(height: 8),
               _filters(c),
               const SizedBox(height: 10),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -125,7 +126,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> with WidgetsB
         child: TextField(
           onChanged: (v) => setState(() => _query = v),
           textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(hintText: 'Tìm tên hoặc tên đăng nhập', prefixIcon: Icon(Icons.search), isDense: true),
+          decoration: const InputDecoration(hintText: 'Tìm tên hoặc tên đăng nhập', prefixIcon: SvgIcon(AppSvg.search), isDense: true),
         ),
       ),
       Padding(

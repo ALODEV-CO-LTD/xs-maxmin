@@ -71,13 +71,13 @@ class _VersionCardState extends State<VersionCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final (String text, Color color, IconData icon) = switch (_phase) {
-      _Phase.checking => ('Đang kiểm tra cập nhật...', cs.onSurface.withValues(alpha: 0.6), Icons.sync),
-      _Phase.upToDate => ('Bạn đang dùng phiên bản mới nhất.', context.okColor, Icons.check_circle_outline),
-      _Phase.optional => ('Có phiên bản mới ${_info.latest}.', cs.primary, Icons.system_update_alt),
-      _Phase.required => ('Phiên bản này không còn được hỗ trợ, cần cập nhật lên ${_info.latest.isEmpty ? _info.min : _info.latest}.', context.badColor, Icons.error_outline),
-      _Phase.notSet => ('Quản trị viên chưa đăng thông tin phiên bản mới.', cs.onSurface.withValues(alpha: 0.6), Icons.info_outline),
-      _Phase.failed => ('Không kiểm tra được (không có mạng hoặc máy chủ không phản hồi).', cs.onSurface.withValues(alpha: 0.6), Icons.cloud_off_outlined),
+    final (String text, Color color, AppSvg icon) = switch (_phase) {
+      _Phase.checking => ('Đang kiểm tra cập nhật...', cs.onSurface.withValues(alpha: 0.6), AppSvg.sync),
+      _Phase.upToDate => ('Bạn đang dùng phiên bản mới nhất.', context.okColor, AppSvg.checkCircle),
+      _Phase.optional => ('Có phiên bản mới ${_info.latest}.', cs.primary, AppSvg.download),
+      _Phase.required => ('Phiên bản này không còn được hỗ trợ, cần cập nhật lên ${_info.latest.isEmpty ? _info.min : _info.latest}.', context.badColor, AppSvg.alertCircle),
+      _Phase.notSet => ('Quản trị viên chưa đăng thông tin phiên bản mới.', cs.onSurface.withValues(alpha: 0.6), AppSvg.info),
+      _Phase.failed => ('Không kiểm tra được (không có mạng hoặc máy chủ không phản hồi).', cs.onSurface.withValues(alpha: 0.6), AppSvg.warning),
     };
     final canDownload = _info.downloadUrl.isNotEmpty && (_phase == _Phase.optional || _phase == _Phase.required);
     return Card(
@@ -96,7 +96,7 @@ class _VersionCardState extends State<VersionCard> {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _phase == _Phase.checking
                 ? const SizedBox(width: 18, height: 18, child: Padding(padding: EdgeInsets.all(2), child: CircularProgressIndicator(strokeWidth: 2)))
-                : Icon(icon, size: 18, color: color),
+                : SvgIcon(icon, size: 18, color: color),
             const SizedBox(width: 8),
             Expanded(child: Text(text, key: const Key('version-status'), style: TextStyle(color: color, fontSize: 13.5))),
           ]),
@@ -105,7 +105,7 @@ class _VersionCardState extends State<VersionCard> {
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 4, children: [
             AppButton(label: 'Kiểm tra cập nhật', variant: AppButtonVariant.secondary, svg: AppSvg.refresh, onPressed: _phase == _Phase.checking ? null : _check),
-            if (canDownload) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, icon: Icons.download, onPressed: _download),
+            if (canDownload) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, svg: AppSvg.download, onPressed: _download),
           ]),
         ]),
       ),

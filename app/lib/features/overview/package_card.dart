@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -77,9 +78,9 @@ class _PackageCardState extends State<PackageCard> with WidgetsBindingObserver {
           PackageLevel.expired || PackageLevel.none => context.badColor,
         };
         final icon = switch (st.level) {
-          PackageLevel.ok => Icons.verified_outlined,
-          PackageLevel.soon => Icons.hourglass_bottom,
-          PackageLevel.expired || PackageLevel.none => Icons.error_outline,
+          PackageLevel.ok => AppSvg.verified,
+          PackageLevel.soon => AppSvg.clock,
+          PackageLevel.expired || PackageLevel.none => AppSvg.alertCircle,
         };
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -87,7 +88,7 @@ class _PackageCardState extends State<PackageCard> with WidgetsBindingObserver {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Row(children: [
-              Icon(icon, color: color, size: 28),
+              SvgIcon(icon, color: color, size: 28),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

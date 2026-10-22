@@ -45,7 +45,7 @@ class DateField extends StatelessWidget {
           labelText: label,
           isDense: true,
           suffixIcon: clearable && value.isNotEmpty
-              ? IconButton(tooltip: 'Bỏ ngày', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 32, height: 32), icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(''))
+              ? IconButton(tooltip: 'Bỏ ngày', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 32, height: 32), icon: const SvgIcon(AppSvg.closeCircle, size: 18), onPressed: () => onChanged(''))
               : const SvgIcon(AppSvg.calendar, size: 18),
         ),
         child: Text(value.isEmpty ? 'Chọn ngày' : viDate(value), style: TextStyle(fontSize: 15, color: value.isEmpty ? theme.hintColor : Colors.black)),

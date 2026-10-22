@@ -126,7 +126,7 @@ class _PasswordFieldState extends State<PasswordField> {
           errorText: widget.errorText,
           suffixIcon: IconButton(
             tooltip: _show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu',
-            icon: Icon(_show ? Icons.visibility_off : Icons.visibility),
+            icon: SvgIcon(_show ? AppSvg.eyeClosed : AppSvg.eye),
             onPressed: () => setState(() => _show = !_show),
           ),
         ),
@@ -267,8 +267,7 @@ class _RecoveryCodeDisplayState extends State<RecoveryCodeDisplay> {
       ),
       const SizedBox(height: 12),
       AppButton(
-        icon: _copied ? Icons.check : null,
-        svg: _copied ? null : AppSvg.copy,
+        svg: _copied ? AppSvg.check : AppSvg.copy,
         label: _copied ? 'Đã sao chép' : 'Sao chép mã',
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: widget.code));

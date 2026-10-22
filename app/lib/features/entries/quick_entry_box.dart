@@ -192,8 +192,8 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
       builder: (ctx) => Dialog.fullscreen(
         backgroundColor: Colors.black,
         child: Stack(children: [
-          Center(child: InteractiveViewer(maxScale: 6, child: Image.file(File(path), errorBuilder: (_, _, _) => const Icon(Icons.broken_image, color: Colors.white)))),
-          SafeArea(child: IconButton(tooltip: 'Đóng', color: Colors.white, icon: const Icon(Icons.close), onPressed: () => Navigator.of(ctx).pop())),
+          Center(child: InteractiveViewer(maxScale: 6, child: Image.file(File(path), errorBuilder: (_, _, _) => const SvgIcon(AppSvg.photoAdd, color: Colors.white)))),
+          SafeArea(child: IconButton(tooltip: 'Đóng', color: Colors.white, icon: const SvgIcon(AppSvg.close), onPressed: () => Navigator.of(ctx).pop())),
         ]),
       ),
     );
@@ -300,7 +300,7 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
           const SizedBox(width: 6),
           AppButton.icon(label: 'Chụp ảnh', variant: AppButtonVariant.secondary, svg: AppSvg.camera, onPressed: _reading ? null : () => _pick(ImageSource.camera)),
           const SizedBox(width: 6),
-          AppButton.icon(label: 'Mẫu cú pháp của khách này ${c.savedTemplate != null ? '(đã lưu)' : '(chưa lưu)'}', variant: _templateOpen ? AppButtonVariant.secondary : AppButtonVariant.ghost, icon: c.savedTemplate != null ? Icons.bookmark : Icons.bookmark_border, onPressed: () => setState(() => _templateOpen = !_templateOpen)),
+          AppButton.icon(label: 'Mẫu cú pháp của khách này ${c.savedTemplate != null ? '(đã lưu)' : '(chưa lưu)'}', variant: _templateOpen ? AppButtonVariant.secondary : AppButtonVariant.ghost, svg: AppSvg.bookmark, onPressed: () => setState(() => _templateOpen = !_templateOpen)),
         ]),
         if (_reading) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
         if (_templateOpen) _templateBox(types),
@@ -321,7 +321,7 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
               message: 'Bấm để xem ảnh lớn',
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(File(_photoPath!), width: 72, height: 72, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox(width: 72, height: 72, child: Icon(Icons.image_outlined))),
+                child: Image.file(File(_photoPath!), width: 72, height: 72, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox(width: 72, height: 72, child: SvgIcon(AppSvg.photoAdd))),
               ),
             ),
           ),

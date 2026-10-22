@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -70,7 +71,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
           onSubmitted: (_) => _submit(),
           decoration: InputDecoration(
             labelText: 'Mật khẩu cấp 2',
-            suffixIcon: IconButton(icon: Icon(_show ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _show = !_show)),
+            suffixIcon: IconButton(icon: SvgIcon(_show ? AppSvg.eyeClosed : AppSvg.eye), onPressed: () => setState(() => _show = !_show)),
           ),
         ),
         if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(_error)),

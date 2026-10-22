@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'svg_icon.dart';
 
 import 'action_bar.dart';
 
@@ -40,9 +41,9 @@ class AppDialog extends StatelessWidget {
           Padding(
             padding: EdgeInsets.fromLTRB(back ? 4 : 20, 8, 8, 0),
             child: Row(children: [
-              if (back) IconButton(tooltip: 'Quay lại', icon: const Icon(Icons.arrow_back), onPressed: closeEnabled ? close : null),
+              if (back) IconButton(tooltip: 'Quay lại', icon: const SvgIcon(AppSvg.backCircle), onPressed: closeEnabled ? close : null),
               Expanded(child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)))),
-              if (!back) IconButton(tooltip: 'Đóng', icon: const Icon(Icons.close), onPressed: closeEnabled ? close : null),
+              if (!back) IconButton(tooltip: 'Đóng', icon: const SvgIcon(AppSvg.close), onPressed: closeEnabled ? close : null),
             ]),
           ),
           if (description != null) Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 4), child: Text(description!, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.62), fontSize: 13.5))),

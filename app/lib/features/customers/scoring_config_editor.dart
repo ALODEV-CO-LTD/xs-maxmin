@@ -177,7 +177,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
           ChoiceChip(
             label: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(regionNames[id]!),
-              if (_isCustomer && _m.regionHasOverride(id)) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.primary)),
+              if (_isCustomer && _m.regionHasOverride(id)) Padding(padding: const EdgeInsets.only(left: 6), child: SvgIcon(AppSvg.circle, size: 8, color: Theme.of(context).colorScheme.primary)),
             ]),
             selected: _m.region == id,
             onSelected: (_) => _switchRegion(id),

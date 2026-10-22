@@ -140,10 +140,10 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 12),
           if (c.selectedCustomer.isNotEmpty && c.days.isNotEmpty) ...[const _SummaryCard(), const SizedBox(height: 12)],
           if (c.selectedCustomer.isEmpty)
-            const _Empty(icon: Icons.people_outline, text: 'Chọn khách hàng ở trên để xem điểm ra của họ.')
+            const _Empty(icon: AppSvg.usersGroup, text: 'Chọn khách hàng ở trên để xem điểm ra của họ.')
           else if (c.days.isEmpty)
             _Empty(
-              icon: Icons.inbox_outlined,
+              icon: AppSvg.archive,
               text: c.onlyMissing
                   ? 'Không có ngày nào thiếu kết quả xổ số trong khoảng này. Bỏ chọn ô lọc để xem toàn bộ lịch sử.'
                   : (c.hasEntriesForCustomer ? 'Chưa có số liệu của khách này trong ngày đã chọn. Bấm X ở ô Ngày để xem mọi ngày.' : 'Khách hàng này chưa có số liệu nào.'),
@@ -178,14 +178,14 @@ class _Banner extends StatelessWidget {
 
 class _Empty extends StatelessWidget {
   const _Empty({required this.icon, required this.text});
-  final IconData icon;
+  final AppSvg icon;
   final String text;
   @override
   Widget build(BuildContext context) => Card(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(children: [
-            Icon(icon, size: 36, color: context.mutedColor),
+            SvgIcon(icon, size: 36, color: context.mutedColor),
             const SizedBox(height: 8),
             Text(text, textAlign: TextAlign.center, style: TextStyle(color: context.mutedColor)),
           ]),
@@ -358,7 +358,7 @@ class _DayCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Icon(open ? Icons.expand_less : Icons.expand_more, size: 22),
+                SvgIcon(open ? AppSvg.chevronUp : AppSvg.chevronDown, size: 22),
                 const SizedBox(width: 4),
                 Text(label.date, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 const SizedBox(width: 8),

@@ -171,11 +171,11 @@ class _ResultCard extends StatelessWidget {
           Text('Kết quả xổ số ${c.regionName}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
           Row(children: [
-            IconButton.outlined(tooltip: 'Ngày trước', icon: const Icon(Icons.chevron_left), onPressed: () => c.shiftDay(-1)),
+            IconButton.outlined(tooltip: 'Ngày trước', icon: const SvgIcon(AppSvg.chevronLeft), onPressed: () => c.shiftDay(-1)),
             const SizedBox(width: 8),
             Expanded(child: DateField(value: c.date, onChanged: c.setDate, label: 'Ngày quay', dense: true)),
             const SizedBox(width: 8),
-            IconButton.outlined(tooltip: 'Ngày sau', icon: const Icon(Icons.chevron_right), onPressed: () => c.shiftDay(1)),
+            IconButton.outlined(tooltip: 'Ngày sau', icon: const SvgIcon(AppSvg.chevronRight), onPressed: () => c.shiftDay(1)),
           ]),
           const SizedBox(height: 10),
           SizedBox(
@@ -299,7 +299,7 @@ class _ResultForm extends StatelessWidget {
           Expanded(child: Text(north ? 'Nhập tay các giải' : 'Nhập tay các giải · $name', style: t.labelLarge, overflow: TextOverflow.ellipsis)),
           Text('${c.filledOf(cur)}/${c.totalBoxes}', style: TextStyle(color: context.mutedColor, fontSize: 13)),
           const SizedBox(width: 6),
-          Icon(c.gridOpen ? Icons.expand_less : Icons.expand_more, size: 22),
+          SvgIcon(c.gridOpen ? AppSvg.chevronUp : AppSvg.chevronDown, size: 22),
         ]),
       ),
     ));
@@ -328,8 +328,8 @@ class _ResultForm extends StatelessWidget {
               semantic: '${p.label} $name số ${k + 1}',
             ),
           if (!locked && !single) ...[
-            _CellButton(icon: Icons.add, tooltip: 'Thêm ô ${p.label}', onPressed: cells.length >= p.count + maxExtraCells ? null : () => c.addCell(north ? null : cur, p)),
-            if (cells.length > p.count) _CellButton(icon: Icons.remove, tooltip: 'Bớt ô ${p.label}', onPressed: () => c.removeCell(north ? null : cur, p)),
+            _CellButton(icon: AppSvg.plus, tooltip: 'Thêm ô ${p.label}', onPressed: cells.length >= p.count + maxExtraCells ? null : () => c.addCell(north ? null : cur, p)),
+            if (cells.length > p.count) _CellButton(icon: AppSvg.close, tooltip: 'Bớt ô ${p.label}', onPressed: () => c.removeCell(north ? null : cur, p)),
           ],
         ]));
         children.add(const SizedBox(height: 10));
@@ -357,14 +357,14 @@ class _ResultForm extends StatelessWidget {
 
 class _CellButton extends StatelessWidget {
   const _CellButton({required this.icon, required this.tooltip, required this.onPressed});
-  final IconData icon;
+  final AppSvg icon;
   final String tooltip;
   final VoidCallback? onPressed;
   @override
   Widget build(BuildContext context) => SizedBox(
         width: 40,
         height: 40,
-        child: IconButton.outlined(tooltip: tooltip, padding: EdgeInsets.zero, iconSize: 20, icon: Icon(icon), onPressed: onPressed),
+        child: IconButton.outlined(tooltip: tooltip, padding: EdgeInsets.zero, iconSize: 20, icon: SvgIcon(icon), onPressed: onPressed),
       );
 }
 

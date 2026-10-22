@@ -53,7 +53,80 @@ enum AppSvg {
   photoAdd('photo_add'),
 
   /// Thêm người (khách hàng, bạn bè)
-  addUser('add_user');
+  addUser('add_user'),
+
+  /// Quản trị viên (Phân quyền)
+  userAdmin('user_admin'),
+
+  /// Đặt mật khẩu xoá dữ liệu
+  newPassword('new_password'),
+
+  /// Mật khẩu lớp hai
+  loginLockRefresh('login_lock_refresh'),
+
+  /// Thông báo & bảo trì
+  megaphone('megaphone'),
+
+  /// Thanh toán & gia hạn
+  pay('pay'),
+
+  /// Hiện mật khẩu / số liệu
+  eye('eye'),
+
+  /// Ẩn mật khẩu / số liệu
+  eyeClosed('eye_closed'),
+
+  /// Đổi mật khẩu
+  changePassword('change_password'),
+
+  /// Phản hồi (Admin)
+  feedback('feedback'),
+
+  /// Nhóm người / khách hàng
+  usersGroup('users_group'),
+
+  // ---- Lucide set (ISC licence, assets/icons/LICENSE-lucide.txt) + SVG Repo arrows: the small interface icons ----
+  warning('triangle_alert'),
+  search('search'),
+  volumeOn('volume_on'),
+  arrowDown('arrow_down'),
+  circle('circle'),
+  download('download'),
+  tag('tag'),
+  alertCircle('circle_alert'),
+  chevronDown('chevron_down'),
+  chevronUp('chevron_up'),
+  close('close'),
+  lock('lock'),
+  backCircle('back_circle'),
+  archive('archive'),
+  checkboxOn('checkbox_on'),
+  checkCircle('check_circle'),
+  bell('bell'),
+  qr('qr'),
+  check('check'),
+  chevronRight('chevron_right'),
+  info('info'),
+  arrowUp('arrow_up'),
+  mic('mic'),
+  chevronLeft('chevron_left'),
+  badge('badge'),
+  attach('attach'),
+  checkboxOff('checkbox_off'),
+  sync('sync'),
+  send('send'),
+  verified('verified'),
+  clock('clock'),
+  phone('phone'),
+  phoneOff('phone_off'),
+  plus('plus'),
+  closeCircle('close_circle'),
+  micOff('mic_off'),
+  bellOff('bell_off'),
+  userRemove('user_remove'),
+  arrowLeft('arrow_left'),
+  volumeOff('volume_off'),
+  bookmark('bookmark');
 
   const AppSvg(this.name);
   final String name;

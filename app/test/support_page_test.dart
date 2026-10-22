@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mamba_app/core/widgets/svg_icon.dart';
+
+import 'svg_finder.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mamba_app/core/api_client.dart';
@@ -65,7 +68,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.textContaining('Chưa có tin nhắn nào'), findsOneWidget);
-    final send = tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.send));
+    final send = tester.widget<IconButton>(find.ancestor(of: bySvg(AppSvg.send), matching: find.byType(IconButton)));
     expect(send.onPressed, isNull);
     await tester.pumpWidget(const SizedBox());
   });

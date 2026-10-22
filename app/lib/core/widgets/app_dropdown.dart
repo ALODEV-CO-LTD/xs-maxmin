@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'svg_icon.dart';
 
 /// The one dropdown field of the app. The field looks like any other input (same [InputDecoration]); tapping it opens a
 /// rounded white list that is ALWAYS right under the field and exactly as wide as the field, at most 320 high (it scrolls).
@@ -100,7 +101,7 @@ class _AppDropdownState<T> extends State<AppDropdown<T>> {
                       child: shown?.child ?? widget.hint ?? const SizedBox.shrink(),
                     ),
                   ),
-                  Icon(Icons.arrow_drop_down, color: enabled ? Colors.black54 : Colors.black26),
+                  SvgIcon(AppSvg.chevronDown, color: enabled ? Colors.black54 : Colors.black26),
                 ],
               ),
             ),

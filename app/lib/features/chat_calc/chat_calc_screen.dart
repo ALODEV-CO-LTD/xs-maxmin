@@ -5,6 +5,7 @@
 //   Lưu       trên máy này (`report:<id>` + `reports:index`); id theo nội dung nên không trùng bản ghi.
 //   Gửi       xem trước rồi gửi đúng nội dung báo cáo cho người bạn qua chat mã hoá 2 đầu.
 import 'dart:convert';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -261,10 +262,10 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(children: [
-                Icon(Icons.grid_view_rounded, color: cs.primary),
+                SvgIcon(AppSvg.calculator, color: cs.primary),
                 const SizedBox(width: 12),
                 Expanded(child: Text('Dùng kết quả ${id == 'mb' ? 'Miền Bắc' : 'đài ${_nameFor(id)}'}', style: const TextStyle(fontSize: 16))),
-                if (_selected == id) Icon(Icons.check_circle, color: cs.primary),
+                if (_selected == id) SvgIcon(AppSvg.checkCircle, color: cs.primary),
               ]),
             ),
           ),

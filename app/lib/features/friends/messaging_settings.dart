@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -70,7 +71,7 @@ class _SheetState extends State<_Sheet> {
               const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(_allowed == true ? Icons.notifications_active_outlined : Icons.notifications_off_outlined, color: _allowed == true ? context.okColor : Brand.warning),
+                leading: SvgIcon(_allowed == true ? AppSvg.bell : AppSvg.bellOff, color: _allowed == true ? context.okColor : Brand.warning),
                 title: Text(_allowed == true ? 'Thông báo đang bật' : 'Thông báo đang tắt'),
                 trailing: _allowed == true
                     ? null
@@ -91,9 +92,9 @@ class _SheetState extends State<_Sheet> {
               const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.inventory_2_outlined),
+                leading: const SvgIcon(AppSvg.archive),
                 title: const Text('Tin nhắn lưu trữ'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const SvgIcon(AppSvg.chevronRight),
                 onTap: () {
                   final nav = Navigator.of(context);
                   nav.pop(); // close this sheet first, the lock prompt and the list open on the page underneath

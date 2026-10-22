@@ -116,7 +116,7 @@ class _StaffBodyState extends State<StaffBody> {
         else ...[
           Row(children: [
             Expanded(child: Text('Tài khoản thứ cấp (${_data.staff.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-            AppButton(label: 'Tạo', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: _create),
+            AppButton(label: 'Tạo', variant: AppButtonVariant.primary, svg: AppSvg.plus, onPressed: _create),
           ]),
           const SizedBox(height: 12),
           if (_data.staff.isEmpty && _error == null) const EmptyState('Chưa có tài khoản thứ cấp nào.'),

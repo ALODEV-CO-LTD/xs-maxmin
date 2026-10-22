@@ -596,7 +596,7 @@ class _ChatPageState extends State<ChatPage> {
             CircleAvatar(
               radius: 14,
               backgroundColor: avatarColor(_c.nameOf(_f)),
-              child: _f.isGroup ? const Icon(Icons.groups, size: 18, color: Colors.white) : Text(initialOf(_c.nameOf(_f)), style: const TextStyle(fontSize: 13, color: Colors.white)),
+              child: _f.isGroup ? const SvgIcon(AppSvg.usersGroup, size: 18, color: Colors.white) : Text(initialOf(_c.nameOf(_f)), style: const TextStyle(fontSize: 13, color: Colors.white)),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -662,7 +662,7 @@ class _ChatPageState extends State<ChatPage> {
                       child: Row(
                         children: [
                           Expanded(child: Text('📌 ${quoteText(pm)}', maxLines: 1, overflow: TextOverflow.ellipsis)),
-                          IconButton(icon: const Icon(Icons.close, size: 18), tooltip: 'Bỏ ghim', onPressed: () => _togglePin(pm.id)),
+                          IconButton(icon: const SvgIcon(AppSvg.close, size: 18), tooltip: 'Bỏ ghim', onPressed: () => _togglePin(pm.id)),
                         ],
                       ),
                     ),
@@ -681,7 +681,7 @@ class _ChatPageState extends State<ChatPage> {
                       Positioned(
                         right: 12,
                         bottom: 12,
-                        child: FloatingActionButton.small(heroTag: null, tooltip: 'Xuống tin mới nhất', onPressed: _toBottom, child: const Icon(Icons.keyboard_arrow_down)),
+                        child: FloatingActionButton.small(heroTag: null, tooltip: 'Xuống tin mới nhất', onPressed: _toBottom, child: const SvgIcon(AppSvg.arrowDown)),
                       ),
                   ],
                 ),
@@ -697,7 +697,7 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(child: Text('${(_pending!.bytes.length / 1024).round()} KB · đã xoá thông tin vị trí/thiết bị', style: theme.textTheme.bodySmall)),
-                      IconButton(icon: const Icon(Icons.close), tooltip: 'Bỏ ảnh', onPressed: () => setState(() => _pending = null)),
+                      IconButton(icon: const SvgIcon(AppSvg.close), tooltip: 'Bỏ ảnh', onPressed: () => setState(() => _pending = null)),
                     ],
                   ),
                 ),
@@ -728,7 +728,7 @@ class _ChatPageState extends State<ChatPage> {
                           style: TextStyle(color: context.mutedColor),
                         ),
                       ),
-                      IconButton(icon: const Icon(Icons.close, size: 18), tooltip: 'Bỏ trả lời', onPressed: () => setState(() => _replyTo = null)),
+                      IconButton(icon: const SvgIcon(AppSvg.close, size: 18), tooltip: 'Bỏ trả lời', onPressed: () => setState(() => _replyTo = null)),
                     ],
                   ),
                 ),
@@ -922,7 +922,7 @@ class _ChatPageState extends State<ChatPage> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.insert_drive_file_outlined, size: 18),
+          const SvgIcon(AppSvg.attach, size: 18),
           const SizedBox(width: 6),
           Flexible(child: Text(a.name)),
         ],
@@ -1208,7 +1208,7 @@ class _GroupSettingsSheet extends StatelessWidget {
               child: CircleAvatar(
                 radius: 32,
                 backgroundColor: avatarColor(group.name),
-                child: const Icon(Icons.groups, size: 34, color: Colors.white),
+                child: const SvgIcon(AppSvg.usersGroup, size: 34, color: Colors.white),
               ),
             ),
             const SizedBox(height: 6),
@@ -1234,7 +1234,7 @@ class _GroupSettingsSheet extends StatelessWidget {
                     : (isCreator
                           ? IconButton(
                               tooltip: 'Xoá khỏi nhóm',
-                              icon: Icon(Icons.person_remove_outlined, size: 20, color: context.badColor),
+                              icon: SvgIcon(AppSvg.userRemove, size: 20, color: context.badColor),
                               onPressed: () => Navigator.pop(context, 'remove:${m.id}'),
                             )
                           : null),

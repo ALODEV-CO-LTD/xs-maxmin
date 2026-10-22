@@ -88,7 +88,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
           if (c.formError.isNotEmpty) ScrollIntoView(key: ValueKey('form-err-${c.formError}'), child: InfoBox(c.formError)),
           // One row: add a line (+), save (Thêm số liệu), delete all.
           Row(children: [
-            AppButton.icon(label: 'Thêm số', variant: AppButtonVariant.secondary, icon: Icons.add, onPressed: c.addRow),
+            AppButton.icon(label: 'Thêm số', variant: AppButtonVariant.secondary, svg: AppSvg.plus, onPressed: c.addRow),
             const SizedBox(width: 8),
             Expanded(child: AppButton(label: 'Thêm số liệu', variant: AppButtonVariant.primary, loading: c.submitting, onPressed: c.submitting || !c.canAdd ? null : c.submit)),
             const SizedBox(width: 8),
@@ -134,7 +134,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
       child: IconButton(
         visualDensity: VisualDensity.compact,
         tooltip: 'Xoá dòng',
-        icon: const Icon(Icons.close, size: 20),
+        icon: const SvgIcon(AppSvg.close, size: 20),
         onPressed: c.rows.length == 1 && r.isBlank ? null : () => c.removeRow(r),
       ),
     );

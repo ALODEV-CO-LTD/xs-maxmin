@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
@@ -120,7 +121,7 @@ class _BackupsSectionState extends State<BackupsSection> {
                   subtitle: Text('${viDateTime(b.createdAt)} · ${formatBackupSize(b.size)}'),
                   trailing: _downloading == b.name
                       ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(tooltip: 'Tải về', icon: const Icon(Icons.download), onPressed: _downloading != null ? null : () => _download(b)),
+                      : IconButton(tooltip: 'Tải về', icon: const SvgIcon(AppSvg.download), onPressed: _downloading != null ? null : () => _download(b)),
                 ),
               ),
             ),

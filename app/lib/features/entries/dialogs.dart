@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 
 import '../../core/theme.dart';
 import '../../core/widgets/app_button.dart';
@@ -53,7 +54,7 @@ class InfoBox extends StatelessWidget {
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(child: Padding(padding: const EdgeInsets.only(top: 2, right: 8), child: Text(text))),
         ?action,
-        if (onClose != null) IconButton(visualDensity: VisualDensity.compact, tooltip: 'Đóng', icon: const Icon(Icons.close, size: 18), onPressed: onClose),
+        if (onClose != null) IconButton(visualDensity: VisualDensity.compact, tooltip: 'Đóng', icon: const SvgIcon(AppSvg.close, size: 18), onPressed: onClose),
       ]),
     );
   }

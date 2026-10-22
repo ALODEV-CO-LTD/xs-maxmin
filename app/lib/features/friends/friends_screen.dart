@@ -167,7 +167,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: Align(alignment: Alignment.centerLeft, child: Text(c.nameOf(f), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)))),
-          ListTile(leading: const Icon(Icons.inventory_2_outlined), title: const Text('Lưu trữ'), onTap: () => Navigator.pop(ctx, 'archive')),
+          ListTile(leading: const SvgIcon(AppSvg.archive), title: const Text('Lưu trữ'), onTap: () => Navigator.pop(ctx, 'archive')),
           ListTile(
             leading: SvgIcon(AppSvg.delete, color: ctx.badColor),
             title: Text(f.isGroup ? 'Rời nhóm' : 'Xoá cuộc trò chuyện', style: TextStyle(color: ctx.badColor)),
@@ -362,13 +362,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
         actions: [
           if (c != null && _searching)
             IconButton(
-              icon: const Icon(Icons.close),
+              icon: const SvgIcon(AppSvg.close),
               tooltip: 'Đóng tìm kiếm',
               onPressed: () => _closeSearch(c),
             )
           else if (c != null) ...[
             IconButton(
-              icon: const Icon(Icons.search),
+              icon: const SvgIcon(AppSvg.search),
               tooltip: 'Tìm kiếm',
               onPressed: _openSearch,
             ),
@@ -383,7 +383,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
               onPressed: () => _newMenu(c),
             ),
             IconButton(
-              icon: const Icon(Icons.badge_outlined),
+              icon: const SvgIcon(AppSvg.badge),
               tooltip: 'ID của bạn',
               onPressed: () => _showMyId(c),
             ),
@@ -431,7 +431,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   leading: const SvgIcon(AppSvg.support),
                   title: Text('Có ${c.supportUnread} phản hồi mới từ Admin'),
                   subtitle: const Text('Chạm để xem Hỗ trợ từ Admin'),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: const SvgIcon(AppSvg.chevronRight),
                   onTap: () => context.push('/support'),
                 ),
               ),
@@ -519,7 +519,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             heroTag: 'friends-top',
             tooltip: 'Lên đầu danh sách',
             onPressed: () => _scroll.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut),
-            child: const Icon(Icons.keyboard_arrow_up),
+            child: const SvgIcon(AppSvg.arrowUp),
           ),
         ),
     ]);
@@ -553,7 +553,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 CircleAvatar(
                   radius: 26,
                   backgroundColor: avatarColor(name),
-                  child: f.isGroup ? const Icon(Icons.groups, color: Colors.white, size: 28) : Text(initialOf(name), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+                  child: f.isGroup ? const SvgIcon(AppSvg.usersGroup, color: Colors.white, size: 28) : Text(initialOf(name), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

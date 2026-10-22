@@ -122,7 +122,7 @@ class _UsersListBodyState extends State<UsersListBody> {
                 leading: const SvgIcon(AppSvg.support),
                 title: const Text('Yêu cầu hỗ trợ khôi phục'),
                 subtitle: Text(_pending > 0 ? '$_pending yêu cầu chờ duyệt' : 'Không có yêu cầu chờ duyệt'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const SvgIcon(AppSvg.chevronRight),
                 onTap: () async {
                   await Navigator.of(context).push(MaterialPageRoute<void>(
                       builder: (_) => AdminRecoveryRequestsPage(api: widget.api, onCount: (n) => _pending = n)));
@@ -137,8 +137,8 @@ class _UsersListBodyState extends State<UsersListBody> {
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Tìm theo tên...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _q.text.isEmpty ? null : IconButton(icon: const Icon(Icons.close), onPressed: () { _q.clear(); _onSearch(''); setState(() {}); }),
+              prefixIcon: const SvgIcon(AppSvg.search),
+              suffixIcon: _q.text.isEmpty ? null : IconButton(icon: const SvgIcon(AppSvg.closeCircle), onPressed: () { _q.clear(); _onSearch(''); setState(() {}); }),
             ),
           ),
           const SizedBox(height: 12),

@@ -83,7 +83,7 @@ class _AccountScreenState extends State<AccountScreen> {
         title: const Text('Tài khoản'),
         actions: [IconButton(icon: const SvgIcon(AppSvg.logout), tooltip: 'Đăng xuất', onPressed: () => confirmLogout(context))],
         automaticallyImplyLeading: !widget.embedded,
-        leading: widget.embedded || context.canPop() ? null : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/admin')),
+        leading: widget.embedded || context.canPop() ? null : IconButton(icon: const SvgIcon(AppSvg.arrowLeft), onPressed: () => context.go('/admin')),
       ),
       body: ListenableBuilder(
         listenable: _ctl,
@@ -129,30 +129,30 @@ class _AccountScreenState extends State<AccountScreen> {
         ),
       ]);
     }
-    // The pills scroll WITH the page (one scroll view): pulling to refresh moves everything together, so no white strip
-    // opens between a fixed pills row and the content.
     final tab = switch (_tab) {
       AccountTab.profile => AccountProfileTab(ctl: _ctl),
       AccountTab.devices => AccountDevicesTab(ctl: _ctl),
       AccountTab.packages => AccountPackagesTab(ctl: _ctl),
       AccountTab.data => AccountDataTab(ctl: _ctl),
     };
-    return RefreshIndicator(
-      onRefresh: () => _ctl.load(silent: true),
-      child: SingleChildScrollView(
-        key: PageStorageKey('account-${_tab.name}'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
-        child: Column(children: [
-          _pills(tabs),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+    // The pills stay fixed under the title and the page does NOT bounce: on iPhone the default bouncing scroll opened a white strip
+    // between the pills and the content (and left the page slid down while it refreshed). With the clamped physics the page stays put
+    // and pulling down only shows the refresh spinner over the content.
+    return Column(children: [
+      _pills(tabs),
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: () => _ctl.load(silent: true),
+          child: SingleChildScrollView(
+            key: PageStorageKey('account-${_tab.name}'),
+            physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 32),
             child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: KeyedSubtree(key: ValueKey(_tab), child: tab))),
           ),
-        ]),
+        ),
       ),
-    );
+    ]);
   }
 }
 

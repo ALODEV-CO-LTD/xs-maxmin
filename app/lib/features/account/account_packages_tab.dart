@@ -277,7 +277,7 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            AppButton(label: 'Xem thông tin chuyển khoản và mã QR', variant: AppButtonVariant.primary, icon: Icons.qr_code_2, onPressed: () => _showTransferSheet(pending)),
+            AppButton(label: 'Xem thông tin chuyển khoản và mã QR', variant: AppButtonVariant.primary, svg: AppSvg.qr, onPressed: () => _showTransferSheet(pending)),
             const SizedBox(height: 8),
             Row(children: [
               Expanded(child: AppButton(label: 'Sao chép nội dung', variant: AppButtonVariant.secondary, svg: AppSvg.copy, onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'))),

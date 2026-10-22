@@ -21,7 +21,7 @@ import '../../core/widgets/app_button.dart';
 class _Section {
   const _Section(this.title, this.icon, this.perm, this.build, {this.root = false});
   final String title;
-  final IconData icon;
+  final AppSvg icon;
   final Object? perm; // a right, a list of rights (any), or null = always
   final Widget Function() build;
   final bool root;
@@ -37,13 +37,13 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   static final _all = <_Section>[
-    _Section('Thống kê', Icons.insert_chart_outlined, 'stats.view', () => const AdminStatsScreen()),
-    _Section('Khách hàng', Icons.groups_outlined, 'users.view', () => const AdminUsersScreen()),
-    _Section('Thanh toán & gia hạn', Icons.check_circle_outline, 'payments.manage', () => const AdminPaymentsScreen()),
-    _Section('Phản hồi', Icons.forum_outlined, 'support.messages', () => const AdminMessagesScreen()),
-    _Section('Thông báo & bảo trì', Icons.campaign_outlined, ['announcements.manage', 'maintenance.manage'], () => const AdminNoticesScreen()),
-    _Section('Cài đặt', Icons.settings_outlined, ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], () => const AdminSettingsScreen()),
-    _Section('Phân quyền', Icons.admin_panel_settings_outlined, null, () => const AdminStaffScreen(), root: true),
+    _Section('Thống kê', AppSvg.chart, 'stats.view', () => const AdminStatsScreen()),
+    _Section('Khách hàng', AppSvg.usersGroup, 'users.view', () => const AdminUsersScreen()),
+    _Section('Thanh toán & gia hạn', AppSvg.pay, 'payments.manage', () => const AdminPaymentsScreen()),
+    _Section('Phản hồi', AppSvg.feedback, 'support.messages', () => const AdminMessagesScreen()),
+    _Section('Thông báo & bảo trì', AppSvg.megaphone, ['announcements.manage', 'maintenance.manage'], () => const AdminNoticesScreen()),
+    _Section('Cài đặt', AppSvg.gear, ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], () => const AdminSettingsScreen()),
+    _Section('Phân quyền', AppSvg.userAdmin, null, () => const AdminStaffScreen(), root: true),
   ];
 
   int _index = 0;
@@ -97,7 +97,7 @@ class _AdminShellState extends State<AdminShell> {
               child: ListView(children: [
                 for (var i = 0; i < sections.length; i++)
                   ListTile(
-                    leading: Icon(sections[i].icon),
+                    leading: SvgIcon(sections[i].icon),
                     title: Text(sections[i].title),
                     selected: i == _index,
                     onTap: () {
@@ -116,7 +116,7 @@ class _AdminShellState extends State<AdminShell> {
               context.push('/admin/account');
             }),
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: const SvgIcon(AppSvg.info),
               title: const Text('Phiên bản ứng dụng'),
               subtitle: Text(AppConfig.appVersion),
               onTap: () {

@@ -414,7 +414,7 @@ class _PackagesSectionState extends State<PackagesSection> {
         else
           Align(
             alignment: Alignment.centerLeft,
-            child: AppButton(label: 'Thêm gói', variant: AppButtonVariant.primary, icon: Icons.add, onPressed: _startNew),
+            child: AppButton(label: 'Thêm gói', variant: AppButtonVariant.primary, svg: AppSvg.plus, onPressed: _startNew),
           ),
         const SizedBox(height: 10),
         if (_items.isEmpty && _editing != 'new') const Placeholder2('Chưa có gói nào.'),

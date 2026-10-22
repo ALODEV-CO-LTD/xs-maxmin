@@ -13,13 +13,13 @@ export const USER_LINKS = [
 export const ADMIN_LINKS = [
   { perm: 'stats.view', path: '/admin/stats', label: 'Thống kê', icon: 'chart-column-increasing' },
   { perm: 'users.view', path: '/admin/users', label: 'Khách hàng', icon: 'users' },
-  { perm: 'payments.manage', path: '/admin/payment-requests', label: 'Thanh toán & gia hạn', icon: 'circle-check' },
-  { perm: 'support.messages', path: '/admin/messages', label: 'Phản hồi', icon: 'support', badge: 'admin-messages' },
-  { perm: ['announcements.manage', 'maintenance.manage'], path: '/admin/notices', label: 'Thông báo', icon: 'message-square-more' },
+  { perm: 'payments.manage', path: '/admin/payment-requests', label: 'Thanh toán & gia hạn', icon: 'pay' },
+  { perm: 'support.messages', path: '/admin/messages', label: 'Phản hồi', icon: 'feedback', badge: 'admin-messages' },
+  { perm: ['announcements.manage', 'maintenance.manage'], path: '/admin/notices', label: 'Thông báo', icon: 'megaphone' },
   { perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], path: '/admin/settings', label: 'Cài đặt', icon: 'settings' },
   // Admin shares /account with customers (change password...). Admin has no "Bạn bè": contact with customers goes
   // through "Phản hồi" above.
-  { root: true, path: '/admin/staff', label: 'Phân quyền', icon: 'users' },
+  { root: true, path: '/admin/staff', label: 'Phân quyền', icon: 'user-admin' },
   { path: '/account', label: 'Tài khoản', icon: 'user' },
 ]
 

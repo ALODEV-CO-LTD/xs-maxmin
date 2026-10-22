@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -159,7 +160,7 @@ class PrivacySettingsCard extends StatelessWidget {
         ),
       const SizedBox(height: 8),
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(p.screenshotGuardOn ? Icons.verified_user_outlined : Icons.info_outline, size: 18, color: context.mutedColor),
+        SvgIcon(p.screenshotGuardOn ? AppSvg.verified : AppSvg.info, size: 18, color: context.mutedColor),
         const SizedBox(width: 8),
         Expanded(child: Text(p.screenshotGuardOn ? 'Chặn chụp màn hình và quay màn hình đang bật (theo chính sách của hệ thống).' : 'Chặn chụp màn hình đang tắt theo chính sách của hệ thống.', style: TextStyle(color: context.mutedColor, fontSize: 13))),
       ]),

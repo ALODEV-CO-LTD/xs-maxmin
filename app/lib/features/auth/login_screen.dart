@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
             onSubmitted: (_) => _submitCredentials(),
             decoration: InputDecoration(
               labelText: 'Mật khẩu',
-              suffixIcon: IconButton(icon: Icon(_showPass ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _showPass = !_showPass)),
+              suffixIcon: IconButton(icon: SvgIcon(_showPass ? AppSvg.eyeClosed : AppSvg.eye), onPressed: () => setState(() => _showPass = !_showPass)),
             ),
           ),
           const SizedBox(height: 18),

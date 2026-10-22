@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 
@@ -77,17 +78,17 @@ class _CallPanelState extends State<CallPanel> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _RoundButton(icon: Icons.call_end, color: context.badColor, label: 'Từ chối', onTap: c.reject),
-                    _RoundButton(icon: Icons.call, color: context.okColor, label: 'Nghe máy', onTap: c.accept),
+                    _RoundButton(icon: AppSvg.phoneOff, color: context.badColor, label: 'Từ chối', onTap: c.reject),
+                    _RoundButton(icon: AppSvg.phone, color: context.okColor, label: 'Nghe máy', onTap: c.accept),
                   ],
                 )
               else
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    if (connected || c.status == CallStatus.outgoing || c.status == CallStatus.connecting) _RoundButton(icon: c.muted ? Icons.mic_off : Icons.mic, color: c.muted ? Brand.warning : theme.colorScheme.surfaceContainerHighest, label: c.muted ? 'Bật micro' : 'Tắt micro', onTap: c.toggleMute),
-                    _RoundButton(icon: Icons.call_end, color: context.badColor, label: 'Kết thúc', onTap: c.hangUp),
-                    if (connected) _RoundButton(icon: c.speaker ? Icons.volume_up : Icons.volume_down, color: c.speaker ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest, label: c.speaker ? 'Loa ngoài' : 'Loa trong', onTap: c.toggleSpeaker),
+                    if (connected || c.status == CallStatus.outgoing || c.status == CallStatus.connecting) _RoundButton(icon: c.muted ? AppSvg.micOff : AppSvg.mic, color: c.muted ? Brand.warning : theme.colorScheme.surfaceContainerHighest, label: c.muted ? 'Bật micro' : 'Tắt micro', onTap: c.toggleMute),
+                    _RoundButton(icon: AppSvg.phoneOff, color: context.badColor, label: 'Kết thúc', onTap: c.hangUp),
+                    if (connected) _RoundButton(icon: c.speaker ? AppSvg.volumeOn : AppSvg.volumeOff, color: c.speaker ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest, label: c.speaker ? 'Loa ngoài' : 'Loa trong', onTap: c.toggleSpeaker),
                   ],
                 ),
             ],
@@ -100,7 +101,7 @@ class _CallPanelState extends State<CallPanel> {
 
 class _RoundButton extends StatelessWidget {
   const _RoundButton({required this.icon, required this.color, required this.label, required this.onTap});
-  final IconData icon;
+  final AppSvg icon;
   final Color color;
   final String label;
   final VoidCallback onTap;
@@ -112,7 +113,7 @@ class _RoundButton extends StatelessWidget {
           child: Material(
             color: color,
             shape: const CircleBorder(),
-            child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: SizedBox(width: 68, height: 68, child: Icon(icon, size: 30, color: Colors.white))),
+            child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: SizedBox(width: 68, height: 68, child: SvgIcon(icon, size: 30, color: Colors.white))),
           ),
         ),
         const SizedBox(height: 8),

@@ -150,7 +150,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     final items = threadItems(_msgs);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.canPop() ? context.pop() : context.go('/account')),
+        leading: IconButton(icon: const SvgIcon(AppSvg.arrowLeft), onPressed: () => context.canPop() ? context.pop() : context.go('/account')),
         title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Hỗ trợ từ Admin', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           Text('Gửi câu hỏi hoặc báo lỗi, Admin trả lời tại đây.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
@@ -216,7 +216,7 @@ class SupportEntryCard extends StatelessWidget {
             leading: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: const SvgIcon(AppSvg.support)),
             title: const Text('Hỗ trợ từ Admin', style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(n > 0 ? 'Có $n phản hồi mới từ Admin' : 'Gửi câu hỏi hoặc báo lỗi cho Admin'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const SvgIcon(AppSvg.chevronRight),
             onTap: () => context.push('/support'),
           ),
         );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -134,7 +135,7 @@ class _NoticeCard extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(12, 8, onClose == null ? 12 : 0, 8),
       decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10), border: Border.all(color: c.withValues(alpha: 0.5))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(warning ? Icons.build_circle_outlined : Icons.campaign_outlined, size: 20, color: warning ? null : c),
+        warning ? const SvgIcon(AppSvg.warning, size: 20) : SvgIcon(AppSvg.megaphone, size: 20, color: c),
         const SizedBox(width: 8),
         Expanded(
           child: Padding(
@@ -145,7 +146,7 @@ class _NoticeCard extends StatelessWidget {
             ]),
           ),
         ),
-        if (onClose != null) IconButton(visualDensity: VisualDensity.compact, constraints: const BoxConstraints(minWidth: 40, minHeight: 40), tooltip: 'Ẩn thông báo', icon: const Icon(Icons.close, size: 20), onPressed: onClose),
+        if (onClose != null) IconButton(visualDensity: VisualDensity.compact, constraints: const BoxConstraints(minWidth: 40, minHeight: 40), tooltip: 'Ẩn thông báo', icon: const SvgIcon(AppSvg.close, size: 20), onPressed: onClose),
       ]),
     );
   }

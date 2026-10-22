@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -181,7 +182,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text('Không bắt buộc · Có thể đặt sau trong Tài khoản', style: TextStyle(fontSize: 12.5)),
                 ]),
               ),
-              Icon(_wipeEnabled ? Icons.remove : Icons.add),
+              SvgIcon(_wipeEnabled ? AppSvg.close : AppSvg.plus),
             ]),
           ),
         ),

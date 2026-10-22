@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -321,7 +322,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                     borderRadius: BorderRadius.circular(10),
                     onTap: _pickRunAt,
                     child: InputDecorator(
-                      decoration: InputDecoration(labelText: _repeat == 'none' ? 'Thời điểm xoá' : 'Thời điểm xoá lần đầu', suffixIcon: const Icon(Icons.schedule, size: 18)),
+                      decoration: InputDecoration(labelText: _repeat == 'none' ? 'Thời điểm xoá' : 'Thời điểm xoá lần đầu', suffixIcon: const SvgIcon(AppSvg.clock, size: 18)),
                       child: Text(_fmtTime(_runAt.toIso8601String())),
                     ),
                   ),
@@ -351,7 +352,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                       if (s['kind'] == 'chat' && s['setByMe'] == false) 'Do bạn bè đặt',
                     ].join('\n')),
                     isThreeLine: s['repeat'] is Map,
-                    trailing: s['status'] == 'pending' ? IconButton(tooltip: 'Huỷ lịch', icon: Icon(Icons.close, color: context.badColor), onPressed: () => _cancel(s)) : null,
+                    trailing: s['status'] == 'pending' ? IconButton(tooltip: 'Huỷ lịch', icon: SvgIcon(AppSvg.close, color: context.badColor), onPressed: () => _cancel(s)) : null,
                   ),
                 ),
     ]);

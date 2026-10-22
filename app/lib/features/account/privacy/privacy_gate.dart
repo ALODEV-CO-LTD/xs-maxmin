@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/widgets/svg_icon.dart';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -165,7 +166,7 @@ class _LockFormState extends State<_LockForm> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Icon(Icons.lock_outline, size: 44),
+                const SvgIcon(AppSvg.lock, size: 44),
                 const SizedBox(height: 12),
                 const Text('Ứng dụng đã khoá', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
