@@ -81,9 +81,7 @@ export default function ChatRetentionPanel({
       <div className="retention-line">
         {rule ? (
           <span className="retention-state">Tự xoá {rule.scope === 'images' ? 'ảnh' : 'tin nhắn'} cũ hơn {ttlLabel} (trên thiết bị này)</span>
-        ) : (
-          <span className="retention-state muted">Tin nhắn không tự xoá</span>
-        )}
+        ) : null}
       </div>
       {error && <div className="alert alert-error" style={{ margin: '6px 0 0' }}>{error}</div>}
       {open && (

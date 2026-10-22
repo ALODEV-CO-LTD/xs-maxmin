@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme.dart';
@@ -66,7 +67,7 @@ class SecretRow extends StatelessWidget {
             SelectableText(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 1)),
           ]),
         ),
-        AppButton(label: 'Chép', variant: AppButtonVariant.ghost, icon: Icons.copy, onPressed: () async {
+        AppButton(label: 'Chép', variant: AppButtonVariant.ghost, svg: AppSvg.copy, onPressed: () async {
             await Clipboard.setData(ClipboardData(text: value));
             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã chép')));
           }),

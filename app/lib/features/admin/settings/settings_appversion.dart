@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
@@ -107,7 +108,7 @@ class _AppVersionSectionState extends State<AppVersionSection> {
         if (!on)
           SizedBox(
             width: double.infinity,
-            child: AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: () => setState(() {
+            child: AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.secondary, onPressed: () => setState(() {
                 _edit.begin();
                 _saved = false;
               })),

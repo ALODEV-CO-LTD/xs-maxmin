@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -153,7 +154,7 @@ class _PasswordPromptState extends State<_PasswordPrompt> {
         body: PasswordField(controller: _c, label: 'Mật khẩu đăng nhập', autofocus: true, onSubmitted: (v) => Navigator.pop(context, v)),
         actions: [
           AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(context)),
-          AppButton(label: 'Xoá dữ liệu', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, _c.text)),
+          AppButton(label: 'Xoá dữ liệu', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(context, _c.text)),
         ],
       );
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -118,7 +119,7 @@ class _UsersListBodyState extends State<UsersListBody> {
           if (widget.rights.recovery)
             Card(
               child: ListTile(
-                leading: const Icon(Icons.support_agent),
+                leading: const SvgIcon(AppSvg.support),
                 title: const Text('Yêu cầu hỗ trợ khôi phục'),
                 subtitle: Text(_pending > 0 ? '$_pending yêu cầu chờ duyệt' : 'Không có yêu cầu chờ duyệt'),
                 trailing: const Icon(Icons.chevron_right),

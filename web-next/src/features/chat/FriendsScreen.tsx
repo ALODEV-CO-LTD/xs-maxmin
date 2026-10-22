@@ -933,7 +933,6 @@ export default function FriendsScreen() {
               {tab === 'settings' && (
                 <div className="card chat-settings">
                   <strong>Cài đặt tin nhắn</strong>
-                  <p className="search-sub">Tin nhắn mã hoá hai đầu, chỉ lưu trên máy này. Tên hiển thị riêng, mã bảo mật và tự xoá chỉnh ở nút ⚙ trong từng cuộc trò chuyện.</p>
                   <button type="button" className="tb-link" onClick={() => { setTab('chats'); setArchiveAsk(true) }}>Tin nhắn lưu trữ</button>
                   <Link className="tb-link" href="/account?tab=security">Bảo mật tài khoản</Link>
                   {myCode && <p className="search-sub">ID của bạn: <strong>{myCode}</strong></p>}
@@ -983,14 +982,6 @@ export default function FriendsScreen() {
               ) : selectedFriend && !selectedFriend.isGroup && !friendKeys[selectedFriend.id] ? (
                 <div className="alert alert-warning e2ee-warn">{selectedFriend.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.</div>
               ) : null}
-              <div className="e2ee-line">
-                <span aria-hidden="true">🔒</span>
-                {selectedGroup ? (
-                  <span>Mã hoá 2 đầu, không lưu trên máy chủ. Mỗi tin được gửi riêng cho từng thành viên là bạn bè của bạn đang online.</span>
-                ) : (
-                  <span>Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.</span>
-                )}
-              </div>
               {showSecurity && peerInfo && (
                 <div className="e2ee-codes">
                   <div>Của {selectedFriend?.name}: <code>{peerInfo.fingerprint}</code></div>

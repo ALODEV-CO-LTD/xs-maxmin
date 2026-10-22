@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import '../../core/widgets/logout.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -80,50 +81,56 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tài khoản'),
-        actions: [IconButton(icon: const Icon(Icons.logout), tooltip: 'Đăng xuất', onPressed: () => confirmLogout(context))],
+        actions: [IconButton(icon: const SvgIcon(AppSvg.logout), tooltip: 'Đăng xuất', onPressed: () => confirmLogout(context))],
         automaticallyImplyLeading: !widget.embedded,
         leading: widget.embedded || context.canPop() ? null : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/admin')),
       ),
       body: ListenableBuilder(
         listenable: _ctl,
         builder: (context, _) {
-          return Column(children: [
-            SizedBox(
-              height: 60,
-              child: ListView(
-                controller: _scroll,
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                children: [
-                  for (final t in tabs)
-                    Padding(
-                      key: _keys[t],
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _TabPill(label: _tabLabels[t]!, selected: t == _tab, onTap: () => _select(t)),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(child: _body()),
-          ]);
+          return _body(tabs);
         },
       ),
     );
   }
 
-  Widget _body() {
-    if (_ctl.loading && _ctl.me == null) return const Center(child: CircularProgressIndicator());
-    if (_ctl.me == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            NoticeBox(_ctl.error ?? 'Không tải được thông tin tài khoản'),
-            AppButton(label: 'Thử lại', variant: AppButtonVariant.secondary, onPressed: _ctl.load),
-          ]),
+  Widget _pills(List<AccountTab> tabs) => SizedBox(
+        height: 60,
+        child: ListView(
+          controller: _scroll,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          children: [
+            for (final t in tabs)
+              Padding(
+                key: _keys[t],
+                padding: const EdgeInsets.only(right: 8),
+                child: _TabPill(label: _tabLabels[t]!, selected: t == _tab, onTap: () => _select(t)),
+              ),
+          ],
         ),
       );
+
+  Widget _body(List<AccountTab> tabs) {
+    if (_ctl.loading && _ctl.me == null) return Column(children: [_pills(tabs), const Expanded(child: Center(child: CircularProgressIndicator()))]);
+    if (_ctl.me == null) {
+      return Column(children: [
+        _pills(tabs),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                NoticeBox(_ctl.error ?? 'Không tải được thông tin tài khoản'),
+                AppButton(label: 'Thử lại', variant: AppButtonVariant.secondary, onPressed: _ctl.load),
+              ]),
+            ),
+          ),
+        ),
+      ]);
     }
+    // The pills scroll WITH the page (one scroll view): pulling to refresh moves everything together, so no white strip
+    // opens between a fixed pills row and the content.
     final tab = switch (_tab) {
       AccountTab.profile => AccountProfileTab(ctl: _ctl),
       AccountTab.devices => AccountDevicesTab(ctl: _ctl),
@@ -136,8 +143,14 @@ class _AccountScreenState extends State<AccountScreen> {
         key: PageStorageKey('account-${_tab.name}'),
         physics: const AlwaysScrollableScrollPhysics(),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 32),
-        child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: KeyedSubtree(key: ValueKey(_tab), child: tab))),
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
+        child: Column(children: [
+          _pills(tabs),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: KeyedSubtree(key: ValueKey(_tab), child: tab))),
+          ),
+        ]),
       ),
     );
   }

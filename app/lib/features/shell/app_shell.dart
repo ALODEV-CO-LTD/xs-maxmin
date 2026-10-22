@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:go_router/go_router.dart';
 
 import '../friends/friends_controller.dart';
@@ -22,15 +23,15 @@ class AppShell extends StatelessWidget {
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
         destinations: [
-          const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Tổng quan'),
-          const NavigationDestination(icon: Icon(Icons.calculate_outlined), selectedIcon: Icon(Icons.calculate), label: 'Tính toán'),
+          const NavigationDestination(icon: SvgIcon(AppSvg.chart), selectedIcon: SvgIcon(AppSvg.chart), label: 'Tổng quan'),
+          const NavigationDestination(icon: SvgIcon(AppSvg.calculator), selectedIcon: SvgIcon(AppSvg.calculator), label: 'Tính toán'),
           NavigationDestination(
-            icon: _UnreadBadge(hub: hub, child: const Icon(Icons.chat_bubble_outline)),
-            selectedIcon: _UnreadBadge(hub: hub, child: const Icon(Icons.chat_bubble)),
+            icon: _UnreadBadge(hub: hub, child: const SvgIcon(AppSvg.friends)),
+            selectedIcon: _UnreadBadge(hub: hub, child: const SvgIcon(AppSvg.friends)),
             label: 'Bạn bè',
           ),
-          const NavigationDestination(icon: Icon(Icons.tune), label: 'Cấu hình'),
-          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Tài khoản'),
+          const NavigationDestination(icon: SvgIcon(AppSvg.config), label: 'Cấu hình'),
+          const NavigationDestination(icon: SvgIcon(AppSvg.account), selectedIcon: SvgIcon(AppSvg.account), label: 'Tài khoản'),
         ],
       ),
     );

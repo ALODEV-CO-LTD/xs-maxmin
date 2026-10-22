@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/admin_session.dart';
@@ -207,7 +208,7 @@ class _AdminNoticesScreenState extends State<AdminNoticesScreen> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => _remove(a)),
+                          child: AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => _remove(a)),
                         ),
                       ],
                     ),

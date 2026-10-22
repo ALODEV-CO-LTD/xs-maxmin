@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -277,7 +278,7 @@ class _CustomerPickerState extends State<_CustomerPicker> {
             child: TextField(decoration: const InputDecoration(hintText: 'Tìm khách hàng...', prefixIcon: Icon(Icons.search)), onChanged: (v) => setState(() => _q = v)),
           ),
           ListTile(
-            leading: const Icon(Icons.person_add_alt_1),
+            leading: const SvgIcon(AppSvg.addUser),
             title: const Text('Thêm khách hàng mới'),
             onTap: () => Navigator.pop(context, '\u0000add'),
           ),
@@ -385,8 +386,8 @@ class _EntryTile extends StatelessWidget {
                 ]),
               ),
               if (!selecting) ...[
-                IconButton(tooltip: 'Sửa', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 34, height: 34), icon: const Icon(Icons.edit_outlined, size: 19), onPressed: onEdit),
-                IconButton(tooltip: 'Xoá', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 34, height: 34), icon: Icon(Icons.delete_outline, size: 19, color: context.badColor), onPressed: onDelete),
+                IconButton(tooltip: 'Sửa', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 34, height: 34), icon: const SvgIcon(AppSvg.editText, size: 19), onPressed: onEdit),
+                IconButton(tooltip: 'Xoá', padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 34, height: 34), icon: SvgIcon(AppSvg.delete, size: 19, color: context.badColor), onPressed: onDelete),
               ],
             ]),
             if (error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6, right: 8), child: Text(error, style: TextStyle(fontSize: 12.5, color: context.badColor))),

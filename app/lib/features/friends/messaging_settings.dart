@@ -10,7 +10,7 @@ import '../../core/widgets/app_button.dart';
 
 /// Texts of the keep-alive switch (shown in the sheet, and checked by a test: they must be honest about the battery).
 const keepAliveTitle = 'Giữ kết nối để nhận tin nhắn và cuộc gọi khi thoát app';
-const keepAliveExplain = 'Tin nhắn mã hoá 2 đầu không lưu trên máy chủ nên chỉ nhận được khi MAMBA đang kết nối. Bật mục này sẽ chạy một dịch vụ nền với thông báo cố định "Đang giữ kết nối", giữ kết nối mạng liên tục nên TỐN PIN HƠN và dùng dữ liệu nền. Tắt nếu bạn không cần. Một số hãng máy (Xiaomi, Oppo, Samsung...) vẫn có thể tự tắt app nền khi tiết kiệm pin.';
+const keepAliveExplain = 'Chạy nền để nhận tin và cuộc gọi khi đã thoát app. TỐN PIN HƠN, tắt nếu không cần.';
 
 Future<void> showMessagingSettings(BuildContext context, FriendsController c) {
   return showModalBottomSheet<void>(
@@ -55,7 +55,7 @@ class _SheetState extends State<_Sheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Cài đặt tin nhắn & cuộc gọi', style: theme.textTheme.titleMedium),
+              Text('Cài đặt tin nhắn', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -72,7 +72,6 @@ class _SheetState extends State<_Sheet> {
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(_allowed == true ? Icons.notifications_active_outlined : Icons.notifications_off_outlined, color: _allowed == true ? context.okColor : Brand.warning),
                 title: Text(_allowed == true ? 'Thông báo đang bật' : 'Thông báo đang tắt'),
-                subtitle: const Text('Thông báo tin nhắn chỉ ghi "Tin nhắn mới từ <tên>", không bao giờ hiện nội dung.'),
                 trailing: _allowed == true
                     ? null
                     : AppButton(
@@ -94,7 +93,6 @@ class _SheetState extends State<_Sheet> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.inventory_2_outlined),
                 title: const Text('Tin nhắn lưu trữ'),
-                subtitle: const Text('Các cuộc trò chuyện đã lưu trữ được ẩn khỏi danh sách. Nhập mật khẩu cấp 2 để xem.'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   final nav = Navigator.of(context);

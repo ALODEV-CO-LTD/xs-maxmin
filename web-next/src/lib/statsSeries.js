@@ -93,6 +93,13 @@ export function rangeTotals(entries, { unit = 'day', metric = 'profit', now = ne
   return { current: sum(all.slice(n)), previous: hasPrev ? sum(prev) : null }
 }
 
+// Tổng quan: the CURRENT period (today / this week / this month / this year) and the one right before it.
+// `previous` is null when that period has no data at all (nothing to compare with).
+export function periodTotals(entries, { unit = 'day', metric = 'profit', now = new Date() } = {}) {
+  const [before, current] = collect(entries, unit, now, 2)
+  return { current: pick(current, metric), previous: before.vao || before.ra ? pick(before, metric) : null }
+}
+
 // Show a label every k bars so labels (~minPx wide) never collide.
 export function tickEvery(count, width, minPx = 46) {
   const fit = Math.max(1, Math.floor(width / minPx))

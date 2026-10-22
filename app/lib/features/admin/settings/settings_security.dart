@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
@@ -269,7 +270,7 @@ class _SecurityPolicySectionState extends State<SecurityPolicySection> {
         ),
         const SizedBox(height: 14),
         if (!editing)
-          AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: () => setState(() {
+          AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.secondary, onPressed: () => setState(() {
               _edit.begin();
               _notice = null;
             }))

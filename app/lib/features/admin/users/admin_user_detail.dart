@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
@@ -178,7 +179,7 @@ class _State extends State<AdminUserDetailPage> {
           ]),
           actions: [
             AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(c, false)),
-            AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: deleteConfirmed(typed.text, u.username) ? () => Navigator.pop(c, true) : null),
+            AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: deleteConfirmed(typed.text, u.username) ? () => Navigator.pop(c, true) : null),
           ],
         ),
       ),
@@ -269,7 +270,7 @@ class _State extends State<AdminUserDetailPage> {
       if (r.delete)
         Padding(
           padding: const EdgeInsets.only(top: 12),
-          child: AppButton(label: 'Xoá tài khoản', variant: AppButtonVariant.danger, onPressed: _busy ? null : _delete),
+          child: AppButton(label: 'Xoá tài khoản', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: _busy ? null : _delete),
         ),
     ];
   }

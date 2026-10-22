@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -168,7 +169,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
           Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: Align(alignment: Alignment.centerLeft, child: Text(c.nameOf(f), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)))),
           ListTile(leading: const Icon(Icons.inventory_2_outlined), title: const Text('Lưu trữ'), onTap: () => Navigator.pop(ctx, 'archive')),
           ListTile(
-            leading: Icon(Icons.delete_outline, color: ctx.badColor),
+            leading: SvgIcon(AppSvg.delete, color: ctx.badColor),
             title: Text(f.isGroup ? 'Rời nhóm' : 'Xoá cuộc trò chuyện', style: TextStyle(color: ctx.badColor)),
             onTap: () => Navigator.pop(ctx, 'delete'),
           ),
@@ -317,7 +318,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   const SizedBox(height: 16),
                   AppButton(
                     label: _copied ? 'Đã chép' : 'Sao chép',
-                    icon: Icons.copy,
+                    svg: AppSvg.copy,
                     variant: AppButtonVariant.primary,
                     onPressed: () async {
                       await _copyCode(c.myCode);
@@ -387,7 +388,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
               onPressed: () => _showMyId(c),
             ),
             IconButton(
-              icon: const Icon(Icons.settings_outlined),
+              icon: const SvgIcon(AppSvg.gear),
               tooltip: 'Cài đặt tin nhắn',
               onPressed: () => showMessagingSettings(context, c),
             ),
@@ -427,7 +428,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             _side(
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.support_agent),
+                  leading: const SvgIcon(AppSvg.support),
                   title: Text('Có ${c.supportUnread} phản hồi mới từ Admin'),
                   subtitle: const Text('Chạm để xem Hỗ trợ từ Admin'),
                   trailing: const Icon(Icons.chevron_right),

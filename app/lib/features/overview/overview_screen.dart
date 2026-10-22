@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:go_router/go_router.dart';
 
@@ -35,7 +36,7 @@ class _SupportButton extends StatelessWidget {
     final hub = MessagingScope.maybeOf(context);
     Widget button(int n) => IconButton(
           tooltip: 'Hỗ trợ từ Admin',
-          icon: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: const Icon(Icons.support_agent)),
+          icon: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: const SvgIcon(AppSvg.support)),
           onPressed: () => context.push('/support'),
         );
     if (hub == null) return button(0);

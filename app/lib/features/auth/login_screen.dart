@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -191,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 8),
           const Text('Bạn vừa nhập mật khẩu xoá dữ liệu. Nếu tiếp tục, số liệu, khách hàng và các dữ liệu liên quan của tài khoản sẽ bị xoá và không thể khôi phục.'),
           CheckboxListTile(contentPadding: EdgeInsets.zero, value: _wipeAck, onChanged: (v) => setState(() => _wipeAck = v ?? false), title: const Text('Tôi hiểu và muốn xoá dữ liệu')),
-          AppButton(label: 'Xoá dữ liệu', variant: AppButtonVariant.danger, loading: _busy, onPressed: _busy || !_wipeAck ? null : _confirmWipe),
+          AppButton(label: 'Xoá dữ liệu', svg: AppSvg.delete, variant: AppButtonVariant.danger, loading: _busy, onPressed: _busy || !_wipeAck ? null : _confirmWipe),
           AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: _busy ? null : () => setState(() => _stage = _Stage.credentials)),
         ];
       case _Stage.wipeDone:

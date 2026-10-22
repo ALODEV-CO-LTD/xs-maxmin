@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -295,9 +296,9 @@ class _QuickEntryBoxState extends State<QuickEntryBox> {
         Row(children: [
           Expanded(child: AppButton(label: 'Phân tích', variant: AppButtonVariant.primary, onPressed: _text.text.trim().isEmpty || _reading ? null : _analyze)),
           const SizedBox(width: 6),
-          AppButton.icon(label: 'Chọn ảnh', variant: AppButtonVariant.secondary, icon: Icons.photo_library_outlined, loading: _reading, onPressed: _reading ? null : () => _pick(ImageSource.gallery)),
+          AppButton.icon(label: 'Chọn ảnh', variant: AppButtonVariant.secondary, svg: AppSvg.photoAdd, loading: _reading, onPressed: _reading ? null : () => _pick(ImageSource.gallery)),
           const SizedBox(width: 6),
-          AppButton.icon(label: 'Chụp ảnh', variant: AppButtonVariant.secondary, icon: Icons.photo_camera_outlined, onPressed: _reading ? null : () => _pick(ImageSource.camera)),
+          AppButton.icon(label: 'Chụp ảnh', variant: AppButtonVariant.secondary, svg: AppSvg.camera, onPressed: _reading ? null : () => _pick(ImageSource.camera)),
           const SizedBox(width: 6),
           AppButton.icon(label: 'Mẫu cú pháp của khách này ${c.savedTemplate != null ? '(đã lưu)' : '(chưa lưu)'}', variant: _templateOpen ? AppButtonVariant.secondary : AppButtonVariant.ghost, icon: c.savedTemplate != null ? Icons.bookmark : Icons.bookmark_border, onPressed: () => setState(() => _templateOpen = !_templateOpen)),
         ]),

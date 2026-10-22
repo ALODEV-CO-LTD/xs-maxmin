@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -211,8 +212,8 @@ class _PhotoBox extends StatelessWidget {
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('Chụp ảnh'), onTap: () => Navigator.pop(ctx, true)),
-          ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('Chọn ảnh từ thư viện'), onTap: () => Navigator.pop(ctx, false)),
+          ListTile(leading: const SvgIcon(AppSvg.camera), title: const Text('Chụp ảnh'), onTap: () => Navigator.pop(ctx, true)),
+          ListTile(leading: const SvgIcon(AppSvg.photoAdd), title: const Text('Chọn ảnh từ thư viện'), onTap: () => Navigator.pop(ctx, false)),
         ]),
       ),
     );
@@ -231,7 +232,7 @@ class _PhotoBox extends StatelessWidget {
           child: AppButton(
             label: north ? 'Đọc kết quả từ ảnh' : 'Đọc kết quả từ ảnh (nhiều đài)',
             variant: AppButtonVariant.secondary,
-            icon: Icons.photo_camera_outlined,
+            svg: AppSvg.camera,
             loading: c.ocrRunning,
             onPressed: c.ocrRunning ? null : () => _choose(context, c),
           ),
@@ -341,12 +342,12 @@ class _ResultForm extends StatelessWidget {
       AppButton.icon(
         label: saved ? 'Xoá kết quả này' : 'Xoá form',
         variant: saved ? AppButtonVariant.danger : AppButtonVariant.secondary,
-        icon: Icons.delete_outline,
+        svg: AppSvg.delete,
         loading: saved && c.deleting == cur,
         onPressed: saved ? (c.deleting.isNotEmpty ? null : () => _confirmDelete(context, c, cur)) : c.clearForm,
       ),
       const SizedBox(width: 8),
-      Expanded(child: AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null)),
+      Expanded(child: AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.secondary, onPressed: locked ? (north ? c.unlockMb : () => c.unlockColumn(cur)) : null)),
       const SizedBox(width: 8),
       Expanded(flex: 2, child: _SaveButton(c)),
     ]));
@@ -410,7 +411,7 @@ Future<void> _confirmDelete(BuildContext context, ResultsController c, String st
       content: Text('Xoá kết quả xổ số $name ngày ${viDate(c.date)}? Không thể hoàn tác.'),
       actions: [
         AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
-        AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+        AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
       ],
     ),
   );

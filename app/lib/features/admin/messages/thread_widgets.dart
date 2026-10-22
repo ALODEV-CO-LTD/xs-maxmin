@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -108,7 +109,7 @@ class ThreadComposer extends StatelessWidget {
               ]),
             ),
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            IconButton(tooltip: 'Gửi ảnh (JPG, PNG, WebP)', onPressed: sending ? null : onPick, icon: const Icon(Icons.image_outlined)),
+            IconButton(tooltip: 'Gửi ảnh (JPG, PNG, WebP)', onPressed: sending ? null : onPick, icon: const SvgIcon(AppSvg.photoAdd)),
             Expanded(
               child: TextField(
                 controller: draft,

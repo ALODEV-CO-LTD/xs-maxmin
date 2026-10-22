@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -254,7 +255,7 @@ class BannerCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
           child: Row(children: [
-            Icon(Icons.chat_bubble_outline, color: theme.colorScheme.primary),
+            SvgIcon(AppSvg.friends, color: theme.colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [

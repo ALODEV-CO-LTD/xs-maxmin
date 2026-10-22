@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -132,7 +133,7 @@ class _CustomersBodyState extends State<_CustomersBody> {
     return Align(
       alignment: Alignment.centerLeft,
       child: OutlinedButton.icon(
-        icon: const Icon(Icons.tune, size: 18),
+        icon: const SvgIcon(AppSvg.config, size: 18),
         label: Text(n == 0 ? 'Bộ lọc' : 'Bộ lọc ($n)'),
         style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
         onPressed: () => showModalBottomSheet<void>(
@@ -145,11 +146,11 @@ class _CustomersBodyState extends State<_CustomersBody> {
     );
   }
 
-  Widget _iconAction(IconData icon, String tooltip, VoidCallback onPressed, {Color? color}) => IconButton(
+  Widget _iconAction(AppSvg icon, String tooltip, VoidCallback onPressed, {Color? color}) => IconButton(
         tooltip: tooltip,
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-        icon: Icon(icon, size: 21, color: color),
+        icon: SvgIcon(icon, size: 21, color: color),
         onPressed: onPressed,
       );
 
@@ -177,16 +178,16 @@ class _CustomersBodyState extends State<_CustomersBody> {
             ),
             // The actions as icons (the label is the tooltip): edit, scoring config (filled when this customer has its own), remove.
             if (cu != null) ...[
-              _iconAction(Icons.edit_outlined, 'Sửa', () => _editPhone(c, cu)),
+              _iconAction(AppSvg.editText, 'Sửa', () => _editPhone(c, cu)),
               _iconAction(
-                cu.scoringRates != null ? Icons.tune : Icons.tune_outlined,
+                AppSvg.config,
                 cu.scoringRates != null ? 'Cấu hình tính điểm (riêng)' : 'Cấu hình tính điểm',
                 () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CustomerConfigScreen(controller: c, customer: cu))),
                 color: cu.scoringRates != null ? Theme.of(context).colorScheme.primary : null,
               ),
               _busyId == cu.id
                   ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-                  : _iconAction(Icons.delete_outline, 'Xoá khỏi danh sách', () => _remove(c, cu), color: context.badColor),
+                  : _iconAction(AppSvg.delete, 'Xoá khỏi danh sách', () => _remove(c, cu), color: context.badColor),
             ],
           ]),
           const SizedBox(height: 10),

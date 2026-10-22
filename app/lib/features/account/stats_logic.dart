@@ -17,6 +17,19 @@ const statMetricLabels = {
   StatMetric.ra: 'Tiền trúng',
   StatMetric.profit: 'Lợi nhuận',
 };
+/// Tổng quan shows the CURRENT period of the chosen unit (today, this week, this month, this year) against the one before it.
+const statCurrentLabels = {
+  StatUnit.day: 'Hôm nay',
+  StatUnit.week: 'Tuần này',
+  StatUnit.month: 'Tháng này',
+  StatUnit.year: 'Năm nay',
+};
+const statPreviousLabels = {
+  StatUnit.day: 'hôm qua',
+  StatUnit.week: 'tuần trước',
+  StatUnit.month: 'tháng trước',
+  StatUnit.year: 'năm trước',
+};
 const statSpan = {
   StatUnit.day: 30,
   StatUnit.week: 12,

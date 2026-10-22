@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -116,7 +117,7 @@ class _ProfileCardState extends State<_ProfileCard> {
     final ok = context.okColor, bad = context.badColor;
     return SectionCard(
       title: 'Thông tin cá nhân',
-      trailing: _editing ? null : AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, size: AppButtonSize.small, onPressed: _startEdit),
+      trailing: _editing ? null : AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.secondary, size: AppButtonSize.small, onPressed: _startEdit),
       children: [
         if (_success != null) NoticeBox(_success!, kind: NoticeKind.success),
         if (_editing) ...[
@@ -156,7 +157,7 @@ class _ProfileCardState extends State<_ProfileCard> {
         const SizedBox(height: 14),
         const VersionCard(),
         const SizedBox(height: 10),
-        AppButton(label: 'Đăng xuất', variant: AppButtonVariant.secondary, icon: Icons.logout, onPressed: _logout),
+        AppButton(label: 'Đăng xuất', variant: AppButtonVariant.secondary, svg: AppSvg.logout, onPressed: _logout),
       ],
     );
   }
@@ -356,8 +357,8 @@ class _CustomerCodesCardState extends State<_CustomerCodesCard> {
             ]),
           ),
           IconButton(tooltip: 'Nhãn', icon: const Icon(Icons.label_outline), onPressed: () => setState(() { _editingId = c['id'] as String?; _labelDraft.text = label ?? ''; })),
-          IconButton(tooltip: 'Sao chép', icon: const Icon(Icons.copy), onPressed: () => copyText(context, '${c['code']}')),
-          IconButton(tooltip: 'Xoá', icon: Icon(Icons.delete_outline, color: context.badColor), onPressed: () => _delete(c)),
+          IconButton(tooltip: 'Sao chép', icon: const SvgIcon(AppSvg.copy), onPressed: () => copyText(context, '${c['code']}')),
+          IconButton(tooltip: 'Xoá', icon: SvgIcon(AppSvg.delete, color: context.badColor), onPressed: () => _delete(c)),
         ]),
         if (editing)
           Padding(

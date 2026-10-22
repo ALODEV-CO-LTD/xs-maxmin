@@ -156,7 +156,7 @@ export default function SupportChat() {
         title="Phản hồi cho Admin"
         onClick={() => (open ? closeChat() : openChat())}
       >
-        <AppIcon name="message-square-more" />
+        <AppIcon name="support" />
         {unread > 0 && <span className="support-badge" aria-label="Tin nhắn chưa đọc">{unread > 9 ? '9+' : unread}</span>}
       </button>
 

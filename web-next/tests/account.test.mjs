@@ -5,7 +5,7 @@ import * as A from '../src/features/account/accountLogic.js'
 import { loadMoney } from '../src/features/account/statsLoad.js'
 import { moneyByDate } from '../src/lib/statsMoney.js'
 import { DEFAULT_RATES } from '../src/lib/scoringConfig.js'
-import { buildSeries, rangeTotals } from '../src/lib/statsSeries.js'
+import { buildSeries, periodTotals, rangeTotals } from '../src/lib/statsSeries.js'
 
 test('tabs: admin has no Thống kê / Gói; ?tab= picks the open tab', () => {
   const user = A.tabsFor(false)
@@ -229,4 +229,24 @@ test('series for the chart follow the picked metric', () => {
   const mk = (metric) => rangeTotals(Object.entries(byDate).map(([entryDate, m]) => ({ entryDate, score: String(metric === 'profit' ? m.settled : m.sent), result: String(m.won) })), { unit: 'day', metric, now: new Date(2026, 9, 19) })
   assert.ok(buildSeries([], { unit: 'day', metric: 'vao', now: new Date(2026, 9, 19) }).length === 30)
   assert.equal(typeof mk('vao').current, 'number')
+})
+
+test('Tổng quan: ngày là hôm nay, tuần là tuần này, tháng là tháng này, năm là năm nay; so với kỳ liền trước', () => {
+  const now = new Date(2026, 9, 21) // thứ Tư 21/10/2026
+  const es = [
+    { entryDate: '2026-10-21', score: '100', result: '30' }, // hôm nay
+    { entryDate: '2026-10-20', score: '40', result: '0' }, // hôm qua = cùng tuần, cùng tháng
+    { entryDate: '2026-10-15', score: '10', result: '0' }, // tuần trước
+    { entryDate: '2026-09-30', score: '5', result: '0' }, // tháng trước
+    { entryDate: '2025-06-01', score: '7', result: '0' }, // năm trước
+  ]
+  assert.deepEqual(periodTotals(es, { unit: 'day', metric: 'vao', now }), { current: 100, previous: 40 })
+  assert.deepEqual(periodTotals(es, { unit: 'day', metric: 'profit', now }), { current: 70, previous: 40 })
+  assert.deepEqual(periodTotals(es, { unit: 'week', metric: 'vao', now }), { current: 140, previous: 10 })
+  assert.deepEqual(periodTotals(es, { unit: 'month', metric: 'vao', now }), { current: 150, previous: 5 })
+  assert.deepEqual(periodTotals(es, { unit: 'year', metric: 'ra', now }), { current: 30, previous: 0 })
+  assert.equal(periodTotals(es, { unit: 'year', metric: 'ra', now }).previous, 0 || 0)
+  // kỳ trước không có số liệu: không so sánh
+  assert.equal(periodTotals([{ entryDate: '2026-10-21', score: '5', result: '0' }], { unit: 'day', metric: 'vao', now }).previous, null)
+  assert.deepEqual(A.STAT_UNITS.map((u) => u.current), ['Hôm nay', 'Tuần này', 'Tháng này', 'Năm nay'])
 })

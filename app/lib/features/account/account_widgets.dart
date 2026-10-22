@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/api_client.dart';
@@ -266,7 +267,8 @@ class _RecoveryCodeDisplayState extends State<RecoveryCodeDisplay> {
       ),
       const SizedBox(height: 12),
       AppButton(
-        icon: _copied ? Icons.check : Icons.copy,
+        icon: _copied ? Icons.check : null,
+        svg: _copied ? null : AppSvg.copy,
         label: _copied ? 'Đã sao chép' : 'Sao chép mã',
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: widget.code));

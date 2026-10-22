@@ -80,10 +80,10 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
     final masked = context.select<MaskStore, bool>((m) => m.masked);
     final ok = context.okColor, bad = context.badColor;
     final cs = Theme.of(context).colorScheme;
-    final sum = sumOf(series);
-    final prevSum = sumOf(
-      buildMoneySeries(money.byDate, _unit, _metric, previousAnchor(_unit, now)),
-    );
+    // The figure is the CURRENT period (today / this week / this month / this year) and is compared with the one before it;
+    // the chart below still shows the last periods so the trend is visible. The series ends at the current period.
+    final sum = series.isEmpty ? 0.0 : series.last.value;
+    final prevSum = series.length < 2 ? 0.0 : series[series.length - 2].value;
     final pct = percentChange(sum, prevSum);
     final isProfit = _metric == StatMetric.profit;
     Color? signColor(double v) => isProfit
@@ -96,6 +96,8 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
     String signed(double v) =>
         isProfit && v > 0 ? '+${formatNumber(v)}' : formatNumber(v);
     final span = statSpanLabels[_unit]!;
+    final current = statCurrentLabels[_unit]!;
+    final previous = statPreviousLabels[_unit]!;
     final delta = sum - prevSum;
 
     Widget fixed(String label, String value, {Color? color}) => Padding(
@@ -189,7 +191,7 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  '${statMetricLabels[_metric]} · $span gần nhất',
+                  '${statMetricLabels[_metric]} · $current',
                   style: TextStyle(color: context.mutedColor, fontSize: 12),
                 ),
                 const SizedBox(height: 2),
@@ -205,8 +207,8 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                 if (prevSum != 0 || sum != 0)
                   MaskedText(
                     prevSum == 0
-                        ? 'Kỳ trước ($span liền trước): chưa có số liệu'
-                        : '${delta >= 0 ? '▲' : '▼'} ${delta >= 0 ? '+' : '−'}${formatNumber(delta.abs())} đ (${pct! >= 0 ? '+' : '−'}${pct.abs().toStringAsFixed(1).replaceAll('.', ',')}%) so với $span liền trước',
+                        ? 'Chưa có số liệu $previous'
+                        : '${delta >= 0 ? '▲' : '▼'} ${delta >= 0 ? '+' : '−'}${formatNumber(delta.abs())} đ (${pct! >= 0 ? '+' : '−'}${pct.abs().toStringAsFixed(1).replaceAll('.', ',')}%) so với $previous',
                     style: TextStyle(
                       fontSize: 12,
                       color: prevSum == 0
@@ -221,6 +223,8 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                     ),
                   ),
                 const SizedBox(height: 10),
+                Text('Biểu đồ $span gần nhất', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+                const SizedBox(height: 4),
                 if (masked)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 36),

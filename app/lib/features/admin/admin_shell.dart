@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -110,7 +111,7 @@ class _AdminShellState extends State<AdminShell> {
               ]),
             ),
             const Divider(height: 1),
-            ListTile(leading: const Icon(Icons.person_outline), title: const Text('Tài khoản'), onTap: () {
+            ListTile(leading: const SvgIcon(AppSvg.account), title: const Text('Tài khoản'), onTap: () {
               Navigator.pop(context);
               context.push('/admin/account');
             }),
@@ -124,7 +125,7 @@ class _AdminShellState extends State<AdminShell> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+              leading: SvgIcon(AppSvg.logout, color: Theme.of(context).colorScheme.error),
               title: Text('Đăng xuất', style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w600)),
               onTap: () {
                 Navigator.pop(context);

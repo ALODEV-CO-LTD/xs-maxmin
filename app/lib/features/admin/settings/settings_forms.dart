@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
@@ -13,7 +14,7 @@ Widget _editBar({required bool editing, required bool saving, required VoidCallb
   if (!editing) {
     return SizedBox(
       width: double.infinity,
-      child: AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: onEdit),
+      child: AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.secondary, onPressed: onEdit),
     );
   }
   return Row(
@@ -446,7 +447,7 @@ class _PackagesSectionState extends State<PackagesSection> {
                           Row(
                             children: [
                               Expanded(
-                                child: AppButton(label: 'Sửa', variant: AppButtonVariant.primary, onPressed: _busy == p.type ? null : () => _startEdit(p)),
+                                child: AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.primary, onPressed: _busy == p.type ? null : () => _startEdit(p)),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -454,7 +455,7 @@ class _PackagesSectionState extends State<PackagesSection> {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: _busy == p.type ? null : () => _remove(p)),
+                                child: AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: _busy == p.type ? null : () => _remove(p)),
                               ),
                             ],
                           ),

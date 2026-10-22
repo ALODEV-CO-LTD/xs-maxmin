@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -175,7 +176,7 @@ class _ChatPageState extends State<ChatPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
+              leading: const SvgIcon(AppSvg.photoAdd),
               title: const Text('Chọn ảnh từ thư viện'),
               subtitle: const Text('JPG, PNG, WebP'),
               onTap: () {
@@ -184,7 +185,7 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
+              leading: const SvgIcon(AppSvg.camera),
               title: const Text('Chụp ảnh'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -301,7 +302,7 @@ class _ChatPageState extends State<ChatPage> {
         content: const Text('Xoá tin nhắn này khỏi máy này? Người kia vẫn giữ bản của họ.'),
         actions: [
           AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
-          AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+          AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -430,7 +431,7 @@ class _ChatPageState extends State<ChatPage> {
             content: Text('Xoá bạn bè "${_f.name}"? Cuộc trò chuyện sẽ không còn hiển thị.'),
             actions: [
               AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
-              AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+              AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
             ],
           ),
         );
@@ -469,7 +470,7 @@ class _ChatPageState extends State<ChatPage> {
             content: Text('Xoá $who khỏi nhóm "${g.name}"? Họ sẽ không còn nhận tin của nhóm.'),
             actions: [
               AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
-              AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+              AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
             ],
           ),
         );
@@ -610,8 +611,8 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.settings_outlined), tooltip: 'Cài đặt cuộc trò chuyện', onPressed: _openSettings),
-          if (canCall) IconButton(icon: const Icon(Icons.call), tooltip: 'Gọi thoại', onPressed: call.busy ? null : () => call.startCall(_f.id, _f.name)),
+          IconButton(icon: const SvgIcon(AppSvg.gear), tooltip: 'Cài đặt cuộc trò chuyện', onPressed: _openSettings),
+          if (canCall) IconButton(icon: const SvgIcon(AppSvg.call), tooltip: 'Gọi thoại', onPressed: call.busy ? null : () => call.startCall(_f.id, _f.name)),
         ],
       ),
       body: SafeArea(
@@ -630,17 +631,6 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
               if (!hasKey) _Banner(color: Brand.warning, child: Text(_f.isGroup ? 'Chưa có thành viên nào là bạn bè của bạn dùng mã hoá 2 đầu nên chưa nhắn được trong nhóm này.' : '${_f.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.')),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Row(
-                  children: [
-                    const Text('🔒 '),
-                    Expanded(
-                      child: Text(_f.isGroup ? 'Mã hoá 2 đầu, không lưu trên máy chủ. Mỗi tin được gửi riêng cho từng thành viên là bạn bè của bạn đang online.' : 'Mã hoá 2 đầu, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.', style: theme.textTheme.bodySmall?.copyWith(color: context.mutedColor)),
-                    ),
-                  ],
-                ),
-              ),
               if (_showSecurity && info != null)
                 _Banner(
                   color: theme.colorScheme.primary,
@@ -654,13 +644,14 @@ class _ChatPageState extends State<ChatPage> {
                     ],
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(_rule?.describe ?? 'Tin nhắn không tự xoá', style: theme.textTheme.bodySmall?.copyWith(color: _rule != null ? theme.colorScheme.primary : context.mutedColor)),
+              if (_rule case final rule?)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(rule.describe, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
+                  ),
                 ),
-              ),
               if (_pinned case final pm?)
                 Material(
                   color: theme.colorScheme.primary.withValues(alpha: 0.08),
@@ -753,7 +744,7 @@ class _ChatPageState extends State<ChatPage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    IconButton(icon: const Icon(Icons.image_outlined), tooltip: 'Gửi ảnh', onPressed: _sending || !hasKey ? null : _attachMenu),
+                    IconButton(icon: const SvgIcon(AppSvg.photoAdd), tooltip: 'Gửi ảnh', onPressed: _sending || !hasKey ? null : _attachMenu),
                     Expanded(
                       child: TextField(
                         controller: _text,
@@ -810,7 +801,7 @@ class _ChatPageState extends State<ChatPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.call, size: 16, color: color),
+          SvgIcon(AppSvg.call, size: 16, color: color),
           const SizedBox(width: 6),
           Flexible(
             child: Text(callLine(c), style: TextStyle(color: color, fontSize: 13)),
@@ -1030,7 +1021,7 @@ class _CodeRow extends StatelessWidget {
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.copy, size: 16),
+          icon: const SvgIcon(AppSvg.copy, size: 16),
           tooltip: 'Sao chép',
           onPressed: () => Clipboard.setData(ClipboardData(text: code)),
         ),

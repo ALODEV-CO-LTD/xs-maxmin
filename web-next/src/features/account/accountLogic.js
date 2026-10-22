@@ -215,10 +215,10 @@ export const fmtNum = (n) => new Intl.NumberFormat('vi-VN').format(n)
 export const signed = (n) => (n > 0 ? '+' : '') + fmtNum(n)
 
 export const STAT_UNITS = [
-  { key: 'day', label: 'Ngày', range: '30 ngày gần nhất', prev: '30 ngày trước đó' },
-  { key: 'week', label: 'Tuần', range: '12 tuần gần nhất', prev: '12 tuần trước đó' },
-  { key: 'month', label: 'Tháng', range: '12 tháng gần nhất', prev: '12 tháng trước đó' },
-  { key: 'year', label: 'Năm', range: '5 năm gần nhất', prev: '5 năm trước đó' },
+  { key: 'day', label: 'Ngày', range: '30 ngày gần nhất', prev: '30 ngày trước đó', current: 'Hôm nay', before: 'hôm qua' },
+  { key: 'week', label: 'Tuần', range: '12 tuần gần nhất', prev: '12 tuần trước đó', current: 'Tuần này', before: 'tuần trước' },
+  { key: 'month', label: 'Tháng', range: '12 tháng gần nhất', prev: '12 tháng trước đó', current: 'Tháng này', before: 'tháng trước' },
+  { key: 'year', label: 'Năm', range: '5 năm gần nhất', prev: '5 năm trước đó', current: 'Năm nay', before: 'năm trước' },
 ]
 export const STAT_METRICS = [
   { key: 'vao', label: 'Tiền gửi' },

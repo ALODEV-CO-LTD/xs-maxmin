@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/widgets/svg_icon.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -212,7 +213,7 @@ class SupportEntryCard extends StatelessWidget {
     final hub = MessagingScope.maybeOf(context);
     Widget tile(int n) => Card(
           child: ListTile(
-            leading: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: const Icon(Icons.support_agent)),
+            leading: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: const SvgIcon(AppSvg.support)),
             title: const Text('Hỗ trợ từ Admin', style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(n > 0 ? 'Có $n phản hồi mới từ Admin' : 'Gửi câu hỏi hoặc báo lỗi cho Admin'),
             trailing: const Icon(Icons.chevron_right),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'scoring_data.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -132,7 +133,7 @@ class _Body extends StatelessWidget {
         else if (c.loadError != null)
           Column(children: [
             _Banner(c.loadError!, error: true),
-            AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: c.load),
+            AppButton(label: 'Thử lại', variant: AppButtonVariant.ghost, svg: AppSvg.refresh, onPressed: c.load),
           ])
         else ...[
           const _Filters(),
@@ -245,7 +246,7 @@ class _Filters extends StatelessWidget {
             const SizedBox(width: 6),
             c.autoCalcRunning > 0
                 ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-                : AppButton(label: 'Tính lại', variant: AppButtonVariant.secondary, size: AppButtonSize.small, icon: Icons.refresh, onPressed: c.selectedCustomer.isEmpty ? null : () => c.syncFrom()),
+                : AppButton(label: 'Tính lại', variant: AppButtonVariant.secondary, size: AppButtonSize.small, svg: AppSvg.refresh, onPressed: c.selectedCustomer.isEmpty ? null : () => c.syncFrom()),
           ]),
         ]),
       ),

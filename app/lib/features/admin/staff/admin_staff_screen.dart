@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/admin_session.dart';
@@ -145,9 +146,9 @@ class _StaffBodyState extends State<StaffBody> {
             ),
           const SizedBox(height: 8),
           Wrap(spacing: 8, children: [
-            AppButton(label: 'Sửa', variant: AppButtonVariant.primary, onPressed: busy ? null : () => _edit(s)),
+            AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.primary, onPressed: busy ? null : () => _edit(s)),
             AppButton(label: s.locked ? 'Mở khoá' : 'Khoá', variant: AppButtonVariant.secondary, onPressed: busy ? null : () => _toggleLock(s)),
-            AppButton(label: 'Xoá', variant: AppButtonVariant.danger, onPressed: busy ? null : () => _remove(s)),
+            AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: busy ? null : () => _remove(s)),
           ]),
         ]),
       ),

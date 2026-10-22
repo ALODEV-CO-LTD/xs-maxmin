@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -182,7 +183,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
             onSelected: (_) => _switchRegion(id),
           ),
         if (!_editing)
-          AppButton(label: 'Sửa', variant: AppButtonVariant.secondary, onPressed: () => setState(() {
+          AppButton(label: 'Sửa', svg: AppSvg.edit, variant: AppButtonVariant.secondary, onPressed: () => setState(() {
                 _editing = true;
                 _notice = '';
               })),

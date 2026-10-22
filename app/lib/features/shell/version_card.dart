@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -85,7 +86,7 @@ class _VersionCardState extends State<VersionCard> {
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.phone_android, size: 20),
+            const SvgIcon(AppSvg.device, size: 20),
             const SizedBox(width: 8),
             const Text('Phiên bản ứng dụng', style: TextStyle(fontWeight: FontWeight.w700)),
             const Spacer(),
@@ -103,7 +104,7 @@ class _VersionCardState extends State<VersionCard> {
           if (_checkedAt != null && _phase != _Phase.checking) Padding(padding: const EdgeInsets.only(top: 4, left: 26), child: Text('Kiểm tra lúc ${_hhmm(_checkedAt!)}', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)))),
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 4, children: [
-            AppButton(label: 'Kiểm tra cập nhật', variant: AppButtonVariant.secondary, icon: Icons.refresh, onPressed: _phase == _Phase.checking ? null : _check),
+            AppButton(label: 'Kiểm tra cập nhật', variant: AppButtonVariant.secondary, svg: AppSvg.refresh, onPressed: _phase == _Phase.checking ? null : _check),
             if (canDownload) AppButton(label: 'Tải bản mới', variant: AppButtonVariant.primary, icon: Icons.download, onPressed: _download),
           ]),
         ]),

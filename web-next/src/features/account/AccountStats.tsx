@@ -8,7 +8,7 @@ import { cachedGet, loadAllEntries } from '@/lib/offline'
 import { DEFAULT_RATES } from '@/lib/scoringConfig'
 import { loadStations } from '@/lib/lotteryStations'
 import { moneyByDate, moneyTotals, pseudoEntries } from '@/lib/statsMoney'
-import { buildSeries, compactNumber, rangeTotals } from '@/lib/statsSeries'
+import { buildSeries, compactNumber, periodTotals } from '@/lib/statsSeries'
 import { useMasked } from '@/lib/maskStore'
 import { useWidth } from './useWidth'
 import { BAR_H, BAR_PAD, STAT_METRICS, STAT_UNITS, barPlot, barTone, deltaOf, fmtNum, signed, statTone, tipLeftPct } from './accountLogic'
@@ -48,7 +48,8 @@ export default function AccountStats() {
   const metricInfo = STAT_METRICS.find((m) => m.key === metric)!
   const entries = useMemo(() => pseudoEntries(money.byDate, metric), [money, metric])
   const series = useMemo(() => buildSeries(entries, { unit, metric }), [entries, unit, metric])
-  const totals = useMemo(() => rangeTotals(entries, { unit, metric }), [entries, unit, metric])
+  // The figure is the CURRENT period (today / this week / ...) against the one before; the chart still shows the last periods.
+  const totals = useMemo(() => periodTotals(entries, { unit, metric }), [entries, unit, metric])
   const { delta, pct } = deltaOf(totals)
   const plot = useMemo(() => barPlot(series, metric, W), [series, metric, W])
   const hovered = plot.bars[hover] || null
@@ -93,14 +94,14 @@ export default function AccountStats() {
 
         <div className="st-summary" aria-live="polite">
           <div className="st-sum-main">
-            <span className="st-sum-label">{metricInfo.label} · {unitInfo.range}</span>
+            <span className="st-sum-label">{metricInfo.label} · {unitInfo.current}</span>
             <strong className={`st-sum-value ${cls(tone(totals.current))}`}>
               <MaskedValue text={(metric === 'profit' ? signed(totals.current) : fmtNum(totals.current)) + ' đ'} />
             </strong>
           </div>
           {delta !== null && (
             <div className="st-sum-prev">
-              So với {unitInfo.prev}:{' '}
+              So với {unitInfo.before}:{' '}
               <b className={cls(tone(delta))}>
                 <MaskedValue text={signed(delta) + ' đ' + (pct !== null ? ` (${pct > 0 ? '+' : ''}${pct}%)` : '')} />
               </b>
@@ -108,6 +109,7 @@ export default function AccountStats() {
           )}
         </div>
 
+        <div className="st-sum-prev">Biểu đồ {unitInfo.range}</div>
         {masked ? (
           <p className="st-chart-masked">Biểu đồ đang ẩn. Bấm Hiện số liệu để xem.</p>
         ) : (

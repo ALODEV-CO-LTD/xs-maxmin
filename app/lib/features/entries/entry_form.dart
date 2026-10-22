@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/svg_icon.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/bet_types.dart';
@@ -91,7 +92,7 @@ class _EntryFormCardState extends State<EntryFormCard> {
             const SizedBox(width: 8),
             Expanded(child: AppButton(label: 'Thêm số liệu', variant: AppButtonVariant.primary, loading: c.submitting, onPressed: c.submitting || !c.canAdd ? null : c.submit)),
             const SizedBox(width: 8),
-            AppButton(label: 'Xoá tất cả', variant: AppButtonVariant.danger, loading: _deletingAll, onPressed: _deletingAll || c.customerEntries.isEmpty ? null : _deleteAll),
+            AppButton(label: 'Xoá tất cả', svg: AppSvg.delete, variant: AppButtonVariant.danger, loading: _deletingAll, onPressed: _deletingAll || c.customerEntries.isEmpty ? null : _deleteAll),
           ]),
         ]),
       ),

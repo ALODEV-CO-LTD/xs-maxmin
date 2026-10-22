@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/widgets/svg_icon.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -276,7 +277,7 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
 
   Widget _filters() {
     Widget date(String label, String value, bool isFrom) => Expanded(
-      child: AppButton(label: value.isEmpty ? label : '$label ${viDate(value)}', variant: AppButtonVariant.secondary, icon: Icons.event, onPressed: () => _pickDate(isFrom)),
+      child: AppButton(label: value.isEmpty ? label : '$label ${viDate(value)}', variant: AppButtonVariant.secondary, svg: AppSvg.calendar, onPressed: () => _pickDate(isFrom)),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

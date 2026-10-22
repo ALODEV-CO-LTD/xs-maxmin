@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'svg_icon.dart';
+
 /// The app's single button kit (mirror of frontend/src/components/AppButton.vue): one place decides shape, colour,
 /// size, icon and the "busy" state of every action button.
 ///
@@ -21,6 +23,7 @@ class AppButton extends StatelessWidget {
     this.variant = AppButtonVariant.secondary,
     this.size = AppButtonSize.medium,
     this.icon,
+    this.svg,
     this.loading = false,
     this.block = false,
   }) : _iconOnly = false;
@@ -30,11 +33,13 @@ class AppButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    required IconData this.icon,
+    this.icon,
+    this.svg,
     this.variant = AppButtonVariant.ghost,
     this.size = AppButtonSize.medium,
     this.loading = false,
-  })  : block = false,
+  })  : assert(icon != null || svg != null),
+        block = false,
         _iconOnly = true;
 
   final String label;
@@ -42,6 +47,9 @@ class AppButton extends StatelessWidget {
   final AppButtonVariant variant;
   final AppButtonSize size;
   final IconData? icon;
+
+  /// An icon from the owner's SVG set (wins over [icon]).
+  final AppSvg? svg;
   final bool loading;
   final bool block;
   final bool _iconOnly;
@@ -64,12 +72,12 @@ class AppButton extends StatelessWidget {
     final Widget child = loading
         ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: spinnerColor))
         : _iconOnly
-            ? Icon(icon, size: 18)
+            ? (svg != null ? SvgIcon(svg!, size: 18) : Icon(icon, size: 18))
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
+                  if (svg != null || icon != null) ...[svg != null ? SvgIcon(svg!, size: 16) : Icon(icon, size: 16), const SizedBox(width: 6)],
                   Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
                 ],
               );

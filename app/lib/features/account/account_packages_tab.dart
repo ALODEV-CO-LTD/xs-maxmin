@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/widgets/svg_icon.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -158,17 +159,17 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
       InfoRow('Ngân hàng', value: '${bank!['bankName']}'),
       InfoRow('Số tài khoản', child: Row(mainAxisSize: MainAxisSize.min, children: [
         Flexible(child: SelectableText('${bank['bankAccountNumber']}', style: const TextStyle(fontWeight: FontWeight.w600))),
-        IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${bank['bankAccountNumber']}')),
+        IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const SvgIcon(AppSvg.copy, size: 18), onPressed: () => copyText(context, '${bank['bankAccountNumber']}')),
       ])),
       InfoRow('Chủ tài khoản', value: '${bank['bankAccountHolder'] ?? '-'}'),
       if (pending != null) ...[
         InfoRow('Số tiền', child: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(formatVnd(pending['amount'] as num), style: const TextStyle(fontWeight: FontWeight.w600)),
-          IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${pending['amount']}', done: 'Đã sao chép số tiền')),
+          IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const SvgIcon(AppSvg.copy, size: 18), onPressed: () => copyText(context, '${pending['amount']}', done: 'Đã sao chép số tiền')),
         ])),
         InfoRow('Nội dung', child: Row(mainAxisSize: MainAxisSize.min, children: [
           Flexible(child: SelectableText('${pending['referenceCode']}', style: const TextStyle(fontWeight: FontWeight.w600))),
-          IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const Icon(Icons.copy, size: 18), onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản')),
+          IconButton(visualDensity: VisualDensity.compact, tooltip: 'Sao chép', icon: const SvgIcon(AppSvg.copy, size: 18), onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản')),
         ])),
       ],
       if (qr != null) ...[
@@ -261,7 +262,7 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
     final pending = _pending;
     final ok = context.okColor, bad = context.badColor;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Align(alignment: Alignment.centerRight, child: AppButton(label: 'Làm mới', variant: AppButtonVariant.ghost, icon: Icons.refresh, onPressed: _loading ? null : _loadAll)),
+      Align(alignment: Alignment.centerRight, child: AppButton(label: 'Làm mới', variant: AppButtonVariant.ghost, svg: AppSvg.refresh, onPressed: _loading ? null : _loadAll)),
       SectionCard(title: 'Gói hiện tại', children: [
         Wrap(spacing: 12, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
           StatusChip(me?.packageLabel ?? '-', color: me?.packageActive == true ? ok : bad),
@@ -279,7 +280,7 @@ class _AccountPackagesTabState extends State<AccountPackagesTab> {
             AppButton(label: 'Xem thông tin chuyển khoản và mã QR', variant: AppButtonVariant.primary, icon: Icons.qr_code_2, onPressed: () => _showTransferSheet(pending)),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: AppButton(label: 'Sao chép nội dung', variant: AppButtonVariant.secondary, icon: Icons.copy, onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'))),
+              Expanded(child: AppButton(label: 'Sao chép nội dung', variant: AppButtonVariant.secondary, svg: AppSvg.copy, onPressed: () => copyText(context, '${pending['referenceCode']}', done: 'Đã sao chép nội dung chuyển khoản'))),
               const SizedBox(width: 10),
               Expanded(child: AppButton(label: 'Huỷ yêu cầu', variant: AppButtonVariant.secondary, onPressed: _cancelling ? null : () => _cancel(pending))),
             ]),
