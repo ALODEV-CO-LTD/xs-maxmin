@@ -28,7 +28,7 @@ class AppShell extends StatelessWidget {
           NavigationDestination(
             icon: _UnreadBadge(hub: hub, child: const SvgIcon(AppSvg.friends)),
             selectedIcon: _UnreadBadge(hub: hub, child: const SvgIcon(AppSvg.friends)),
-            label: 'Bạn bè',
+            label: 'Nhắn tin',
           ),
           const NavigationDestination(icon: SvgIcon(AppSvg.config), label: 'Cấu hình'),
           const NavigationDestination(icon: SvgIcon(AppSvg.account), selectedIcon: SvgIcon(AppSvg.account), label: 'Tài khoản'),

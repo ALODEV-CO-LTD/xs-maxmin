@@ -6,7 +6,7 @@ export const USER_LINKS = [
   { path: '/scoring', label: 'Tính điểm', icon: 'calculator' },
   { path: '/customers', label: 'Khách hàng', icon: 'users' },
   { path: '/scoring-settings', label: 'Cấu hình tính điểm', icon: 'sliders' },
-  { path: '/friends', label: 'Bạn bè', icon: 'message-circle-more', badge: 'friends' },
+  { path: '/friends', label: 'Nhắn tin', icon: 'message-circle-more', badge: 'friends' },
   { path: '/account', label: 'Tài khoản', icon: 'user' },
 ]
 

@@ -53,7 +53,7 @@ class _CallPanelState extends State<CallPanel> {
     final connected = c.status == CallStatus.connected;
     final theme = Theme.of(context);
     return Material(
-      color: theme.scaffoldBackgroundColor,
+      color: Color.alphaBlend(theme.colorScheme.primary.withValues(alpha: 0.07), theme.scaffoldBackgroundColor),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -86,9 +86,9 @@ class _CallPanelState extends State<CallPanel> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    if (connected || c.status == CallStatus.outgoing || c.status == CallStatus.connecting) _RoundButton(icon: c.muted ? AppSvg.micOff : AppSvg.mic, color: c.muted ? Brand.warning : theme.colorScheme.surfaceContainerHighest, label: c.muted ? 'Bật micro' : 'Tắt micro', onTap: c.toggleMute),
+                    if (connected || c.status == CallStatus.outgoing || c.status == CallStatus.connecting) _RoundButton(icon: c.muted ? AppSvg.micOff : AppSvg.mic, color: c.muted ? Brand.warning : _idleFill(theme), iconColor: c.muted ? Colors.white : theme.colorScheme.primary, label: c.muted ? 'Bật micro' : 'Tắt micro', onTap: c.toggleMute),
                     _RoundButton(icon: AppSvg.phoneOff, color: context.badColor, label: 'Kết thúc', onTap: c.hangUp),
-                    if (connected) _RoundButton(icon: c.speaker ? AppSvg.volumeOn : AppSvg.volumeOff, color: c.speaker ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest, label: c.speaker ? 'Loa ngoài' : 'Loa trong', onTap: c.toggleSpeaker),
+                    if (connected) _RoundButton(icon: c.speaker ? AppSvg.volumeOn : AppSvg.volumeOff, color: c.speaker ? theme.colorScheme.primary : _idleFill(theme), iconColor: c.speaker ? Colors.white : theme.colorScheme.primary, label: c.speaker ? 'Loa ngoài' : 'Loa trong', onTap: c.toggleSpeaker),
                   ],
                 ),
             ],
@@ -99,10 +99,14 @@ class _CallPanelState extends State<CallPanel> {
   }
 }
 
+/// Fill of the idle (not toggled) round buttons: a green tint, a little deeper than the call screen's own pale-green background.
+Color _idleFill(ThemeData theme) => theme.colorScheme.primary.withValues(alpha: 0.16);
+
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.color, required this.label, required this.onTap});
+  const _RoundButton({required this.icon, required this.color, required this.label, required this.onTap, this.iconColor = Colors.white});
   final AppSvg icon;
   final Color color;
+  final Color iconColor;
   final String label;
   final VoidCallback onTap;
   @override
@@ -113,7 +117,7 @@ class _RoundButton extends StatelessWidget {
           child: Material(
             color: color,
             shape: const CircleBorder(),
-            child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: SizedBox(width: 68, height: 68, child: SvgIcon(icon, size: 30, color: Colors.white))),
+            child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: SizedBox(width: 68, height: 68, child: SvgIcon(icon, size: 20, color: iconColor))),
           ),
         ),
         const SizedBox(height: 8),

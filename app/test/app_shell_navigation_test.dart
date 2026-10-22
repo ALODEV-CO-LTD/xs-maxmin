@@ -89,7 +89,7 @@ void main() {
   testWidgets('the bottom bar has five items in order and no "Thêm"; the app opens on Tổng quan', (tester) async {
     await _pump(tester);
     final labels = tester.widgetList<NavigationDestination>(find.byType(NavigationDestination)).map((d) => d.label).toList();
-    expect(labels, ['Tổng quan', 'Tính toán', 'Bạn bè', 'Cấu hình', 'Tài khoản']);
+    expect(labels, ['Tổng quan', 'Tính toán', 'Nhắn tin', 'Cấu hình', 'Tài khoản']);
     expect(_nav('Thêm'), findsNothing);
     expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
     // the statistics are the home page
@@ -166,9 +166,9 @@ void main() {
     expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
   });
 
-  testWidgets('Bạn bè, Cấu hình and Tài khoản are tabs (no back arrow)', (tester) async {
+  testWidgets('Nhắn tin, Cấu hình and Tài khoản are tabs (no back arrow)', (tester) async {
     await _pump(tester);
-    await tester.tap(_nav('Bạn bè'));
+    await tester.tap(_nav('Nhắn tin'));
     await _settle(tester);
     expect(find.text('Tin nhắn'), findsOneWidget);
     expect(find.byType(BackButton), findsNothing);
