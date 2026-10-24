@@ -63,7 +63,7 @@ class _ServiceMeta implements ChatMeta {
   Future<void> set(String key, String? value) => chat.store.setMeta(key, value);
 }
 
-/// Gửi văn bản cho một người bạn qua chat mã hoá 2 đầu. Trả về câu thông báo kết quả; `ok` = đã đi (chưa chắc đã tới).
+/// Gửi văn bản cho một người bạn qua chat mã hoá đầu cuối. Trả về câu thông báo kết quả; `ok` = đã đi (chưa chắc đã tới).
 abstract class ChatSender {
   Future<({bool ok, String message})> send(String friendId, String text);
 }

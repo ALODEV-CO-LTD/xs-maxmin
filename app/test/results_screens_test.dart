@@ -50,7 +50,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(host(FakeServer(), const ScoringScreen()));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Điểm ra được máy tự động tính'), findsOneWidget); // (the heading is the Tính điểm tab of Tính toán)
+    expect(find.textContaining('Điểm ra được tự động tính'), findsOneWidget); // (the heading is the Tính điểm tab of Tính toán)
     expect(find.text('Chọn khách hàng ở trên để xem điểm ra của họ.', skipOffstage: false), findsOneWidget);
     await tester.tap(find.text('-- Chọn khách hàng --'));
     await tester.pumpAndSettle();

@@ -11,7 +11,7 @@ export const USER_LINKS = [
 ]
 
 export const ADMIN_LINKS = [
-  { perm: 'stats.view', path: '/admin/stats', label: 'Thống kê', icon: 'chart-column-increasing' },
+  { perm: 'stats.view', path: '/admin/stats', label: 'Tổng quan', icon: 'chart-column-increasing' },
   { perm: 'users.view', path: '/admin/users', label: 'Khách hàng', icon: 'users' },
   { perm: 'payments.manage', path: '/admin/payment-requests', label: 'Thanh toán & gia hạn', icon: 'pay' },
   { perm: 'support.messages', path: '/admin/messages', label: 'Phản hồi', icon: 'feedback', badge: 'admin-messages' },

@@ -1,6 +1,6 @@
 // Chat attachments (files + images). The server stores them with the message
-// and enforces the same 5 MB limit; checking here just saves a round trip.
-export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+// and enforces the same 25 MB limit; checking here just saves a round trip.
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 // Only pictures can be sent (K37/K38/S09): GIFs and other files (PDF, Word, zip...) can carry an
 // author, device or creation time that cannot be reliably removed, so they are refused here

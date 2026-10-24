@@ -37,7 +37,7 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   static final _all = <_Section>[
-    _Section('Thống kê', AppSvg.chart, 'stats.view', () => const AdminStatsScreen()),
+    _Section('Tổng quan', AppSvg.chart, 'stats.view', () => const AdminStatsScreen()),
     _Section('Khách hàng', AppSvg.usersGroup, 'users.view', () => const AdminUsersScreen()),
     _Section('Thanh toán & gia hạn', AppSvg.pay, 'payments.manage', () => const AdminPaymentsScreen()),
     _Section('Phản hồi', AppSvg.feedback, 'support.messages', () => const AdminMessagesScreen()),

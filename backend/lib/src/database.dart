@@ -91,7 +91,7 @@ void _migrateSchema(Database db) {
   // own (see routes/api/me/scoring-settings), not admin-controlled. Null
   // means "use the built-in default" (same default baked into that route).
   _ensureColumn(db, 'users', 'scoring_rates', 'TEXT');
-  // Chat attachments (files / images, <= 5 MB each) stored with the message.
+  // Chat attachments (files / images, <= 25 MB each) stored with the message.
   _ensureColumn(db, 'direct_messages', 'attachment_name', 'TEXT');
   _ensureColumn(db, 'direct_messages', 'attachment_type', 'TEXT');
   _ensureColumn(db, 'direct_messages', 'attachment_size', 'INTEGER');

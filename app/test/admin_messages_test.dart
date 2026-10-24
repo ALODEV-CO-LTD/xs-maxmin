@@ -77,7 +77,7 @@ void main() {
   test('attachment payload rejects non-images, empty and oversize', () {
     expect(() => buildAttachmentPayload(Uint8List(0)), throwsException);
     expect(() => buildAttachmentPayload(Uint8List.fromList([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])), throwsException);
-    final big = Uint8List(5 * 1024 * 1024 + 1)..setAll(0, [0xff, 0xd8, 0xff]);
+    final big = Uint8List(25 * 1024 * 1024 + 1)..setAll(0, [0xff, 0xd8, 0xff]);
     expect(() => buildAttachmentPayload(big), throwsException);
   });
 

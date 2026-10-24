@@ -43,7 +43,7 @@ class NoticesState {
 }
 
 const dismissedNoticesKey = 'xoso_dismissed_notices';
-const noticeRefresh = Duration(minutes: 5);
+const noticeRefresh = Duration(seconds: 60);
 
 /// Banner area at the top of the customer's screens; shows nothing while there is nothing to show or while offline.
 class AnnouncementBanner extends StatefulWidget {
@@ -82,7 +82,9 @@ class _AnnouncementBannerState extends State<AnnouncementBanner> {
 
   Future<void> _load() async {
     try {
-      final res = await context.read<ApiClient>().get('/announcements') as Map<String, dynamic>;
+      final api = context.read<ApiClient>();
+      final res = await api.get('/announcements') as Map<String, dynamic>;
+      api.applyNotices(res['maintenance']);
       if (mounted) setState(() => _state = NoticesState.fromJson(res));
     } catch (_) {/* offline or not allowed: keep what we have */}
   }

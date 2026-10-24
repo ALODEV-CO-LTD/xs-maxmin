@@ -28,7 +28,7 @@ void main() {
     test('rejects malformed frames (bad part indexes, too many parts, wrong types)', () {
       Map<String, dynamic> base() => {'id': 'abcdefgh', 'from': 'u1', 'iv': 'AA==', 'ct': 'BB=='};
       expect(E2eeFrame.tryParse({...base(), 'part': 2, 'parts': 2}), isNull);
-      expect(E2eeFrame.tryParse({...base(), 'part': 0, 'parts': 9}), isNull);
+      expect(E2eeFrame.tryParse({...base(), 'part': 0, 'parts': 41}), isNull);
       expect(E2eeFrame.tryParse({...base(), 'part': -1, 'parts': 2}), isNull);
       expect(E2eeFrame.tryParse({...base(), 'ct': 5}), isNull);
       expect(E2eeFrame.tryParse({'id': 'abcdefgh'}), isNull);

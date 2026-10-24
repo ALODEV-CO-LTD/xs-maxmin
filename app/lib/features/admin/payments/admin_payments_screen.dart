@@ -301,7 +301,7 @@ class _PaymentRequestsViewState extends State<PaymentRequestsView> {
         const SizedBox(height: 10),
         TextField(
           controller: _q,
-          decoration: const InputDecoration(hintText: 'Tìm tên, tài khoản hoặc mã tham chiếu...', prefixIcon: SvgIcon(AppSvg.search, size: 8)),
+          decoration: const InputDecoration(hintText: 'Tìm tên, tài khoản hoặc mã tham chiếu...', prefixIcon: SvgIcon(AppSvg.search, size: 14)),
           onChanged: (v) => _setFilter(_f.copyWith(q: v), debounce: true),
         ),
         const SizedBox(height: 10),

@@ -119,7 +119,7 @@ class _Body extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Text(
-          'Điểm ra được máy tự động tính và lưu theo kết quả xổ số đã nhập ở màn Nhập kết quả. Tỉ lệ ăn của từng khách chỉnh ở màn Khách hàng.',
+          'Điểm ra được tự động tính và lưu theo kết quả xổ số đã nhập ở màn Nhập kết quả. Tỉ lệ ăn của từng khách chỉnh ở màn Khách hàng.',
           style: t.bodySmall?.copyWith(color: context.mutedColor),
         ),
         const SizedBox(height: 12),

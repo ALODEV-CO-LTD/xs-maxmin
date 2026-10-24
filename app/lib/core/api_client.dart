@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:http/http.dart' as http;
 
 import 'auth_store.dart';
@@ -54,6 +55,16 @@ class ApiClient {
   DateTime? _offlineAt;
   static const _offlineFailFast = Duration(seconds: 6);
 
+  /// Set to the admin's message while maintenance mode is on (the server answers 503 `{maintenance: true}` to customers); null
+  /// when it is off. The app shows a full-screen notice while it is set (features/shell/maintenance_gate.dart).
+  final ValueNotifier<String?> maintenance = ValueNotifier<String?>(null);
+
+  /// Reads the `maintenance` object of GET /announcements (`{enabled, message}`) into [maintenance].
+  void applyNotices(Object? m) {
+    final on = m is Map && m['enabled'] == true;
+    maintenance.value = on ? (m['message'] is String && (m['message'] as String).trim().isNotEmpty ? (m['message'] as String).trim() : 'Hệ thống đang bảo trì, vui lòng quay lại sau.') : null;
+  }
+
   /// A person asked to refresh: forget the recent network failure so the next reads really try the network.
   void retryNow() => _offlineAt = null;
 
@@ -84,6 +95,7 @@ class ApiClient {
     if (res.statusCode < 200 || res.statusCode >= 300) {
       if (res.statusCode == 401 && !_isReauth(path, method)) auth.clear();
       final msg = data is Map && data['error'] is String ? data['error'] as String : statusFallbackMessage(res.statusCode);
+      if (res.statusCode == 503 && data is Map && data['maintenance'] == true) maintenance.value = msg;
       throw ApiError(res.statusCode, msg, data is Map<String, dynamic> ? data : null);
     }
     return data;

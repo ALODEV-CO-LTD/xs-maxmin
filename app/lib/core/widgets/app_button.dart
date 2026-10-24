@@ -72,12 +72,12 @@ class AppButton extends StatelessWidget {
     final Widget child = loading
         ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: spinnerColor))
         : _iconOnly
-            ? (svg != null ? SvgIcon(svg!, size: 7) : Icon(icon, size: 18))
+            ? (svg != null ? SvgIcon(svg!, size: 14) : Icon(icon, size: 18))
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (svg != null || icon != null) ...[svg != null ? SvgIcon(svg!, size: 6) : Icon(icon, size: 16), const SizedBox(width: 6)],
+                  if (svg != null || icon != null) ...[svg != null ? SvgIcon(svg!, size: 14) : Icon(icon, size: 16), const SizedBox(width: 6)],
                   Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
                 ],
               );

@@ -160,12 +160,12 @@ String initial(String name) => name.trim().isEmpty ? '?' : String.fromCharCode(n
 
 /// The `attachment` field of `POST /admin/messages/:userId`: `{name, type, data(base64)}`. The server ignores name and
 /// type and re-derives them from the bytes, but the web sends them, so we do too. Bytes must already be scrubbed.
-/// Throws [Exception] with a Vietnamese message when not a JPG/PNG/WebP, empty, or over 5 MB.
+/// Throws [Exception] with a Vietnamese message when not a JPG/PNG/WebP, empty, or over 25 MB.
 Map<String, dynamic> buildAttachmentPayload(Uint8List bytes, {String? type, int Function()? byte}) {
   if (bytes.isEmpty) throw Exception('Tệp trống');
   final t = sniffImageType(bytes);
   if (t == null || (type != null && type != t)) throw Exception(imageOnlyMessage);
-  if (bytes.length > maxAttachmentBytes) throw Exception('Tệp quá lớn (tối đa 5 MB)');
+  if (bytes.length > maxAttachmentBytes) throw Exception('Tệp quá lớn (tối đa 25 MB)');
   return {'name': anonymousName(t, byte), 'type': t, 'data': base64Encode(bytes)};
 }
 

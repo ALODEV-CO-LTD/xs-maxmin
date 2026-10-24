@@ -6,7 +6,7 @@ import { ALLOWED_IMAGE_TYPES, IMAGE_ONLY_MESSAGE, MAX_ATTACHMENT_BYTES } from '@
 
 // Image button for a chat composer. Only JPG, PNG and WebP pictures can be sent (GIFs and other files can carry
 // author/device/time data that cannot be reliably removed). `onPick` gets the chosen File, `onError` a message when the
-// file is not an allowed picture, is empty or is over the 5 MB limit. The chosen file is shown by <AttachmentPreview>.
+// file is not an allowed picture, is empty or is over the 25 MB limit. The chosen file is shown by <AttachmentPreview>.
 export default function ChatAttachButtons({
   disabled = false,
   icon = 'image',
@@ -25,7 +25,7 @@ export default function ChatAttachButtons({
     if (!file) return
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return onError(IMAGE_ONLY_MESSAGE)
     if (file.size === 0) return onError('Tệp trống')
-    if (file.size > MAX_ATTACHMENT_BYTES) return onError('Tệp quá lớn (tối đa 5 MB)')
+    if (file.size > MAX_ATTACHMENT_BYTES) return onError('Tệp quá lớn (tối đa 25 MB)')
     onPick(file)
   }
   return (

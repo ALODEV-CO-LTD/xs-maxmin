@@ -248,3 +248,10 @@
 
 }
 
+
+.adm-stats .period-fig { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 10px; }
+.adm-stats .period-name { font-size: 12px; color: var(--muted, #6b7280); }
+.adm-stats .period-value { font-size: 24px; font-weight: 800; }
+.adm-stats .period-note { font-size: 12px; color: var(--muted, #6b7280); }
+.adm-stats .period-note.up { color: var(--success, #15803d); }
+.adm-stats .period-note.down { color: var(--danger, #b91c1c); }

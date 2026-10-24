@@ -1,4 +1,4 @@
-// Kho chat mã hoá 2 đầu (features/chat/chatStore.js) chạy với CSDL trong bộ nhớ và ổ cắm giả; máy "bạn bè" được đóng
+// Kho chat mã hoá đầu cuối (features/chat/chatStore.js) chạy với CSDL trong bộ nhớ và ổ cắm giả; máy "bạn bè" được đóng
 // vai bằng chính các hàm mã hoá (đúng định dạng gói mà app Flutter dùng: e2ee-msg / e2ee-ack / e2ee-undelivered).
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -261,14 +261,14 @@ test('previews: tin cuối mỗi cuộc trò chuyện', async () => {
   assert.equal(p[BOB].mine, true)
 })
 
-test('frameParts: cắt theo 1.000.000 ký tự, tối đa 8 phần', () => {
+test('frameParts: cắt theo 1.000.000 ký tự, tối đa 40 phần', () => {
   const ct = 'a'.repeat(LIMITS.PART_CHARS * 2 + 5)
   const frames = frameParts('u', 'id', 'iv', ct, 7)
   assert.equal(frames.length, 3)
   assert.deepEqual(frames.map((f) => f.part), [0, 1, 2])
   assert.ok(frames.every((f) => f.parts === 3 && f.type === 'e2ee-msg' && f.ts === 7))
   assert.equal(frames.map((f) => f.ct).join(''), ct)
-  assert.equal(frameParts('u', 'id', 'iv', 'a'.repeat(LIMITS.PART_CHARS * 8 + 1), 7), null)
+  assert.equal(frameParts('u', 'id', 'iv', 'a'.repeat(LIMITS.PART_CHARS * 40 + 1), 7), null)
 })
 
 // ---- giao diện: hàm thuần của màn Tin nhắn ----

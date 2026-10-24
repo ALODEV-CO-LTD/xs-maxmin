@@ -8,7 +8,7 @@ import 'package:sqlite3/sqlite3.dart';
 /// Chat attachments (images only: JPEG, PNG, WebP) live in `direct_messages`
 /// (`attachment_name/type/size/data`), so friend chat, the customer's Phản hồi
 /// thread and admin replies share one implementation.
-const maxAttachmentBytes = 5 * 1024 * 1024;
+const maxAttachmentBytes = 25 * 1024 * 1024;
 
 // Only these may be shown inline (<img>). Anything else - SVG and HTML
 // included, both of which can carry script - is always served as a download.
@@ -30,7 +30,7 @@ class AttachmentParse {
 }
 
 /// Reads `{data(base64)}` (name/type are ignored) from a request body field. `null`/absent
-/// means "no attachment"; anything that is not a clean JPEG/PNG/WebP, or is over 5 MB, is an error.
+/// means "no attachment"; anything that is not a clean JPEG/PNG/WebP, or is over 25 MB, is an error.
 AttachmentParse parseAttachment(Object? raw) {
   if (raw == null) return AttachmentParse.none();
   if (raw is! Map) return AttachmentParse.fail('Tệp đính kèm không hợp lệ');
@@ -47,7 +47,7 @@ AttachmentParse parseAttachment(Object? raw) {
   }
   if (bytes.isEmpty) return AttachmentParse.fail('Tệp đính kèm trống');
   if (bytes.length > maxAttachmentBytes) {
-    return AttachmentParse.fail('Tệp quá lớn (tối đa 5 MB)');
+    return AttachmentParse.fail('Tệp quá lớn (tối đa 25 MB)');
   }
 
   // Only images are accepted (K37/K38/S09). The client is untrusted, so everything the

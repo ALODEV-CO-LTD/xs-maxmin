@@ -178,12 +178,15 @@ class SvgIcon extends StatelessWidget {
       excludeFromSemantics: true,
     );
     final k = _glyphScale[icon.name];
-    return k == null
+    final glyph = k == null
         ? pic
         : SizedBox(
             width: s,
             height: s,
             child: Transform.scale(scale: k, child: pic),
           );
+    // Align (not a bare box): where a parent forces a minimum size (a TextField's prefix/suffix slot is at least 48x48)
+    // the icon keeps its own [size] and sits in the middle instead of being stretched to fill the slot.
+    return Align(widthFactor: 1, heightFactor: 1, child: glyph);
   }
 }

@@ -90,6 +90,54 @@ class RecoveryCodeCardState extends State<RecoveryCodeCard> {
   }
 }
 
+/// Confirm + password + POST /me/delete-data. Null = the user backed out; otherwise `error` is null on success.
+Future<({String? error})?> runDeleteData(BuildContext context) async {
+  final api = context.read<ApiClient>();
+  if (!await confirmDialog(context, title: 'Xoá toàn bộ dữ liệu', message: 'CẢNH BÁO: Thao tác này sẽ xoá vĩnh viễn: $wipeDeletes. $wipeKeeps Bạn có chắc chắn muốn tiếp tục?', confirmText: 'Tiếp tục', danger: true)) return null;
+  if (!context.mounted) return null;
+  final password = await showDialog<String>(context: context, builder: (_) => const _PasswordPrompt());
+  if (password == null || password.isEmpty) return null;
+  try {
+    await api.post('/me/delete-data', {'password': password});
+    return (error: null);
+  } catch (e) {
+    return (error: e is ApiError ? e.message : 'Không xoá được dữ liệu');
+  }
+}
+
+/// The compact "Xoá toàn bộ dữ liệu" button (Tổng quan, under the all-time figures). [onDeleted] runs after a successful wipe.
+class DeleteDataButton extends StatefulWidget {
+  const DeleteDataButton({super.key, this.onDeleted});
+  final VoidCallback? onDeleted;
+  @override
+  State<DeleteDataButton> createState() => _DeleteDataButtonState();
+}
+
+class _DeleteDataButtonState extends State<DeleteDataButton> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _delete() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final r = await runDeleteData(context);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = r?.error;
+    });
+    if (r != null && r.error == null) widget.onDeleted?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_error != null) NoticeBox(_error!),
+        AppButton(label: 'Xoá toàn bộ dữ liệu', svg: AppSvg.delete, variant: AppButtonVariant.danger, loading: _busy, block: true, onPressed: _busy ? null : _delete),
+      ]);
+}
+
 class _DeleteDataCard extends StatefulWidget {
   const _DeleteDataCard();
   @override
@@ -102,24 +150,20 @@ class _DeleteDataCardState extends State<_DeleteDataCard> {
   bool _busy = false;
 
   Future<void> _delete() async {
-    final api = context.read<ApiClient>();
-    if (!await confirmDialog(context, title: 'Xoá toàn bộ dữ liệu', message: 'CẢNH BÁO: Thao tác này sẽ xoá vĩnh viễn: $wipeDeletes. $wipeKeeps Bạn có chắc chắn muốn tiếp tục?', confirmText: 'Tiếp tục', danger: true)) return;
-    if (!mounted) return;
-    final password = await showDialog<String>(context: context, builder: (_) => const _PasswordPrompt());
-    if (password == null || password.isEmpty) return;
     setState(() {
       _busy = true;
       _error = null;
       _success = null;
     });
-    try {
-      await api.post('/me/delete-data', {'password': password});
-      if (mounted) setState(() => _success = 'Đã xoá toàn bộ dữ liệu của bạn.');
-    } catch (e) {
-      if (mounted) setState(() => _error = e is ApiError ? e.message : 'Không xoá được dữ liệu');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final r = await runDeleteData(context);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (r != null) {
+        _error = r.error;
+        _success = r.error == null ? 'Đã xoá toàn bộ dữ liệu của bạn.' : null;
+      }
+    });
   }
 
   @override

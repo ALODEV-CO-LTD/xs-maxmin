@@ -3,8 +3,11 @@ import '../../core/widgets/svg_icon.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme.dart';
+
 import '../account/account_stats_tab.dart';
 import '../friends/messaging_host.dart';
+import 'guide_dialog.dart';
 import 'package_card.dart';
 
 /// Tổng quan: the home tab. The statistics (customers, plays, points in/out, profit, chart by day/month/year).
@@ -13,7 +16,12 @@ class OverviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Tổng quan'), actions: const [_SupportButton()]),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: IconButton(tooltip: 'Hướng dẫn', icon: const SvgIcon(AppSvg.info), onPressed: () => showGuideDialog(context)),
+        title: const Text('Tổng quan'),
+        actions: const [_SupportButton()],
+      ),
       body: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 32),
@@ -36,7 +44,7 @@ class _SupportButton extends StatelessWidget {
     final hub = MessagingScope.maybeOf(context);
     Widget button(int n) => IconButton(
           tooltip: 'Hỗ trợ từ Admin',
-          icon: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: const SvgIcon(AppSvg.support)),
+          icon: Badge(isLabelVisible: n > 0, label: Text(n > 9 ? '9+' : '$n'), child: SvgIcon(AppSvg.support, color: context.badColor)),
           onPressed: () => context.push('/support'),
         );
     if (hub == null) return button(0);

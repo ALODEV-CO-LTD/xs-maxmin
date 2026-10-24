@@ -322,7 +322,7 @@ class _DeletionSchedulesState extends State<DeletionSchedules> {
                     borderRadius: BorderRadius.circular(10),
                     onTap: _pickRunAt,
                     child: InputDecorator(
-                      decoration: InputDecoration(labelText: _repeat == 'none' ? 'Thời điểm xoá' : 'Thời điểm xoá lần đầu', suffixIcon: const SvgIcon(AppSvg.clock, size: 7)),
+                      decoration: InputDecoration(labelText: _repeat == 'none' ? 'Thời điểm xoá' : 'Thời điểm xoá lần đầu', suffixIcon: const SvgIcon(AppSvg.clock, size: 14)),
                       child: Text(_fmtTime(_runAt.toIso8601String())),
                     ),
                   ),

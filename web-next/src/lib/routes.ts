@@ -18,7 +18,7 @@ export const ROUTES: AppRoute[] = [
   { path: '/friends', title: 'Tin nhắn', kind: 'user' }, // a thread opens as /friends?thread=<id>
   { path: '/account', title: 'Tài khoản', kind: 'shared' },
   { path: '/admin/users', title: 'Quản lý khách hàng', kind: 'admin', perm: 'users.view' },
-  { path: '/admin/stats', title: 'Thống kê', kind: 'admin', perm: 'stats.view' },
+  { path: '/admin/stats', title: 'Tổng quan', kind: 'admin', perm: 'stats.view' },
   { path: '/admin/settings', title: 'Cài đặt hệ thống', kind: 'admin', perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'] },
   { path: '/admin/payment-requests', title: 'Yêu cầu thanh toán', kind: 'admin', perm: 'payments.manage' },
   { path: '/admin/messages', title: 'Phản hồi khách hàng', kind: 'admin', perm: 'support.messages' }, // a thread: ?user=<id>

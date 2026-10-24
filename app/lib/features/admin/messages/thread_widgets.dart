@@ -22,7 +22,7 @@ Future<Uint8List?> pickScrubbedImage(ImageSource source) async {
   if (raw.isEmpty) throw Exception('Tệp trống');
   if (sniffImageType(raw) == null) throw Exception(imageOnlyMessage);
   final clean = await scrubImage(raw);
-  if (clean.bytes.length > maxAttachmentBytes) throw Exception('Tệp quá lớn (tối đa 5 MB)');
+  if (clean.bytes.length > maxAttachmentBytes) throw Exception('Tệp quá lớn (tối đa 25 MB)');
   return clean.bytes;
 }
 
@@ -43,11 +43,14 @@ class DayDivider extends StatelessWidget {
 
 /// One message bubble. [mine] puts it on the right in the accent colour; [attachmentPath] is the API path of its picture.
 class ThreadBubble extends StatelessWidget {
-  const ThreadBubble({super.key, required this.msg, required this.mine, required this.attachmentPath, this.senderLabel});
+  const ThreadBubble({super.key, required this.msg, required this.mine, required this.attachmentPath, this.senderLabel, this.onDelete});
   final AdminMsg msg;
   final bool mine;
   final String attachmentPath;
   final String? senderLabel;
+
+  /// When set (the admin's thread) a small trash button sits beside the time and deletes this message.
+  final VoidCallback? onDelete;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -71,7 +74,19 @@ class ThreadBubble extends StatelessWidget {
               ],
             ]),
           ),
-          Padding(padding: const EdgeInsets.only(top: 2, bottom: 2), child: Text(timeLabel(msg.createdAt), style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.55)))),
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 2),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(timeLabel(msg.createdAt), style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.55))),
+              if (onDelete != null)
+                InkResponse(
+                  key: const Key('delete-message'),
+                  onTap: onDelete,
+                  radius: 18,
+                  child: Padding(padding: const EdgeInsets.fromLTRB(10, 4, 4, 4), child: SvgIcon(AppSvg.delete, size: 14, color: Brand.danger)),
+                ),
+            ]),
+          ),
         ]),
       ),
     );

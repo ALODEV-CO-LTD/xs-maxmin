@@ -69,7 +69,7 @@ export async function decryptBytes(key, { iv, ct }, { from, to, id }) {
 }
 
 // Plaintext frame: [4-byte header length][header JSON][raw file bytes]. Keeping the
-// file as raw bytes (not base64) leaves room for a 5 MB file under the relay's cap.
+// file as raw bytes (not base64) leaves room for a 25 MB file under the relay's cap.
 // `kind` marks a system notice instead of a chat message (e.g. 'screenshot').
 // `group` is the group header of a group message: { i: id, n: name, c: creator, u: updatedAt, m: [[id, name], ...] }.
 export function packMessage({ text = '', ts = Date.now(), att = null, kind = null, group = null }, fileBytes = null) {

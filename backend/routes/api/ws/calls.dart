@@ -48,12 +48,12 @@ const _maxMessageChars = 64 * 1024;
 /// stores NOTHING: if they are offline the sender is told (`e2ee-undelivered`)
 /// and nothing is kept. The recipient confirms with `e2ee-ack`, which is relayed
 /// back. The plaintext (text and any attachment) is inside `ct`; the server
-/// never sees it. A 5 MB file does not fit one WebSocket frame, so the
+/// never sees it. A 25 MB file does not fit one WebSocket frame, so the
 /// ciphertext is split into parts (`part`/`parts`, at most 8) that are relayed
 /// one by one and put back together by the receiver; the relay keeps no state.
 const _e2eeTypes = {'e2ee-msg', 'e2ee-ack'};
 const _maxE2eeChars = 2 * 1024 * 1024; // one frame (part) of ciphertext
-const _maxE2eeParts = 8;
+const _maxE2eeParts = 40;
 
 Future<Response> onRequest(RequestContext context) async {
   final token = context.request.uri.queryParameters['token'];

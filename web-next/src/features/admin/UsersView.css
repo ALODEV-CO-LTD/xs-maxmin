@@ -29,8 +29,8 @@
 .adm-users .search-field .search-icon {
   position: absolute;
   left: 14px;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: var(--muted);
   pointer-events: none;
   transition: color 0.15s ease;

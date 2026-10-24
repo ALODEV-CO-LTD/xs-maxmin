@@ -8,8 +8,9 @@ import '../../../core/theme.dart';
 import '../users/admin_users_widgets.dart';
 import 'admin_stats_chart.dart';
 import 'admin_stats_logic.dart';
+import '../../account/stats_logic.dart' show StatUnit, percentChange, statCurrentLabels, statPreviousLabels;
 
-/// Admin - Thống kê: subscriber tiles, revenue / new-user charts and the per-package table. Body only.
+/// Admin - Tổng quan: subscriber tiles, revenue / new-user charts and the per-package table. Body only.
 class AdminStatsScreen extends StatelessWidget {
   const AdminStatsScreen({super.key});
   @override
@@ -97,19 +98,29 @@ class _StatsBodyState extends State<StatsBody> {
       const SizedBox(height: 20),
       Text(s.canRevenue ? 'Thu nhập và người dùng mới' : 'Người dùng mới', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       const SizedBox(height: 8),
-      Wrap(spacing: 8, children: [
-        for (final r in statsRanges)
-          ChoiceChip(
-            label: Text(r.label),
-            selected: _range == r.key,
-            onSelected: (_) {
-              setState(() => _range = r.key);
-              _load();
-            },
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SegmentedButton<String>(
+          style: ButtonStyle(
+            minimumSize: const WidgetStatePropertyAll(Size(0, 28)),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
+            textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 12)),
           ),
-      ]),
-      const SizedBox(height: 4),
-      Text('${statsRangeSpans[_range]}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
+          showSelectedIcon: false,
+          segments: [for (final r in statsRanges) ButtonSegment(value: r.key, label: Text(r.label))],
+          selected: {_range},
+          onSelectionChanged: (v) {
+            setState(() => _range = v.first);
+            _load();
+          },
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (s.canRevenue) _periodFigure(context, 'Thu nhập', [for (final p in s.series) p.revenue], money: true),
+      _periodFigure(context, 'Người dùng mới', [for (final p in s.series) p.newUsers]),
+      Text('Biểu đồ ${statsRangeSpans[_range]}', style: TextStyle(fontSize: 12, color: context.mutedColor)),
       const SizedBox(height: 8),
       if (s.canRevenue) ...[
         AdminSeriesChart(points: [for (final p in s.series) ChartPoint(p.date, p.revenue)], line: false, color: Theme.of(context).colorScheme.primary, label: 'Thu nhập', money: true, unit: _range),
@@ -128,6 +139,33 @@ class _StatsBodyState extends State<StatsBody> {
               ]),
       ),
     ];
+  }
+
+  /// "Thu nhập · Hôm nay" with the current period's total and the change against the previous one (same idea as Tổng quan of a customer).
+  Widget _periodFigure(BuildContext context, String name, List<int> values, {bool money = false}) {
+    final unit = StatUnit.values.firstWhere((u) => u.name == _range, orElse: () => StatUnit.day);
+    final current = values.isEmpty ? 0 : values.last;
+    final previous = values.length < 2 ? 0 : values[values.length - 2];
+    final prevLabel = statPreviousLabels[unit]!;
+    String fmt(num v) => money ? '${formatNumber(v)} đ' : formatNumber(v);
+    final delta = current - previous;
+    final pct = percentChange(current.toDouble(), previous.toDouble());
+    final String note;
+    if (current == 0 && previous == 0) {
+      note = '';
+    } else if (previous == 0) {
+      note = 'Chưa có số liệu $prevLabel';
+    } else {
+      note = '${delta >= 0 ? '▲' : '▼'} ${delta >= 0 ? '+' : '−'}${fmt(delta.abs())} (${pct! >= 0 ? '+' : '−'}${pct.abs().toStringAsFixed(1).replaceAll('.', ',')}%) so với $prevLabel';
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('$name · ${statCurrentLabels[unit]}', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+        Text(fmt(current), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+        if (note.isNotEmpty) Text(note, style: TextStyle(fontSize: 12, color: previous == 0 ? context.mutedColor : (delta > 0 ? context.okColor : delta < 0 ? context.badColor : context.mutedColor))),
+      ]),
+    );
   }
 
   Widget _tile(BuildContext context, int value, String label, Color? color) => Card(

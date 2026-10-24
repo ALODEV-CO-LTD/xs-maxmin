@@ -265,7 +265,7 @@ export default function ScoringScreen() {
     <div className="page scoring-page">
       <h1 className="page-title">Tính điểm</h1>
       <p className="page-subtitle">
-        Điểm ra được máy tự động tính và lưu, theo kết quả xổ số đã nhập ở trang{' '}
+        Điểm ra được tự động tính và lưu, theo kết quả xổ số đã nhập ở trang{' '}
         <Link href="/results" className="tap-link">Nhập kết quả</Link>. Tỉ lệ ăn và giải đối chiếu của từng khách chỉnh ở trang{' '}
         <Link href="/customers" className="tap-link">Khách hàng</Link> (nút Cấu hình tính điểm ở từng khách).
       </p>

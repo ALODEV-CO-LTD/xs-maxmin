@@ -6,8 +6,8 @@ import 'package:dart_frog/dart_frog.dart';
 const authBodyMaxBytes = 8 * 1024;
 const smallBodyMaxBytes = 256 * 1024;
 
-/// A chat message with a 5 MB image: base64 is 4/3 of the file, plus room for the text and the JSON envelope.
-const messageBodyMaxBytes = 7 * 1024 * 1024 + 512 * 1024;
+/// A chat message with a 25 MB image: base64 is 4/3 of the file, plus room for the text and the JSON envelope.
+const messageBodyMaxBytes = 34 * 1024 * 1024;
 
 /// Result of [readJsonBody]: either [body] (a JSON object) or the [error] response to return as is.
 class JsonBodyResult {

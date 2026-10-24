@@ -165,7 +165,7 @@ class ChatService extends ChangeNotifier {
       await applyRetentionAll();
     } catch (e) {
       ready = false;
-      error = e is ApiError ? e.message : 'Không khởi tạo được mã hoá 2 đầu trên thiết bị này.';
+      error = e is ApiError ? e.message : 'Không khởi tạo được mã hoá đầu cuối trên thiết bị này.';
     }
     if (!_disposed) notifyListeners();
   }
@@ -339,13 +339,13 @@ class ChatService extends ChangeNotifier {
 
   /// Sends [text] and/or one [image] to [friendId]. Throws a Vietnamese-message [Exception] for invalid input.
   Future<ChatMessage> send(String friendId, String text, {OutgoingImage? image}) async {
-    if (!ready) throw Exception('Mã hoá 2 đầu chưa sẵn sàng trên thiết bị này.');
+    if (!ready) throw Exception('Mã hoá đầu cuối chưa sẵn sàng trên thiết bị này.');
     final id = newMessageId();
     ChatAttachment? att;
     String? ext;
     if (image != null) {
       if (!allowedImageTypes.contains(image.type)) throw Exception(imageOnlyMessage);
-      if (image.bytes.length > maxAttachmentBytes) throw Exception('Tệp quá lớn (tối đa 5 MB)');
+      if (image.bytes.length > maxAttachmentBytes) throw Exception('Tệp quá lớn (tối đa 25 MB)');
       ext = imageExt(image.type);
       att = ChatAttachment(name: anonymousName(image.type, () => DateTime.now().microsecondsSinceEpoch & 0xff), type: image.type, size: image.bytes.length, path: await store.writeFile(id, image.bytes, ext));
     }
@@ -535,7 +535,7 @@ class ChatService extends ChangeNotifier {
   /// Creates the group on this device and tells every member (an empty, end-to-end encrypted "new group" message that carries the
   /// name and the member list). Members must be friends of the creator, since the relay only carries messages between friends.
   Future<ChatGroup> createGroup(String name, String myName, List<GroupMember> others) async {
-    if (!ready) throw Exception('Mã hoá 2 đầu chưa sẵn sàng trên thiết bị này.');
+    if (!ready) throw Exception('Mã hoá đầu cuối chưa sẵn sàng trên thiết bị này.');
     final n = name.trim();
     if (n.isEmpty) throw Exception('Nhập tên nhóm.');
     final ids = {for (final o in others) o.id}..remove(userId);
@@ -816,6 +816,10 @@ class ChatService extends ChangeNotifier {
   /// Conversations hidden from the Tin nhắn list ("Lưu trữ").
   final Set<String> archived = {};
 
+  /// friendId -> when the user deleted that conversation on this device (ms). The row leaves the list until a newer message,
+  /// an unread badge or a missed call brings it back; the friend stays in the contacts.
+  final Map<String, int> clearedAt = {};
+
   /// Loads aliases and the archive from the local store. Called by [init].
   Future<void> restorePrefs() async {
     aliases
@@ -827,6 +831,12 @@ class ChatService extends ChangeNotifier {
     archived
       ..clear()
       ..addAll(_decodeList(await store.meta('archive')));
+    clearedAt
+      ..clear()
+      ..addEntries([
+        for (final e in (await store.metaWithPrefix('cleared:')).entries)
+          if (int.tryParse(e.value) != null) MapEntry(e.key.substring(8), int.parse(e.value)),
+      ]);
   }
 
   static List<String> _decodeList(String? raw) {
@@ -894,6 +904,9 @@ class ChatService extends ChangeNotifier {
       await store.setMeta('decode:${m.id}', null);
     }
     await store.setMeta('pin:$friendId', null);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    clearedAt[friendId] = now;
+    await store.setMeta('cleared:$friendId', '$now');
     _bump();
   }
 

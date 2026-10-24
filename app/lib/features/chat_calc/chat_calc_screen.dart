@@ -3,7 +3,7 @@
 //   Kết quả   tính bằng kết quả ĐÚNG đài + ngày của tài khoản (bản đã lưu trên máy, chạy được offline); chưa có thì báo và cho
 //             thử lại, tuyệt đối không dùng số mẫu hay đài khác.
 //   Lưu       trên máy này (`report:<id>` + `reports:index`); id theo nội dung nên không trùng bản ghi.
-//   Gửi       xem trước rồi gửi đúng nội dung báo cáo cho người bạn qua chat mã hoá 2 đầu.
+//   Gửi       xem trước rồi gửi đúng nội dung báo cáo cho người bạn qua chat mã hoá đầu cuối.
 import 'dart:convert';
 import '../../core/widgets/svg_icon.dart';
 
@@ -188,7 +188,7 @@ class _ChatCalcScreenState extends State<ChatCalcScreen> {
     );
     if (go != true || !mounted) return;
     if (sender == null) {
-      setState(() => _notice = 'Mã hoá 2 đầu chưa sẵn sàng trên thiết bị này, chưa gửi được.');
+      setState(() => _notice = 'Mã hoá đầu cuối chưa sẵn sàng trên thiết bị này, chưa gửi được.');
       return;
     }
     setState(() {

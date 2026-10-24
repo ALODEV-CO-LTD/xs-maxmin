@@ -115,6 +115,12 @@ void main() {
       await s2.deleteConversation('f1');
       expect(await store.messagesOf('f1'), isEmpty);
       expect(await store.messagesOf('f2'), hasLength(1));
+      // the deletion time is kept so the row leaves the Tin nhắn list until something newer arrives
+      expect(s2.clearedAt['f1'], isNotNull);
+      expect(s2.clearedAt['f2'], isNull);
+      final s3 = svc(store);
+      await s3.restorePrefs();
+      expect(s3.clearedAt['f1'], s2.clearedAt['f1']);
     });
   });
 

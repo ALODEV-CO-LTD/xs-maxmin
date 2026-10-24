@@ -11,8 +11,8 @@ import 'package:sqlite3/sqlite3.dart';
 ///
 /// Maintenance mode is configured by the admin through the generic
 /// `settings` store (keys `maintenance_enabled` = "true"/"false" and
-/// `maintenance_message`) - see admin/AnnouncementsView.vue. It only shows a
-/// notice; it does not lock anyone out.
+/// `maintenance_message`) - see admin/AnnouncementsView.vue. It also locks customers out: see lib/src/maintenance.dart (503 for
+/// customer accounts, admins unaffected); this feed stays readable for the message.
 Response onRequest(RequestContext context) {
   final auth = requireAuth(context);
   if (auth == null) return unauthorized();

@@ -2,10 +2,11 @@
 import './AnnouncementBanner.css'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { applyNotices } from '@/lib/maintenanceStore'
 
 // Banner for admin notices (A12/A16): maintenance mode (not dismissable while it is on) and announcements
 // (maintenance / policy change / info) that the user can close for the current session. GET /announcements, refreshed
-// every 5 minutes; silently ignored while offline.
+// every minute; silently ignored while offline.
 const KIND_LABEL: Record<string, string> = { maintenance: 'Bảo trì', policy: 'Chính sách', info: 'Thông báo' }
 const DISMISSED_KEY = 'xoso_dismissed_notices'
 
@@ -32,6 +33,7 @@ export default function AnnouncementBanner() {
       try {
         const data = await api.get('/announcements')
         if (!alive) return
+        applyNotices(data.maintenance)
         setMaintenance(data.maintenance || { enabled: false, message: '' })
         setAnnouncements(data.announcements || [])
       } catch {
@@ -39,7 +41,7 @@ export default function AnnouncementBanner() {
       }
     }
     load()
-    const timer = setInterval(load, 5 * 60 * 1000)
+    const timer = setInterval(load, 60 * 1000)
     return () => {
       alive = false
       clearInterval(timer)

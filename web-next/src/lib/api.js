@@ -16,6 +16,7 @@
 //     in the UI - no need to re-map error messages.
 //   - `api.get/post/patch/del(path, body)` are convenience shortcuts.
 import { useAuthStore } from './authStore'
+import { useMaintenanceStore } from './maintenanceStore'
 
 export class ApiError extends Error {
   constructor(status, message, data = null) {
@@ -82,6 +83,7 @@ async function apiFetch(path, { method = 'GET', body, headers = {} } = {}) {
       auth.clear()
     }
     const message = data && typeof data.error === 'string' ? data.error : statusFallback(res.status)
+    if (res.status === 503 && data && data.maintenance === true) useMaintenanceStore.getState().setMessage(message)
     throw new ApiError(res.status, message, data)
   }
 

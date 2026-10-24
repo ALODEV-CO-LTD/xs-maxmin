@@ -12,7 +12,7 @@ const _maxSide = 2560;
 /// Re-encodes a picture so that only the pixels survive (no EXIF / GPS / device / time / colour profile), like the
 /// web's canvas redraw (attachments.js `scrubImageMetadata`). The EXIF orientation is applied first. JPEG stays
 /// JPEG, PNG stays PNG, WebP becomes PNG (no WebP encoder, same fallback as Safari on the web). Very large photos are
-/// scaled down so the result fits the 5 MB limit. Throws an [Exception] with a Vietnamese message.
+/// scaled down so the result fits the 25 MB limit. Throws an [Exception] with a Vietnamese message.
 Future<OutgoingImage> scrubImage(Uint8List bytes) async {
   final type = sniffImageType(bytes);
   if (type == null) throw Exception(imageOnlyMessage);

@@ -11,7 +11,6 @@ import '../../core/widgets/app_button.dart';
 
 /// Texts of the keep-alive switch (shown in the sheet, and checked by a test: they must be honest about the battery).
 const keepAliveTitle = 'Giữ kết nối để nhận tin nhắn và cuộc gọi khi thoát app';
-const keepAliveExplain = 'Chạy nền để nhận tin và cuộc gọi khi đã thoát app. TỐN PIN HƠN, tắt nếu không cần.';
 
 Future<void> showMessagingSettings(BuildContext context, FriendsController c) {
   return showModalBottomSheet<void>(
@@ -61,7 +60,6 @@ class _SheetState extends State<_Sheet> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text(keepAliveTitle),
-                subtitle: const Padding(padding: EdgeInsets.only(top: 4), child: Text(keepAliveExplain)),
                 value: c.keepAlive,
                 onChanged: (v) async {
                   await c.setKeepAlive(v);

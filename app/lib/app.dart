@@ -30,6 +30,7 @@ import 'features/overview/overview_screen.dart';
 import 'features/support/support_page.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/shell/app_shell.dart';
+import 'features/shell/maintenance_gate.dart';
 import 'features/shell/update_gate.dart';
 import 'core/widgets/app_button.dart';
 
@@ -149,7 +150,7 @@ class _MambaAppState extends State<MambaApp> {
       context: ctx,
       builder: (c) => AlertDialog(
         title: const Text('Bật thông báo?'),
-        content: const Text('Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ. Thông báo chỉ báo "có người nhắn / gọi bạn" (kèm tên), không hiện nội dung; bạn cần mở MAMBA để nhận tin.'),
+        content: const Text('Tin nhắn được mã hoá đầu cuối và không lưu trên máy chủ. Thông báo chỉ báo "có người nhắn / gọi bạn" (kèm tên), không hiện nội dung; bạn cần mở MAMBA để nhận tin.'),
         actions: [
           AppButton(label: 'Để sau', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(c, false)),
           AppButton(label: 'Bật thông báo', variant: AppButtonVariant.primary, onPressed: () => Navigator.pop(c, true)),
@@ -189,7 +190,7 @@ class _MambaAppState extends State<MambaApp> {
               notifier: _notifier,
               ringer: _ringer,
               background: _background,
-              child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: PrivacyGate(child: DismissKeyboard(child: child ?? const SizedBox.shrink())))),
+              child: PushBinding(registrar: _push, child: UpdateGate(api: _api, child: MaintenanceGate(api: _api, auth: _auth, child: PrivacyGate(child: DismissKeyboard(child: child ?? const SizedBox.shrink()))))),
             ),
             // Until the saved session is read, nothing of the app is shown (no flash of the home tab for a signed-out start).
             if (!_auth.ready) const Positioned.fill(child: ColoredBox(color: Colors.white, child: Center(child: CircularProgressIndicator()))),

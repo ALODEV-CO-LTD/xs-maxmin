@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import AnnouncementBanner from './AnnouncementBanner'
+import MaintenanceScreen from './MaintenanceScreen'
 import AppButton from './AppButton'
 import AppIcon from './AppIcon'
 import ConfirmDialog from './ConfirmDialog'
@@ -100,6 +101,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="shell">
+      <MaintenanceScreen onLogout={() => { teardownSession(); useAuthStore.getState().logout(); router.push('/login') }} />
       <header className="topbar">
         <div className="brand" aria-label="MAMBA">
           {/* eslint-disable-next-line @next/next/no-img-element */}

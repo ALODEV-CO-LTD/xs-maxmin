@@ -68,7 +68,7 @@ void main() {
     expect(String.fromCharCodes(out).contains('hidden-tail'), isFalse);
   });
 
-  test('over 5 MB is refused', () {
+  test('over 25 MB is refused', () {
     final big = Uint8List(maxAttachmentBytes + 1)..setRange(0, 3, [0xFF, 0xD8, 0xFF]);
     expect(parseAttachment(_upload(big)).error, isNotNull);
   });

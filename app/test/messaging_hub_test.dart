@@ -346,8 +346,7 @@ void main() {
       expect(again.background.modes.last, ServiceMode.off);
     });
 
-    test('the UI text is honest about battery use', () {
-      expect(keepAliveExplain, contains('TỐN PIN'));
+    test('the keep-alive switch title', () {
       expect(keepAliveTitle, 'Giữ kết nối để nhận tin nhắn và cuộc gọi khi thoát app');
     });
   });

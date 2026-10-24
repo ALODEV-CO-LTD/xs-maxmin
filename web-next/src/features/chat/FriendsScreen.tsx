@@ -978,10 +978,18 @@ export default function FriendsScreen() {
                 </div>
               )}
               {selectedGroup && !groupCanSend ? (
-                <div className="alert alert-warning e2ee-warn">Chưa có thành viên nào là bạn bè của bạn dùng mã hoá 2 đầu nên chưa nhắn được trong nhóm này.</div>
+                <div className="alert alert-warning e2ee-warn">Chưa có thành viên nào là bạn bè của bạn dùng mã hoá đầu cuối nên chưa nhắn được trong nhóm này.</div>
               ) : selectedFriend && !selectedFriend.isGroup && !friendKeys[selectedFriend.id] ? (
-                <div className="alert alert-warning e2ee-warn">{selectedFriend.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.</div>
+                <div className="alert alert-warning e2ee-warn">{selectedFriend.name} chưa bật mã hoá đầu cuối (chưa mở phiên bản mới) nên chưa nhắn được.</div>
               ) : null}
+              <div className="e2ee-line">
+                <span aria-hidden="true">🔒</span>
+                {selectedGroup ? (
+                  <span>Mã hoá đầu cuối, không lưu trên máy chủ. Mỗi tin được gửi riêng cho từng thành viên là bạn bè của bạn đang online.</span>
+                ) : (
+                  <span>Mã hoá đầu cuối, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.</span>
+                )}
+              </div>
               {showSecurity && peerInfo && (
                 <div className="e2ee-codes">
                   <div>Của {selectedFriend?.name}: <code>{peerInfo.fingerprint}</code></div>
@@ -1127,7 +1135,7 @@ export default function FriendsScreen() {
                     {addCandidates.map((f) => (
                       <li key={f.id}><label><input type="checkbox" checked={addPicked.includes(f.id)} onChange={() => setAddPicked((cur) => (cur.includes(f.id) ? cur.filter((x) => x !== f.id) : [...cur, f.id]))} /> {displayName(f)}</label></li>
                     ))}
-                    {!addCandidates.length && <li className="search-hint">Không còn bạn bè nào (đã bật mã hoá 2 đầu) để thêm.</li>}
+                    {!addCandidates.length && <li className="search-hint">Không còn bạn bè nào (đã bật mã hoá đầu cuối) để thêm.</li>}
                     {addCandidates.length > 0 && <li><button type="button" className="tb-link strong" disabled={!addPicked.length} onClick={addMembers}>Thêm {addPicked.length || ''}</button></li>}
                   </ul>
                 )}
@@ -1248,7 +1256,7 @@ export default function FriendsScreen() {
               ))}
               {!groupCandidates.length && <li className="search-hint">Chưa có bạn bè nào dùng được để thêm vào nhóm.</li>}
             </ul>
-            <p className="search-sub">Chọn ít nhất 2 bạn bè ({groupMembers.length} đã chọn). Nhóm chỉ nằm trên máy của các thành viên, tin nhắn mã hoá 2 đầu, máy chủ không lưu. Bạn chỉ gửi được cho thành viên là bạn bè của bạn.</p>
+            <p className="search-sub">Chọn ít nhất 2 bạn bè ({groupMembers.length} đã chọn). Nhóm chỉ nằm trên máy của các thành viên, tin nhắn mã hoá đầu cuối, máy chủ không lưu. Bạn chỉ gửi được cho thành viên là bạn bè của bạn.</p>
             {groupError && <div className="alert alert-error">{groupError}</div>}
             <div className="group-actions">
               <AppButton variant="ghost" size="sm" onClick={() => setGroupOpen(false)}>Đóng</AppButton>

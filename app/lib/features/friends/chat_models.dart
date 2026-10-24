@@ -18,10 +18,10 @@ class SysKind {
 
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 const imageOnlyMessage = 'Chỉ gửi được ảnh JPG, PNG hoặc WebP (không gửi GIF hay tệp khác)';
-const maxAttachmentBytes = 5 * 1024 * 1024;
+const maxAttachmentBytes = 25 * 1024 * 1024;
 
 /// Human text for the failure reasons the relay / client can report (e2ee/chat.js REASONS).
-const failReasons = {'offline': 'Bạn bè đang offline, tin nhắn chưa được gửi. Hãy gửi lại khi họ trực tuyến.', 'not-friend': 'Không còn là bạn bè nên không gửi được.', 'invalid': 'Tin nhắn không hợp lệ.', 'no-key': 'Bạn bè chưa bật mã hoá 2 đầu (chưa mở phiên bản mới), chưa gửi được.', 'no-socket': 'Mất kết nối tới máy chủ, thử lại sau.', 'timeout': 'Không nhận được xác nhận, tin nhắn có thể chưa tới.'};
+const failReasons = {'offline': 'Bạn bè đang offline, tin nhắn chưa được gửi. Hãy gửi lại khi họ trực tuyến.', 'not-friend': 'Không còn là bạn bè nên không gửi được.', 'invalid': 'Tin nhắn không hợp lệ.', 'no-key': 'Bạn bè chưa bật mã hoá đầu cuối (chưa mở phiên bản mới), chưa gửi được.', 'no-socket': 'Mất kết nối tới máy chủ, thử lại sau.', 'timeout': 'Không nhận được xác nhận, tin nhắn có thể chưa tới.'};
 String reasonText(String? reason) => failReasons[reason] ?? 'Chưa gửi được.';
 
 class ChatAttachment {
@@ -224,7 +224,7 @@ List<ChatMessage> expiredMessages(Iterable<ChatMessage> messages, RetentionRule 
 
 /// One `e2ee-msg` frame (a message is split in up to [maxParts] parts of [partChars] ciphertext characters).
 const partChars = 1000000;
-const maxParts = 8;
+const maxParts = 40;
 
 class E2eeFrame {
   E2eeFrame({required this.id, required this.from, required this.fromName, required this.iv, required this.ct, required this.part, required this.parts, this.ts, this.fromDevice});

@@ -103,7 +103,7 @@ class _Header extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(
-        'Nhập kết quả xổ số rồi bấm "Lưu kết quả": điểm ra của khách hàng tự được tính và lưu. Kết quả đã lưu chỉ hiển thị; bấm "Sửa" để chỉnh.',
+        'Nhập kết quả xổ số rồi bấm "Lưu kết quả": điểm ra của khách hàng tự được tính ở màn hình tính điểm',
         style: t.bodySmall?.copyWith(color: context.mutedColor),
       ),
     ]);

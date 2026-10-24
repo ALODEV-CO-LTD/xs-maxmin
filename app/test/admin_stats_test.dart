@@ -94,7 +94,7 @@ void main() {
       await t.pumpAndSettle();
       expect(seen, contains('/admin/stats?range=$key'));
     }
-    expect(find.text('5 năm gần nhất'), findsOneWidget);
+    expect(find.text('Biểu đồ 5 năm gần nhất'), findsOneWidget);
     await t.binding.setSurfaceSize(null);
   });
 

@@ -56,7 +56,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Bật thông báo?'),
         content: const Text(
-          'Tin nhắn được mã hoá 2 đầu và không lưu trên máy chủ, nên chỉ nhận được khi ứng dụng đang chạy. Bật thông báo để biết khi có tin nhắn hoặc cuộc gọi đến. Thông báo chỉ ghi "Tin nhắn mới từ <tên>", không hiện nội dung.',
+          'Tin nhắn được mã hoá đầu cuối và không lưu trên máy chủ, nên chỉ nhận được khi ứng dụng đang chạy. Bật thông báo để biết khi có tin nhắn hoặc cuộc gọi đến. Thông báo chỉ ghi "Tin nhắn mới từ <tên>", không hiện nội dung.',
         ),
         actions: [
           AppButton(
@@ -351,7 +351,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 onChanged: c.setSearch,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
-                  hintText: 'Tìm kiếm',
+                  hintText: 'Nhập ID bạn bè',
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -409,9 +409,16 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final q = c.searchQuery.trim();
     final all = c.filteredFriends;
     final archived = c.chat?.archived ?? const <String>{};
+    // A conversation the user deleted leaves the list (the friend stays in the contacts). It comes back with a newer message,
+    // an unread badge, a missed call, or while searching. A friend never talked to is still listed (just accepted).
+    bool deleted(Friend f) {
+      final at = c.chat?.clearedAt[f.id];
+      return at != null && f.lastMessageAt <= at && (c.chat?.unread[f.id] ?? 0) == 0 && (c.unseenMissed[f.id] ?? 0) == 0;
+    }
+
     final friends = [
       for (final f in all)
-        if (!archived.contains(f.id)) f,
+        if (!archived.contains(f.id) && (q.isNotEmpty || !deleted(f))) f,
     ];
     final list = RefreshIndicator(
       onRefresh: () async {
@@ -744,7 +751,7 @@ class _GroupDialogState extends State<_GroupDialog> {
             ),
             if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error, style: TextStyle(fontSize: 13, color: context.badColor))),
             const SizedBox(height: 6),
-            Text('Nhóm chỉ nằm trên máy của các thành viên, tin nhắn mã hoá 2 đầu, máy chủ không lưu. Bạn chỉ gửi được cho thành viên là bạn bè của bạn.', style: TextStyle(fontSize: 12, color: context.mutedColor)),
+            Text('Nhóm chỉ nằm trên máy của các thành viên, tin nhắn mã hoá đầu cuối, máy chủ không lưu. Bạn chỉ gửi được cho thành viên là bạn bè của bạn.', style: TextStyle(fontSize: 12, color: context.mutedColor)),
           ],
         ),
       ),

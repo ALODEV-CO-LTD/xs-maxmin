@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/mask_store.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/masked_text.dart';
+import 'account_data_tab.dart' show DeleteDataButton;
 import 'account_widgets.dart';
 import 'stats_chart.dart';
 import '../../core/lottery_stations.dart';
@@ -127,23 +128,18 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(color: context.mutedColor, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
           SingleChildScrollView(scrollDirection: Axis.horizontal, child: seg),
         ],
       ),
     );
     final segStyle = ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
-      tapTargetSize: MaterialTapTargetSize.padded,
-      visualDensity: VisualDensity.standard,
+      minimumSize: const WidgetStatePropertyAll(Size(0, 28)),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
       padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 12),
+        EdgeInsets.symmetric(horizontal: 8),
       ),
-      textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 13)),
+      textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 12)),
     );
 
     return Column(
@@ -172,7 +168,7 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                         setState(() => _metric = v.first),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 group(
                   'Kỳ',
                   SegmentedButton<StatUnit>(
@@ -273,6 +269,8 @@ class _AccountStatsTabState extends State<AccountStatsTab> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 14),
+                DeleteDataButton(onDeleted: _load),
               ],
             ),
           ),

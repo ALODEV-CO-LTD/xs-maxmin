@@ -517,7 +517,7 @@ class _ChatPageState extends State<ChatPage> {
         if (!f.isAdmin && !inGroup.contains(f.id) && _chat.friendKeys.containsKey(f.id)) f,
     ];
     if (candidates.isEmpty) {
-      setState(() => _error = 'Không còn bạn bè nào (đã bật mã hoá 2 đầu) để thêm vào nhóm.');
+      setState(() => _error = 'Không còn bạn bè nào (đã bật mã hoá đầu cuối) để thêm vào nhóm.');
       return;
     }
     final picked = <String>{};
@@ -630,7 +630,7 @@ class _ChatPageState extends State<ChatPage> {
                     ],
                   ),
                 ),
-              if (!hasKey) _Banner(color: Brand.warning, child: Text(_f.isGroup ? 'Chưa có thành viên nào là bạn bè của bạn dùng mã hoá 2 đầu nên chưa nhắn được trong nhóm này.' : '${_f.name} chưa bật mã hoá 2 đầu (chưa mở phiên bản mới) nên chưa nhắn được.')),
+              if (!hasKey) _Banner(color: Brand.warning, child: Text(_f.isGroup ? 'Chưa có thành viên nào là bạn bè của bạn dùng mã hoá đầu cuối nên chưa nhắn được trong nhóm này.' : '${_f.name} chưa bật mã hoá đầu cuối (chưa mở phiên bản mới) nên chưa nhắn được.')),
               if (_showSecurity && info != null)
                 _Banner(
                   color: theme.colorScheme.primary,
@@ -644,6 +644,18 @@ class _ChatPageState extends State<ChatPage> {
                     ],
                   ),
                 ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Row(
+                  children: [
+                    SvgIcon(AppSvg.lock, size: 14, color: context.mutedColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(_f.isGroup ? 'Mã hoá đầu cuối, không lưu trên máy chủ. Mỗi tin được gửi riêng cho từng thành viên là bạn bè của bạn đang online.' : 'Mã hoá đầu cuối, không lưu trên máy chủ. Chỉ gửi được khi bạn bè đang online.', style: theme.textTheme.bodySmall?.copyWith(color: context.mutedColor)),
+                    ),
+                  ],
+                ),
+              ),
               if (_rule case final rule?)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),

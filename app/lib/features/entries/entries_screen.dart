@@ -193,7 +193,7 @@ class _EntriesBodyState extends State<_EntriesBody> {
         borderRadius: BorderRadius.circular(10),
         onTap: () => _pickCustomer(c),
         child: InputDecorator(
-          decoration: const InputDecoration(labelText: 'Khách hàng', suffixIcon: SvgIcon(AppSvg.chevronDown, size: 8)),
+          decoration: const InputDecoration(labelText: 'Khách hàng', suffixIcon: SvgIcon(AppSvg.chevronDown, size: 14)),
           child: Text(c.selectedName.isEmpty ? '-- Chọn khách hàng --' : c.selectedName, overflow: TextOverflow.ellipsis),
         ),
       ),
@@ -275,7 +275,7 @@ class _CustomerPickerState extends State<_CustomerPicker> {
         builder: (ctx, scroll) => Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: TextField(decoration: const InputDecoration(hintText: 'Tìm khách hàng...', prefixIcon: SvgIcon(AppSvg.search, size: 8)), onChanged: (v) => setState(() => _q = v)),
+            child: TextField(decoration: const InputDecoration(hintText: 'Tìm khách hàng...', prefixIcon: SvgIcon(AppSvg.search, size: 14)), onChanged: (v) => setState(() => _q = v)),
           ),
           ListTile(
             leading: const SvgIcon(AppSvg.addUser),

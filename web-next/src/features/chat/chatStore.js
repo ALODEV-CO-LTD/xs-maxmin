@@ -4,7 +4,7 @@
 // signaling WebSocket to a friend who is ONLINE (the server stores nothing; an offline friend means "not sent"), and
 // kept only in this device's IndexedDB. Admin support (Phản hồi) is separate and plaintext.
 //
-// The wire format is shared with the Flutter app and must not change: e2ee-msg {to,id,iv,ct,part,parts,ts} (<= 8 parts
+// The wire format is shared with the Flutter app and must not change: e2ee-msg {to,id,iv,ct,part,parts,ts} (<= 40 parts
 // of 1,000,000 ciphertext characters), e2ee-ack {to,id}, e2ee-undelivered {id,reason}.
 //
 // Everything that touches the browser or the network goes through `deps`, so the tests can run this store against an
@@ -24,7 +24,7 @@ export const REASONS = {
   offline: 'Bạn bè đang offline, tin nhắn chưa được gửi. Hãy gửi lại khi họ trực tuyến.',
   'not-friend': 'Không còn là bạn bè nên không gửi được.',
   invalid: 'Tin nhắn không hợp lệ.',
-  'no-key': 'Bạn bè chưa bật mã hoá 2 đầu (chưa mở phiên bản mới), chưa gửi được.',
+  'no-key': 'Bạn bè chưa bật mã hoá đầu cuối (chưa mở phiên bản mới), chưa gửi được.',
   'no-socket': 'Mất kết nối tới máy chủ, thử lại sau.',
   timeout: 'Không nhận được xác nhận, tin nhắn có thể chưa tới.',
 }
@@ -33,7 +33,7 @@ export const reasonText = (reason) => REASONS[reason] || 'Chưa gửi được.'
 export const LIMITS = {
   ACK_WAIT_MS: 15000,
   PART_CHARS: 1000000, // ciphertext characters per WebSocket frame (the server allows 2 M)
-  MAX_PARTS: 8,
+  MAX_PARTS: 40,
   PART_WAIT_MS: 60000,
 }
 
@@ -335,7 +335,7 @@ export const useChatStore = create((set, get) => {
         await get().loadFriendKeys()
         await get().applyRetentionAll()
       } catch {
-        set({ ready: false, error: 'Không khởi tạo được mã hoá 2 đầu trên thiết bị này.' })
+        set({ ready: false, error: 'Không khởi tạo được mã hoá đầu cuối trên thiết bị này.' })
         console.error('e2ee init failed')
       }
     },
@@ -438,14 +438,14 @@ export const useChatStore = create((set, get) => {
 
     // Sends `text` and/or one `file` to `friend` ({id, name}). Returns the stored message.
     async send(friend, text, file) {
-      if (!get().ready) throw new Error('Mã hoá 2 đầu chưa sẵn sàng trên thiết bị này.')
+      if (!get().ready) throw new Error('Mã hoá đầu cuối chưa sẵn sàng trên thiết bị này.')
       const id = newMessageId()
       let fileBytes = null
       let att = null
       let stored = null
       if (file) {
         if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error(IMAGE_ONLY_MESSAGE)
-        if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Tệp quá lớn (tối đa 5 MB)')
+        if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Tệp quá lớn (tối đa 25 MB)')
         // The picture is redrawn (no EXIF/GPS/device/time) and renamed before it is encrypted.
         const clean = await scrubImageMetadata(file)
         const name = anonymousName(clean.type)
@@ -482,7 +482,7 @@ export const useChatStore = create((set, get) => {
     // Creates the group on this device and tells every member. `others` = [{ id, name }] of friends (the relay only
     // carries messages between friends).
     async createGroup(name, myName, others) {
-      if (!get().ready) throw new Error('Mã hoá 2 đầu chưa sẵn sàng trên thiết bị này.')
+      if (!get().ready) throw new Error('Mã hoá đầu cuối chưa sẵn sàng trên thiết bị này.')
       const n = String(name || '').trim()
       if (!n) throw new Error('Nhập tên nhóm.')
       const seen = new Set([userId])

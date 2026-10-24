@@ -6,9 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/theme.dart';
 import 'admin_messages_logic.dart';
 import 'thread_widgets.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/svg_icon.dart';
 
 /// One customer's support thread (web: components/AdminChatPane.vue). Oldest on top, newest at the bottom.
 class AdminThreadPage extends StatefulWidget {
@@ -137,6 +139,46 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
     }
   }
 
+  /// Asks, then deletes one message of this thread on the server (it disappears for the customer too).
+  Future<void> _deleteOne(AdminMsg m) async {
+    if (!await _confirm('Xoá tin nhắn', 'Xoá tin nhắn này? Tin nhắn cũng sẽ biến mất bên khách hàng và không thể khôi phục.') || !mounted) return;
+    try {
+      await context.read<ApiClient>().delete('/admin/messages/$_uid/${m.id}');
+      if (mounted) setState(() => _msgs = [for (final x in _msgs) if (x.id != m.id) x]);
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _sendError = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _sendError = 'Không xoá được tin nhắn');
+    }
+  }
+
+  /// Clears the whole thread with this customer.
+  Future<void> _clearAll() async {
+    if (!await _confirm('Xoá cuộc trò chuyện', 'Xoá toàn bộ phản hồi với khách hàng này? Cả tin của khách và của Admin đều bị xoá, bên khách hàng cũng không còn thấy, không thể khôi phục.') || !mounted) return;
+    try {
+      await context.read<ApiClient>().delete('/admin/messages/$_uid');
+      if (mounted) setState(() => _msgs = []);
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _sendError = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _sendError = 'Không xoá được cuộc trò chuyện');
+    }
+  }
+
+  Future<bool> _confirm(String title, String message) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            AppButton(label: 'Huỷ', variant: AppButtonVariant.ghost, onPressed: () => Navigator.pop(ctx, false)),
+            AppButton(label: 'Xoá', svg: AppSvg.delete, variant: AppButtonVariant.danger, onPressed: () => Navigator.pop(ctx, true)),
+          ],
+        ),
+      ) ==
+      true;
+
   String get _subtitle {
     final c = widget.conversation;
     return [
@@ -157,6 +199,9 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
           Text(c.userName.isEmpty ? 'Khách hàng' : c.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           if (_subtitle.isNotEmpty) Text(_subtitle, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65))),
         ]),
+        actions: [
+          if (_msgs.isNotEmpty) IconButton(key: const Key('clear-thread'), tooltip: 'Xoá cuộc trò chuyện', icon: SvgIcon(AppSvg.delete, color: context.badColor), onPressed: _clearAll),
+        ],
       ),
       body: SafeArea(
         child: Column(children: [
@@ -177,7 +222,7 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
                               final it = items[i];
                               if (it is String) return DayDivider(it);
                               final m = it as AdminMsg;
-                              return ThreadBubble(msg: m, mine: m.fromAdmin, attachmentPath: '/admin/messages/$_uid/attachment/${m.id}');
+                              return ThreadBubble(msg: m, mine: m.fromAdmin, attachmentPath: '/admin/messages/$_uid/attachment/${m.id}', onDelete: () => _deleteOne(m));
                             },
                           ),
                   ),
