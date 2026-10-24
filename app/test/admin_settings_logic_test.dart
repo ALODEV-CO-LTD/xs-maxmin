@@ -77,7 +77,9 @@ void main() {
       expect(f.blurOnHideEnabled, isTrue);
       expect(f.screenshotGuardEnabled, isTrue); // default kept
       expect(f.toJson()['blurOnHideEnabled'], true);
-      expect(f.toJson().keys, hasLength(8));
+      expect(f.toJson().keys, hasLength(9));
+      expect(SecurityPolicyForm.fromJson({'hideLockSeconds': 90}).withNumber('hideLockSeconds', 120).hideLockSeconds, 120);
+      expect(const SecurityPolicyForm(hideLockSeconds: 3601).validate(), isNotNull);
       expect(f.withNumber('tokenDays', 9).tokenDays, 9);
       expect(const SecurityPolicyForm().lockExample, '30 giây → 1 phút → 2 phút → 4 phút');
       expect(const SecurityPolicyForm(loginBaseLockSeconds: 600, loginMaxLockSeconds: 900).lockExample, '10 phút → 15 phút → 15 phút → 15 phút');

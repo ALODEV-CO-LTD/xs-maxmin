@@ -146,10 +146,11 @@ CREATE TABLE IF NOT EXISTS direct_messages (
   to_user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content       TEXT NOT NULL,
   created_at    TEXT NOT NULL,
-  attachment_name TEXT,           -- chat attachment (file / image, <= 5 MB)
+  attachment_name TEXT,           -- chat attachment (file / image, <= 25 MB)
   attachment_type TEXT,
   attachment_size INTEGER,
-  attachment_data BLOB
+  attachment_data BLOB,
+  deleted_at    TEXT              -- Admin deleted this reply (Phản hồi): content and attachment are blanked, the row stays as a notice
 );
 
 CREATE TABLE IF NOT EXISTS friendships (

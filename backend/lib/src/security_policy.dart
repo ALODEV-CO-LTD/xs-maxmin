@@ -10,6 +10,8 @@ import 'package:sqlite3/sqlite3.dart';
 ///  - tokenDays: how long a login lasts before the person must sign in again.
 ///  - autoLockMinutes: default idle auto-lock for accounts that never chose
 ///    their own (0 = off); each person can still pick a value in Tài khoản.
+///  - hideLockSeconds: default "lock when the app was in the background / tab hidden for this long" for accounts that
+///    never chose their own (0 = off); each person can still pick a value in Tài khoản.
 ///  - screenshotGuardEnabled: cover the screen when a desktop screenshot shortcut
 ///    (Cmd+Shift+3/4/5, Win+Shift+S) is held (frontend/src/screenshotGuard.js).
 ///  - watermarkEnabled: faint viewer name/time overlay on every screen so a
@@ -24,6 +26,7 @@ class SecurityPolicy {
     this.loginMaxLockSeconds = 15 * 60,
     this.tokenDays = 30,
     this.autoLockMinutes = 0,
+    this.hideLockSeconds = 0,
     this.watermarkEnabled = false,
     this.screenshotGuardEnabled = true,
     this.blurOnHideEnabled = false,
@@ -34,6 +37,7 @@ class SecurityPolicy {
   final int loginMaxLockSeconds;
   final int tokenDays;
   final int autoLockMinutes;
+  final int hideLockSeconds;
   final bool watermarkEnabled;
   final bool screenshotGuardEnabled;
   final bool blurOnHideEnabled;
@@ -44,6 +48,7 @@ class SecurityPolicy {
         'loginMaxLockSeconds': loginMaxLockSeconds,
         'tokenDays': tokenDays,
         'autoLockMinutes': autoLockMinutes,
+        'hideLockSeconds': hideLockSeconds,
         'watermarkEnabled': watermarkEnabled,
         'screenshotGuardEnabled': screenshotGuardEnabled,
         'blurOnHideEnabled': blurOnHideEnabled,
@@ -59,6 +64,7 @@ const _ranges = <String, (int, int, String)>{
   'loginMaxLockSeconds': (30, 86400, 'Thời gian khoá tối đa (giây)'),
   'tokenDays': (1, 365, 'Thời hạn đăng nhập (ngày)'),
   'autoLockMinutes': (0, 240, 'Tự khoá màn hình mặc định (phút)'),
+  'hideLockSeconds': (0, 3600, 'Khoá khi thoát ra / chuyển ứng dụng mặc định (giây)'),
 };
 
 SecurityPolicy loadPolicy(Database db) {
@@ -80,6 +86,7 @@ SecurityPolicy loadPolicy(Database db) {
     loginMaxLockSeconds: max < base ? base : max,
     tokenDays: num('tokenDays', d.tokenDays),
     autoLockMinutes: num('autoLockMinutes', d.autoLockMinutes),
+    hideLockSeconds: num('hideLockSeconds', d.hideLockSeconds),
     watermarkEnabled: stored['watermarkEnabled'] == null ? d.watermarkEnabled : stored['watermarkEnabled'] == 'true',
     screenshotGuardEnabled: stored['screenshotGuardEnabled'] == null ? d.screenshotGuardEnabled : stored['screenshotGuardEnabled'] == 'true',
     blurOnHideEnabled: stored['blurOnHideEnabled'] == null ? d.blurOnHideEnabled : stored['blurOnHideEnabled'] == 'true',

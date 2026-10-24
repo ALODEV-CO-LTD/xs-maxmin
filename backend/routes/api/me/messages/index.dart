@@ -49,6 +49,7 @@ Response _list(RequestContext context, String userId) {
             'content': r['content'],
             'createdAt': r['created_at'],
             'attachment': attachmentMeta(r),
+            'deleted': r['deleted_at'] != null,
           },
       ],
     },

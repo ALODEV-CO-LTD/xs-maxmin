@@ -218,6 +218,8 @@ export function parseMessage(text, { betTypes = ['de', 'lo'], template = null, k
   for (const [a, t] of Object.entries(cfg.typeAliases || {})) aliasMap[fold(a)] = t
   const aliasKeys = Object.keys(aliasMap).filter(Boolean).sort((a, b) => b.length - a.length)
   const aliasRe = aliasKeys.length ? new RegExp(`(?<![a-z0-9])(${aliasKeys.map(escapeRe).join('|')})(?![a-z0-9])`, 'g') : null
+  // "44 x20 55 x30": several "số … dấu điểm" groups in one segment, each with its own điểm.
+  const groupRe = new RegExp(`(\\d[\\d\\s,.;\\-/]*?)\\s*(?:${markers.map(escapeRe).join('|')})\\s*(\\d+(?:[.,]\\d+)?)(?:\\s*(?:diem|d)(?![a-z0-9]))?`, 'g')
   const stakeRe = new RegExp(`^(.*?)(?:${markers.map(escapeRe).join('|')})\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:diem|d)?\\s*$`)
 
   const rows = []
@@ -286,6 +288,15 @@ export function parseMessage(text, { betTypes = ['de', 'lo'], template = null, k
       const type = seg.type || stickyType || cfg.defaultType || betTypes[0] || 'de'
       const assumed = !seg.type && !stickyType && !cfg.defaultType
 
+      const groups = [...body.matchAll(groupRe)]
+      if (groups.length > 1 && !body.replace(groupRe, '').replace(/[\s,;.\-/]/g, '')) {
+        for (const g of groups) {
+          for (const n of g[1].match(/\d+/g)) push(type, assumed, n, g[2].replace(',', '.'), line)
+        }
+        produced = true
+        continue
+      }
+
       let left = body
       let score = ''
       const m = body.match(stakeRe)
@@ -317,10 +328,19 @@ export function decodeMessage(text, { betTypes = ['de', 'lo'], template = null, 
   for (const t of betTypes) aliasMap[fold(t)] = t
   for (const [a, t] of Object.entries(cfg.typeAliases || {})) aliasMap[fold(a)] = t
   const compact = makeCompactParser(compactSymbols(aliasMap, cfg), betTypes)
+  // The hạng mục written before a token ("de 44x20", or "de:" on the line above) is the type a bare "x" stands for, exactly like
+  // parseMessage reads it: "44x20" after "de" is Đề 44 x 20 điểm, not a bao lô.
+  let stickyType = ''
   return String(text || '').split(/\r?\n/).map((original) => {
     const parts = original.split(/(\s+)/).filter((p) => p !== '').map((tok) => {
       if (/^\s+$/.test(tok)) return { text: tok, decoded: tok, status: 'space' }
-      const p = compact(fold(tok), cfg.defaultType)
+      const f = fold(tok)
+      const key = f.replace(/[:.\-–]+$/, '')
+      if (Object.prototype.hasOwnProperty.call(aliasMap, key)) {
+        stickyType = aliasMap[key] // a hạng mục keyword: remembered for the tokens after it, shown as typed
+        return { text: tok, decoded: tok, status: 'plain' }
+      }
+      const p = compact(f, stickyType || cfg.defaultType)
       if (!p) return { text: tok, decoded: tok, status: /\d/.test(tok) ? 'unknown' : 'plain' }
       return { text: tok, decoded: p.canon, status: p.canon === tok ? 'same' : 'changed' }
     })

@@ -113,6 +113,32 @@ export function assignStations(columns, candidates) {
   return columns
 }
 
+// The row of 6-digit special prizes (đặc biệt), left to right. A 6-digit word elsewhere (a draw code in the header, a code in a
+// footer) must not be taken for it: the row with the MOST 6-digit numbers wins (one per station); on a tie the one that has about
+// 17 other numbers above it per column, the way a real table does.
+export function specialRow(nums) {
+  const six = nums.filter((w) => w.text.length === 6).sort((a, b) => a.cy - b.cy)
+  if (!six.length) return []
+  const tol = Math.max(6, (six[0].y1 - six[0].y0) * 0.6)
+  const groups = []
+  for (const w of six) {
+    const g = groups[groups.length - 1]
+    if (g && Math.abs(w.cy - g[g.length - 1].cy) <= tol) g.push(w)
+    else groups.push([w])
+  }
+  let best = null
+  let bestKey = [-1, 0]
+  for (const g of groups) {
+    const above = nums.filter((w) => w.text.length < 6 && w.cy < g[0].cy - tol).length
+    const key = [g.length, -Math.abs(above - 17 * g.length)]
+    if (key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) {
+      best = g
+      bestKey = key
+    }
+  }
+  return best.sort((a, b) => a.cx - b.cx)
+}
+
 export function parseColumns(words) {
   // The title line of the page ("XSMN Thứ 4 » XSMN 07/10/2026") holds a date whose digits must not count as prizes:
   // everything down to the date word is ignored. Only the FIRST real date in the top third of the picture counts: a stray
@@ -124,13 +150,16 @@ export function parseColumns(words) {
   const dateWords = words.filter((w) => isDate(String(w.text || '').trim()) && centreY(w) <= top + span * 0.35)
   const dateTop = dateWords.length ? dateWords.reduce((m, w) => (centreY(w) < centreY(m) ? w : m)) : null
   const cut = dateTop ? centreY(dateTop) + (dateTop.y1 - dateTop.y0) * 0.9 : -Infinity
-  const nums = words
+  const allNums = words
     .map((w) => ({ ...w, text: String(w.text || '').trim() }))
     .filter((w) => /^\d+$/.test(w.text) && w.text.length >= 2 && w.text.length <= 6)
     .map((w) => ({ ...w, cx: centreX(w), cy: centreY(w) }))
     .filter((w) => w.cy > cut)
-  const specials = nums.filter((w) => w.text.length === 6).sort((a, b) => a.cx - b.cx)
+  const specials = specialRow(allNums)
   if (!specials.length) return { columns: [], date: null }
+  // Everything printed BELOW the special-prize row is not a prize: a footer, a lô tô table, a phone number, the next ad.
+  const tableBottom = Math.max(...specials.map((w) => w.cy)) + (specials[0].y1 - specials[0].y0) * 0.9
+  const nums = allNums.filter((w) => w.cy <= tableBottom)
 
   // One 6-digit special prize per station: they fix the column centres.
   const centres = specials.map((w) => w.cx)

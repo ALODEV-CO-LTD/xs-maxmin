@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
-import '../../../core/theme.dart';
 import 'admin_messages_logic.dart';
 import 'thread_widgets.dart';
 import '../../../core/widgets/app_button.dart';
@@ -139,29 +138,16 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
     }
   }
 
-  /// Asks, then deletes one message of this thread on the server (it disappears for the customer too).
+  /// Asks, then deletes one of Admin's OWN replies on the server. It stays in the thread as "Tin nhắn đã bị xoá" (the customer sees the same).
   Future<void> _deleteOne(AdminMsg m) async {
-    if (!await _confirm('Xoá tin nhắn', 'Xoá tin nhắn này? Tin nhắn cũng sẽ biến mất bên khách hàng và không thể khôi phục.') || !mounted) return;
+    if (!await _confirm('Xoá tin nhắn', 'Xoá tin nhắn này? Khách hàng sẽ thấy "Tin nhắn đã bị xoá" ở vị trí này và không thể khôi phục nội dung.') || !mounted) return;
     try {
       await context.read<ApiClient>().delete('/admin/messages/$_uid/${m.id}');
-      if (mounted) setState(() => _msgs = [for (final x in _msgs) if (x.id != m.id) x]);
+      if (mounted) setState(() => _msgs = [for (final x in _msgs) x.id == m.id ? x.asDeleted() : x]);
     } on ApiError catch (e) {
       if (mounted) setState(() => _sendError = e.message);
     } catch (_) {
       if (mounted) setState(() => _sendError = 'Không xoá được tin nhắn');
-    }
-  }
-
-  /// Clears the whole thread with this customer.
-  Future<void> _clearAll() async {
-    if (!await _confirm('Xoá cuộc trò chuyện', 'Xoá toàn bộ phản hồi với khách hàng này? Cả tin của khách và của Admin đều bị xoá, bên khách hàng cũng không còn thấy, không thể khôi phục.') || !mounted) return;
-    try {
-      await context.read<ApiClient>().delete('/admin/messages/$_uid');
-      if (mounted) setState(() => _msgs = []);
-    } on ApiError catch (e) {
-      if (mounted) setState(() => _sendError = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _sendError = 'Không xoá được cuộc trò chuyện');
     }
   }
 
@@ -199,9 +185,6 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
           Text(c.userName.isEmpty ? 'Khách hàng' : c.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           if (_subtitle.isNotEmpty) Text(_subtitle, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65))),
         ]),
-        actions: [
-          if (_msgs.isNotEmpty) IconButton(key: const Key('clear-thread'), tooltip: 'Xoá cuộc trò chuyện', icon: SvgIcon(AppSvg.delete, color: context.badColor), onPressed: _clearAll),
-        ],
       ),
       body: SafeArea(
         child: Column(children: [
@@ -222,7 +205,7 @@ class _AdminThreadPageState extends State<AdminThreadPage> with WidgetsBindingOb
                               final it = items[i];
                               if (it is String) return DayDivider(it);
                               final m = it as AdminMsg;
-                              return ThreadBubble(msg: m, mine: m.fromAdmin, attachmentPath: '/admin/messages/$_uid/attachment/${m.id}', onDelete: () => _deleteOne(m));
+                              return ThreadBubble(msg: m, mine: m.fromAdmin, attachmentPath: '/admin/messages/$_uid/attachment/${m.id}', onDelete: m.fromAdmin && !m.deleted ? () => _deleteOne(m) : null);
                             },
                           ),
                   ),

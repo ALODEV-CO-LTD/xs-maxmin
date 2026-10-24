@@ -147,7 +147,7 @@ class PrivacySettingsCard extends StatelessWidget {
         initialValue: p.hideLockSeconds,
         isExpanded: true,
         decoration: const InputDecoration(labelText: 'Khoá khi thoát ra / chuyển ứng dụng'),
-        items: [for (final s in hide) DropdownMenuItem(value: s, child: Text(hideLabel(s)))],
+        items: [for (final s in hide) DropdownMenuItem(value: s, child: Text(hideLabel(s) + (!p.hasOwnHideLock && s == p.hideLockSeconds && s > 0 ? ' (mặc định của hệ thống)' : '')))],
         onChanged: (v) => v == null ? null : store.setHideLockSeconds(v),
       ),
       if (p.policy.blurOnHideEnabled)

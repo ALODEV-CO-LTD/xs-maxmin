@@ -10,6 +10,7 @@ List<String> parse(String text, [List<String> bt = types, SyntaxTemplate? tpl]) 
 List<String> decode(String text, [List<String> bt = types, SyntaxTemplate? tpl]) => decodeMessage(text, betTypes: bt, template: tpl).map((l) => l.decoded).toList();
 
 void main() {
+  groupsMain();
   test('ví dụ chính: 20lo100 70lo500 54lo300', () {
     expect(parse('20lo100 70lo500 54lo300'), ['lo:20@100', 'lo:70@500', 'lo:54@300']);
     expect(decode('20lo100 70lo500 54lo300'), ['20lô100 70lô500 54lô300']);
@@ -151,5 +152,14 @@ void main() {
     expect(parse('22.67lo10;50.65lo20', wide), ['xien2:22 67@10', 'xien2:50 65@20']);
     expect(parse('22.67lo10.5', wide), ['xien2:22 67@10.5']);
     expect(parse('22.67de10', wide), ['de:22@10', 'de:67@10']); // đề stays a list of numbers
+  });
+}
+
+void groupsMain() {
+  test('sau hạng mục, nhiều cụm "số x điểm" trên một dòng', () {
+    expect(parse('de 44 x20'), ['de:44@20']);
+    expect(parse('de 44x20 55x30'), ['de:44@20', 'de:55@30']);
+    expect(parse('de 44 x20, 55 x30'), ['de:44@20', 'de:55@30']);
+    expect(parse('de 44 55 x20 lo 12 x10'), ['de:44@20', 'de:55@20', 'lo:12@10']);
   });
 }

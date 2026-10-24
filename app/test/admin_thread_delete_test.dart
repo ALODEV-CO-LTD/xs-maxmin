@@ -18,10 +18,10 @@ http.Response _j(Object o) => http.Response(
 
 void main() {
   testWidgets(
-    'Admin can delete one customer message, then clear the whole thread',
+    'Admin can delete only ITS OWN replies; the message becomes "Tin nhắn đã bị xoá" in place',
     (tester) async {
       final calls = <String>[];
-      var msgs = [
+      var msgs = <Map<String, dynamic>>[
         {
           'id': 'm1',
           'sender': 'user',
@@ -34,14 +34,23 @@ void main() {
           'content': 'Chào bạn',
           'createdAt': '2026-10-10T10:05:00Z',
         },
+        {
+          'id': 'm3',
+          'sender': 'admin',
+          'content': '',
+          'createdAt': '2026-10-10T10:06:00Z',
+          'deleted': true,
+        },
       ];
       final api = ApiClient(
         AuthStore()..token = 't',
         client: MockClient((r) async {
           if (r.method == 'DELETE') {
             calls.add('${r.method} ${r.url.path}');
-            if (r.url.path.endsWith('/m1')) msgs = [msgs[1]];
-            if (r.url.path.endsWith('/u1')) msgs = [];
+            msgs = [
+              for (final m in msgs)
+                m['id'] == 'm2' ? {...m, 'content': '', 'deleted': true} : m,
+            ];
             return _j({'ok': true});
           }
           if (r.url.path == '/api/admin/messages/u1') {
@@ -67,24 +76,23 @@ void main() {
       );
       await tester.pump();
       await tester.pump();
-      expect(find.text('Xin chào admin'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('delete-message')).first);
+      // m1 is the customer's (no trash), m2 is Admin's (trash), m3 is already deleted (notice, no trash)
+      expect(find.text('Xin chào admin'), findsOneWidget);
+      expect(find.byKey(const Key('delete-message')), findsOneWidget);
+      expect(find.byKey(const Key('clear-thread')), findsNothing);
+      expect(find.byKey(const Key('deleted-message')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('delete-message')));
       await tester.pumpAndSettle();
       expect(find.text('Xoá tin nhắn'), findsOneWidget);
       await tester.tap(find.text('Xoá').last);
       await tester.pumpAndSettle();
-      expect(calls, ['DELETE /api/admin/messages/u1/m1']);
-      expect(find.text('Xin chào admin'), findsNothing);
-      expect(find.text('Chào bạn'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('clear-thread')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Xoá').last);
-      await tester.pumpAndSettle();
-      expect(calls.last, 'DELETE /api/admin/messages/u1');
+      expect(calls, ['DELETE /api/admin/messages/u1/m2']);
       expect(find.text('Chào bạn'), findsNothing);
-      expect(find.text('Chưa có tin nhắn nào'), findsOneWidget);
+      expect(find.byKey(const Key('deleted-message')), findsNWidgets(2));
+      expect(find.byKey(const Key('delete-message')), findsNothing);
+      expect(find.text('Xin chào admin'), findsOneWidget);
     },
   );
 }

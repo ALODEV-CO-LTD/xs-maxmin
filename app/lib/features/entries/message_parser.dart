@@ -324,7 +324,11 @@ class DecodedLine {
 /// number, never guesses: a token that is not compact notation is kept exactly as typed. Whitespace is preserved.
 List<DecodedLine> decodeMessage(String? text, {List<String> betTypes = const ['de', 'lo'], SyntaxTemplate? template, Map<String, List<String>>? kindSymbols}) {
   final cfg = template ?? SyntaxTemplate();
-  final compact = _makeCompactParser(_compactSymbols(_aliasMapFor(betTypes, cfg), cfg, kindSymbols), betTypes);
+  final aliasMap = _aliasMapFor(betTypes, cfg);
+  final compact = _makeCompactParser(_compactSymbols(aliasMap, cfg, kindSymbols), betTypes);
+  // The hạng mục written before a token ("de 44x20", or "de:" on the line above) is the type a bare "x" stands for, exactly like
+  // parseMessage reads it: "44x20" after "de" is Đề 44 x 20 điểm, not a bao lô.
+  var stickyType = '';
   return (text ?? '').split(RegExp(r'\r?\n')).map((original) {
     // split(/(\s+)/) keeps the separators; JS `\s` ~ Dart `\s` plus a few unicode spaces, close enough for chat text
     final pieces = <String>[];
@@ -337,10 +341,31 @@ List<DecodedLine> decodeMessage(String? text, {List<String> betTypes = const ['d
     if (last < original.length) pieces.add(original.substring(last));
     final parts = pieces.map((tok) {
       if (RegExp(r'^\s+$').hasMatch(tok)) return DecodedPart(tok, tok, 'space');
-      final p = compact(foldText(tok), cfg.defaultType);
+      final f = foldText(tok);
+      final key = f.replaceAll(RegExp(r'[:.\-–]+$'), '');
+      if (aliasMap.containsKey(key)) {
+        stickyType = aliasMap[key]!; // a hạng mục keyword: remembered for the tokens after it, shown as typed
+        return DecodedPart(tok, tok, 'plain');
+      }
+      final p = compact(f, stickyType.isNotEmpty ? stickyType : cfg.defaultType);
       if (p == null) return DecodedPart(tok, tok, RegExp(r'\d').hasMatch(tok) ? 'unknown' : 'plain');
       return DecodedPart(tok, p.canon, p.canon == tok ? 'same' : 'changed');
     }).toList();
+    // "de 44 x20" is not compact notation (nothing to rewrite) but parseMessage reads it without any doubt: such a line is not
+    // flagged "chưa nhận ra". Only a line the parser cannot read cleanly (unclear type, odd characters, no score...) stays flagged.
+    if (parts.any((x) => x.status == 'unknown')) {
+      final read = parseMessage(
+        original,
+        betTypes: betTypes,
+        kindSymbols: kindSymbols,
+        template: SyntaxTemplate(defaultType: stickyType.isNotEmpty ? stickyType : cfg.defaultType, typeAliases: cfg.typeAliases, stakeMarkers: cfg.stakeMarkers),
+      );
+      if (read.rows.isNotEmpty && read.ignored.isEmpty && read.rows.every((r) => !r.uncertain)) {
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].status == 'unknown') parts[i] = DecodedPart(parts[i].text, parts[i].decoded, 'plain');
+        }
+      }
+    }
     return DecodedLine(original, parts);
   }).toList();
 }
@@ -353,6 +378,7 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
   final aliasMap = _aliasMapFor(betTypes, cfg);
   final aliasKeys = aliasMap.keys.where((k) => k.isNotEmpty).toList()..sort((a, b) => b.length.compareTo(a.length));
   final aliasRe = aliasKeys.isEmpty ? null : RegExp('(?<![a-z0-9])(${aliasKeys.map(_escapeRe).join('|')})(?![a-z0-9])');
+  final groupRe = RegExp('(\\d[\\d\\s,.;\\-/]*?)\\s*(?:${markers.map(_escapeRe).join('|')})\\s*(\\d+(?:[.,]\\d+)?)(?:\\s*(?:diem|d)(?![a-z0-9]))?');
   final stakeRe = RegExp('^(.*?)(?:${markers.map(_escapeRe).join('|')})\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:diem|d)?\\s*\$');
 
   final rows = <ParsedRow>[];
@@ -427,6 +453,17 @@ ParseResult parseMessage(String? text, {List<String> betTypes = const ['de', 'lo
       if (seg.type != null) stickyType = seg.type!;
       final type = seg.type ?? (stickyType.isNotEmpty ? stickyType : (cfg.defaultType.isNotEmpty ? cfg.defaultType : (betTypes.isNotEmpty ? betTypes.first : 'de')));
       final assumed = seg.type == null && stickyType.isEmpty && cfg.defaultType.isEmpty;
+
+      final groups = groupRe.allMatches(body).toList();
+      if (groups.length > 1 && body.replaceAll(groupRe, '').replaceAll(RegExp(r'[\s,;.\-/]'), '').isEmpty) {
+        for (final g in groups) {
+          for (final n in RegExp(r'\d+').allMatches(g.group(1)!)) {
+            push(type, assumed, n.group(0)!, g.group(2)!.replaceFirst(',', '.'), line);
+          }
+        }
+        produced = true;
+        continue;
+      }
 
       var left = body;
       var score = '';

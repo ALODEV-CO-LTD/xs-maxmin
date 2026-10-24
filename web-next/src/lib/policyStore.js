@@ -11,6 +11,7 @@ export const usePolicyStore = create((set) => ({
   screenshotGuardEnabled: true,
   blurOnHideEnabled: false,
   autoLockMinutes: 0,
+  hideLockSeconds: 0,
   loaded: false,
   async load() {
     try {
@@ -19,9 +20,10 @@ export const usePolicyStore = create((set) => ({
       setScreenshotGuardEnabled(screenshotGuardEnabled)
       const blurOnHideEnabled = res.blurOnHideEnabled === true
       const autoLockMinutes = Number(res.autoLockMinutes) || 0
-      set({ watermarkEnabled: res.watermarkEnabled === true, screenshotGuardEnabled, blurOnHideEnabled, autoLockMinutes, loaded: true })
+      const hideLockSeconds = Number(res.hideLockSeconds) || 0
+      set({ watermarkEnabled: res.watermarkEnabled === true, screenshotGuardEnabled, blurOnHideEnabled, autoLockMinutes, hideLockSeconds, loaded: true })
       usePrivacyStore.getState().setBlurPolicy(blurOnHideEnabled)
-      usePrivacyStore.getState().applyServerDefault(autoLockMinutes)
+      usePrivacyStore.getState().applyServerDefault(autoLockMinutes, hideLockSeconds)
     } catch {
       /* keep the safe defaults */
     }

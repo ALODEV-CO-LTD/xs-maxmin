@@ -18,6 +18,17 @@ void main() {
     expect([p.loginFreeAttempts, p.loginBaseLockSeconds, p.loginMaxLockSeconds, p.tokenDays, p.autoLockMinutes, p.watermarkEnabled], [5, 30, 900, 30, 0, false]);
     expect(p.screenshotGuardEnabled, true);
     expect(p.blurOnHideEnabled, false);
+    expect(p.hideLockSeconds, 0);
+  });
+
+  test('hideLockSeconds (default "lock when away") is saved, bounded 0..3600 and exposed', () {
+    final db = _db();
+    savePolicy(db, {'hideLockSeconds': 60});
+    expect(loadPolicy(db).hideLockSeconds, 60);
+    expect(loadPolicy(db).toJson()['hideLockSeconds'], 60);
+    expect(validatePolicyInput({'hideLockSeconds': 3601}), isNotNull);
+    expect(validatePolicyInput({'hideLockSeconds': -1}), isNotNull);
+    expect(validatePolicyInput({'hideLockSeconds': 0}), isNull);
   });
 
   test('saved values are used; out-of-range stored values fall back', () {

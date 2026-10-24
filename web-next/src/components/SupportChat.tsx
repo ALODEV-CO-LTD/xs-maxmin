@@ -20,7 +20,7 @@ import { supportUnreadOf, useNotifyStore } from '@/lib/notifyStore'
 // Oldest message on top, newest at the bottom (like every chat), composer pinned at the bottom of the popover.
 // The red badge on the button is the support unread count; opening the popover marks it read.
 // notify.supportOpen lets other code (a message toast, the old /feedback link) open it.
-interface Msg { id: string; sender: 'user' | 'admin'; content: string; createdAt: string; attachment?: Att }
+interface Msg { id: string; sender: 'user' | 'admin'; content: string; createdAt: string; attachment?: Att; deleted?: boolean }
 
 export function timeLabel(iso: string) {
   const d = new Date(iso)
@@ -183,8 +183,8 @@ export default function SupportChat() {
                   <li key={m.id} className={`sp-msg${m.sender === 'user' ? ' mine' : ''}`}>
                     <div className="sp-bubble">
                       {m.sender === 'admin' && <span className="sp-from">Admin</span>}
-                      {m.content && <span className="sp-text">{m.content}</span>}
-                      {m.attachment && <MessageAttachment att={m.attachment} path={`/me/messages/${m.id}/attachment`} />}
+                      {m.deleted ? <span className="sp-text sp-deleted"><i>Tin nhắn đã bị xoá</i></span> : m.content && <span className="sp-text">{m.content}</span>}
+                      {!m.deleted && m.attachment && <MessageAttachment att={m.attachment} path={`/me/messages/${m.id}/attachment`} />}
                     </div>
                     <time className="sp-time">{timeLabel(m.createdAt)}</time>
                   </li>

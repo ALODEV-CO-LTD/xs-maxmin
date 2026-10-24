@@ -139,3 +139,10 @@ test('viết lỏng: cách quãng, gạch nối, ; / dấu chấm phẩy, "đi�
   assert.deepEqual(parse('22.67lo10.5', WIDE), ['xien2:22 67@10.5'])
   assert.deepEqual(parse('22.67de10', WIDE), ['de:22@10', 'de:67@10']) // đề thì vẫn là danh sách số
 })
+
+test('sau hạng mục, nhiều cụm "số x điểm" trên một dòng: mỗi cụm có điểm riêng', () => {
+  assert.deepEqual(parse('de 44 x20'), ['de:44@20'])
+  assert.deepEqual(parse('de 44x20 55x30'), ['de:44@20', 'de:55@30'])
+  assert.deepEqual(parse('de 44 x20, 55 x30'), ['de:44@20', 'de:55@30'])
+  assert.deepEqual(parse('de 44 55 x20 lo 12 x10'), ['de:44@20', 'de:55@20', 'lo:12@10'])
+})

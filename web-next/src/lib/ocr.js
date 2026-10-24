@@ -13,6 +13,7 @@
 //   worse, so it is deliberately not used.)
 // - Failures are classified so the user is told what actually went wrong.
 import { createWorker } from 'tesseract.js'
+import { northNumbers } from './northTable'
 
 const ASSET_BASE = `${window.location.origin}/tesseract`
 const OCR_TIMEOUT_MS = 150000
@@ -77,7 +78,8 @@ async function decode(file) {
   }
 }
 
-// `table`: aim for ~900-1400 px wide (best accuracy for a results table).
+// `table`: aim for ~1300 px wide (measured: a 432 px screenshot read 20/27 numbers at 2x and 27/27 at 3x), flattened onto
+// white (a transparent PNG has no background otherwise) and in grey with the contrast stretched.
 // `text`: only shrink huge photos, leave the rest alone.
 async function prepareImage(file, mode) {
   let bitmap
@@ -90,12 +92,12 @@ async function prepareImage(file, mode) {
   const h = bitmap.height
   let scale = 1
   if (mode === 'table') {
-    if (w < 900) scale = Math.min(900 / w, 6)
-    else if (w > 1400) scale = 1000 / w
+    if (w < 1300) scale = Math.min(1300 / w, 6)
+    else if (w > 1800) scale = 1600 / w
   } else if (Math.max(w, h) > 2200) {
     scale = 2200 / Math.max(w, h)
   }
-  if (scale === 1) return file
+  if (scale === 1 && mode !== 'table') return file
   const canvas = document.createElement('canvas')
   canvas.width = Math.max(1, Math.round(w * scale))
   canvas.height = Math.max(1, Math.round(h * scale))
@@ -105,9 +107,34 @@ async function prepareImage(file, mode) {
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close?.()
+  if (mode === 'table') stretchContrast(ctx, canvas.width, canvas.height)
   return new Promise((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new OcrError('memory', MESSAGES.memory))), 'image/png')
   })
+}
+
+// Grey + stretch the darkest / lightest 1% to black / white: bold digits on a tinted row read much better.
+function stretchContrast(ctx, w, h) {
+  try {
+    const img = ctx.getImageData(0, 0, w, h)
+    const d = img.data
+    const hist = new Array(256).fill(0)
+    for (let i = 0; i < d.length; i += 4) {
+      const g = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114)
+      d[i] = d[i + 1] = d[i + 2] = g
+      hist[g]++
+    }
+    const cut = (w * h) / 100
+    let lo = 0
+    let hi = 255
+    for (let acc = 0; lo < 255 && (acc += hist[lo]) < cut; lo++);
+    for (let acc = 0; hi > 0 && (acc += hist[hi]) < cut; hi--);
+    if (hi - lo < 30) return ctx.putImageData(img, 0, 0)
+    for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / (hi - lo)))
+    ctx.putImageData(img, 0, 0)
+  } catch {
+    /* a canvas the browser will not read back: keep the picture as drawn */
+  }
 }
 
 // ---- engine -----------------------------------------------------------------
@@ -188,6 +215,32 @@ export function tablePlausibility(text) {
     score += Math.min(n, want) / want - Math.max(0, n - want) / want
   }
   return score
+}
+
+/**
+ * Miền Bắc photo with the positions of the words: the prize numbers are picked by length and place (northTable.js), so a
+ * label column, a đầu / đuôi table or a footer next to the table cannot take a prize box. Falls back to the plain text of
+ * the best reading when no table is recognised. Returns { text } like recognizeLotteryTable.
+ */
+export async function recognizeNorthTable(file, { onProgress } = {}) {
+  try {
+    const image = await prepareImage(file, 'table')
+    return await withWorker('eng', onProgress, async (worker) => {
+      let best = null
+      for (const psm of ['11', '6']) {
+        await worker.setParameters({ tessedit_pageseg_mode: psm })
+        const { data } = await worker.recognize(image, {}, { text: true, blocks: true })
+        const text = data.text || ''
+        const picked = northNumbers(collectWords(data))
+        const score = (picked ? picked.found : 0) + tablePlausibility(picked ? picked.numbers.join(' ') : text) * 0.01
+        if (!best || score > best.score + 1e-9) best = { text: picked && picked.found >= 20 ? picked.numbers.join(' ') : text, score, psm }
+        if (picked && picked.found === 27) break
+      }
+      return best
+    })
+  } catch (err) {
+    throw classify(err)
+  }
 }
 
 /**

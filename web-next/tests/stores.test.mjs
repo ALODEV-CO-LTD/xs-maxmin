@@ -331,3 +331,14 @@ test('notify: toast "Phản hồi" mở popover thay vì chuyển trang', async 
   goTo('/friends')
   assert.deepEqual(pushed, ['/friends'])
 })
+
+test('mặc định "khoá khi ẩn trang" của Admin dùng cho người chưa tự chọn', async () => {
+  const mem = new Map()
+  globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) }
+  const { usePrivacyStore: p } = await import('../src/lib/privacyStore.js?hide-default')
+  p.getState().applyServerDefault(0, 90)
+  assert.equal(p.getState().hideLockSeconds, 90)
+  p.getState().saveSettings({ hideLockSeconds: 0 })
+  p.getState().applyServerDefault(0, 120)
+  assert.equal(p.getState().hideLockSeconds, 0, 'đã tự chọn thì không bị mặc định ghi đè')
+})

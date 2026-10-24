@@ -8,8 +8,11 @@ import '../../../core/api_client.dart';
 
 /// Admin-set security policy (`GET /me/policy`). Safe defaults apply until the answer says otherwise.
 class PrivacyPolicy {
-  const PrivacyPolicy({this.autoLockMinutes = 0, this.watermarkEnabled = false, this.screenshotGuardEnabled = true, this.blurOnHideEnabled = false});
+  const PrivacyPolicy({this.autoLockMinutes = 0, this.hideLockSeconds = 0, this.watermarkEnabled = false, this.screenshotGuardEnabled = true, this.blurOnHideEnabled = false});
   final int autoLockMinutes;
+
+  /// Admin default for "lock when the app was away for this long" (0 = off); a person's own choice wins.
+  final int hideLockSeconds;
   final bool watermarkEnabled;
   final bool screenshotGuardEnabled;
   final bool blurOnHideEnabled;
@@ -20,8 +23,11 @@ class PrivacyPolicy {
     if (json is! Map) return const PrivacyPolicy();
     final raw = json['autoLockMinutes'];
     final minutes = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
+    final rawHide = json['hideLockSeconds'];
+    final hide = rawHide is num ? rawHide.toInt() : int.tryParse('$rawHide') ?? 0;
     return PrivacyPolicy(
       autoLockMinutes: minutes < 0 ? 0 : minutes,
+      hideLockSeconds: hide < 0 ? 0 : hide,
       watermarkEnabled: json['watermarkEnabled'] == true,
       screenshotGuardEnabled: json['screenshotGuardEnabled'] != false,
       blurOnHideEnabled: json['blurOnHideEnabled'] == true,
@@ -55,7 +61,7 @@ class PrivacyStore extends ChangeNotifier {
   bool away = false;
 
   int? _ownAutoLockMinutes; // null = follow the Admin default
-  int hideLockSeconds = 0;
+  int? _ownHideLockSeconds; // null = follow the Admin default
   bool blurOnHide = true;
 
   /// Set by features that must not be interrupted (e.g. a voice call): idle time then counts as activity.
@@ -69,6 +75,8 @@ class PrivacyStore extends ChangeNotifier {
 
   int get autoLockMinutes => _ownAutoLockMinutes ?? policy.autoLockMinutes;
   bool get hasOwnAutoLock => _ownAutoLockMinutes != null;
+  int get hideLockSeconds => _ownHideLockSeconds ?? policy.hideLockSeconds;
+  bool get hasOwnHideLock => _ownHideLockSeconds != null;
   bool get screenshotGuardOn => policy.screenshotGuardEnabled;
 
   /// Blur is allowed by the Admin AND chosen by the user.
@@ -95,7 +103,7 @@ class PrivacyStore extends ChangeNotifier {
           final a = raw['autoLockMinutes'];
           _ownAutoLockMinutes = a is num && a >= 0 ? a.toInt() : null;
           final h = raw['hideLockSeconds'];
-          hideLockSeconds = h is num && h >= 0 ? h.toInt() : 0;
+          _ownHideLockSeconds = h is num && h >= 0 ? h.toInt() : null;
           blurOnHide = raw['blurOnHide'] is bool ? raw['blurOnHide'] as bool : true;
         }
       } catch (_) {/* defaults */}
@@ -143,7 +151,7 @@ class PrivacyStore extends ChangeNotifier {
 
   Future<void> _saveSettings() async {
     final p = await _prefs();
-    await p?.setString(_settingsKey, jsonEncode({if (_ownAutoLockMinutes != null) 'autoLockMinutes': _ownAutoLockMinutes, 'hideLockSeconds': hideLockSeconds, 'blurOnHide': blurOnHide}));
+    await p?.setString(_settingsKey, jsonEncode({if (_ownAutoLockMinutes != null) 'autoLockMinutes': _ownAutoLockMinutes, if (_ownHideLockSeconds != null) 'hideLockSeconds': _ownHideLockSeconds, 'blurOnHide': blurOnHide}));
   }
 
   Future<void> setAutoLockMinutes(int minutes) async {
@@ -154,7 +162,7 @@ class PrivacyStore extends ChangeNotifier {
   }
 
   Future<void> setHideLockSeconds(int seconds) async {
-    hideLockSeconds = seconds < 0 ? 0 : seconds;
+    _ownHideLockSeconds = seconds < 0 ? 0 : seconds;
     notifyListeners();
     await _saveSettings();
   }

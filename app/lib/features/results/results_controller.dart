@@ -663,12 +663,19 @@ class ResultsController extends ChangeNotifier {
   }
 
   void _applyNorth(OcrResult res) {
-    final before = filledCount(mbForm);
     // Rows from the word positions (the plain text order of the reader can run down the columns).
     final ordered = orderedDigitText(uprightWords(repairDigitWords(res.words), lengthsDecreaseDownward: true));
-    guessNorthForm(ordered.isEmpty ? res.text : ordered, mbForm);
+    // Read into empty boxes, then put the numbers found over the old ones: a photo read again (or over typed numbers) must
+    // replace them, not be reported as "nothing recognised" because every box was already filled.
+    final fresh = {for (final e in mbForm.entries) e.key: List<String>.filled(e.value.length, '')};
+    guessNorthForm(ordered.isEmpty ? res.text : ordered, fresh);
+    for (final e in fresh.entries) {
+      for (var i = 0; i < e.value.length; i++) {
+        if (e.value[i].isNotEmpty) mbForm[e.key]![i] = e.value[i];
+      }
+    }
     mbLocked = true;
-    if (filledCount(mbForm) == before) {
+    if (filledCount(fresh) == 0) {
       ocrError = 'Không nhận ra số nào trong ảnh. Hãy chụp rõ cả bảng hoặc nhập tay.';
     } else {
       saveMsg = 'Đã điền từ ảnh. Kiểm tra lại các ô rồi bấm "Lưu kết quả".';

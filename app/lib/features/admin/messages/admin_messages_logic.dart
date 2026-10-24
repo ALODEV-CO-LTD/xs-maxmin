@@ -55,19 +55,25 @@ class MsgAttachment {
 }
 
 class AdminMsg {
-  const AdminMsg({required this.id, required this.fromAdmin, required this.content, required this.createdAt, this.attachment});
+  const AdminMsg({required this.id, required this.fromAdmin, required this.content, required this.createdAt, this.attachment, this.deleted = false});
   final String id;
   final bool fromAdmin;
   final String content;
   final String createdAt;
   final MsgAttachment? attachment;
+
+  /// Admin deleted this reply: both sides see "Tin nhắn đã bị xoá" in its place.
+  final bool deleted;
   factory AdminMsg.fromJson(Map<String, dynamic> j) => AdminMsg(
         id: '${j['id'] ?? ''}',
         fromAdmin: j['sender'] == 'admin',
         content: (j['content'] as String?) ?? '',
         createdAt: (j['createdAt'] as String?) ?? '',
         attachment: MsgAttachment.fromJson(j['attachment']),
+        deleted: j['deleted'] == true,
       );
+
+  AdminMsg asDeleted() => AdminMsg(id: id, fromAdmin: fromAdmin, content: '', createdAt: createdAt, deleted: true);
 }
 
 /// Strips Vietnamese diacritics and lower-cases (MessagesView.vue noAccents).

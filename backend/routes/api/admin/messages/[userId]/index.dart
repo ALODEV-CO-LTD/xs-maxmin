@@ -7,7 +7,7 @@ import 'package:server/src/database.dart';
 import 'package:server/src/push.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// `GET`/`POST`/`DELETE /api/admin/messages/:userId` - admin reading, replying to or clearing
+/// `GET`/`POST /api/admin/messages/:userId` - admin reading or replying to
 /// one customer's thread. Backed by `direct_messages` between that customer
 /// and any admin account (the customer's Phản hồi page reads the same
 /// table), with `sender` derived as 'admin'/'user' from who sent each row
@@ -22,24 +22,8 @@ Future<Response> onRequest(RequestContext context, String userId) async {
   return switch (context.request.method) {
     HttpMethod.get => _list(context, userId),
     HttpMethod.post => await _reply(context, auth.userId, userId),
-    HttpMethod.delete => _clear(context, userId),
     _ => Response(statusCode: 405, body: 'Method not allowed'),
   };
-}
-
-/// Clears the whole thread of that customer with the admins (the rows are shared with the customer's Phản hồi page, so it
-/// disappears there too). The customer's messages and the admins' replies alike.
-Response _clear(RequestContext context, String userId) {
-  final db = context.read<Database>();
-  db.execute(
-    '''
-    DELETE FROM direct_messages
-    WHERE (from_user_id = ? AND to_user_id IN (SELECT id FROM users WHERE role = 'admin'))
-       OR (to_user_id = ? AND from_user_id IN (SELECT id FROM users WHERE role = 'admin'))
-    ''',
-    [userId, userId],
-  );
-  return Response.json(body: {'deleted': db.updatedRows});
 }
 
 Response _list(RequestContext context, String userId) {
@@ -63,6 +47,7 @@ Response _list(RequestContext context, String userId) {
             'content': r['content'],
             'createdAt': r['created_at'],
             'attachment': attachmentMeta(r),
+            'deleted': r['deleted_at'] != null,
           },
       ],
     },

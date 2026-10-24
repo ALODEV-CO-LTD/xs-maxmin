@@ -18,6 +18,7 @@ interface Msg {
   content: string
   createdAt: string
   attachment?: Att
+  deleted?: boolean
 }
 
 // One customer's support thread inside the admin inbox. Oldest on top, composer pinned.
@@ -109,39 +110,21 @@ export default function AdminChatPane({ userId, onSent }: { userId: string; onSe
     }
   }
 
-  // Deleting is done on the server for both sides (the thread is shared with the customer's Phản hồi page).
+  // Admin may delete only ITS OWN replies: the message stays in the thread (for both sides) as "Tin nhắn đã bị xoá".
   async function removeOne(m: Msg) {
-    if (!(await showConfirm({ title: 'Xoá tin nhắn', message: 'Xoá tin nhắn này? Tin nhắn cũng sẽ biến mất bên khách hàng và không thể khôi phục.', confirmText: 'Xoá', danger: true }))) return
+    if (!(await showConfirm({ title: 'Xoá tin nhắn', message: 'Xoá tin nhắn này? Khách hàng sẽ thấy "Tin nhắn đã bị xoá" ở vị trí này và không thể khôi phục nội dung.', confirmText: 'Xoá', danger: true }))) return
     try {
       await api.del(`/admin/messages/${userId}/${m.id}`)
-      count.current = Math.max(0, count.current - 1)
-      setMessages((list) => list.filter((x) => x.id !== m.id))
+      setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, content: '', attachment: undefined, deleted: true } : x)))
       onSent?.()
     } catch (err) {
       setSendError(errMsg(err, 'Không xoá được tin nhắn'))
     }
   }
 
-  async function clearAll() {
-    if (!(await showConfirm({ title: 'Xoá cuộc trò chuyện', message: 'Xoá toàn bộ phản hồi với khách hàng này? Cả tin của khách và của Admin đều bị xoá, bên khách hàng cũng không còn thấy, không thể khôi phục.', confirmText: 'Xoá', danger: true }))) return
-    try {
-      await api.del(`/admin/messages/${userId}`)
-      count.current = 0
-      setMessages([])
-      onSent?.()
-    } catch (err) {
-      setSendError(errMsg(err, 'Không xoá được cuộc trò chuyện'))
-    }
-  }
-
   return (
     <div className="adm-pane">
       <div className="pane">
-        {messages.length > 0 && (
-          <div className="pane-tools">
-            <button type="button" className="msg-del" onClick={clearAll}>Xoá cuộc trò chuyện</button>
-          </div>
-        )}
         <div ref={thread} className="thread" role="log" aria-label="Tin nhắn, mới nhất ở dưới">
           {error && <div className="alert alert-error">{error}</div>}
           {loading ? <p className="empty">Đang tải...</p> : messages.length === 0 && <p className="empty">Chưa có tin nhắn nào</p>}
@@ -151,11 +134,11 @@ export default function AdminChatPane({ userId, onSent }: { userId: string; onSe
             ) : (
               <div key={m.id} className={`msg ${m.sender === 'admin' ? 'msg-admin' : 'msg-user'}`}>
                 <div className="msg-bubble">
-                  {m.content && <span className="msg-text">{m.content}</span>}
-                  {m.attachment && <MessageAttachment att={m.attachment} path={`/admin/messages/${userId}/attachment/${m.id}`} />}
+                  {m.deleted ? <span className="msg-text"><i>Tin nhắn đã bị xoá</i></span> : m.content && <span className="msg-text">{m.content}</span>}
+                  {!m.deleted && m.attachment && <MessageAttachment att={m.attachment} path={`/admin/messages/${userId}/attachment/${m.id}`} />}
                 </div>
                 <time className="msg-time">{timeLabel(m.createdAt)}</time>
-                <button type="button" className="msg-del" aria-label="Xoá tin nhắn" onClick={() => removeOne(m)}>Xoá</button>
+                {m.sender === 'admin' && !m.deleted && <button type="button" className="msg-del" aria-label="Xoá tin nhắn" onClick={() => removeOne(m)}>Xoá</button>}
               </div>
             ),
           )}

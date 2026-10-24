@@ -97,6 +97,7 @@ export const POLICY_DEFAULT = {
   loginMaxLockSeconds: 900,
   tokenDays: 30,
   autoLockMinutes: 0,
+  hideLockSeconds: 0,
   watermarkEnabled: false,
   screenshotGuardEnabled: true,
   blurOnHideEnabled: false,

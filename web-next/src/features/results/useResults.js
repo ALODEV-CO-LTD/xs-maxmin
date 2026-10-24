@@ -265,8 +265,8 @@ export function useResults() {
     if (ocr.previewUrl) URL.revokeObjectURL(ocr.previewUrl)
     patchOcr({ previewUrl: URL.createObjectURL(file), running: true, progress: 0 })
     try {
-      const { recognizeLotteryTable } = await import('../../lib/ocr')
-      const { text } = await recognizeLotteryTable(file, { onProgress: (p) => patchOcr({ progress: p }) })
+      const { recognizeNorthTable } = await import('../../lib/ocr')
+      const { text } = await recognizeNorthTable(file, { onProgress: (p) => patchOcr({ progress: p }) })
       setForms((all) => ({ ...all, [MB_COL]: guessFromText(all[MB_COL] || blankForm(structure), text) }))
       setRead((r) => ({ ...r, [MB_COL]: true }))
       setEdit((e) => ({ ...e, [MB_COL]: false }))

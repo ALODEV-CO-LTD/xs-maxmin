@@ -247,7 +247,7 @@ class _SecurityPolicySectionState extends State<SecurityPolicySection> {
         const SizedBox(height: 10),
         SectionCard(
           title: 'Phiên đăng nhập',
-          children: [_num('tokenDays', 'Chỉ áp dụng cho lần đăng nhập mới.'), _num('autoLockMinutes', '0 là tắt. Chỉ dùng cho người chưa tự chọn trong Tài khoản.')],
+          children: [_num('tokenDays', 'Chỉ áp dụng cho lần đăng nhập mới.'), _num('autoLockMinutes', '0 là tắt. Áp dụng cho cả hệ thống, chỉ dùng cho người chưa tự chọn trong Tài khoản.'), _num('hideLockSeconds', '0 là tắt. Khoá khi thoát ra hoặc chuyển ứng dụng quá số giây này (tắt màn hình cũng tính). Áp dụng cho cả hệ thống, chỉ dùng cho người chưa tự chọn trong Tài khoản.')],
         ),
         const SizedBox(height: 10),
         SectionCard(

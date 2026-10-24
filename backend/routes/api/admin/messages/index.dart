@@ -32,7 +32,7 @@ Response onRequest(RequestContext context) {
         WHERE (dm.from_user_id = u.id AND dm.to_user_id IN (SELECT id FROM users WHERE role = 'admin'))
            OR (dm.to_user_id = u.id AND dm.from_user_id IN (SELECT id FROM users WHERE role = 'admin'))
         ORDER BY dm.created_at DESC LIMIT 1) AS last_from_user,
-      (SELECT CASE WHEN dm.content = '' THEN '[Đính kèm] ' || COALESCE(dm.attachment_name, '') ELSE dm.content END FROM direct_messages dm
+      (SELECT CASE WHEN dm.deleted_at IS NOT NULL THEN 'Tin nhắn đã bị xoá' WHEN dm.content = '' THEN '[Đính kèm] ' || COALESCE(dm.attachment_name, '') ELSE dm.content END FROM direct_messages dm
         WHERE (dm.from_user_id = u.id AND dm.to_user_id IN (SELECT id FROM users WHERE role = 'admin'))
            OR (dm.to_user_id = u.id AND dm.from_user_id IN (SELECT id FROM users WHERE role = 'admin'))
         ORDER BY dm.created_at DESC LIMIT 1) AS last_content,

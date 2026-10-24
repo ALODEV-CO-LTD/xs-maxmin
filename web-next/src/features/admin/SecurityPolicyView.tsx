@@ -112,7 +112,8 @@ export default function SecurityPolicyView({ embedded = false }: { embedded?: bo
                 <h2>Phiên đăng nhập</h2>
                 <div className="grid">
                   {num('tokenDays', 1, 365, '1 đến 365', 'Thời hạn đăng nhập (ngày)', '. Chỉ áp dụng cho lần đăng nhập mới; phiên hiện có giữ hạn cũ.')}
-                  {num('autoLockMinutes', 0, 240, '0 là tắt', 'Tự khoá màn hình mặc định (phút)', '. Chỉ dùng cho người chưa tự chọn trong Tài khoản.', false)}
+                  {num('autoLockMinutes', 0, 240, '0 là tắt', 'Tự khoá màn hình mặc định (phút)', '. Áp dụng cho cả hệ thống; chỉ dùng cho người chưa tự chọn trong Tài khoản.', false)}
+                  {num('hideLockSeconds', 0, 3600, '0 là tắt', 'Khoá khi chuyển tab / ẩn trang mặc định (giây)', '. Khoá khi tab hoặc cửa sổ bị ẩn quá số giây này. Áp dụng cho cả hệ thống; chỉ dùng cho người chưa tự chọn trong Tài khoản.', false)}
                 </div>
               </section>
 

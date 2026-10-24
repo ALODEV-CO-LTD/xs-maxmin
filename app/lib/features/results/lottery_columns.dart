@@ -209,6 +209,35 @@ const _positions = <(String, int, int)>[
   ('dacBiet', 1, 6),
 ];
 
+/// The row of 6-digit special prizes (đặc biệt) among the recognised numbers, left to right. A 6-digit word elsewhere (a draw
+/// code in the header, a code in a footer) must not be taken for it: the row with the MOST 6-digit numbers wins (one per
+/// station), and on a tie the one that has about 17 other numbers above it per column, the way a real table does.
+List<OcrWord> _specialRow(List<OcrWord> nums) {
+  final six = nums.where((w) => w.text.length == 6).toList()..sort((a, b) => a.cy.compareTo(b.cy));
+  if (six.isEmpty) return const [];
+  final tol = math.max(6.0, (six.first.y1 - six.first.y0) * 0.6);
+  final groups = <List<OcrWord>>[];
+  for (final w in six) {
+    if (groups.isNotEmpty && (w.cy - groups.last.last.cy).abs() <= tol) {
+      groups.last.add(w);
+    } else {
+      groups.add([w]);
+    }
+  }
+  List<OcrWord>? best;
+  var bestKey = (-1, 0.0);
+  for (final g in groups) {
+    final above = nums.where((w) => w.text.length < 6 && w.cy < g.first.cy - tol).length;
+    final fit = -((above - 17 * g.length).abs()).toDouble();
+    final key = (g.length, fit);
+    if (key.$1 > bestKey.$1 || (key.$1 == bestKey.$1 && key.$2 > bestKey.$2)) {
+      best = g;
+      bestKey = key;
+    }
+  }
+  return best!..sort((a, b) => a.cx.compareTo(b.cx));
+}
+
 ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
   // The title line of the page ("XSMN Thứ 4 » XSMN 07/10/2026") holds a date whose digits must not count as prizes:
   // everything down to the date word is ignored. Only the FIRST real date in the top third of the picture counts: a stray
@@ -228,8 +257,11 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
       if (w.cy > cut)
         if (_digitsOf(w.text) case final d? when d.length >= 2 && d.length <= 6) OcrWord(d, w.x0, w.y0, w.x1, w.y1),
   ];
-  final specials = nums.where((w) => w.text.length == 6).toList()..sort((a, b) => a.cx.compareTo(b.cx));
+  final specials = _specialRow(nums);
   if (specials.isEmpty) return const ParsedColumns([], null);
+  // Everything printed BELOW the special-prize row is not a prize: a footer, a lô tô table, a phone number, the next ad.
+  final tableBottom = specials.map((w) => w.cy).reduce(math.max) + (specials.first.y1 - specials.first.y0) * 0.9;
+  nums = [for (final w in nums) if (w.cy <= tableBottom) w];
 
   // Only numbers inside the band of the station columns are prizes. The printed table also has a label column on its left
   // ("100N", "3TR", "2Tỷ" - read as "100", "3"...) and a header cell with the date ("19/10" "2026"): read as 3 and 4 digit
@@ -420,9 +452,97 @@ List<List<OcrWord>> _digitRows(List<OcrWord> words) {
 /// Rows ABOVE the first row holding a 5-digit number (the đặc biệt) are dropped: they are the title / date ("18 10 2026"),
 /// whose digits would otherwise take the first slots of giải tư / giải bảy.
 String orderedDigitText(List<OcrWord> words) {
-  final rows = _digitRows(words);
+  final rows = _digitRows(_withoutSideColumns(words));
+  // Preferred: find the 10 printed rows of the Miền Bắc table among everything else in the photo (title, date, draw codes,
+  // phone numbers, a lô tô table, footers...) and read only those, keeping in each row the words of the right length.
+  final table = _northTableRows(rows);
+  if (table != null) return [for (final r in table) ...r.map((w) => w.text.trim())].join(' ');
+  // Other layouts (giải ba / giải năm printed as ONE row of 6, a side table of đầu / đuôi, "6 ô · 5 số" labels whose "ô" is read
+  // as a digit): the rows do not match the usual 10, so pick the numbers by their length and place instead.
+  final byLen = _northByLength(rows);
+  if (byLen != null) return byLen.map((w) => w.text.trim()).join(' ');
   final first = rows.indexWhere((r) => r.any((w) => w.text.trim().length == 5));
   return [for (final r in (first > 0 ? rows.sublist(first) : rows)) ...r.map((w) => w.text.trim())].join(' ');
+}
+
+/// A label column ("ĐB", "G1", "6 ô · 5 số" read as digits) on the left and a đầu / đuôi table on the right are not prizes:
+/// words whose centre lies outside the span of the 4- and 5-digit numbers (the widest rows) are left out. Only when the photo
+/// has at least 5 five-digit numbers (a real table), otherwise every word is kept.
+List<OcrWord> _withoutSideColumns(List<OcrWord> words) {
+  bool digitsLen(OcrWord w, bool Function(int) ok) => RegExp(r'^\d+$').hasMatch(w.text.trim()) && ok(w.text.trim().length);
+  final long = [for (final w in words) if (digitsLen(w, (n) => n == 4 || n == 5)) w];
+  if (long.where((w) => w.text.trim().length == 5).length < 5) return words;
+  final widths = long.map((w) => w.x1 - w.x0).toList()..sort();
+  final margin = widths[widths.length ~/ 2] * 0.4; // a short number at the end of a row may stick out a little
+  final left = long.map((w) => w.x0).reduce(math.min) - margin, right = long.map((w) => w.x1).reduce(math.max) + margin;
+  return [for (final w in words) if (!digitsLen(w, (n) => n >= 1 && n <= 3) || (w.cx >= left && w.cx <= right)) w];
+}
+
+/// The 27 numbers of a Miền Bắc table picked by length when the printed rows cannot be matched: 10 five-digit, 10 four-digit,
+/// 3 three-digit and 4 two-digit, in reading order. Extra short numbers (a label such as "6 ô" read as "60", a date, a side
+/// table) sit ABOVE the table or beside it, so when there are too many, the ones lowest in the picture win for the short
+/// prizes (giải sáu, giải bảy are the last rows), and the first ones for the long prizes. Null unless the five- and four-digit
+/// numbers are all there (otherwise the old reading is kept).
+List<OcrWord>? _northByLength(List<List<OcrWord>> rows) {
+  final all = [for (final r in rows) ...r];
+  List<OcrWord> of(int n) => [for (final w in all) if (w.text.trim().length == n) w];
+  final five = of(5), four = of(4), three = of(3), two = of(2);
+  if (five.length < 10 || four.length < 10 || three.length < 3 || two.length < 4) return null;
+  final f5 = five.sublist(0, 10);
+  final lastTop = f5.map((w) => w.cy).reduce(math.max);
+  final f4 = [for (final w in four) if (w.cy >= f5.first.cy) w].take(10).toList();
+  if (f4.length < 10) return null;
+  final last4 = f4.map((w) => w.cy).reduce(math.max);
+  final t2 = two.length > 4 ? two.sublist(two.length - 4) : two;
+  final t3 = [for (final w in three) if (w.cy > lastTop && w.cy <= t2.first.cy + 1) w];
+  final f3 = (t3.length >= 3 ? t3.sublist(t3.length - 3) : three.sublist(three.length - 3));
+  if (f3.first.cy < last4 - 1) return null; // giải sáu must sit under giải năm
+  return [...f5, ...f4, ...f3, ...t2];
+}
+
+/// The 10 rows of a Miền Bắc result table, top to bottom: (digits, how many numbers). Giải ba and giải năm print two rows of 3.
+const _northRows = <(int, int)>[(5, 1), (5, 1), (5, 2), (5, 3), (5, 3), (4, 4), (4, 3), (4, 3), (3, 3), (2, 4)];
+
+/// The best-fitting run of 10 consecutive digit rows for [_northRows], reduced to the numbers of the expected length (when a
+/// row has more of them than the table does, the tightest group of neighbours: the printed numbers sit close together, a
+/// stray one of the same length at the side of the table does not). Null when no run fits well enough (a cropped or unusual
+/// photo): the caller then reads everything as before.
+List<List<OcrWord>>? _northTableRows(List<List<OcrWord>> rows) {
+  const total = 27;
+  if (rows.length < _northRows.length) return null;
+  int hits(List<OcrWord> r, (int, int) want) => math.min(r.where((w) => w.text.trim().length == want.$1).length, want.$2);
+  var bestAt = -1, bestScore = 0;
+  for (var s = 0; s + _northRows.length <= rows.length; s++) {
+    var sc = 0;
+    for (var i = 0; i < _northRows.length; i++) {
+      sc += hits(rows[s + i], _northRows[i]);
+    }
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestAt = s;
+    }
+  }
+  if (bestAt < 0 || bestScore < total - 6) return null; // at least 21 of the 27 numbers where they belong
+  final out = <List<OcrWord>>[];
+  for (var i = 0; i < _northRows.length; i++) {
+    final (len, count) = _northRows[i];
+    final same = rows[bestAt + i].where((w) => w.text.trim().length == len).toList();
+    if (same.length <= count) {
+      out.add(same);
+      continue;
+    }
+    var from = 0;
+    var span = double.infinity;
+    for (var k = 0; k + count <= same.length; k++) {
+      final sp = same[k + count - 1].cx - same[k].cx;
+      if (sp < span) {
+        span = sp;
+        from = k;
+      }
+    }
+    out.add(same.sublist(from, from + count));
+  }
+  return out;
 }
 
 /// A photo can reach the reader turned (a phone held sideways or upside down): then "top to bottom" runs the other way,

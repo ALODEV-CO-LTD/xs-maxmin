@@ -132,6 +132,7 @@ const policyRanges = <String, PolicyRange>{
   'loginMaxLockSeconds': PolicyRange(30, 86400, 'Thời gian khoá tối đa (giây)'),
   'tokenDays': PolicyRange(1, 365, 'Thời hạn đăng nhập (ngày)'),
   'autoLockMinutes': PolicyRange(0, 240, 'Tự khoá màn hình mặc định (phút)'),
+  'hideLockSeconds': PolicyRange(0, 3600, 'Khoá khi thoát ra / chuyển ứng dụng mặc định (giây)'),
 };
 
 class SecurityPolicyForm {
@@ -141,12 +142,13 @@ class SecurityPolicyForm {
     this.loginMaxLockSeconds = 900,
     this.tokenDays = 30,
     this.autoLockMinutes = 0,
+    this.hideLockSeconds = 0,
     this.watermarkEnabled = false,
     this.screenshotGuardEnabled = true,
     this.blurOnHideEnabled = false,
   });
 
-  final int loginFreeAttempts, loginBaseLockSeconds, loginMaxLockSeconds, tokenDays, autoLockMinutes;
+  final int loginFreeAttempts, loginBaseLockSeconds, loginMaxLockSeconds, tokenDays, autoLockMinutes, hideLockSeconds;
   final bool watermarkEnabled, screenshotGuardEnabled, blurOnHideEnabled;
 
   factory SecurityPolicyForm.fromJson(Map<String, dynamic> j) {
@@ -159,6 +161,7 @@ class SecurityPolicyForm {
       loginMaxLockSeconds: i('loginMaxLockSeconds', d.loginMaxLockSeconds),
       tokenDays: i('tokenDays', d.tokenDays),
       autoLockMinutes: i('autoLockMinutes', d.autoLockMinutes),
+      hideLockSeconds: i('hideLockSeconds', d.hideLockSeconds),
       watermarkEnabled: b('watermarkEnabled', d.watermarkEnabled),
       screenshotGuardEnabled: b('screenshotGuardEnabled', d.screenshotGuardEnabled),
       blurOnHideEnabled: b('blurOnHideEnabled', d.blurOnHideEnabled),
@@ -171,6 +174,7 @@ class SecurityPolicyForm {
     'loginMaxLockSeconds': loginMaxLockSeconds,
     'tokenDays': tokenDays,
     'autoLockMinutes': autoLockMinutes,
+    'hideLockSeconds': hideLockSeconds,
     'watermarkEnabled': watermarkEnabled,
     'screenshotGuardEnabled': screenshotGuardEnabled,
     'blurOnHideEnabled': blurOnHideEnabled,
@@ -185,6 +189,7 @@ class SecurityPolicyForm {
     loginMaxLockSeconds: key == 'loginMaxLockSeconds' ? v : loginMaxLockSeconds,
     tokenDays: key == 'tokenDays' ? v : tokenDays,
     autoLockMinutes: key == 'autoLockMinutes' ? v : autoLockMinutes,
+    hideLockSeconds: key == 'hideLockSeconds' ? v : hideLockSeconds,
     watermarkEnabled: watermarkEnabled,
     screenshotGuardEnabled: screenshotGuardEnabled,
     blurOnHideEnabled: blurOnHideEnabled,
@@ -196,6 +201,7 @@ class SecurityPolicyForm {
     loginMaxLockSeconds: loginMaxLockSeconds,
     tokenDays: tokenDays,
     autoLockMinutes: autoLockMinutes,
+    hideLockSeconds: hideLockSeconds,
     watermarkEnabled: watermark ?? watermarkEnabled,
     screenshotGuardEnabled: screenshotGuard ?? screenshotGuardEnabled,
     blurOnHideEnabled: blurOnHide ?? blurOnHideEnabled,

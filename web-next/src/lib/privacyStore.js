@@ -64,7 +64,8 @@ const inCall = () => {
 }
 
 let timer = null
-let serverDefaultMinutes = 0 // admin policy default, remembered so start() can re-apply it
+let serverDefaultMinutes = 0 // admin policy defaults, remembered so start() can re-apply them
+let serverDefaultHideSeconds = 0
 let hiddenAt = 0
 let lastWrite = 0
 let lastActive = 0
@@ -89,11 +90,14 @@ export const usePrivacyStore = create((set, get) => ({
     if (on !== true) set({ away: false })
   },
 
-  // Admin-set default idle lock (policyStore): used only while this person has not chosen their own value (nothing
-  // saved in this browser yet).
-  applyServerDefault(minutes) {
+  // Admin-set system defaults (policyStore): the idle lock minutes and the "lock when the page was hidden" seconds. Used only
+  // while this person has not chosen their own values (nothing saved in this browser yet).
+  applyServerDefault(minutes, hideSeconds = serverDefaultHideSeconds) {
     serverDefaultMinutes = minutes
-    if (readStorage(SETTINGS_KEY) === null && minutes > 0) set({ autoLockMinutes: minutes })
+    serverDefaultHideSeconds = hideSeconds
+    if (readStorage(SETTINGS_KEY) !== null) return
+    if (minutes > 0) set({ autoLockMinutes: minutes })
+    if (hideSeconds > 0) set({ hideLockSeconds: hideSeconds })
   },
 
   lock() {
@@ -136,7 +140,7 @@ export const usePrivacyStore = create((set, get) => ({
   start() {
     if (cleanup) return
     set(loadSettings())
-    get().applyServerDefault(serverDefaultMinutes)
+    get().applyServerDefault(serverDefaultMinutes, serverDefaultHideSeconds)
     lastActive = Number(readStorage(ACTIVE_KEY)) || Date.now()
     if (readStorage(LOCKED_KEY) === '1') set({ locked: true })
     get().checkIdle()

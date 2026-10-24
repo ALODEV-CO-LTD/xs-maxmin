@@ -57,7 +57,7 @@ void main() {
       SharedPreferences.setMockInitialValues(prefs);
       clock = _Clock();
       s = PrivacyStore(clock: () => clock.now);
-      api = _api((r) => http.Response('{"autoLockMinutes":${policy['autoLockMinutes'] ?? 0},"blurOnHideEnabled":${policy['blur'] ?? false},"screenshotGuardEnabled":${policy['guard'] ?? true}}', 200));
+      api = _api((r) => http.Response('{"autoLockMinutes":${policy['autoLockMinutes'] ?? 0},"hideLockSeconds":${policy['hideLockSeconds'] ?? 0},"blurOnHideEnabled":${policy['blur'] ?? false},"screenshotGuardEnabled":${policy['guard'] ?? true}}', 200));
       await s.start(api);
     }
 
@@ -69,6 +69,20 @@ void main() {
       expect(s.autoLockMinutes, 1);
       await s.setAutoLockMinutes(0);
       expect(s.autoLockMinutes, 0, reason: '0 = the user switched it off, overriding the default');
+    });
+
+    test('the Admin default for "lock when away" applies until the user chooses their own', () async {
+      await startWith({'hideLockSeconds': 60});
+      expect(s.hideLockSeconds, 60);
+      expect(s.hasOwnHideLock, isFalse);
+      // away for 61 s, back: locked by the system default
+      s.onLifecycle(AppLifecycleState.paused);
+      clock.now = clock.now.add(const Duration(seconds: 61));
+      s.onLifecycle(AppLifecycleState.resumed);
+      expect(s.locked, isTrue);
+      await s.setHideLockSeconds(0);
+      expect(s.hideLockSeconds, 0, reason: '0 = the user switched it off, overriding the default');
+      expect(s.hasOwnHideLock, isTrue);
     });
 
     test('locks only after the idle limit, touch resets the clock', () async {

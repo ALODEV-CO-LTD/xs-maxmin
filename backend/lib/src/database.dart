@@ -96,6 +96,8 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'direct_messages', 'attachment_type', 'TEXT');
   _ensureColumn(db, 'direct_messages', 'attachment_size', 'INTEGER');
   _ensureColumn(db, 'direct_messages', 'attachment_data', 'BLOB');
+  // Admin deleted one of ITS replies in Phản hồi: the row stays as a "tin nhắn đã bị xoá" notice (content/attachment blanked).
+  _ensureColumn(db, 'direct_messages', 'deleted_at', 'TEXT');
   // Mã khôi phục (K07/K08): only a bcrypt hash of the code is stored, never
   // the code itself (see recovery_codes.dart). The failed-attempt counter and
   // lock-until timestamp throttle guessing on /api/auth/recover. All nullable
@@ -415,7 +417,8 @@ void _createSchema(Database db) {
       attachment_name TEXT,
       attachment_type TEXT,
       attachment_size INTEGER,
-      attachment_data BLOB
+      attachment_data BLOB,
+      deleted_at TEXT
     );
   ''');
 

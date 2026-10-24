@@ -49,7 +49,7 @@ class ThreadBubble extends StatelessWidget {
   final String attachmentPath;
   final String? senderLabel;
 
-  /// When set (the admin's thread) a small trash button sits beside the time and deletes this message.
+  /// When set (Admin's own replies only) a small trash button sits beside the time and deletes this message.
   final VoidCallback? onDelete;
   @override
   Widget build(BuildContext context) {
@@ -67,8 +67,11 @@ class ThreadBubble extends StatelessWidget {
             decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
               if (senderLabel != null) Text(senderLabel!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: mine ? fg : cs.primary)),
-              if (msg.content.isNotEmpty) SelectableText(msg.content, style: TextStyle(color: fg)),
-              if (msg.attachment != null) ...[
+              if (msg.deleted)
+                Text('Tin nhắn đã bị xoá', key: const Key('deleted-message'), style: TextStyle(color: fg.withValues(alpha: 0.75), fontStyle: FontStyle.italic))
+              else if (msg.content.isNotEmpty)
+                SelectableText(msg.content, style: TextStyle(color: fg)),
+              if (!msg.deleted && msg.attachment != null) ...[
                 if (msg.content.isNotEmpty) const SizedBox(height: 6),
                 AttachmentView(att: msg.attachment!, path: attachmentPath, color: fg),
               ],
@@ -78,7 +81,7 @@ class ThreadBubble extends StatelessWidget {
             padding: const EdgeInsets.only(top: 2, bottom: 2),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(timeLabel(msg.createdAt), style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.55))),
-              if (onDelete != null)
+              if (onDelete != null && !msg.deleted)
                 InkResponse(
                   key: const Key('delete-message'),
                   onTap: onDelete,
