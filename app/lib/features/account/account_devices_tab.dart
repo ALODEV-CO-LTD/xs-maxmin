@@ -11,6 +11,7 @@ import 'me_profile.dart';
 import 'privacy/privacy_store.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dropdown.dart';
+import '../friends/messaging_host.dart';
 
 /// Thiết bị & riêng tư: signed-in devices (revoke), the recovery code and the privacy settings of this device.
 class AccountDevicesTab extends StatelessWidget {
@@ -20,6 +21,8 @@ class AccountDevicesTab extends StatelessWidget {
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const _SessionsCard(),
         const SizedBox(height: 14),
+        // Admin accounts have no friend chat, so no chat devices.
+        if (ctl.me?.isAdmin != true) ...[const ChatDevicesCard(), const SizedBox(height: 14)],
         // Admin accounts have no recovery code (like the web).
         if (ctl.me?.isAdmin != true) ...[RecoveryCodeCard(ctl: ctl), const SizedBox(height: 14)],
         const PrivacySettingsCard(),
@@ -109,6 +112,119 @@ class _SessionsCardState extends State<_SessionsCard> {
                   ]),
                 ),
                 if (s['current'] != true) AppButton(label: 'Đăng xuất', variant: AppButtonVariant.ghost, onPressed: () => _revoke(s)),
+              ]),
+            ),
+      ],
+    );
+  }
+}
+
+
+/// "Thiết bị ·8F2K" (the last characters of its random id), or "Bản app cũ" for the single key older versions published.
+String chatDeviceName(Map<String, dynamic> d) {
+  final id = '${d['id']}';
+  if (id == 'legacy') return 'Bản app cũ (một khoá chung)';
+  return 'Thiết bị ·${id.length > 4 ? id.substring(id.length - 4).toUpperCase() : id.toUpperCase()}';
+}
+
+/// Thiết bị nhận tin nhắn: every device of this account that has its own chat key (friends encrypt each message once per device).
+/// A lost phone can be removed here so friends stop encrypting for it; a device still in use registers itself again when it is next
+/// opened.
+class ChatDevicesCard extends StatefulWidget {
+  const ChatDevicesCard({super.key, this.thisDeviceId});
+
+  /// Test hook: the id of this device (default: the one the chat service of the app uses).
+  final String? thisDeviceId;
+
+  @override
+  State<ChatDevicesCard> createState() => _ChatDevicesCardState();
+}
+
+class _ChatDevicesCardState extends State<ChatDevicesCard> {
+  List<Map<String, dynamic>> _devices = [];
+  bool _loading = true;
+  String? _error;
+  String? _removing;
+
+  String? get _mine => widget.thisDeviceId ?? MessagingScope.maybeOf(context)?.chat?.myDeviceId;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await context.read<ApiClient>().get('/me/e2ee-devices') as Map;
+      if (!mounted) return;
+      setState(() {
+        _devices = [for (final d in (res['devices'] as List? ?? const [])) (d as Map).cast<String, dynamic>()];
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiError ? e.message : 'Không tải được danh sách thiết bị nhắn tin');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _remove(Map<String, dynamic> d) async {
+    final api = context.read<ApiClient>();
+    final ok = await confirmDialog(
+      context,
+      title: 'Xoá thiết bị nhắn tin',
+      message: 'Bạn bè sẽ không mã hoá tin nhắn gửi cho "${chatDeviceName(d)}" nữa, máy đó không nhận được tin mới. Nếu máy đó vẫn đang dùng, nó tự đăng ký lại khi mở app.',
+      confirmText: 'Xoá',
+      danger: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() {
+      _removing = '${d['id']}';
+      _error = null;
+    });
+    try {
+      await api.delete('/me/e2ee-devices/${d['id']}');
+      await _load();
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiError ? e.message : 'Không xoá được thiết bị');
+    } finally {
+      if (mounted) setState(() => _removing = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mine = _mine;
+    return SectionCard(
+      title: 'Thiết bị nhắn tin',
+      trailing: AppButton(label: 'Làm mới', variant: AppButtonVariant.ghost, onPressed: _loading ? null : () => _load()),
+      children: [
+        Text('Mỗi thiết bị có khoá mã hoá riêng; bạn bè mã hoá từng tin cho từng thiết bị của bạn. Máy bị mất có thể xoá ở đây.', style: TextStyle(color: context.mutedColor, fontSize: 13)),
+        const SizedBox(height: 10),
+        if (_error != null) NoticeBox(_error!),
+        if (_loading)
+          const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
+        else if (_devices.isEmpty)
+          Text('Chưa có thiết bị nào đăng ký khoá nhắn tin.', style: TextStyle(color: context.mutedColor))
+        else
+          for (final d in _devices)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+              decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outlineVariant), borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                      Text(chatDeviceName(d), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      if (mine != null && '${d['id']}' == mine) StatusChip('Thiết bị này', color: context.okColor, small: true),
+                    ]),
+                    const SizedBox(height: 2),
+                    Text('Đăng ký: ${viDateTimeLocal(d['createdAt'] as String?)} · Gần nhất: ${viDateTimeLocal(d['lastSeen'] as String?, withTime: true)}', style: TextStyle(color: context.mutedColor, fontSize: 12.5)),
+                  ]),
+                ),
+                if (mine == null || '${d['id']}' != mine) AppButton(label: 'Xoá', variant: AppButtonVariant.ghost, loading: _removing == '${d['id']}', onPressed: _removing != null ? null : () => _remove(d)),
               ]),
             ),
       ],

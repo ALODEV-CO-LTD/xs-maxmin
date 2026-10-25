@@ -61,6 +61,9 @@ class Device {
   Future<void> start({MemoryKeyVault? sharedVault}) async {
     chat = ChatService(api: api, userId: who.id, store: store, vault: sharedVault ?? vault, socket: socket, ackWait: const Duration(seconds: 5));
     _sub = socket.frames.listen(chat.onFrame);
+    // like FriendsController: the socket opens with this install's device id, so the relay can hand it the frames made for it
+    socket.deviceIdProvider = () => chat.myDeviceId;
+    await chat.prepareDevice();
     socket.start();
     await until(() => socket.ready, 'socket of $label');
     await chat.init();
@@ -90,6 +93,16 @@ Future<void> untilAsync(Future<bool> Function() ok, String what, {Duration timeo
     if (DateTime.now().isAfter(end)) fail('timeout: $what');
     await Future<void>.delayed(const Duration(milliseconds: 50));
   }
+}
+
+int _n = 0;
+
+/// Two new accounts that are friends (a phone that registered earlier on the shared accounts stays registered, so tests about the NUMBER of
+/// phones of an account need accounts of their own).
+Future<(Account, Account)> _freshPair() async {
+  final a = await _register('Ha${_n++}'), b = await _register('Binh${_n++}');
+  await _befriend(a, b);
+  return (a, b);
 }
 
 void main() {
@@ -154,21 +167,78 @@ void main() {
     await ios.stop();
   });
 
-  test('the same account on a SECOND phone replaces the key: the first phone can no longer read new messages (known limitation)', () async {
+  test('the same account on a SECOND phone: each phone has its own key and BOTH read new messages', () async {
+    final (huong, minh) = await _freshPair();
     final iosA = Device('ios-1', minh), android = Device('android', huong);
     await iosA.start();
     await android.start();
     await android.chat.loadFriendKeys();
 
-    // a second phone (fresh key vault) signs in to the same account and publishes its own key
+    // a second phone (fresh key vault) signs in to the same account: it registers its OWN key next to the first one
     final iosB = Device('ios-2', minh);
     await iosB.start();
-    await android.chat.loadFriendKeys(); // Android now encrypts to the second phone's key
+    expect(iosB.chat.myDeviceId, isNot(iosA.chat.myDeviceId));
+    await android.chat.loadFriendKeys(); // Android now knows both devices of Minh
+    expect(android.chat.friendDevices[minh.id]!.length, 2);
+    expect(android.chat.peerInfo[minh.id]!.changed, isFalse, reason: 'a new device is not a "key changed" warning');
 
-    await android.chat.send(minh.id, 'tin sau khi máy thứ hai đăng nhập');
+    final sent = await android.chat.send(minh.id, 'tin sau khi máy thứ hai đăng nhập');
     await untilAsync(() async => (await iosB.texts(huong.id)).any((m) => m.text == 'tin sau khi máy thứ hai đăng nhập'), 'second phone reads it');
+    await untilAsync(() async => (await iosA.texts(huong.id)).any((m) => m.text == 'tin sau khi máy thứ hai đăng nhập'), 'first phone reads it too');
+    await untilAsync(() async => (await android.texts(minh.id)).firstWhere((m) => m.id == sent.id).status == MsgStatus.delivered, 'Android sees the acknowledgement');
+
+    // and each phone can answer: Android reads it with the key of the phone that sent it
+    await iosB.chat.loadFriendKeys();
+    await iosB.chat.send(huong.id, 'trả lời từ máy thứ hai');
+    await untilAsync(() async => (await android.texts(minh.id)).any((m) => !m.mine && m.text == 'trả lời từ máy thứ hai'), 'Android reads the reply of the second phone');
+    await iosA.chat.loadFriendKeys();
+    await iosA.chat.send(huong.id, 'trả lời từ máy thứ nhất');
+    await untilAsync(() async => (await android.texts(minh.id)).any((m) => !m.mine && m.text == 'trả lời từ máy thứ nhất'), 'Android reads the reply of the first phone');
+
+    await iosA.stop();
+    await iosB.stop();
+    await android.stop();
+  });
+
+  test('one phone of the friend offline: the message still arrives on the other and is not marked failed', () async {
+    final (huong, minh) = await _freshPair();
+    final iosA = Device('ios-1', minh), android = Device('android', huong);
+    await iosA.start();
+    final iosB = Device('ios-2', minh); // registers its key, then goes offline
+    await iosB.start();
+    await iosB.stop();
+    await android.start();
+    await android.chat.loadFriendKeys();
+    expect(android.chat.friendDevices[minh.id]!.length, 2);
+
+    final m = await android.chat.send(minh.id, 'một máy đang tắt');
+    await untilAsync(() async => (await iosA.texts(huong.id)).any((x) => x.text == 'một máy đang tắt'), 'the phone that is on reads it');
+    await untilAsync(() async => (await android.texts(minh.id)).firstWhere((x) => x.id == m.id).status == MsgStatus.delivered, 'delivered');
     await Future<void>.delayed(const Duration(seconds: 1));
-    expect((await iosA.texts(huong.id)).any((m) => m.text == 'tin sau khi máy thứ hai đăng nhập'), isFalse, reason: 'the first phone cannot decrypt (different key)');
+    expect((await android.texts(minh.id)).firstWhere((x) => x.id == m.id).status, MsgStatus.delivered, reason: 'the offline phone must not turn it into a failure');
+    await iosA.stop();
+    await android.stop();
+  });
+
+  test('a phone removed from the account (Thiết bị nhắn tin > Xoá) stops receiving: friends no longer encrypt for it', () async {
+    final (huong, minh) = await _freshPair();
+    final iosA = Device('ios-1', minh), android = Device('android', huong);
+    await iosA.start();
+    final iosB = Device('ios-2', minh);
+    await iosB.start();
+    await android.start();
+    await android.chat.loadFriendKeys();
+    expect(android.chat.friendDevices[minh.id]!.length, 2);
+
+    final r = await http.delete(Uri.parse('${AppConfig.api}/me/e2ee-devices/${iosB.chat.myDeviceId}'), headers: {'authorization': 'Bearer ${minh.token}'});
+    expect(r.statusCode, 200);
+    await android.chat.loadFriendKeys();
+    expect(android.chat.friendDevices[minh.id]!.map((d) => d.id), [iosA.chat.myDeviceId]);
+
+    await android.chat.send(minh.id, 'sau khi xoá máy thứ hai');
+    await untilAsync(() async => (await iosA.texts(huong.id)).any((m) => m.text == 'sau khi xoá máy thứ hai'), 'the remaining phone reads it');
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect((await iosB.texts(huong.id)).any((m) => m.text == 'sau khi xoá máy thứ hai'), isFalse);
     await iosA.stop();
     await iosB.stop();
     await android.stop();

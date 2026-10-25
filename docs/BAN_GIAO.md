@@ -474,6 +474,8 @@ Trước đây Tổng quan cộng thẳng "điểm vào/ra" của mọi kiểu �
 
 `tools/test_chat_e2e.sh` (~1 phút): dựng một máy chủ THỬ cô lập (bản sao backend, DB mới, cổng 8597, không đụng dữ liệu thật), tạo hai tài khoản, kết bạn, rồi chạy `app/test_e2e/chat_two_devices_test.dart` với mã app thật: hai "thiết bị" (mỗi bên có kho khoá, kho tin nhắn và WebSocket riêng; Android và iOS dùng chung mã Dart nên không khác nhau về giao thức) gửi/nhận/xác nhận hai chiều, tin dài có dấu và emoji, bạn offline rồi "Gửi lại", và giới hạn "cùng một tài khoản trên hai máy" (máy thứ hai thay khoá, máy thứ nhất không đọc được tin mới).
 
+**Cập nhật 25/10/2026 (chat nhiều máy):** bộ thử này đã được sửa theo chat nhiều máy (CHƯA commit). Mỗi "thiết bị" nay mở WebSocket kèm mã máy (`socket.deviceIdProvider` + `chat.prepareDevice()`, giống `FriendsController`); trước đó bộ thử không khai báo mã máy nên máy chủ không giao được khung nào và 4 bài đều quá hạn. Bài cuối cũ ("máy thứ hai thay khoá") đã thay bằng ba bài: hai máy cùng tài khoản đều đọc được tin và trả lời được; một máy offline thì tin vẫn tới máy kia và không bị báo lỗi; xoá một máy (`DELETE /me/e2ee-devices/<id>`) thì bạn bè thôi mã hoá cho máy đó. Chạy lại: `tools/test_chat_e2e.sh` (6 bài đạt). Kiểm toàn bộ 25/10/2026: `tools/test_all.sh` đạt cả năm phần (app analyze sạch, app 605 test, web 245 test và build, backend 194 test).
+
 ## Web chuyển từ Vue sang Next.js (19/10/2026)
 
 Web giờ là **Next.js 16** trong `web-next/` (App Router, React 19, TypeScript, xuất tĩnh ra `web-next/out`); thư mục Vue `frontend/` đã bỏ (xem lại bằng tag git `vue-frontend-final`). Backend Dart và app Flutter không đổi.
