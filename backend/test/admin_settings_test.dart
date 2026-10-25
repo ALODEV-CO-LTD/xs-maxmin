@@ -1,4 +1,5 @@
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/admin_trash.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
@@ -28,6 +29,7 @@ void main() {
 
   test('DELETE only for allowed keys; markers survive', () async {
     final db = testDb();
+    ensureAdminTrashTable(db);
     db.execute("INSERT INTO settings (key, value) VALUES ('perm_split_maintenance', '1'), ('bank_bin', '9'), ('POLICY.x', '1')");
     Future<Response> del(Object body) => callRoute(route.onRequest, db, userId: 'adm', role: 'admin', method: HttpMethod.delete, body: body);
     expect((await del({'keys': ['perm_split_maintenance']})).statusCode, 400);

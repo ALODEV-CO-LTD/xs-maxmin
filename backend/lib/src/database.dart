@@ -12,6 +12,7 @@ import 'package_plans.dart';
 import 'customer_codes.dart';
 import 'friend_requests.dart';
 import 'e2ee_devices.dart';
+import 'admin_trash.dart';
 import 'deletion_scheduler.dart';
 
 const _uuid = Uuid();
@@ -114,6 +115,8 @@ void _migrateSchema(Database db) {
   _ensureColumn(db, 'users', 'e2ee_public_key', 'TEXT');
   // One key per DEVICE (lib/src/e2ee_devices.dart); an account's single older key becomes its `legacy` device.
   ensureE2eeDevicesTable(db);
+  // What an Admin deletes is kept for 7 days (lib/src/admin_trash.dart).
+  ensureAdminTrashTable(db);
   // Multi-level Admin (lib/src/permissions.dart): NULL = root Admin, else a JSON list
   // of permission keys for a staff account.
   _ensureColumn(db, 'users', 'staff_permissions', 'TEXT');

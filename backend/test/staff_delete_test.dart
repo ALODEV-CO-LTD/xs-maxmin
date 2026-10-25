@@ -1,4 +1,5 @@
 import 'package:dart_frog/dart_frog.dart';
+import 'package:server/src/admin_trash.dart';
 import 'package:test/test.dart';
 
 import '../routes/api/admin/staff/[id].dart' as route;
@@ -8,6 +9,7 @@ void main() {
   test('deleting a staff member with payment and announcement history works and keeps the history', () async {
     final db = testDb();
     db.execute('ALTER TABLE users ADD COLUMN staff_permissions TEXT');
+    ensureAdminTrashTable(db);
     db.execute('''CREATE TABLE announcements (id TEXT PRIMARY KEY, kind TEXT NOT NULL DEFAULT 'info', title TEXT NOT NULL,
       body TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, created_by TEXT REFERENCES users(id))''');
     db.execute("INSERT INTO users (id, username, name, password_hash, role, data_used, created_at, staff_permissions) VALUES ('st1','staff1','S','x','admin',0,'2026-01-01','[\"payments.manage\"]')");

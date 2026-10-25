@@ -107,6 +107,9 @@ enum AppSvg {
   check('check'),
   chevronRight('chevron_right'),
   info('info'),
+
+  /// Hướng dẫn (danh sách có kính lúp)
+  guide('guide'),
   arrowUp('arrow_up'),
   mic('mic'),
   chevronLeft('chevron_left'),

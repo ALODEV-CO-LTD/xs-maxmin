@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/request_body.dart';
+import 'package:server/src/admin_trash.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -21,6 +22,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   switch (context.request.method) {
     case HttpMethod.delete:
+      trashAnnouncement(db, existing.first, deletedBy: auth.userId);
       db.execute('DELETE FROM announcements WHERE id = ?', [id]);
       return Response.json(body: {'ok': true});
     case HttpMethod.patch:

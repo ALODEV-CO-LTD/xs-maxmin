@@ -24,7 +24,8 @@ const adminPermissions = <String, String>{
   'announcements.manage': 'Đăng, ẩn/hiện và xoá thông báo gửi tới người dùng',
   'maintenance.manage': 'Bật/tắt chế độ bảo trì và sửa nội dung banner bảo trì',
   'settings.manage': 'Cài đặt hệ thống (ngân hàng, giá gói)',
-  'backups.manage': 'Sao lưu và tải cơ sở dữ liệu',
+  'backups.manage': 'Sao lưu và tải cơ sở dữ liệu, khôi phục dữ liệu một khách từ bản sao lưu',
+  'trash.manage': 'Thùng rác 7 ngày: xem, khôi phục hoặc xoá hẳn những gì Admin đã xoá',
   'security.view': 'Xem nhật ký bảo mật',
   'security.policy': 'Cấu hình chính sách bảo mật (số lần nhập sai, thời gian khoá, thời hạn đăng nhập, đóng dấu màn hình)',
 };

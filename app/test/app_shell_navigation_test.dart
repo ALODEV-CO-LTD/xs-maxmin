@@ -14,7 +14,9 @@ import 'package:mamba_app/core/mask_store.dart';
 import 'package:mamba_app/core/scoring_config_bus.dart';
 import 'package:mamba_app/core/theme.dart';
 import 'package:mamba_app/features/account/privacy/privacy_store.dart';
+import 'package:mamba_app/core/widgets/svg_icon.dart';
 import 'package:mamba_app/features/calc/calc_screen.dart';
+import 'svg_finder.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -195,5 +197,16 @@ void main() {
     router.go('/overview');
     await tester.pumpAndSettle();
     expect(find.byType(NavigationBar), findsNothing); // sent back to /admin
+  });
+
+  testWidgets('Tổng quan: the top-left "Hướng dẫn" button has the owner\'s search-list icon and opens the guide', (tester) async {
+    await _pump(tester);
+    expect(bySvg(AppSvg.guide), findsOneWidget);
+    expect(find.byTooltip('Hướng dẫn'), findsOneWidget);
+    expect(find.descendant(of: find.byTooltip('Hướng dẫn'), matching: bySvg(AppSvg.guide)), findsOneWidget);
+    expect(bySvg(AppSvg.info), findsNothing); // the old icon is gone from this button
+    await tester.tap(find.byTooltip('Hướng dẫn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hướng dẫn sử dụng'), findsOneWidget);
   });
 }

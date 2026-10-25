@@ -111,14 +111,19 @@ class DefaultConfigScreen extends StatelessWidget {
     final bus = Provider.of<ScoringConfigBus?>(context, listen: false);
     return Scaffold(
       appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Cấu hình tính điểm mặc định')),
+      // The region bar and Sửa / Lưu stay at the top; only the table under them scrolls.
       body: SafeArea(
-        child: ListView(padding: const EdgeInsets.all(16), children: [
-          ScoringConfigEditor(onSaved: (m) {
-            if (m == null) return;
-            bus?.publish(m);
-            onSaved?.call(m);
-          }),
-        ]),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: ScoringConfigEditor(
+            scrollable: true,
+            onSaved: (m) {
+              if (m == null) return;
+              bus?.publish(m);
+              onSaved?.call(m);
+            },
+          ),
+        ),
       ),
     );
   }

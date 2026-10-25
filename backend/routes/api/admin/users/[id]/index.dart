@@ -1,7 +1,9 @@
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/request_body.dart';
+import 'package:server/src/admin_trash.dart';
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/security.dart';
 import 'package:server/src/permissions.dart';
 import 'package:server/src/password_policy.dart';
 import 'package:server/src/recovery_codes.dart';
@@ -55,7 +57,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
   return switch (context.request.method) {
     HttpMethod.get => _get(context, id),
     HttpMethod.patch => _patch(context, id),
-    HttpMethod.delete => _delete(context, id),
+    HttpMethod.delete => _delete(context, id, auth),
     _ => Response(statusCode: 405, body: 'Method not allowed'),
   };
 }
@@ -187,7 +189,7 @@ void _clearLockouts(Database db, String userId, String username) {
   );
 }
 
-Response _delete(RequestContext context, String id) {
+Response _delete(RequestContext context, String id, AuthTokenPayload auth) {
   final db = context.read<Database>();
   final target = db.select(
     "SELECT * FROM users WHERE id = ? AND role = 'user'",
@@ -199,6 +201,8 @@ Response _delete(RequestContext context, String id) {
       body: {'error': 'Không tìm thấy khách hàng'},
     );
   }
+  // 7 days in the Admin trash (the account with everything it owns), then gone for good
+  trashAccount(db, id, staff: false, deletedBy: auth.userId);
   db.execute('DELETE FROM users WHERE id = ?', [id]);
-  return Response.json(body: {'deleted': true});
+  return Response.json(body: {'deleted': true, 'trashDays': trashDays});
 }

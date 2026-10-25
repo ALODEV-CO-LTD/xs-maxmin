@@ -8,7 +8,7 @@ import '../../core/widgets/svg_icon.dart';
 Future<void> showGuideDialog(BuildContext context) => showDialog<void>(context: context, builder: (_) => const _GuideDialog());
 
 const guideSections = <(AppSvg, String, String)>[
-  (AppSvg.chart, 'Tổng quan', 'Xem gói đang dùng và số liệu theo kỳ: chọn Tiền gửi, Tiền trúng hoặc Lợi nhuận, rồi Ngày, Tuần, Tháng, Năm. Số lớn là kỳ hiện tại (hôm nay, tuần này, tháng này, năm nay), dòng nhỏ so với kỳ liền trước. Cuối trang là số liệu toàn bộ và nút xoá dữ liệu.'),
+  (AppSvg.chart, 'Tổng quan', 'Xem gói đang dùng và số liệu theo kỳ: chọn Tiền khách gửi, Tiền khách trúng hoặc Lợi nhuận, rồi Ngày, Tuần, Tháng, Năm. Số lớn là kỳ hiện tại (hôm nay, tuần này, tháng này, năm nay), dòng nhỏ so với kỳ liền trước. Cuối trang là số liệu toàn bộ và nút xoá dữ liệu.'),
   (AppSvg.calculator, 'Tính toán', 'Gồm 4 tab theo thứ tự làm việc: Nhập số, Kết quả, Tính điểm, Khách hàng.'),
   (AppSvg.edit, '1. Nhập số', 'Chọn khách và ngày, nhập từng dòng (hạng mục, số, điểm vào) hoặc dán tin nhắn / chụp ảnh để app đọc sẵn rồi kiểm tra lại trước khi lưu.'),
   (AppSvg.check, '2. Kết quả', 'Nhập kết quả xổ số các miền rồi bấm "Lưu kết quả". Điểm ra của khách hàng sẽ tự được tính ở màn hình Tính điểm.'),

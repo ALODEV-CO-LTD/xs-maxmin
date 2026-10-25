@@ -162,4 +162,42 @@ void main() {
     expect(find.text('23.000'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Cấu hình: thanh chọn miền và nút Sửa / Lưu đứng yên khi lướt xuống, chỉ bảng bên dưới cuộn', (tester) async {
+    // a small screen, so the table is longer than the screen and really scrolls
+    tester.view.physicalSize = const Size(400, 560);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final server = _Server();
+    await tester.pumpWidget(_app(server, const DefaultConfigScreen()));
+    await tester.pumpAndSettle();
+    double top(Finder f) => tester.getTopLeft(f).dy;
+    final bac = find.widgetWithText(ChoiceChip, 'Miền Bắc');
+    final edit = find.text('Sửa');
+    final y0 = top(bac), yEdit0 = top(edit);
+
+    // scroll the table a long way down
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(tester.state<ScrollableState>(find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first).position.pixels, greaterThan(100));
+    expect(top(bac), y0, reason: 'the region bar must not move');
+    expect(top(edit), yEdit0, reason: 'Sửa must not move');
+    expect(bac, findsOneWidget);
+
+    // while editing, the save row is pinned as well, and so is the bar
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    final save = find.text('Lưu cấu hình');
+    final ySave0 = top(save);
+    final before = tester.state<ScrollableState>(find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first).position.pixels;
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(tester.state<ScrollableState>(find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first).position.pixels, greaterThan(before), reason: 'the table scrolls while editing too');
+    expect(top(save), ySave0);
+    expect(top(bac), y0);
+
+    // the table itself did scroll
+    expect(tester.state<ScrollableState>(find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first).position.pixels, greaterThan(100));
+    expect(tester.takeException(), isNull);
+  });
 }

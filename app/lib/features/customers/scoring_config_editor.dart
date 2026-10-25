@@ -17,10 +17,14 @@ import '../../core/keyboard.dart';
 /// Cấu hình tính điểm, one editor for both places:
 ///  - [customer] == null: the account-wide default (GET/PUT /me/scoring-settings);
 ///  - [customer] set: that customer's own settings (PATCH /me/customers/:id {scoringRates}), falling back to [accountRates].
-/// It does not scroll by itself: put it in a scroll view.
+/// It does not scroll by itself: put it in a scroll view - or pass [scrollable] and give it a bounded height: then the region bar and the
+/// "Sửa" / save row stay at the top and only the table below scrolls.
 class ScoringConfigEditor extends StatefulWidget {
-  const ScoringConfigEditor({super.key, this.customer, this.accountRates = const {}, this.onSaved});
+  const ScoringConfigEditor({super.key, this.customer, this.accountRates = const {}, this.onSaved, this.scrollable = false});
   final Customer? customer;
+
+  /// true: the editor fills the height it is given, keeps its top (regions, Sửa / Lưu) fixed and scrolls the table itself.
+  final bool scrollable;
   final RatesMap accountRates;
 
   /// Called with the saved map (customer: null = follows the account again).
@@ -169,7 +173,7 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
   Widget build(BuildContext context) {
     if (_loading) return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
     final muted = TextStyle(fontSize: 13, color: context.mutedColor);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final header = <Widget>[
       if (_error.isNotEmpty) InfoBox(_error),
       if (_notice.isNotEmpty) InfoBox(_notice, kind: InfoKind.success),
       Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -200,6 +204,8 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
             Expanded(child: AppButton(label: _isCustomer ? 'Lưu cấu hình khách này' : 'Lưu cấu hình', variant: AppButtonVariant.primary, loading: _saving, onPressed: _saving || !_m.dirty ? null : _save)),
           ]),
         ),
+    ];
+    final body = <Widget>[
       const SizedBox(height: 8),
       for (final g in _m.groupsOf(all: _editing)) ...[
         Container(
@@ -224,6 +230,12 @@ class _ScoringConfigEditorState extends State<ScoringConfigEditor> {
         Text(!_isCustomer ? '' : (_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định'), style: muted),
       ] else if (_isCustomer)
         Padding(padding: const EdgeInsets.only(top: 4), child: Text(_m.overrideCount > 0 ? '${_m.overrideCount} mục riêng' : 'Đang dùng cấu hình mặc định', style: muted)),
+    ];
+    if (!widget.scrollable) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [...header, ...body]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      ...header,
+      // keyed: the row of Lưu / Huỷ appears above while editing, and the table must keep its scroll position
+      Expanded(key: const ValueKey('config-table'), child: ListView(padding: const EdgeInsets.only(bottom: 24), children: body)),
     ]);
   }
 

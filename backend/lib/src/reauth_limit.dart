@@ -63,6 +63,11 @@ int reauthRecordFailure(Database db, String userId, String action, {String? ip})
   return lockSeconds;
 }
 
+int _failCount(Database db, String userId) {
+  final rows = db.select('SELECT fail_count FROM login_attempts WHERE key = ?', [_key(userId)]);
+  return rows.isEmpty ? 0 : rows.first['fail_count'] as int;
+}
+
 void reauthClear(Database db, String userId) {
   db.execute('DELETE FROM login_attempts WHERE key = ?', [_key(userId)]);
 }
@@ -96,5 +101,14 @@ Response? checkReauthPassword(
   }
   final lock = reauthRecordFailure(db, userId, action, ip: ip);
   if (lock > 0) return lockedResponse(lock);
-  return Response.json(statusCode: 403, body: {'error': wrongMessage});
+  // Tell the client how it stands, so it can say "sai 3/5 lần, còn 2 lần trước khi bị khoá tạm": `failedAttempts` so far, the
+  // `maxAttempts` before a lock (the policy's free tries; the last one that fails starts the lock), and `attemptsLeft`.
+  final max = loadPolicy(db).loginFreeAttempts;
+  final failed = _failCount(db, userId);
+  return Response.json(statusCode: 403, body: {
+    'error': wrongMessage,
+    'failedAttempts': failed,
+    'maxAttempts': max,
+    'attemptsLeft': (max - failed).clamp(0, max),
+  });
 }

@@ -18,7 +18,7 @@ class OverviewScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: IconButton(tooltip: 'Hướng dẫn', icon: const SvgIcon(AppSvg.info), onPressed: () => showGuideDialog(context)),
+        leading: IconButton(tooltip: 'Hướng dẫn', icon: const SvgIcon(AppSvg.guide), onPressed: () => showGuideDialog(context)),
         title: const Text('Tổng quan'),
         actions: const [_SupportButton()],
       ),

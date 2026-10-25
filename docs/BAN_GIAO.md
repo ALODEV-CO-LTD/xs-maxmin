@@ -636,3 +636,29 @@ Nguồn: thư mục `~/Downloads/icon svg/` (13 file, đều một màu). Đã c
 - Chưa thử trên máy thật: Admin xoá tin của mình (xoá mềm) và mặc định hệ thống cho "Khoá khi thoát ra"; chưa gửi thử ảnh chat thật 25 MB bằng tài khoản đăng nhập (đã thử 30 MB qua địa chỉ công khai tới được backend).
 - Ý tưởng chưa làm: khi engine thiếu số, xếp số theo hàng để không lệch ô; phần đọc ảnh Miền Nam/Miền Trung chưa được rà lại trong phiên này.
 - `flutter analyze` còn 1 cảnh báo cũ ở `app/test_e2e/chat_two_devices_test.dart:67` (không liên quan).
+
+
+## 25/10/2026 — Thùng rác Admin 7 ngày và khôi phục dữ liệu một khách từ bản sao lưu (CHƯA commit, CHƯA deploy)
+
+Theo yêu cầu: khách không tự khôi phục trong app, mà nhờ Admin; thùng rác 7 ngày chỉ chứa những gì **chính Admin xoá**; dữ liệu khách tự xoá thì khôi phục từ bản sao lưu.
+
+**A. Thùng rác Admin** (`backend/lib/src/admin_trash.dart`, `user_rows.dart`; bảng mới `admin_trash`, tạo trong `database.dart` cùng các migration)
+- Mọi đường xoá của Admin chụp bản sao dạng JSON vào `admin_trash` TRƯỚC khi xoá: tài khoản khách (kèm mọi dòng nó sở hữu: khách hàng, số liệu, kết quả, mẫu cú pháp, lịch xoá, giao dịch, yêu cầu thanh toán, tin hỗ trợ kèm ảnh, bạn bè, mã ID, thiết bị nhắn tin...), tài khoản nhân viên (chỉ dòng tài khoản), thông báo, gói dịch vụ, khoá cài đặt bị xoá (ngân hàng...). Hook ở `admin/users/[id]`, `staff/[id]`, `announcements/[id]`, `packages/[code]`, `settings` (DELETE).
+- Giữ **7 ngày** (`trashDays`), tự dọn khi Admin mở danh sách hoặc khôi phục. Không đưa vào thùng rác: dữ liệu khách tự xoá trong app, xoá theo lịch, và "Xoá toàn bộ dữ liệu" bằng mật khẩu xoá (cố ý: tính năng đó sinh ra để huỷ hẳn).
+- API (quyền mới `trash.manage`, Admin gốc có sẵn, hiện trong bảng phân quyền): `GET /admin/trash` (loại, nhãn, số dòng theo bảng, còn mấy ngày, người xoá; KHÔNG trả nội dung), `POST /admin/trash/<id>/restore` (409 kèm lý do: tên đăng nhập đã bị người khác dùng, tài khoản đã có lại...), `DELETE /admin/trash/<id>` (xoá hẳn). Khôi phục giữ nguyên mã và mật khẩu cũ; phiên đăng nhập cũ không dựng lại; bạn bè/lời mời với tài khoản đã bị xoá thì bỏ qua. Ghi nhật ký bảo mật `trash_restored`, `trash_purged`.
+- App Admin: mục **Thùng rác** trong ngăn kéo (`features/admin/trash/`): mỗi mục có "Còn N ngày", tóm tắt số lượng, Khôi phục (hỏi trước) và Xoá hẳn (hỏi trước).
+
+**B. Khôi phục dữ liệu MỘT khách từ bản sao lưu** (`backend/lib/src/backup_restore.dart`)
+- `GET /admin/backups` thêm trường `sources`: bản Admin tạo trong app (`data/backups`) VÀ bản cron hằng ngày (`/var/backups/xs-maxmin`, đổi được bằng biến môi trường `XOSO_CRON_BACKUP_DIR`), mới nhất trước; trường `backups` cũ (để tải về) giữ nguyên. Mã bản sao lưu dạng `manual:<tên>` hoặc `cron:<tên>`, tên khớp mẫu chặt nên không trỏ ra ngoài hai thư mục.
+- `GET /admin/backups/users?backup=<id>`: các khách có trong bản đó kèm số lượng lúc đó và hiện tại (chỉ số lượng). `POST /admin/backups/restore-user {backup, userId, mode}`: chỉ đụng số liệu, khách hàng, kết quả, mẫu cú pháp, lịch xoá của ĐÚNG khách đó. `merge` (mặc định): thêm lại phần còn thiếu, không ghi đè, không nhân đôi. `replace`: xoá dữ liệu hiện tại của khách rồi ghi lại như bản sao lưu (app bắt gõ tên đăng nhập để xác nhận). Một giao dịch, tự tạo thêm một bản sao lưu an toàn ngay trước khi làm (trả về `safetyBackup`), ghi nhật ký `backup_user_restored`. Tài khoản đã bị xoá thì từ chối và chỉ sang Thùng rác. Quyền: `backups.manage` (mô tả quyền đã sửa cho đúng).
+- App Admin: Cài đặt > Sao lưu có thêm phần "Khôi phục dữ liệu một khách" (danh sách bản sao lưu cả hai nguồn, bấm Khôi phục → tìm khách → xem lúc đó/hiện tại → chọn chế độ).
+- Giới hạn: chỉ lấy lại được những gì đã có trong bản sao lưu; bản cron chạy mỗi ngày nên dữ liệu nhập và xoá trong cùng ngày có thể không có trong đó. Máy chủ giữ 14 bản cron và tối đa 20 bản Admin tạo.
+
+**Kiểm:** backend 211 test (thêm `admin_trash_test.dart` 9 bài, `backup_restore_user_test.dart` 8 bài, và sửa 2 test cũ cho bảng `admin_trash`), app 616 test (`admin_trash_restore_test.dart` 11 bài), `flutter analyze` sạch. **Chưa kiểm trên máy thật hay máy chủ thật; chưa deploy; chưa có phía web.**
+
+**Cùng đợt 25/10/2026 (app + backend):**
+- **Màn khoá app báo số lần sai và đếm ngược** (`privacy_gate.dart`; backend `reauth_limit.dart`): sai mật khẩu thì hiện "Đã sai X/Y lần. Còn N lần thử trước khi bị khoá tạm" (máy chủ trả thêm `failedAttempts`, `maxAttempts`, `attemptsLeft` ở phản hồi 403 của mọi chỗ nhập lại mật khẩu; Y là số lần miễn phí của chính sách Admin, mặc định 5, lần sai thứ Y bắt đầu khoá). Bị khoá (429) thì đếm ngược từng giây từ `retryAfterSeconds` ("30 giây", "2 phút 05 giây"), ô nhập và nút bị tắt, hết giờ tự mở lại. Màn Đăng nhập chưa đổi. Test `app/test/lock_attempts_test.dart`, `backend/test/reauth_attempts_test.dart`.
+- **Tổng quan:** hai nút chỉ số đổi thành "Tiền khách gửi" / "Tiền khách trúng"; nút Hướng dẫn dùng icon `assets/icons/guide.svg` (file `search-list-svgrepo-com.svg` của chủ dự án, nét 1,5).
+- **Cấu hình (tab):** thanh chọn miền và nút Sửa / hàng Lưu đứng yên, chỉ bảng bên dưới cuộn (`ScoringConfigEditor(scrollable: true)`; màn cấu hình riêng từng khách vẫn cuộn cả trang). Test trong `app/test/flows_test.dart`.
+- Bộ thử máy chủ cục bộ cho simulator: build bản sao tạm của app (thay ML Kit bằng bản giả) với `--dart-define=API_BASE=http://127.0.0.1:<cổng>` và chạy `dart_frog dev` từ một bản sao backend (`XOSO_SEED_DEMO=1 XOSO_ADMIN_PASSWORD=...`, `XOSO_CRON_BACKUP_DIR` để thử bản cron).
+

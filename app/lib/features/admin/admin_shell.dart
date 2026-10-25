@@ -15,6 +15,7 @@ import 'payments/admin_payments_screen.dart';
 import 'settings/admin_settings_screen.dart';
 import 'staff/admin_staff_screen.dart';
 import 'stats/admin_stats_screen.dart';
+import 'trash/admin_trash_screen.dart';
 import 'users/admin_users_screen.dart';
 import '../../core/widgets/app_button.dart';
 
@@ -43,6 +44,7 @@ class _AdminShellState extends State<AdminShell> {
     _Section('Phản hồi', AppSvg.feedback, 'support.messages', () => const AdminMessagesScreen()),
     _Section('Thông báo & bảo trì', AppSvg.megaphone, ['announcements.manage', 'maintenance.manage'], () => const AdminNoticesScreen()),
     _Section('Cài đặt', AppSvg.gear, ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], () => const AdminSettingsScreen()),
+    _Section('Thùng rác', AppSvg.delete, 'trash.manage', () => const AdminTrashScreen()),
     _Section('Phân quyền', AppSvg.userAdmin, null, () => const AdminStaffScreen(), root: true),
   ];
 

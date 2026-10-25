@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/request_body.dart';
+import 'package:server/src/admin_trash.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/package_plans.dart';
 import 'package:server/src/permissions.dart';
@@ -48,6 +49,8 @@ Future<Response> onRequest(RequestContext context, String code) async {
           body: {'error': 'Gói đã có tài khoản hoặc giao dịch sử dụng nên không thể xoá. Hãy ẩn gói để ngừng bán.'},
         );
       }
+      final raw = db.select('SELECT * FROM packages WHERE code = ?', [code]);
+      if (raw.isNotEmpty) trashPackage(db, raw.first, deletedBy: auth.userId);
       db.execute('DELETE FROM packages WHERE code = ?', [code]);
       return Response.json(body: {'ok': true});
     default:

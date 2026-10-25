@@ -123,18 +123,61 @@ class _LockForm extends StatefulWidget {
   State<_LockForm> createState() => _LockFormState();
 }
 
+/// "45 giây", "1 phút 05 giây", "15 phút".
+String formatLockWait(int seconds) {
+  if (seconds < 60) return '$seconds giây';
+  final m = seconds ~/ 60, r = seconds % 60;
+  return r == 0 ? '$m phút' : '$m phút ${r.toString().padLeft(2, '0')} giây';
+}
+
 class _LockFormState extends State<_LockForm> {
   final _password = TextEditingController();
   String? _error;
   bool _busy = false;
 
+  /// While the server has locked the unlock attempts: the seconds left, counted down live (each second), and the deadline as a second
+  /// check (a timer stops while the app is in the background).
+  int _lockLeft = 0;
+  DateTime? _lockUntil;
+  Timer? _tick;
+
+  bool get _locked => _lockLeft > 0;
+
   @override
   void dispose() {
+    _tick?.cancel();
     _password.dispose();
     super.dispose();
   }
 
+  void _startLock(int seconds) {
+    _tick?.cancel();
+    _lockLeft = seconds < 1 ? 1 : seconds;
+    _lockUntil = DateTime.now().add(Duration(seconds: _lockLeft));
+    _tick = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      final byClock = _lockUntil!.difference(DateTime.now()).inSeconds;
+      final next = (_lockLeft - 1) < byClock ? _lockLeft - 1 : byClock; // whichever says less is left
+      setState(() => _lockLeft = next < 0 ? 0 : next);
+      if (_lockLeft == 0) {
+        t.cancel();
+        _lockUntil = null;
+        _error = null;
+      }
+    });
+  }
+
+  /// What a refused unlock tells the person: how many wrong tries so far and how many are left before the temporary lock.
+  static String wrongMessage(ApiError e) {
+    final d = e.data;
+    final failed = d?['failedAttempts'], max = d?['maxAttempts'], left = d?['attemptsLeft'];
+    if (failed is! num || max is! num || left is! num) return e.message;
+    final tail = left <= 0 ? 'Lần sai tiếp theo sẽ bị khoá tạm.' : 'Còn ${left.toInt()} lần thử trước khi bị khoá tạm.';
+    return '${e.message}. Đã sai ${failed.toInt()}/${max.toInt()} lần. $tail';
+  }
+
   Future<void> _unlock() async {
+    if (_locked) return;
     if (_password.text.isEmpty) {
       setState(() => _error = 'Vui lòng nhập mật khẩu');
       return;
@@ -147,7 +190,17 @@ class _LockFormState extends State<_LockForm> {
       await widget.store.unlock(widget.api, _password.text);
       _password.clear();
     } on ApiError catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      if (e.status == 429) {
+        final secs = e.data?['retryAfterSeconds'];
+        setState(() {
+          _error = null;
+          _password.clear();
+          _startLock(secs is num ? secs.toInt() : (int.tryParse(RegExp(r'(\d+) giây').firstMatch(e.message)?.group(1) ?? '') ?? 30));
+        });
+      } else {
+        setState(() => _error = e.status == 403 ? wrongMessage(e) : e.message);
+      }
     } catch (_) {
       if (mounted) setState(() => _error = 'Đã xảy ra lỗi, vui lòng thử lại');
     } finally {
@@ -172,10 +225,13 @@ class _LockFormState extends State<_LockForm> {
                 const SizedBox(height: 8),
                 const Text('Để bảo vệ dữ liệu, ứng dụng đã khoá. Nhập mật khẩu (hoặc mật khẩu lớp hai) để tiếp tục. Dữ liệu bạn đang nhập vẫn được giữ nguyên.', textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                if (_error != null) NoticeBox(_error!),
-                PasswordField(controller: _password, label: 'Mật khẩu', enabled: !_busy, autofocus: true, onSubmitted: (_) => _unlock()),
+                if (_locked)
+                  NoticeBox('Đã nhập sai quá nhiều lần. Vui lòng thử lại sau ${formatLockWait(_lockLeft)}.', key: const ValueKey('lock-countdown'))
+                else if (_error != null)
+                  NoticeBox(_error!),
+                PasswordField(controller: _password, label: 'Mật khẩu', enabled: !_busy && !_locked, autofocus: true, onSubmitted: (_) => _unlock()),
                 const SizedBox(height: 14),
-                AppButton(label: 'Mở khoá', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy ? null : _unlock),
+                AppButton(label: _locked ? 'Thử lại sau ${formatLockWait(_lockLeft)}' : 'Mở khoá', variant: AppButtonVariant.primary, loading: _busy, onPressed: _busy || _locked ? null : _unlock),
                 AppButton(label: 'Đăng xuất', variant: AppButtonVariant.ghost, onPressed: _busy ? null : widget.auth.clear),
               ]),
             ),

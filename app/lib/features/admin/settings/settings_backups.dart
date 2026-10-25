@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import '../payments/payments_logic.dart' show viDateTime;
+import 'restore_customer.dart';
 import 'settings_logic.dart';
 import 'settings_ui.dart';
 import '../../../core/widgets/app_button.dart';
@@ -28,6 +29,7 @@ class _BackupsSectionState extends State<BackupsSection> {
   bool _loading = true, _creating = false;
   String? _error, _message, _downloading;
   List<BackupItem> _items = [];
+  List<BackupSource> _sources = [];
 
   ApiClient get _api => context.read<ApiClient>();
 
@@ -46,10 +48,16 @@ class _BackupsSectionState extends State<BackupsSection> {
       final res = await _api.get('/admin/backups');
       if (!mounted) return;
       setState(
-        () => _items = [
-          for (final b in ((res as Map)['backups'] as List? ?? const []))
-            if (b is Map<String, dynamic>) BackupItem.fromJson(b),
-        ],
+        () {
+          _items = [
+            for (final b in ((res as Map)['backups'] as List? ?? const []))
+              if (b is Map<String, dynamic>) BackupItem.fromJson(b),
+          ];
+          _sources = [
+            for (final b in (res['sources'] as List? ?? const []))
+              if (b is Map<String, dynamic>) BackupSource.fromJson(b),
+          ];
+        },
       );
     } catch (e) {
       if (mounted) setState(() => _error = errText(e, 'Không tải được danh sách'));
@@ -125,6 +133,8 @@ class _BackupsSectionState extends State<BackupsSection> {
                 ),
               ),
             ),
+        // restoring ONE customer from a backup (also from the daily server backups)
+        if (!_loading) RestoreCustomerSection(sources: _sources),
       ],
     );
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:server/src/request_body.dart';
+import 'package:server/src/admin_trash.dart';
 import 'package:server/src/auth_middleware.dart';
 import 'package:server/src/password_policy.dart';
 import 'package:server/src/permissions.dart';
@@ -37,6 +38,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
     // member with history could not be deleted (FK error => 500). Keep the history, drop only the reference.
     db.execute('BEGIN');
     try {
+      trashAccount(db, id, staff: true, deletedBy: auth.userId);
       db.execute('UPDATE payment_requests SET decided_by = NULL WHERE decided_by = ?', [id]);
       db.execute('UPDATE announcements SET created_by = NULL WHERE created_by = ?', [id]);
       db.execute('DELETE FROM users WHERE id = ?', [id]);

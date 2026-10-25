@@ -13,8 +13,8 @@ const statUnitLabels = {
   StatUnit.year: 'Năm',
 };
 const statMetricLabels = {
-  StatMetric.vao: 'Tiền gửi',
-  StatMetric.ra: 'Tiền trúng',
+  StatMetric.vao: 'Tiền khách gửi',
+  StatMetric.ra: 'Tiền khách trúng',
   StatMetric.profit: 'Lợi nhuận',
 };
 /// Tổng quan shows the CURRENT period of the chosen unit (today, this week, this month, this year) against the one before it.

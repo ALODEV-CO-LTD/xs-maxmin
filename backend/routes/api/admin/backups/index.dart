@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:path/path.dart' as p;
 import 'package:server/src/auth_middleware.dart';
+import 'package:server/src/backup_restore.dart';
 import 'package:server/src/permissions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -19,7 +20,8 @@ Future<Response> onRequest(RequestContext context) async {
   if (denied != null) return denied;
 
   return switch (context.request.method) {
-    HttpMethod.get => Response.json(body: {'backups': listBackups()}),
+    // `backups`: the ones made in the app (download); `sources`: also the daily server backups, for "restore one customer"
+    HttpMethod.get => Response.json(body: {'backups': listBackups(), 'sources': listRestorableBackups()}),
     HttpMethod.post => _create(context),
     _ => Response(statusCode: 405, body: 'Method not allowed'),
   };

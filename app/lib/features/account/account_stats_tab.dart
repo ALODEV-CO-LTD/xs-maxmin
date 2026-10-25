@@ -14,7 +14,7 @@ import 'stats_logic.dart';
 import 'stats_money.dart';
 import '../../core/widgets/app_button.dart';
 
-/// Thống kê: one card with metric (tiền gửi / tiền trúng / lợi nhuận, in đồng) + period (ngày/tuần/tháng/năm) selectors, period total, bar chart and all-time figures (all masked by "Ẩn số liệu").
+/// Thống kê: one card with metric (tiền khách gửi / tiền khách trúng / lợi nhuận, in đồng) + period (ngày/tuần/tháng/năm) selectors, period total, bar chart and all-time figures (all masked by "Ẩn số liệu").
 class AccountStatsTab extends StatefulWidget {
   const AccountStatsTab({super.key});
   @override
