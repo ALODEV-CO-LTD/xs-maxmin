@@ -199,14 +199,22 @@ void main() {
     expect(find.byType(NavigationBar), findsNothing); // sent back to /admin
   });
 
-  testWidgets('Tổng quan: the top-left "Hướng dẫn" button has the owner\'s search-list icon and opens the guide', (tester) async {
+  testWidgets('Tổng quan: "Hướng dẫn sử dụng" and "Liên hệ admin" sit in one row above the package card (not in the bar) and work', (tester) async {
     await _pump(tester);
-    expect(bySvg(AppSvg.guide), findsOneWidget);
-    expect(find.byTooltip('Hướng dẫn'), findsOneWidget);
-    expect(find.descendant(of: find.byTooltip('Hướng dẫn'), matching: bySvg(AppSvg.guide)), findsOneWidget);
-    expect(bySvg(AppSvg.info), findsNothing); // the old icon is gone from this button
-    await tester.tap(find.byTooltip('Hướng dẫn'));
+    expect(find.descendant(of: find.byType(AppBar), matching: bySvg(AppSvg.guide)), findsNothing); // gone from the bar
+    expect(find.descendant(of: find.byType(AppBar), matching: bySvg(AppSvg.support)), findsNothing);
+    final guide = find.byKey(const Key('overview-guide'));
+    final support = find.byKey(const Key('overview-support'));
+    expect(find.descendant(of: guide, matching: bySvg(AppSvg.guide)), findsOneWidget); // the owner's icon
+    expect(find.descendant(of: guide, matching: find.text('Hướng dẫn sử dụng')), findsOneWidget);
+    expect(find.descendant(of: support, matching: bySvg(AppSvg.support)), findsOneWidget);
+    expect(find.descendant(of: support, matching: find.text('Liên hệ admin')), findsOneWidget);
+    // side by side, the guide first, above the package card
+    expect(tester.getTopLeft(guide).dx, lessThan(tester.getTopLeft(support).dx));
+    expect(tester.getTopLeft(guide).dy, tester.getTopLeft(support).dy);
+    expect(tester.getBottomLeft(guide).dy, lessThan(tester.getTopLeft(find.byKey(const Key('package-headline'))).dy));
+    await tester.tap(guide);
     await tester.pumpAndSettle();
-    expect(find.text('Hướng dẫn sử dụng'), findsOneWidget);
+    expect(find.descendant(of: find.byType(Dialog), matching: find.text('Hướng dẫn sử dụng')), findsOneWidget);
   });
 }

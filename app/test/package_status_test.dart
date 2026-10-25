@@ -93,11 +93,48 @@ void main() {
       expect(find.text('Gia hạn'), findsOneWidget);
     });
 
-    testWidgets('nothing is shown before the profile is read, nor for an Admin', (t) async {
+    testWidgets('before the profile is read (or offline) the card says so but keeps its two shortcuts', (t) async {
       await pump(t, null);
-      expect(find.byKey(const Key('package-headline')), findsNothing);
-      await pump(t, me(left: const Duration(days: 1), role: 'admin'));
-      expect(find.byKey(const Key('package-headline')), findsNothing);
+      expect(find.text('Chưa tải được'), findsOneWidget);
+      expect(find.byKey(const Key('overview-guide')), findsOneWidget);
+      expect(find.byKey(const Key('overview-support')), findsOneWidget);
+      expect(find.text('Gia hạn'), findsNothing);
+    });
+
+    testWidgets('the two shortcuts sit side by side ABOVE the "Số ngày sử dụng" card, outside it, at any width', (t) async {
+      Future<void> at(double w) => t.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: SizedBox(width: w, child: PackageCard(controller: ctl(me(left: const Duration(days: 89)).copyForTest(now))))))));
+      for (final w in [300.0, 400.0, 520.0]) {
+        await at(w);
+        final head = find.byKey(const Key('package-headline'));
+        final guide = find.byKey(const Key('overview-guide'));
+        final support = find.byKey(const Key('overview-support'));
+        final card = find.ancestor(of: head, matching: find.byType(Card));
+        expect(t.getTopLeft(guide).dy, t.getTopLeft(support).dy, reason: 'same row at $w');
+        expect(t.getTopLeft(guide).dx, lessThan(t.getTopLeft(support).dx), reason: 'guide first at $w');
+        expect(t.getBottomLeft(guide).dy, lessThanOrEqualTo(t.getTopLeft(card).dy), reason: 'above the card at $w');
+        expect(find.descendant(of: card, matching: find.byKey(const Key('overview-guide'))), findsNothing, reason: 'not inside the card');
+        expect(find.descendant(of: card, matching: find.byKey(const Key('overview-support'))), findsNothing);
+        expect(t.getSize(guide).width, closeTo(t.getSize(support).width, 1), reason: 'two equal halves at $w');
+        expect(t.takeException(), isNull, reason: 'no overflow at $w');
+      }
+    });
+
+    testWidgets('the two shortcuts do what they say', (t) async {
+      var guide = 0, support = 0;
+      await t.pumpWidget(MaterialApp(home: Scaffold(body: PackageCard(controller: ctl(me(left: const Duration(days: 40)).copyForTest(now)), onGuide: () => guide++, onSupport: () => support++))));
+      await t.tap(find.byKey(const Key('overview-guide')));
+      await t.tap(find.byKey(const Key('overview-support')));
+      expect(guide, 1);
+      expect(support, 1);
+    });
+
+    testWidgets('the title is "Số ngày sử dụng" and the shortcuts are there in every state of the package', (t) async {
+      for (final m in [me(left: const Duration(days: 89)), me(left: const Duration(days: 2)), me(left: const Duration(days: -1), active: false), me(left: null, active: false)]) {
+        await pump(t, m.packageExpiresAt == null ? m : m.copyForTest(now));
+        expect(find.text('Số ngày sử dụng'), findsOneWidget);
+        expect(find.byKey(const Key('overview-guide')), findsOneWidget);
+        expect(find.byKey(const Key('overview-support')), findsOneWidget);
+      }
     });
   });
 }
