@@ -294,7 +294,11 @@ ParsedColumns parseColumns(List<OcrWord> words, LotteryStations stations) {
   OcrWord? dateTop;
   for (final w in words) {
     final t = w.text.trim();
-    if ((dateRe.hasMatch(t) || RegExp(r'^20\d\d$').hasMatch(t)) && w.cy <= top + span * 0.35 && (dateTop == null || w.cy < dateTop.cy)) dateTop = w;
+    // a bare year ("2026" after "19/10") is part of the date only when a day/month word stands on its row: a prize such as
+    // "2052" or "2024" must never be taken for it (that cut away every row above it - the 2-, 3- and first 4-digit prizes)
+    final isYear = RegExp(r'^20\d\d$').hasMatch(t) &&
+        words.any((o) => !identical(o, w) && (o.cy - w.cy).abs() <= (w.y1 - w.y0) * 0.6 && RegExp(r'^\d{1,2}\s*[/.-]\s*\d{1,2}$').hasMatch(o.text.trim()));
+    if ((dateRe.hasMatch(t) || isYear) && w.cy <= top + span * 0.35 && (dateTop == null || w.cy < dateTop.cy)) dateTop = w;
   }
   final cut = dateTop == null ? double.negativeInfinity : dateTop.cy + (dateTop.y1 - dateTop.y0) * 0.9;
   var nums = <OcrWord>[

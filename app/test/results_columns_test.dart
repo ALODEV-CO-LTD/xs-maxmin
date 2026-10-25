@@ -58,6 +58,31 @@ void main() {
         ],
       ];
 
+  test('a prize that looks like a year (2052) must not cut away the rows above it', () {
+    // Vĩnh Long / Bình Dương / Trà Vinh photo without any title: Bình Dương's first 6th-prize number is "2052"
+    final cols = [
+      ['73', '146', '5360', '2815', '6283', '5214', '14220', '92710', '07252', '03703', '20758', '27029', '12926', '52437', '37278', '06581', '78961', '411227'],
+      ['75', '838', '2052', '5358', '0033', '2129', '22657', '78872', '99561', '37045', '95520', '84016', '37139', '75935', '31234', '82353', '11152', '962651'],
+      ['07', '714', '9964', '9486', '0272', '1370', '09732', '05315', '62014', '47278', '39003', '04156', '08477', '91109', '22196', '02853', '03625', '855406'],
+    ];
+    final names = [['Vĩnh', 'Long'], ['Bình', 'Dương'], ['Trà', 'Vinh']];
+    final words = [
+      for (var i = 0; i < 3; i++) ...[
+        for (final (j, n) in names[i].indexed) w(n, xs[i] - 30 + j * 60, 30),
+        for (final (r, v) in cols[i].indexed) w(v, xs[i], 80 + r * 30.0),
+      ],
+    ];
+    final p = parseColumns(words, st);
+    expect(p.columns.length, 3);
+    for (final (i, c) in p.columns.indexed) {
+      expect(c.issues, isEmpty);
+      expect(c.complete, isTrue);
+      expect(c.values['giaiTam'], [cols[i][0]]);
+      expect(c.values['giaiBay'], [cols[i][1]]);
+      expect(c.values['giaiSau'], cols[i].sublist(2, 5));
+    }
+  });
+
   test('parses a 3-station table: columns, prizes in table order, title digits ignored', () {
     final p = parseColumns(table(), st);
     expect(p.columns.length, 3);
