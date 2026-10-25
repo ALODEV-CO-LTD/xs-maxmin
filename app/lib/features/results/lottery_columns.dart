@@ -53,6 +53,46 @@ const _aliases = <String, List<String>>{
   'mn-dalat': ['da lat', 'lam dong'],
 };
 
+// The short codes printed under a station name ("PY", "TTH"...), as xskt sites write them. A header word equal to one of them names the
+// station even when the long name was not read.
+const _codes = <String, List<String>>{
+  'mt-hue': ['tth', 'hue'],
+  'mt-phuyen': ['py'],
+  'mt-daklak': ['dlk', 'dl'],
+  'mt-quangnam': ['qnm', 'qna'],
+  'mt-danang': ['dng', 'dna'],
+  'mt-khanhhoa': ['kh'],
+  'mt-binhdinh': ['bdi', 'bd'],
+  'mt-quangtri': ['qt'],
+  'mt-quangbinh': ['qb'],
+  'mt-gialai': ['gl'],
+  'mt-ninhthuan': ['nt'],
+  'mt-quangngai': ['qng', 'qgi'],
+  'mt-daknong': ['dno', 'dnn'],
+  'mt-kontum': ['kt'],
+  'mn-tphcm': ['hcm', 'tp'],
+  'mn-dongthap': ['dt'],
+  'mn-camau': ['cm'],
+  'mn-bentre': ['bt'],
+  'mn-vungtau': ['vt'],
+  'mn-baclieu': ['bl'],
+  'mn-dongnai': ['dn'],
+  'mn-cantho': ['ct'],
+  'mn-soctrang': ['st'],
+  'mn-tayninh': ['tn'],
+  'mn-angiang': ['ag'],
+  'mn-binhthuan': ['bth'],
+  'mn-vinhlong': ['vl'],
+  'mn-binhduong': ['bd'],
+  'mn-travinh': ['tv'],
+  'mn-longan': ['la'],
+  'mn-binhphuoc': ['bp'],
+  'mn-haugiang': ['hg'],
+  'mn-tiengiang': ['tg'],
+  'mn-kiengiang': ['kg'],
+  'mn-dalat': ['dl'],
+};
+
 class _Spec {
   const _Spec(this.len, this.take);
   final int len;
@@ -143,6 +183,11 @@ double headerScore(String headerText, String id, LotteryStations stations) {
   final words = foldText(headerText).split(' ').where((w) => w.isNotEmpty && !RegExp(r'^\d+$').hasMatch(w) && !_noise.contains(w)).toList();
   final names = [foldText(stations.stationName(id)), ...(_aliases[id] ?? const [])];
   var best = 0.0;
+  // a short code on its own ("PY", "TTH") is a strong hint too
+  final codes = _codes[id] ?? const [];
+  for (final w in foldText(headerText).split(' ')) {
+    if (w.length >= 2 && w.length <= 4 && codes.contains(w)) best = 0.95;
+  }
   for (var i = 0; i < words.length; i++) {
     for (var n = 1; n <= 3 && i + n <= words.length; n++) {
       final win = words.sublist(i, i + n).join(' ');
@@ -386,18 +431,29 @@ String? regionFromColumns(List<OcrColumn> columns, LotteryStations stations) {
 
 /// The photo has no readable date: the latest day, today or up to 6 days before [fromIso], on which every station in [ids]
 /// draws (so the right stations come up for the table). Null when there is none or fewer than 2 stations are known.
-String? inferDateFromStations(String regionId, Iterable<String> ids, String fromIso, LotteryStations stations) {
+String? inferDateFromStations(String regionId, Iterable<String> ids, String fromIso, LotteryStations stations, {int? columnCount}) {
   final want = ids.toSet();
-  if (want.length < 2) return null;
+  if (want.isEmpty) return null;
   final base = DateTime.tryParse(fromIso);
   if (base == null) return null;
   final start = DateTime.utc(base.year, base.month, base.day);
+  // the days (latest first) on which every named station draws; with [columnCount] (the columns of the photo) a day that has exactly that
+  // many stations is a better fit than one with more (Thừa Thiên Huế draws on Monday with Phú Yên, and on Sunday with two others)
+  final days = <(String, int)>[];
   for (var back = 0; back <= 6; back++) {
     final d = start.subtract(Duration(days: back));
     final iso = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-    if (stations.stationsOn(regionId, iso).toSet().containsAll(want)) return iso;
+    final on = stations.stationsOn(regionId, iso);
+    if (on.toSet().containsAll(want)) days.add((iso, on.length));
   }
-  return null;
+  var fit = days;
+  if (columnCount != null) {
+    final exact = [for (final d in days) if (d.$2 == columnCount) d];
+    if (exact.isNotEmpty) fit = exact;
+  }
+  if (fit.isEmpty) return null;
+  // one station that draws on two weekdays says nothing about which: only a single fit (or two or more stations) decides
+  return want.length >= 2 || fit.length == 1 ? fit.first.$1 : null;
 }
 
 String? _regionFromTitleWords(List<OcrWord> words) {
@@ -634,4 +690,39 @@ void guessNorthForm(String text, Map<String, List<String>> form) {
     final b = form['giaiBay'];
     if (b != null && k < b.length && b[k].trim().isEmpty && k < byLen[2]!.length) b[k] = byLen[2]![k];
   }
+}
+
+/// The day of the week printed in the photo ("Thứ hai", "Thứ 2", "Chủ nhật" in the top-left cell or the title): 1 = Monday .. 7 = Sunday,
+/// or null. Only the upper part of the picture is looked at, so a word further down never counts.
+int? weekdayFromWords(List<OcrWord> words) {
+  if (words.isEmpty) return null;
+  final top = words.map((w) => w.y0).reduce(math.min), bottom = words.map((w) => w.y1).reduce(math.max);
+  final limit = top + (bottom - top) * 0.3;
+  final head = [for (final w in words) if (w.cy <= limit) w]..sort((a, b) => (a.cy - b.cy).abs() > (a.y1 - a.y0) / 2 ? a.cy.compareTo(b.cy) : a.cx.compareTo(b.cx));
+  final t = ' ${foldText(head.map((w) => w.text).join(' '))} ';
+  const names = {
+    1: ['thu hai', 'thu 2'],
+    2: ['thu ba', 'thu 3'],
+    3: ['thu tu', 'thu 4'],
+    4: ['thu nam', 'thu 5'],
+    5: ['thu sau', 'thu 6'],
+    6: ['thu bay', 'thu 7'],
+    7: ['chu nhat'],
+  };
+  for (final e in names.entries) {
+    for (final n in e.value) {
+      if (t.contains(' $n ')) return e.key;
+    }
+  }
+  return null;
+}
+
+/// The latest date that is [weekday] (1 Monday .. 7 Sunday), today or up to 6 days before [fromIso].
+String dateOfWeekdayOnOrBefore(int weekday, String fromIso) {
+  final base = DateTime.parse(fromIso);
+  var d = DateTime.utc(base.year, base.month, base.day);
+  while (d.weekday != weekday) {
+    d = d.subtract(const Duration(days: 1));
+  }
+  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }

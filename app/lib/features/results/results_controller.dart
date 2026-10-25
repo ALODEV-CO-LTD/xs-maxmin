@@ -697,10 +697,12 @@ class ResultsController extends ChangeNotifier {
     final seenRegion = titleRegion == 'mt' || titleRegion == 'mn' ? titleRegion! : (headerRegion ?? (region == 'mb' ? 'mn' : region));
     // The day: the date printed in the photo; when it cannot be read, the recent day on which the stations named in the
     // headers all draw; else the selected day.
+    // (order: the printed date; the weekday word "Thứ hai"; the stations named; the selected day)
     var seenDate = parsed.date ?? date;
     if (parsed.date == null) {
+      final weekday = weekdayFromWords(res.words);
       final named = [for (final c in parsed.columns) if (c.station != null) c.station!];
-      seenDate = inferDateFromStations(seenRegion, named, date, stations) ?? date;
+      seenDate = weekday != null ? dateOfWeekdayOnOrBefore(weekday, date) : (inferDateFromStations(seenRegion, named, date, stations, columnCount: parsed.columns.length) ?? date);
     }
     final regionStations = stations.regionOf(seenRegion).stations.keys.where((id) => id != 'mb').toList();
     assignStations(parsed.columns, stations.stationsOn(seenRegion, seenDate), stations, others: regionStations);
