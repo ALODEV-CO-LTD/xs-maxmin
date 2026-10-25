@@ -614,3 +614,23 @@ Nguồn: thư mục `~/Downloads/icon svg/` (13 file, đều một màu). Đã c
 **Phát hành 24/10/2026 (commit `b4feb32`):** backend + web đã deploy (`deploy.sh` rồi `deploy-web-next.sh`; sao lưu `/opt/xs-maxmin/backend.bak-20261024-103628`, `web.bak-20261024-103628`, DB `/root/xoso-live-20261024-103628.db`, `web.bak-20261024-103646`). Gồm: Admin chỉ xoá (mềm) tin của mình trong Phản hồi, mặc định hệ thống cho "Khoá khi thoát ra", đọc ảnh XSMB theo vị trí chữ (web `northTable.js`, app `_northByLength` + bỏ cột nhãn/bảng đầu đuôi; ảnh mới ghi đè ô đã có), nhiều cụm "số x điểm" trên một dòng sau hạng mục. Sau deploy: DB 11 người dùng, 5 tin nhắn, các trang web 200. iPhone 12 đã cài đè từ bản ngay trước commit (code app giống nhau). Chưa build APK mới.
 
 **Giới hạn dung lượng nginx / Cloudflare (24/10/2026):** nginx để mặc định 1 MB nên **mọi ảnh chat trên ~1 MB (kể cả giới hạn 5 MB cũ) bị 413** trước khi tới backend. Đã thêm `client_max_body_size 40m;` trong `location /api/` của site `xs.massagehomeriyadh.com` (file `/etc/nginx/sites-enabled/xs-maxmin.conf`; sao lưu `/root/xs-maxmin.conf.bak-body-*`). Thử qua địa chỉ công khai (Cloudflare Tunnel): 2 / 12 / 30 MB tới được backend (401 vì chưa đăng nhập), 45 MB bị 413. Cloudflare không chặn ở mức này. `deploy-web-next.sh` chỉ thêm nginx khi chưa có `xs-next-web` nên không ghi đè dòng này; dựng lại máy chủ thì phải thêm lại.
+
+## 24/10/2026 (tối) — Tổng kết phiên: nhận diện kiểu đánh, đọc ảnh XSMB, phát hành, nginx
+
+**Đã làm**
+- **Nhận diện kiểu đánh (Nhập từ tin nhắn, app + web):** kiểm tra `de 44 x20` (và các biến thể có dấu, hoa/thường, `de 44x20`, `de: 44x20`) ra **Đề 44, 20 điểm** ở cả `messageParser.js` và `message_parser.dart`; `44x20` không có hạng mục vẫn là **bao lô** theo tài liệu "Cấu hình tính toán" (20x30 = lô), trừ khi khách có loại mặc định là đề. Lỗi thật tìm được và đã sửa: sau một hạng mục, nhiều cụm "số x điểm" trên một dòng (`de 44x20 55x30`, `de 44 x20, 55 x30`) trước đây bị gán điểm của cụm cuối cho mọi số và bị đánh dấu "không chắc"; nay mỗi cụm có điểm riêng (`groupRe`). Test: `web-next/tests/messageParser.test.mjs`, `app/test/message_parser_compact_test.dart`.
+- **Đọc ảnh kết quả XSMB (Nhập kết quả):**
+  - Web: đã chạy đúng engine tesseract.js trên 2 ảnh mẫu (xskt.com.vn có bảng Đầu/Đuôi, và bảng có nhãn "6 ô · 5 số"). Lỗi: nhãn bị đọc thành số (`08`, `62`, `448`) chen vào giải bảy; ảnh nhỏ chỉ phóng 2 lần nên `74599`→`74500`; PNG nền trong suốt không được đặt lên nền trắng. Sửa: `ocr.js` phóng ~1300 px + nền trắng + xám + kéo tương phản (đo: 3x đọc 27/27 ảnh xskt), hàm mới `recognizeNorthTable`; `src/lib/northTable.js` chọn 10 số 5 chữ số / 10 số 4 chữ số / 3 số 3 chữ số / 4 số 2 chữ số theo vị trí, bỏ cột nhãn trái và bảng bên phải, sửa chữ giống số (`I9640`). Test `tests/northTable.test.mjs` + `tests/fixtures/northPhotos.json` (chữ và toạ độ thật).
+  - App: `lottery_columns.dart` thêm `_withoutSideColumns` và `_northByLength` (giải ba/giải năm in một hàng 6 số, nhãn "ô" đọc thành chữ số); `results_controller.dart` `_applyNorth` nay **ghi đè** các ô đã có (trước đó chỉ điền ô trống nên đọc lại ảnh báo sai "Không nhận ra số nào"). Test `results_ocr_title_test.dart`.
+  - Giới hạn còn lại: khi engine bỏ sót một số (ví dụ `241`→`24`, `94`→`9%`) các số sau cùng giải lệch một ô; người dùng vẫn phải kiểm các ô trước khi lưu. Chưa thử bằng ảnh thật trên trình duyệt / iPhone; ML Kit (app) chưa chạy được trên máy ảo nên chỉ kiểm bằng toạ độ mô phỏng.
+- **Phát hành:** commit `b4feb32` (mã) và `1ddf86e` (tài liệu); backend + web deploy 24/10 (xem mục "Phát hành 24/10/2026 (commit `b4feb32`)" phía trên); iPhone 12 cài đè bằng `tools/install_ios.sh`.
+- **nginx:** thêm `client_max_body_size 40m` (xem mục "Giới hạn dung lượng nginx / Cloudflare"): trước đó mọi ảnh chat trên ~1 MB bị 413.
+- **APK:** build `~/Desktop/MAMBA-1.0.0.apk` (release, versionCode 21, 139,5 MB) từ mã đã commit; **chưa đăng** lên máy chủ, chưa cài thử trên máy Android.
+- **Dọn:** đã tắt máy ảo iOS (iPhone 17 Pro); không có máy ảo Android chạy.
+
+**Đang làm / còn dở**
+- Chờ chủ dự án thử đọc ảnh XSMB trên web và iPhone (2 ảnh mẫu ở trên) và báo ô nào còn lệch.
+- Chờ chủ dự án thử APK và nói "đồng ý đăng" thì mới chạy `tools/publish_apk.sh <apk> --notes "..." --yes`.
+- Chưa thử trên máy thật: Admin xoá tin của mình (xoá mềm) và mặc định hệ thống cho "Khoá khi thoát ra"; chưa gửi thử ảnh chat thật 25 MB bằng tài khoản đăng nhập (đã thử 30 MB qua địa chỉ công khai tới được backend).
+- Ý tưởng chưa làm: khi engine thiếu số, xếp số theo hàng để không lệch ô; phần đọc ảnh Miền Nam/Miền Trung chưa được rà lại trong phiên này.
+- `flutter analyze` còn 1 cảnh báo cũ ở `app/test_e2e/chat_two_devices_test.dart:67` (không liên quan).
