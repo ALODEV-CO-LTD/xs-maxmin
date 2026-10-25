@@ -154,7 +154,6 @@ const _glyphScale = <String, double>{
   'plus': 1.25,
   'refresh': 0.86,
   'search': 1.08, 'volume_on': 1.15, 'volume_off': 1.15, 'badge': 1.1, 'clock': 0.88,
-  'support': 0.86,
   'sync': 1.25,
   'user_admin': 0.86,
   'users_group': 0.88,
