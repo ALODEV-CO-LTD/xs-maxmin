@@ -132,7 +132,15 @@ class ResultsController extends ChangeNotifier {
   List<Prize> get structure => stations.regionOf(region).structure;
   int get totalBoxes => structure.fold(0, (n, p) => n + p.count);
   List<String> get scheduledStations => region == 'mb' ? const [] : stations.stationsOn(region, date);
-  List<String> get boardStations => region == 'mb' ? const [] : [...scheduledStations, ...extraStations.where((id) => !scheduledStations.contains(id))];
+  /// After a photo was read: only the stations that are in it are shown (the other stations of the day are hidden until the day,
+  /// the region or the table is changed). null = show the whole day.
+  Set<String>? photoOnly;
+  List<String> get boardStations {
+    if (region == 'mb') return const [];
+    final all = [...scheduledStations, ...extraStations.where((id) => !scheduledStations.contains(id))];
+    final only = photoOnly;
+    return only == null ? all : [for (final id in all) if (only.contains(id)) id];
+  }
 
   /// Every other station of the region (the whole catalogue), to add with "+ Đài khác".
   List<({String value, String label})> get otherStations => region == 'mb'
@@ -272,6 +280,7 @@ class ResultsController extends ChangeNotifier {
   void addStation(String id) {
     if (id.isEmpty || region == 'mb') return;
     if (!extraStations.contains(id) && !scheduledStations.contains(id)) extraStations = [...extraStations, id];
+    photoOnly = photoOnly == null ? null : {...photoOnly!, id};
     board[id] ??= blankForm(structure);
     activeStation = id;
     notifyListeners();
@@ -296,6 +305,7 @@ class ResultsController extends ChangeNotifier {
   Future<void> setDate(String iso) async {
     if (iso == date || !isIsoDate(iso)) return;
     date = iso;
+    photoOnly = null;
     ocrNote = null;
     ocrWarnings = [];
     photoPath = null;
@@ -310,6 +320,7 @@ class ResultsController extends ChangeNotifier {
   Future<void> setRegion(String r) async {
     if (r == region) return;
     region = r;
+    photoOnly = null;
     ocrNote = null;
     ocrWarnings = [];
     ocrError = null;
@@ -378,6 +389,10 @@ class ResultsController extends ChangeNotifier {
       mbLocked = false;
     }
     photoPath = null;
+    photoOnly = null;
+    for (final st in boardStations) {
+      board[st] ??= blankForm(structure);
+    }
     ocrError = null;
     ocrNote = null;
     notifyListeners();
@@ -711,6 +726,7 @@ class ResultsController extends ChangeNotifier {
       date = seenDate;
       ocrNote = 'Ảnh là kết quả ${stations.regionOf(seenRegion).name} ngày ${viDate(seenDate)}; đã chuyển sang miền và ngày này.';
     }
+    photoOnly = {for (final c in parsed.columns) if (c.station != null) c.station!};
     await loadDay(keepMessages: true);
     // Every recognised column goes straight into the table under its station.
     var firstSet = false;

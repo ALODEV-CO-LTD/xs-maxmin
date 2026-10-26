@@ -6,11 +6,14 @@ import 'package:mamba_app/core/auth_store.dart';
 import 'package:mamba_app/core/lottery_stations.dart';
 import 'package:mamba_app/core/mask_store.dart';
 import 'package:mamba_app/core/theme.dart';
+import 'package:mamba_app/features/results/lottery_columns.dart';
+import 'package:mamba_app/features/results/ocr_service.dart';
 import 'package:mamba_app/features/results/results_controller.dart';
 import 'package:mamba_app/features/results/results_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'results_columns_test.dart' show w, columnWords;
 import 'results_controller_test.dart' show FakeServer, fillColumn, date;
 import 'scoring_fixtures.dart';
 
@@ -18,6 +21,7 @@ ApiClient client(FakeServer f) => ApiClient(AuthStore(), client: MockClient(f.ha
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  _photoOnlyTests();
 
   test('shapeForm keeps groups longer than usual; resultBody drops empty extra boxes only', () {
     final st = testStations().regionOf('mn').structure;
@@ -173,5 +177,43 @@ void main() {
     expect(find.text('+ Đài khác (1)'), findsNothing);
     expect(find.textContaining('Nhập tay các giải · TP. Hồ Chí Minh'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+}
+
+class _FakeOcr implements OcrService {
+  _FakeOcr(this.words);
+  final List<OcrWord> words;
+  @override
+  Future<String?> pick({required bool camera}) async => '/photo.jpg';
+  @override
+  Future<OcrResult> read(String path) async => OcrResult('', words);
+}
+
+void _photoOnlyTests() {
+  test('after a photo only the stations in it are shown; changing the day or clearing brings the others back', () async {
+    final fs = FakeServer();
+    // a photo of two of the three stations that draw on 07/10 (Đồng Nai, Cần Thơ); Sóc Trăng is not in it
+    final words = [
+      for (final (i, name) in ['Đồng Nai', 'Cần Thơ'].indexed) ...[
+        for (final (j, part) in name.split(' ').indexed) w(part, 200.0 + i * 300 - 30 + j * 50, 60),
+        ...columnWords(200.0 + i * 300, i + 1),
+      ],
+    ];
+    final c = ResultsController(client(fs), testStations(), ocr: _FakeOcr(words), initialDate: date);
+    await c.init();
+    await c.setRegion('mn');
+    expect(c.boardStations, ['mn-dongnai', 'mn-cantho', 'mn-soctrang']);
+    await c.readPhoto(camera: false);
+    expect(c.date, date);
+    expect(c.boardStations, ['mn-dongnai', 'mn-cantho']);
+    expect(c.board.keys.toSet(), {'mn-dongnai', 'mn-cantho'});
+    expect(c.otherStations.map((o) => o.value), contains('mn-soctrang')); // still reachable with "+ Đài khác"
+    c.clearForm();
+    expect(c.boardStations, ['mn-dongnai', 'mn-cantho', 'mn-soctrang']);
+    expect(c.board.containsKey('mn-soctrang'), isTrue);
+    await c.readPhoto(camera: false);
+    expect(c.boardStations, ['mn-dongnai', 'mn-cantho']);
+    await c.setDate('2026-10-08');
+    expect(c.boardStations, c.scheduledStations);
   });
 }
