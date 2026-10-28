@@ -16,6 +16,7 @@ export const ADMIN_LINKS = [
   { perm: 'payments.manage', path: '/admin/payment-requests', label: 'Thanh toán & gia hạn', icon: 'pay' },
   { perm: 'support.messages', path: '/admin/messages', label: 'Phản hồi', icon: 'feedback', badge: 'admin-messages' },
   { perm: ['announcements.manage', 'maintenance.manage'], path: '/admin/notices', label: 'Thông báo', icon: 'megaphone' },
+  { perm: 'trash.manage', path: '/admin/trash', label: 'Thùng rác', icon: 'trash' },
   { perm: ['settings.manage', 'security.view', 'security.policy', 'backups.manage'], path: '/admin/settings', label: 'Cài đặt', icon: 'settings' },
   // Admin shares /account with customers (change password...). Admin has no "Bạn bè": contact with customers goes
   // through "Phản hồi" above.

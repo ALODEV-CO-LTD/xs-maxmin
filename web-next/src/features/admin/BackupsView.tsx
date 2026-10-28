@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import AppButton from '@/components/AppButton'
 import { api } from '@/lib/api'
 import { errMsg, fmtDateTime } from './common'
+import RestoreCustomer, { type BackupSource } from './RestoreCustomer'
 import { formatSize } from './settingsLogic'
 
 interface Backup {
@@ -15,6 +16,7 @@ interface Backup {
 // Sao lưu dữ liệu, embedded in Cài đặt. API: GET/POST /admin/backups, GET /admin/backups/:name (Blob download)
 export default function BackupsView({ embedded = false }: { embedded?: boolean }) {
   const [backups, setBackups] = useState<Backup[]>([])
+  const [sources, setSources] = useState<BackupSource[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [downloading, setDownloading] = useState('')
@@ -24,7 +26,10 @@ export default function BackupsView({ embedded = false }: { embedded?: boolean }
   useEffect(() => {
     api
       .get('/admin/backups')
-      .then((res) => setBackups(res.backups))
+      .then((res) => {
+        setBackups(res.backups)
+        setSources(res.sources || [])
+      })
       .catch((err) => setError(errMsg(err, 'Không tải được danh sách')))
       .finally(() => setLoading(false))
   }, [])
@@ -36,6 +41,7 @@ export default function BackupsView({ embedded = false }: { embedded?: boolean }
     try {
       const b = await api.post('/admin/backups')
       setBackups((l) => [b, ...l])
+      api.get('/admin/backups').then((res) => setSources(res.sources || [])).catch(() => {})
       setMessage(`Đã tạo bản sao lưu ${b.name}`)
     } catch (err) {
       setError(errMsg(err, 'Không tạo được bản sao lưu'))
@@ -100,6 +106,8 @@ export default function BackupsView({ embedded = false }: { embedded?: boolean }
             </table>
           )}
         </div>
+
+        <RestoreCustomer sources={sources} />
       </div>
     </div>
   )

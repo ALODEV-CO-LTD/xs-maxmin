@@ -23,6 +23,7 @@ export const ROUTES: AppRoute[] = [
   { path: '/admin/payment-requests', title: 'Yêu cầu thanh toán', kind: 'admin', perm: 'payments.manage' },
   { path: '/admin/messages', title: 'Phản hồi khách hàng', kind: 'admin', perm: 'support.messages' }, // a thread: ?user=<id>
   { path: '/admin/notices', title: 'Thông báo & bảo trì', kind: 'admin', perm: ['announcements.manage', 'maintenance.manage'] },
+  { path: '/admin/trash', title: 'Thùng rác', kind: 'admin', perm: 'trash.manage' },
   { path: '/admin/staff', title: 'Phân quyền Admin', kind: 'admin', rootOnly: true },
 ]
 

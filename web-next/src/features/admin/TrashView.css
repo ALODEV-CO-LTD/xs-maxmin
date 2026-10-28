@@ -1,0 +1,13 @@
+.adm-trash { display: contents; }
+.adm-trash .intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+.adm-trash .list { display: flex; flex-direction: column; gap: 10px; }
+.adm-trash .item { padding: 14px; }
+.adm-trash .item-head { display: flex; align-items: center; gap: 10px; }
+.adm-trash .item-head .app-icon { width: 20px; height: 20px; flex: none; }
+.adm-trash .item-label { flex: 1; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.adm-trash .left { color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.adm-trash .left.soon { color: var(--danger-text, #b91c1c); }
+.adm-trash .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.adm-trash .counts { font-size: 14px; margin-top: 2px; }
+.adm-trash .actions { display: flex; gap: 10px; margin-top: 12px; }
+.adm-trash .empty { color: var(--muted); padding: 24px; text-align: center; }

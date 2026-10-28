@@ -1,0 +1,17 @@
+.adm-restore { margin-top: 28px; }
+.adm-restore h2 { font-size: 18px; margin: 0 0 4px; }
+.adm-restore .sub { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.adm-restore .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.adm-restore .row .name { font-size: 14px; overflow-wrap: anywhere; }
+.adm-restore .row .info { color: var(--muted); font-size: 13px; }
+.adm-restore .list { display: flex; flex-direction: column; }
+.adm-restore .cust { text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border); padding: 10px 2px; cursor: pointer; color: inherit; font: inherit; }
+.adm-restore .cust:hover { background: var(--surface); }
+.adm-restore .cust .t { font-weight: 600; }
+.adm-restore .cust .d { color: var(--muted); font-size: 13px; }
+.adm-restore .kv { display: flex; gap: 12px; margin: 3px 0; font-size: 14px; }
+.adm-restore .kv .k { width: 140px; color: var(--muted); flex: none; }
+.adm-restore .mode { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; cursor: pointer; }
+.adm-restore .mode input { margin-top: 4px; }
+.adm-restore .mode .d { color: var(--muted); font-size: 13px; display: block; }
+.adm-restore .note { color: var(--muted); font-size: 13px; margin-top: 8px; }

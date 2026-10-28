@@ -16,6 +16,7 @@ const ADMIN_PAGES = [
   ['payments.manage', '/admin/payment-requests'],
   [['announcements.manage', 'maintenance.manage'], '/admin/notices'],
   [['settings.manage', 'security.view', 'security.policy', 'backups.manage'], '/admin/settings'],
+  ['trash.manage', '/admin/trash'],
 ]
 
 export const useAuthStore = create((set, get) => ({
