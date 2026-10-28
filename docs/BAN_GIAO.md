@@ -664,3 +664,34 @@ Theo yêu cầu: khách không tự khôi phục trong app, mà nhờ Admin; th�
 - **Tổng quan: hai nút tắt nằm ngang, trên thẻ gói** (`features/overview/package_card.dart`): "Hướng dẫn sử dụng" (xanh, icon `guide.svg`) và "Liên hệ admin" (đỏ, kèm số trả lời chưa đọc) xếp một hàng hai nửa bằng nhau ngay dưới tiêu đề, phía trên thẻ "Số ngày sử dụng"; thanh tiêu đề chỉ còn chữ "Tổng quan". Hai nút luôn hiện, kể cả khi chưa tải được gói (thẻ ghi "Chưa tải được"). Test `package_status_test.dart`, `app_shell_navigation_test.dart`.
 - **Phiên bản app 1.0.1 (22)** (`app/pubspec.yaml` `1.0.1+22` và `lib/core/config.dart`: `appVersionName` 1.0.1, `appBuild` 22). Hai icon của chủ dự án thay cho "Hướng dẫn sử dụng" (`assets/icons/guide.svg`, file `huong-dan-su-dung.svg`, cuốn sách mở) và "Liên hệ admin" (`assets/icons/support.svg`, file `lien-he-admin.svg`, tai nghe); icon `support` cũng dùng ở mục Hỗ trợ từ Admin trong Tài khoản và danh sách Admin trong Nhắn tin. Màu trong file SVG (#22C55E, #EF4444) không dùng: `SvgIcon` tô theo màu của nút. Hệ số cân khung `support` đã bỏ (icon mới vừa khung).
 
+
+
+## 26–28/10/2026 — Đọc ảnh Miền Nam/Miền Trung sửa lỗi, chỉ hiện đài có trong ảnh, đăng APK 1.0.2
+
+**Cập nhật trạng thái các mục cũ:** phần "25/10/2026" ở trên (thùng rác Admin, khôi phục từ bản sao lưu, màn khoá báo số lần sai, nhãn Tổng quan, Cấu hình đứng yên, hai nút ngang, app 1.0.1) **đã commit** (`b27fdc2`, `aa956c0`, `98fc59d`) và backend **đã deploy** (máy chủ khớp với repo; đợt 26–28/10 chỉ sửa app nên không phải deploy backend). Nhánh `mask-short` trên GitHub đã có tới `1763e79`.
+
+**1. Đọc nhầm Phú Yên thành Kon Tum** (ảnh Miền Trung "Thứ hai", đài Phú Yên và Thừa T. Huế; commit `6da3c1e`)
+- Nguyên nhân: tiêu đề cột Phú Yên đọc không ra, ảnh không in ngày, ngày đang chọn là Chủ nhật, nên app xếp cột theo thứ tự trang trong lịch Chủ nhật (Kon Tum, Khánh Hòa, Huế) và gán nhầm Kon Tum.
+- Sửa trong `app/lib/features/results/lottery_columns.dart` và `results_controller.dart` (`_applySouthCentral`):
+  - Mã đài ngắn in trên tiêu đề (`_codes`: PY, TTH, KT, HCM, TP, BD, TV, VL...) nhận ra đài (điểm 0,95).
+  - Chữ thứ trong ảnh ("Thứ hai"..."Chủ nhật") quyết định ngày (`weekdayFromWords`, `dateOfWeekdayOnOrBefore`: ngày gần nhất không sau ngày đang chọn).
+  - Thứ tự suy ngày: ngày in trong ảnh, rồi chữ thứ, rồi các đài đọc được tiêu đề (`inferDateFromStations`, nhận từ 1 đài, có tham số `columnCount` = số cột của ảnh để chọn ngày có đúng số đài đó; một đài bán hai thứ như Huế (thứ hai, chủ nhật) hay TP.HCM (thứ hai, thứ bảy) mà không phân biệt được thì trả null và dùng ngày đang chọn), rồi ngày đang chọn.
+- Test: `app/test/results_station_detect_test.dart`.
+
+**2. Mất giải 8, giải 7 và dòng đầu giải 6** (ảnh Vĩnh Long, Bình Dương, Trà Vinh; commit `1131ae2`)
+- Nguyên nhân: giải 6 của Bình Dương có số **2052**, khớp mẫu "năm" `^20\d\d$`, nên `parseColumns` coi đó là dòng ngày tháng của tiêu đề và cắt mọi thứ từ dòng đó trở lên. Cả 3 đài mất đúng 3 dòng (2 chữ số 0/1, 3 chữ số 0/1, 4 chữ số 3/4).
+- Sửa: một từ chỉ có năm chỉ được coi là phần của ngày khi cùng dòng có từ ngày/tháng dạng "19/10". Ngày đầy đủ "07/10/2026" vẫn nhận như cũ.
+- Test: `app/test/results_columns_test.dart` ("a prize that looks like a year (2052)...", dùng đúng 54 số của ảnh).
+
+**3. Chỉ hiện các đài có trong ảnh** (commit `a1fdfd7`; `results_controller.dart`, trường `photoOnly`)
+- Sau khi đọc ảnh Miền Nam/Trung, `boardStations` chỉ gồm các đài đã nhận ra trong ảnh; đài còn lại của ngày ẩn đi nhưng vẫn thêm lại được bằng "+ Đài khác". Đài có trong ảnh mà không thuộc lịch ngày vẫn hiện như trước.
+- Hiện lại đủ đài khi đổi ngày, đổi miền hoặc bấm xoá bảng (khi xoá bảng, đài bị ẩn được dựng lại ô trống). Đọc ảnh lần nữa thì lọc lại theo ảnh mới.
+- Test: `app/test/results_stations_cells_test.dart` (có `_FakeOcr` thay ML Kit).
+
+**4. Phát hành**
+- Phiên bản **1.0.2 (23)** (`app/pubspec.yaml`, `lib/core/config.dart`; commit `1763e79`). APK `MAMBA-1.0.2.apk` đã đăng lên máy chủ bằng `tools/publish_apk.sh --yes` (chủ dự án đồng ý), đã tải lại kiểm SHA-256 khớp, `app_latest_version` = 1.0.2; trên Desktop chỉ giữ `MAMBA-1.0.2.apk`. Ghi chú phát hành: sửa đọc nhầm đài Phú Yên và mất giải 8, giải 7.
+- **APK 1.0.2 CHƯA có mục 3** (chỉ hiện đài có trong ảnh). iPhone 12 đã cài đè bản có cả mục 1, 2, 3 bằng `tools/install_ios.sh 00008101-0019496E2260001E` (không gỡ app, giữ chat) nhưng vẫn mang số 1.0.2. Muốn máy khác có mục 3 thì phải tăng phiên bản (1.0.3) và đăng APK mới.
+
+**Kiểm:** `flutter test` 635 bài đạt; `flutter analyze` còn 1 cảnh báo cũ ở `app/test_e2e/chat_two_devices_test.dart:70`. **Chưa thử bằng ảnh thật** cả ba mục (ML Kit không chạy được trên máy ảo; chỉ có test với từ OCR dựng sẵn từ đúng ảnh chủ dự án gửi). Web (`web-next/`) chưa có các sửa này (web đang tạm dừng). Commit `a1fdfd7` chưa push lên GitHub khi viết dòng này.
+
+**Bẫy:** `tools/install_ios.sh` cần tham số là mã thiết bị (`xcrun devicectl list devices`; iPhone 12 là `00008101-0019496E2260001E`). Số phiên bản nằm ở hai chỗ phải đổi cùng nhau: `pubspec.yaml` và `lib/core/config.dart`. Tắt máy ảo: `xcrun simctl shutdown all`.
