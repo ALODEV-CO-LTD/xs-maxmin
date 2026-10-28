@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/authStore'
 import { navigate } from '@/lib/hooks'
 import { teardownSession } from '@/lib/session'
 import { usePrivacyStore } from '@/lib/privacyStore'
+import { formatLockWait, lockLeftAt, lockSeconds, wrongMessage } from '@/lib/lockAttempts'
 
 // Auto-lock screen + hide-when-away blur (K09/K40/S02, K32/S10). Mounted once for logged-in users; all logic lives in
 // lib/privacyStore.js. The screens underneath stay mounted (only covered and made inert, via #app) so half-typed input
@@ -20,6 +21,10 @@ export default function PrivacyGuard() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const field = useRef<HTMLDivElement>(null)
+  // While the server has locked the unlock attempts (429): the seconds left, counted down live from a clock deadline.
+  const [lockLeft, setLockLeft] = useState(0)
+  const [lockUntil, setLockUntil] = useState(0)
+  const isLocked = lockLeft > 0
 
   useEffect(() => {
     usePrivacyStore.getState().start()
@@ -50,8 +55,23 @@ export default function PrivacyGuard() {
     field.current?.querySelector('input')?.focus()
   }, [locked])
 
+  useEffect(() => {
+    if (!lockUntil) return
+    const timer = window.setInterval(() => {
+      const left = lockLeftAt(lockUntil)
+      setLockLeft(left)
+      if (left === 0) {
+        window.clearInterval(timer)
+        setLockUntil(0)
+        setError('')
+      }
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [lockUntil])
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (isLocked) return
     setError('')
     if (!password) return setError('Vui lòng nhập mật khẩu')
     setBusy(true)
@@ -59,7 +79,17 @@ export default function PrivacyGuard() {
       await usePrivacyStore.getState().unlock(password)
       setPassword('')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Đã xảy ra lỗi, vui lòng thử lại')
+      if (err instanceof ApiError && err.status === 429) {
+        const secs = lockSeconds(err.message, err.data)
+        setPassword('')
+        setError('')
+        setLockLeft(secs)
+        setLockUntil(Date.now() + secs * 1000)
+      } else if (err instanceof ApiError) {
+        setError(err.status === 403 ? wrongMessage(err.message, err.data) : err.message)
+      } else {
+        setError('Đã xảy ra lỗi, vui lòng thử lại')
+      }
     } finally {
       setBusy(false)
     }
@@ -80,12 +110,16 @@ export default function PrivacyGuard() {
           <p className="pl-msg">
             Để bảo vệ dữ liệu, ứng dụng đã khoá. Nhập mật khẩu (hoặc mật khẩu lớp hai) để tiếp tục. Dữ liệu bạn đang nhập vẫn được giữ nguyên.
           </p>
-          {error && <div className="alert alert-error" role="alert">{error}</div>}
+          {isLocked ? (
+            <div className="alert alert-error" role="alert" data-testid="lock-countdown">Đã nhập sai quá nhiều lần. Vui lòng thử lại sau {formatLockWait(lockLeft)}.</div>
+          ) : (
+            error && <div className="alert alert-error" role="alert">{error}</div>
+          )}
           <div ref={field} className="field">
             <label htmlFor="pl-password">Mật khẩu</label>
-            <PasswordInput id="pl-password" value={password} onChange={setPassword} autoComplete="current-password" disabled={busy} />
+            <PasswordInput id="pl-password" value={password} onChange={setPassword} autoComplete="current-password" disabled={busy || isLocked} />
           </div>
-          <AppButton variant="primary" block type="submit" loading={busy}>{busy ? 'Đang kiểm tra...' : 'Mở khoá'}</AppButton>
+          <AppButton variant="primary" block type="submit" loading={busy} disabled={isLocked}>{busy ? 'Đang kiểm tra...' : isLocked ? `Thử lại sau ${formatLockWait(lockLeft)}` : 'Mở khoá'}</AppButton>
           <AppButton variant="ghost" block onClick={logoutNow}>Đăng xuất</AppButton>
         </form>
       </div>,
