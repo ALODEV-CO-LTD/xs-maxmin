@@ -5,7 +5,7 @@
 // Table layout (top to bottom): G.8 (2 digits x1), G.7 (3 x1), G.6 (4 x3), G.5 (4 x1), G.4 (5 x7), G.3 (5 x2), G.2 (5 x1),
 // G.1 (5 x1), G.ĐB (6 x1). So per column: the 2-digit number is G8, the 3-digit G7, the four 4-digit numbers are G6 x3 then
 // G5, the eleven 5-digit numbers are G4 x7, G3 x2, G2, G1 (reading order), the 6-digit number is the special prize.
-import { regionList, stationName } from './lotteryStations'
+import { regionList, stationName, stationsOn } from './lotteryStations'
 
 const fold = (s) =>
   String(s || '')
@@ -24,6 +24,28 @@ const ALIASES = {
   'mt-daklak': ['dak lak', 'daklak', 'dac lac'],
   'mt-daknong': ['dak nong', 'daknong', 'dac nong'],
   'mn-dalat': ['da lat', 'lam dong'],
+}
+
+// The short codes printed under a station name ("PY", "TTH"...), as xskt sites write them. A header word equal to one of them
+// names the station even when the long name was not read. Same table as the app (lottery_columns.dart `_codes`).
+const CODES = {
+  'mt-hue': ['tth', 'hue'], 'mt-phuyen': ['py'], 'mt-daklak': ['dlk', 'dl'], 'mt-quangnam': ['qnm', 'qna'], 'mt-danang': ['dng', 'dna'],
+  'mt-khanhhoa': ['kh'], 'mt-binhdinh': ['bdi', 'bd'], 'mt-quangtri': ['qt'], 'mt-quangbinh': ['qb'], 'mt-gialai': ['gl'],
+  'mt-ninhthuan': ['nt'], 'mt-quangngai': ['qng', 'qgi'], 'mt-daknong': ['dno', 'dnn'], 'mt-kontum': ['kt'],
+  'mn-tphcm': ['hcm', 'tp'], 'mn-dongthap': ['dt'], 'mn-camau': ['cm'], 'mn-bentre': ['bt'], 'mn-vungtau': ['vt'], 'mn-baclieu': ['bl'],
+  'mn-dongnai': ['dn'], 'mn-cantho': ['ct'], 'mn-soctrang': ['st'], 'mn-tayninh': ['tn'], 'mn-angiang': ['ag'], 'mn-binhthuan': ['bth'],
+  'mn-vinhlong': ['vl'], 'mn-binhduong': ['bd'], 'mn-travinh': ['tv'], 'mn-longan': ['la'], 'mn-binhphuoc': ['bp'], 'mn-haugiang': ['hg'],
+  'mn-tiengiang': ['tg'], 'mn-kiengiang': ['kg'], 'mn-dalat': ['dl'],
+}
+const headerCodes = (headerText) => fold(headerText).split(' ').filter((w) => w.length >= 2 && w.length <= 4)
+
+/** The station a header names by its short code alone, when the code belongs to exactly one station ("PY" yes; "DL" and "BD" belong to two). */
+export function stationFromCode(headerText) {
+  for (const w of headerCodes(headerText)) {
+    const owners = Object.keys(CODES).filter((id) => CODES[id].includes(w))
+    if (owners.length === 1) return owners[0]
+  }
+  return null
 }
 
 const SPEC = [
@@ -80,6 +102,9 @@ function headerScore(headerText, id) {
   const words = fold(headerText).split(' ').filter((w) => w && !/^\d+$/.test(w) && !NOISE.has(w))
   const names = [fold(stationName(id)), ...(ALIASES[id] || [])]
   let best = 0
+  // a short code on its own ("PY", "TTH") is a strong hint too
+  const codes = CODES[id] || []
+  if (headerCodes(headerText).some((w) => codes.includes(w))) best = 0.95
   for (let i = 0; i < words.length; i++)
     for (let n = 1; n <= 3 && i + n <= words.length; n++) {
       const win = words.slice(i, i + n).join(' ')
@@ -146,8 +171,16 @@ export function parseColumns(words) {
   const allY = words.map(centreY)
   const top = allY.length ? Math.min(...allY) : 0
   const span = allY.length ? Math.max(...allY) - top : 0
-  const isDate = (t) => /^\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*(20)?\d{2}$/.test(t) || /^20\d\d$/.test(t)
-  const dateWords = words.filter((w) => isDate(String(w.text || '').trim()) && centreY(w) <= top + span * 0.35)
+  // A bare year ("2026" after "19/10") is part of the date only when a day/month word stands on its row: a prize such as "2052" or
+  // "2024" must never be taken for it (that cut away every row above it: the 2-, 3- and first 4-digit prizes).
+  const isFullDate = (t) => /^\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*(20)?\d{2}$/.test(t)
+  const isDayMonth = (t) => /^\d{1,2}\s*[/.-]\s*\d{1,2}$/.test(t)
+  const isDate = (w) => {
+    const t = String(w.text || '').trim()
+    if (isFullDate(t)) return true
+    return /^20\d\d$/.test(t) && words.some((o) => o !== w && Math.abs(centreY(o) - centreY(w)) <= (w.y1 - w.y0) * 0.6 && isDayMonth(String(o.text || '').trim()))
+  }
+  const dateWords = words.filter((w) => isDate(w) && centreY(w) <= top + span * 0.35)
   const dateTop = dateWords.length ? dateWords.reduce((m, w) => (centreY(w) < centreY(m) ? w : m)) : null
   const cut = dateTop ? centreY(dateTop) + (dateTop.y1 - dateTop.y0) * 0.9 : -Infinity
   const allNums = words
@@ -179,7 +212,7 @@ export function parseColumns(words) {
   for (const col of columns) {
     col.header.sort((a, b) => a.cx - b.cx)
     col.headerText = col.header.map((h) => h.text).join(' ')
-    col.station = matchStation(col.headerText)
+    col.station = matchStation(col.headerText) || stationFromCode(col.headerText)
     // Exactly the 18 numbers of a column were seen: take them by their place in the table, top to bottom, even when one
     // of them has a wrong length (a digit lost or added by the reader). The wrong-length cell is reported and shown red
     // for the user to fix, instead of every row after it shifting out of place.
@@ -216,4 +249,57 @@ export function parseColumns(words) {
   const m = words.map((w) => w.text).join(' ').match(/(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})/)
   const date = m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null
   return { columns: columns.map(({ tokens, header, ...c }) => c), date }
+}
+
+/** The day of the week printed in the photo ("Thứ hai", "Thứ 2", "Chủ nhật" in the top-left cell or the title): 1 = Monday .. 7 = Sunday,
+ *  or null. Only the upper part of the picture is looked at, so a word further down never counts. */
+export function weekdayFromWords(words) {
+  if (!words || !words.length) return null
+  const top = Math.min(...words.map((w) => w.y0))
+  const bottom = Math.max(...words.map((w) => w.y1))
+  const limit = top + (bottom - top) * 0.3
+  const head = words
+    .filter((w) => centreY(w) <= limit)
+    .sort((a, b) => (Math.abs(centreY(a) - centreY(b)) > (a.y1 - a.y0) / 2 ? centreY(a) - centreY(b) : centreX(a) - centreX(b)))
+  const t = ` ${fold(head.map((w) => w.text).join(' '))} `
+  const names = { 1: ['thu hai', 'thu 2'], 2: ['thu ba', 'thu 3'], 3: ['thu tu', 'thu 4'], 4: ['thu nam', 'thu 5'], 5: ['thu sau', 'thu 6'], 6: ['thu bay', 'thu 7'], 7: ['chu nhat'] }
+  for (const [day, list] of Object.entries(names)) if (list.some((n) => t.includes(` ${n} `))) return Number(day)
+  return null
+}
+
+const isoOf = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+function utcDay(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+/** The latest date that is `weekday` (1 Monday .. 7 Sunday): the day `fromIso` itself or up to 6 days before it. */
+export function dateOfWeekdayOnOrBefore(weekday, fromIso) {
+  const d = utcDay(fromIso)
+  while ((d.getUTCDay() || 7) !== weekday) d.setUTCDate(d.getUTCDate() - 1)
+  return isoOf(d)
+}
+
+/** The photo has no readable date: the latest day, `fromIso` or up to 6 days before, on which every station in `ids` draws. With
+ *  `columnCount` (the columns of the photo) a day that has exactly that many stations is a better fit than one with more (Thừa Thiên
+ *  Huế draws on Monday with Phú Yên and on Sunday with two others). One station that draws on two weekdays says nothing about which:
+ *  only a single fit (or two or more stations) decides. Null when there is none. */
+export function inferDateFromStations(regionId, ids, fromIso, columnCount) {
+  const want = new Set(ids)
+  if (want.size === 0 || !fromIso) return null
+  const days = []
+  for (let back = 0; back <= 6; back++) {
+    const d = utcDay(fromIso)
+    d.setUTCDate(d.getUTCDate() - back)
+    const iso = isoOf(d)
+    const on = stationsOn(regionId, iso)
+    if ([...want].every((id) => on.includes(id))) days.push({ iso, n: on.length })
+  }
+  let fit = days
+  if (columnCount != null) {
+    const exact = days.filter((d) => d.n === columnCount)
+    if (exact.length) fit = exact
+  }
+  if (!fit.length) return null
+  return want.size >= 2 || fit.length === 1 ? fit[0].iso : null
 }

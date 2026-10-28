@@ -6,7 +6,7 @@ import { api } from '../../lib/api'
 import { loadAllEntries } from '../../lib/offline'
 import { loadStations, regionList, regionOf, stationName, stationsOn } from '../../lib/lotteryStations'
 import { useStations } from '../../lib/useStations'
-import { assignStations, parseColumns } from '../../lib/lotteryColumns'
+import { assignStations, dateOfWeekdayOnOrBefore, inferDateFromStations, parseColumns, weekdayFromWords } from '../../lib/lotteryColumns'
 import { showConfirm } from '../../lib/confirm'
 import { today } from '../../lib/dates'
 import {
@@ -32,6 +32,9 @@ export function useResults() {
   })
   const [region, setRegionState] = useState('mb')
   const [extra, setExtra] = useState([])
+  // After a photo was read: only the stations that are in it are shown (the other stations of the day are hidden until the day, the
+  // region or the table is changed; "+ Đài khác" still adds them). null = show the whole day.
+  const [photoOnly, setPhotoOnly] = useState(null)
   const [forms, setForms] = useState({})
   const [saved, setSaved] = useState({})
   const [read, setRead] = useState({}) // column filled from a photo
@@ -56,7 +59,8 @@ export function useResults() {
 
   const structure = regionOf(region).structure
   const scheduled = stationsOn(region, date)
-  const choices = joinStations(scheduled, extra)
+  const allChoices = joinStations(scheduled, extra)
+  const choices = photoOnly ? allChoices.filter((id) => photoOnly.includes(id)) : allChoices
   const cols = columnsOf(region, choices)
   const curCol = cols.includes(activeCol) ? activeCol : cols[0] || ''
   const otherStations = Object.keys(regionOf(region).stations || {}).filter((id) => !choices.includes(id)).map((id) => ({ value: id, label: stationName(id) }))
@@ -122,6 +126,7 @@ export function useResults() {
       skipReload.current = false
       return
     }
+    setPhotoOnly(null)
     loadBoard(region, date)
   }, [region, date, loadBoard])
 
@@ -143,14 +148,18 @@ export function useResults() {
   function addStation(id) {
     if (!id) return
     setExtra((x) => (x.includes(id) ? x : [...x, id]))
+    setPhotoOnly((only) => (only && !only.includes(id) ? [...only, id] : only))
     setForms((all) => ({ ...all, [id]: shapeForm(structure, null) }))
     setSaved((s) => ({ ...s, [id]: false }))
     setActiveCol(id)
   }
   function clearForm() {
-    setForms((all) => Object.fromEntries(cols.map((c) => [c, shapeForm(structure, null)]).concat(Object.entries(all).filter(([k]) => !cols.includes(k)))))
+    // the stations hidden after a photo come back with an empty table
+    const every = columnsOf(region, allChoices)
+    setPhotoOnly(null)
+    setForms((all) => Object.fromEntries(every.map((c) => [c, shapeForm(structure, null)]).concat(Object.entries(all).filter(([k]) => !every.includes(k)))))
     setRead({})
-    setEdit(Object.fromEntries(cols.map((c) => [c, true])))
+    setEdit(Object.fromEntries(every.map((c) => [c, true])))
     setOcr((o) => {
       if (region === 'mb' && o.previewUrl) URL.revokeObjectURL(o.previewUrl)
       return { ...o, warnings: [], error: '', previewUrl: region === 'mb' ? '' : o.previewUrl }
@@ -288,7 +297,14 @@ export function useResults() {
       // which region and day the photo is of: from its title ("XSMT ... 09/10/2026"), else what is selected now
       const text = words.map((w) => String(w.text)).join(' ').toLowerCase()
       const seenRegion = /xsmt/.test(text) ? 'mt' : /xsmn/.test(text) ? 'mn' : region
-      const day = parsed.date || date
+      // the day: the date printed in the photo; else the weekday word ("Thứ hai"); else the recent day on which the stations named in the
+      // headers all draw (the number of columns picks between days); else the selected day
+      let day = parsed.date
+      if (!day) {
+        const weekday = weekdayFromWords(words)
+        const named = parsed.columns.filter((c) => c.station).map((c) => c.station)
+        day = weekday ? dateOfWeekdayOnOrBefore(weekday, date) : inferDateFromStations(seenRegion, named, date, parsed.columns.length) || date
+      }
       assignStations(parsed.columns, stationsOn(seenRegion, day))
       let note = ''
       if (seenRegion !== region || day !== date) {
@@ -315,6 +331,7 @@ export function useResults() {
       }
       setForms((all) => ({ ...all, ...nextForms }))
       setRead(nextRead)
+      setPhotoOnly(parsed.columns.filter((c) => c.station).map((c) => c.station))
       patchOcr({ note, warnings })
       setSaveMsg('Đã điền bảng từ ảnh. Kiểm tra các ô (ô đỏ là chưa đủ hoặc sai độ dài) rồi bấm "Lưu kết quả".')
     } catch (err) {
