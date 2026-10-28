@@ -5,6 +5,7 @@ import RecoveryCodePanel from '@/components/RecoveryCodePanel'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/authStore'
 import { showConfirm } from '@/lib/confirm'
+import ChatDevicesCard from './ChatDevicesCard'
 import { fmtSeen } from './accountLogic'
 import PrivacySettings from './PrivacySettings'
 
@@ -89,6 +90,9 @@ export default function DevicesTab() {
           </div>
         )}
       </div>
+
+      {/* Admin accounts have no friend chat, so no chat devices. */}
+      {!isAdmin && <ChatDevicesCard />}
 
       {/* Mã khôi phục + quyền riêng tư */}
       <div className="acct-top">

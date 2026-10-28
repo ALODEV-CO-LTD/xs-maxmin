@@ -152,7 +152,7 @@ test('stats: tones, delta, bar plot geometry', () => {
   assert.deepEqual(A.deltaOf({ current: 150, previous: 100 }), { delta: 50, pct: 50 })
   assert.deepEqual(A.deltaOf({ current: 10, previous: 0 }), { delta: 10, pct: null })
   assert.deepEqual(A.deltaOf({ current: 10, previous: null }), { delta: null, pct: null })
-  assert.deepEqual(A.STAT_METRICS.map((m) => m.label), ['Tiền gửi', 'Tiền trúng', 'Lợi nhuận'])
+  assert.deepEqual(A.STAT_METRICS.map((m) => m.label), ['Tiền khách gửi', 'Tiền khách trúng', 'Lợi nhuận'])
   assert.deepEqual(A.STAT_UNITS.map((u) => u.range), ['30 ngày gần nhất', '12 tuần gần nhất', '12 tháng gần nhất', '5 năm gần nhất'])
 
   const series = Array.from({ length: 30 }, (_, i) => ({ key: 'k' + i, label: String(i), full: 'd' + i, value: i === 3 ? -50 : i * 10 }))

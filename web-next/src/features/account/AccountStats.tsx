@@ -15,7 +15,7 @@ import { BAR_H, BAR_PAD, STAT_METRICS, STAT_UNITS, barPlot, barTone, deltaOf, fm
 import { loadMoney } from './statsLoad'
 
 // Thống kê tab of Tài khoản: roster size, number of plays, money sent / won and profit (same money as Tính điểm).
-// One card: metric (Tiền gửi / Tiền trúng / Lợi nhuận) + period (Ngày / Tuần / Tháng / Năm), a summary strip for the
+// One card: metric (Tiền khách gửi / Tiền khách trúng / Lợi nhuận) + period (Ngày / Tuần / Tháng / Năm), a summary strip for the
 // visible range (vs the previous range), the bar chart and the fixed totals. Aggregation: lib/statsSeries.js.
 // API: GET /me/customers, GET /me/entries (all pages, cached offline), GET /me/scoring-settings, GET /lottery-results
 type Money = { byDate: Record<string, any>; customers: number; plays: number } // eslint-disable-line @typescript-eslint/no-explicit-any

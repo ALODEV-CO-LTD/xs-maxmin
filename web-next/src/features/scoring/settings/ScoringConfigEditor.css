@@ -12,6 +12,19 @@
   gap: 8px;
   margin-bottom: 12px;
 }
+/* The region tabs and the Sửa button stay put while the table scrolls under them (the Lưu row is already sticky at the
+   bottom while editing): the standalone page sticks under the 64px header, the dialog (customer settings) at its own top. */
+.sce-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+  padding: 8px 0;
+  background: var(--background);
+}
+.settings-embedded .sce-bar,
+.md-box .sce-bar {
+  top: 0;
+}
 .sce-tabs {
   display: flex;
   flex-wrap: wrap;

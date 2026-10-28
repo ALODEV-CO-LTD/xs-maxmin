@@ -221,8 +221,8 @@ export const STAT_UNITS = [
   { key: 'year', label: 'Năm', range: '5 năm gần nhất', prev: '5 năm trước đó', current: 'Năm nay', before: 'năm trước' },
 ]
 export const STAT_METRICS = [
-  { key: 'vao', label: 'Tiền gửi' },
-  { key: 'ra', label: 'Tiền trúng' },
+  { key: 'vao', label: 'Tiền khách gửi' },
+  { key: 'ra', label: 'Tiền khách trúng' },
   { key: 'profit', label: 'Lợi nhuận' },
 ]
 export const statTone = (metric, n) => (metric === 'profit' ? (n >= 0 ? 'pos' : 'neg') : '')
